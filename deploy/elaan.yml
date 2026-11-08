@@ -1,10 +1,8 @@
-title: "Kitchen parchi par order note ka wazeh status"
-audience: pos
-categories:
-  - restaurant
-  - hotel
+title: "Mehfooz login aur support case ki behtar jaanch"
+audience: all
 type: improvement
 points:
-  - "Order note likhte waqt ab nazar aayega ke woh kitchen parchi par aayega ya notes ka switch band hai."
-  - "Ijazat rakhne wala owner ya manager note ke paas se hi shop ki KOT par order notes ON kar sakta hai."
-  - "Pehle bheji hui kitchen parchi par naya note khud nahi pohanchta; aisi tabdeeli kitchen ko alag se batayein."
+  - "Two-step login apni marzi se on kar sakte hain. Recovery codes ek martaba dikhte hain; unhein mehfooz jagah rakh lein."
+  - "Account Profile se password badalne par doosre purane browsers ko dobara login karna hoga; password badalne wala browser chalta rahega."
+  - "Company band karne ki request password se tasdeeq hoti hai; request dete hi account ya bills delete nahi hote."
+  - "Support team shikayat ke saath zimmedar afsar, priority, waqt aur related messages ka record rakh sakti hai. Sirf jawab bhejne se shikayat solved mark nahi hoti."

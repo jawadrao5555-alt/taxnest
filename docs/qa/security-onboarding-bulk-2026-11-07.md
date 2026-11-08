@@ -1,4 +1,81 @@
-# Security and onboarding bulk — P1
+# Security, onboarding and support release — PR #365
+
+## Current release contract
+
+This branch integrates deployed PRs #363/#364 and current main
+`559e499aedc02018438dc71bd4d08c718a909c00`. Existing purchase snapshots, billing
+documents, diagnostics, fiscal identity, numbering, saved preferences and Agent
+pairing remain in place. Browser, native and billing probes from both releases
+are retained. Merge conflicts are resolved by retaining both sets of journeys
+and fixtures, not by dropping either branch's acceptance.
+
+| Area | Implemented behavior | Required acceptance |
+| --- | --- | --- |
+| Recovery and login | Expiring, bounded-attempt, single-use reset grants; per-guard generations; optional default-OFF authenticator/recovery anti-replay | Auth HTTP set, concurrent native reset/two-step probes, independent Chromium sessions |
+| Profile password | Current locked stored password, atomic credential/generation/remember-token rotation; requesting browser remains signed in | PasswordUpdateTest and real profile form with a second browser refused |
+| Company deletion | Fresh password rechecked under lock; verified durable request, seven-day hold, restore and separate database/private-file cleanup evidence | Profile/lifecycle HTTP and native concurrent request/restore proofs |
+| Administrator authority | Persisted billing/lifecycle/release/configuration/super-admin checks before mutation; retained history without write controls or machine keys | Capability HTTP matrix and real 1366/390 pages/direct negative requests |
+| Integrated billing | New #363 financial-adjustment POST refuses revoked billing authority before input handling; documents use persisted readers; adjustment form uses fresh capability | Purchased-billing compatibility and capability tests |
+| Delegation and devices | Read-only impersonation, audited manage-as, refreshed consultant/OAuth/viewer/Agent lifecycle decisions | Revocation/impersonation/Reporting/Agent regressions |
+| Restored access | Confirmed operator quarantine revokes restored reset/reporting/consultant paths; durable epoch refuses stale authenticated sessions across file/cookie/Redis/database stores; remember tokens cleared | Native command plus actual file-session Chromium drill, fresh-password relogin and unchanged companies/Agent pairing |
+| Guided setup/import | Validated saved setup or explicit skip; preview/fingerprint/one-claim posting; existing configurations preserved | Onboarding/import HTTP tests and desktop/mobile journeys |
+| Consent and exports | Versioned Healthcare grant/withdrawal; optional support-copy consent/key quarantine; owned expiring invoice exports use explicit POST progress and retain source/history | Consent, export retention, native expiry and browser checks |
+| Support lifecycle | Company, owner, priority, explicit SLA, build-backed resolution/reopen; append-only same-company related/duplicate case links | Migrated HTTP/native and actual owner/priority/SLA/link/resolve/reopen forms |
+| Reply evidence | Only a successful explicit source-linked mail reply records transport acceptance; it never asserts customer delivery/acknowledgement or resolves the case | Mocked SMTP success/failure/compose coverage; no real messages |
+| Customer experience | Existing notification targeting/read persistence, tutorials, themes and language settings remain; controls retain labels and mobile/keyboard access | Existing notification/tutorial/general browser acceptance |
+
+Related/duplicate links use canonically ordered case IDs, row locks and a unique
+identity. Reversed retries create one link and one event on each case. Both case
+rows, statuses and resolution history remain unchanged. The source message stays
+inside its original company case; no cross-company evidence is disclosed. The
+first undeployed support schema previously used a restrictive company foreign
+key, which an actual purge regression reproduced as an integrity failure. The
+release schema instead retains original company identity/name snapshots and
+nulls only the live company reference on a reviewed purge. Case/event/link
+history survives, read links still enforce original company identity, and new
+links are refused after company purge. The deletion manifest records that
+retained support-evidence disposition without inventing a statutory policy.
+
+The restore browser drill is isolated from ordinary seeded recovery journeys:
+it uses the real command only against the guarded disposable `rc-browser`
+database with file sessions, proves stale-admin refusal and fresh login at both
+viewports, then rebuilds that fixture. It is not run inside a general journey
+that would invalidate another viewport's prepared reset grant.
+
+## Data-flow and preservation boundaries
+
+| Data family | Existing boundary retained by this release |
+| --- | --- |
+| Fiscal/accounting and purchased billing | Exact company/product, immutable fiscal/document references, existing business retention; no automatic fiscal submission or rewrite |
+| AI, Caller ID and messaging | Existing saved feature/provider preferences and scoped endpoints; capability changes do not silently enable, consent to or send anything |
+| Healthcare | Branch/role scope, versioned recorded consent and withdrawal; no patient/clinical records used for testing |
+| Optional local-bill support copies | Explicit consent/expiry and separate keys; confirmed restored-copy quarantine preserves its established destruction policy |
+| Support | Explicit administrator company attribution, same-company case links and immutable timeline; transport acceptance remains separate from acknowledgement/resolution |
+| Exports and deletion | Owned expiring invoice/audit exports; verified request and recoverable bin policy; source/history and private-file cleanup evidence remain distinct |
+| Recovery/operator evidence | Restore identifier retained as a hash, revocation counts and Agent digest; no password, raw token or message body in new restore evidence |
+
+Production backup freshness/RPO/RTO, physical-backup erasure, a production restore,
+whole-company portability export, universal statutory-retention decisions and
+new greeting/assistant/product-publication programmes are not established by
+this release. Existing policies are preserved, and broad planning trackers
+#320/#321/#337 remain open. The synthetic restore drill establishes access
+containment and preservation only; it does not make those broader claims.
+
+## Verification gate
+
+Fresh exact-head PHP8.4/full suite, native MariaDB, Chromium at 1366/390, Node/
+Agent/Android, locked build, exact-SHA manifest, workflow safety and final validate
+are mandatory. Local PHP8.3/SQLite checks are supplemental. Published current-head
+CI evidence and approval readiness are recorded in the PR description. No
+production credentials, customer data, mail, fiscal requests, approval, merge or
+deployment are used to prepare this release.
+
+## Historical implementation evidence
+
+The chronological notes below refer to earlier incremental heads. Their WIP,
+Draft and pending-CI statements are historical, not the current PR status.
+
+### Earlier security and onboarding ledger
 
 ## Fresh owner password for deployment approval
 

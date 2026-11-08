@@ -170,6 +170,7 @@ class PosPaidAddonFlowTest extends TestCase
             $table->integer('free_invoice_limit')->nullable();
             $table->text('override_reason')->nullable();
             $table->unsignedBigInteger('override_by')->nullable();
+            $table->text('purchase_snapshot')->nullable();
             $table->timestamps();
         });
 
@@ -336,7 +337,9 @@ class PosPaidAddonFlowTest extends TestCase
     private function approve(PaymentProof $proof, array $payload = [])
     {
         return $this->actingAs($this->admin(), 'admin')
-            ->post(route('saas.admin.payment-proofs.approve', $proof->id), $payload);
+            ->post(route('saas.admin.payment-proofs.approve', $proof->id), array_merge([
+                'verified_received_amount' => (float) $proof->amount,
+            ], $payload));
     }
 
     // ─── 1. who may buy ──────────────────────────────────────────────────
@@ -1013,6 +1016,47 @@ class PosPaidAddonFlowTest extends TestCase
         $addon = PosAddon::where('company_id', $company->id)->firstOrFail();
         $this->assertEquals($quotedAmount, (float) $addon->amount);
         $this->assertEquals($quotedAmount, (float) $proof->fresh()->amount);
+    }
+
+    public function test_pending_addon_approval_uses_the_frozen_purchased_plan_after_catalogue_gate_edit(): void
+    {
+        $plan = $this->makePlan('Business');
+        $company = $this->makeShop($plan);
+        $subscription = Subscription::where('company_id', $company->id)->firstOrFail();
+
+        // Freeze the package exactly as assignment does. Caller ID was an
+        // optional add-on when this shop bought its package and filed proof.
+        DB::table('subscriptions')->where('id', $subscription->id)->update([
+            'purchase_snapshot' => json_encode([
+                'version' => 1,
+                'company_id' => $company->id,
+                'plan' => [
+                    'id' => $plan->id,
+                    'name' => 'Business',
+                    'product_type' => 'pos',
+                    'is_trial' => false,
+                    'caller_id_enabled' => false,
+                    'rider_tracking_enabled' => false,
+                ],
+            ], JSON_THROW_ON_ERROR),
+        ]);
+
+        $this->buy($company, ['caller_id'], 'annual');
+        $proof = PaymentProof::firstOrFail();
+        $quotedAmount = (float) $proof->amount;
+
+        // A later catalogue edit controls new sales only. It must not rewrite
+        // the purchased package or invalidate this already quoted proof.
+        PricingPlan::whereKey($plan->id)->update(['caller_id_enabled' => true]);
+        PosAddonService::flushCache();
+
+        $this->approve($proof)->assertSessionHasNoErrors();
+
+        $addon = PosAddon::where('company_id', $company->id)->where('addon_code', 'caller_id')->firstOrFail();
+        $this->assertSame('verified', $proof->fresh()->status);
+        $this->assertEquals($quotedAmount, (float) $addon->amount);
+        $this->assertSame($subscription->id, (int) $addon->subscription_id);
+        $this->assertTrue((bool) PricingPlan::findOrFail($plan->id)->caller_id_enabled);
     }
 
     public function test_activate_refuses_to_invent_an_expiry(): void

@@ -38,7 +38,7 @@ if (($argv[1] ?? '') === 'worker') {
         usleep(10000);
     }
     $record = app(CompanyDeletionLifecycle::class)->requestByOwner(
-        Company::findOrFail((int) $companyId), User::findOrFail((int) $userId), 'Concurrent verified synthetic request'
+        Company::findOrFail((int) $companyId), User::findOrFail((int) $userId), 'Concurrent verified synthetic request', 'SyntheticOwner123!'
     );
     echo 'REQUEST_ID='.$record->id."\n";
     exit(0);

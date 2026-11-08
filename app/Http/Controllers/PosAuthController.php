@@ -296,35 +296,41 @@ class PosAuthController extends Controller
             $request->input('billing_cycle')
         );
 
-        $company = Company::create($companyData);
+        // Company, owner, credential ledger and zero-price trial are one unit.
+        // Never sign in or consume the referral session after a partial signup.
+        $user = \Illuminate\Support\Facades\DB::transaction(function () use ($request, $companyData) {
+            $company = Company::create($companyData);
+
+            $userData = [
+                'name' => $request->name,
+                'email' => $request->email,
+                'phone' => $request->phone,
+                'password' => Hash::make($request->password),
+                'company_id' => $company->id,
+                'role' => 'company_admin',
+                'pos_role' => 'pos_admin',
+                'is_active' => true,
+            ];
+            // Guest language picker on the register page: keep the language the
+            // user chose before signing up. hasColumn = PROD schema-drift guard.
+            $guestLang = $request->session()->get(\App\Support\PosLocale::SESSION_KEY);
+            if (\App\Support\PosLocale::isValid($guestLang)
+                && \Illuminate\Support\Facades\Schema::hasColumn('users', 'language')) {
+                $userData['language'] = $guestLang;
+            }
+            $user = User::create($userData);
+
+            CredentialLedgerService::record([
+                'email' => $request->email,
+                'phone' => $request->phone,
+                'ntn' => $request->company_ntn,
+            ], $company->id, 'pos');
+
+            $this->startTrial($company->id, 'pos');
+
+            return $user;
+        });
         $request->session()->forget(\App\Services\AgentReferralService::SESSION_KEY);
-
-        $userData = [
-            'name' => $request->name,
-            'email' => $request->email,
-            'phone' => $request->phone,
-            'password' => Hash::make($request->password),
-            'company_id' => $company->id,
-            'role' => 'company_admin',
-            'pos_role' => 'pos_admin',
-            'is_active' => true,
-        ];
-        // Guest language picker on the register page: keep the language the
-        // user chose before signing up. hasColumn = PROD schema-drift guard.
-        $guestLang = $request->session()->get(\App\Support\PosLocale::SESSION_KEY);
-        if (\App\Support\PosLocale::isValid($guestLang)
-            && \Illuminate\Support\Facades\Schema::hasColumn('users', 'language')) {
-            $userData['language'] = $guestLang;
-        }
-        $user = User::create($userData);
-
-        CredentialLedgerService::record([
-            'email' => $request->email,
-            'phone' => $request->phone,
-            'ntn' => $request->company_ntn,
-        ], $company->id, 'pos');
-
-        $this->startTrial($company->id, 'pos');
 
         Auth::guard('pos')->login($user);
 

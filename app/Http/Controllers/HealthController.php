@@ -8,6 +8,7 @@ use App\Services\HealthAccessService;
 use App\Services\HealthModuleService;
 use App\Services\HealthPlatformService;
 use App\Services\HealthScopeService;
+use App\Services\SubscriptionBillingHistory;
 use App\Support\HealthPanel;
 use App\Support\PosLocale;
 use Illuminate\Http\Request;
@@ -204,16 +205,24 @@ class HealthController extends Controller
     {
         $company = $this->company();
         $user = $this->user();
+        $isOwner = HealthAccessService::isOwner($user);
 
         return view('health.settings', [
             'company' => $company,
             'orgType' => HealthPlatformService::orgType($company),
             'enabledModules' => HealthModuleService::enabled($company),
-            'isOwner' => HealthAccessService::isOwner($user),
+            'isOwner' => $isOwner,
             'plan' => HealthPlatformService::activePlan($company),
             'departmentCount' => HealthDepartment::query()->count(),
             'departmentLimit' => HealthPlatformService::departmentLimit($company),
             'fbrReadiness' => HealthPlatformService::fbrReadiness($company),
+            'billingHistory' => $isOwner
+                ? SubscriptionBillingHistory::forCompany((int) $company?->id, 'health_billing_history_page')
+                : null,
+            'billingDocumentRoutes' => [
+                'invoice' => 'health.billing.documents.invoice',
+                'receipt' => 'health.billing.documents.receipt',
+            ],
         ]);
     }
 

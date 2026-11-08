@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 $database = getenv('DB_DATABASE') ?: '';
 $socket = getenv('DB_SOCKET') ?: '';
-if (getenv('APP_ENV') !== 'rc-mariadb' || !getenv('LD_PRELOAD')
-    || !preg_match('/^taxnest_rc_[a-z0-9_]+_full$/D', $database)
-    || !preg_match('#^/tmp/taxnest-rc-mariadb-[a-z0-9_]+/run/mariadb.sock$#D', $socket)) {
+if (getenv('APP_ENV') !== 'rc-mariadb' || ! getenv('LD_PRELOAD')
+    || ! preg_match('/^taxnest_rc_[a-z0-9_]+_full$/D', $database)
+    || ! preg_match('#^/tmp/taxnest-rc-mariadb-[a-z0-9_]+/run/mariadb.sock$#D', $socket)) {
     fwrite(STDERR, "FAIL unsafe restore security quarantine target\n");
     exit(2);
 }
@@ -15,8 +15,12 @@ require dirname(__DIR__, 2).'/vendor/autoload.php';
 $app = require dirname(__DIR__, 2).'/bootstrap/app.php';
 $app->make(\Illuminate\Contracts\Console\Kernel::class)->bootstrap();
 
-use App\Models\{AdminUser, Company, User};
-use Illuminate\Support\Facades\{Artisan, DB, Hash};
+use App\Models\AdminUser;
+use App\Models\Company;
+use App\Models\User;
+use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 
 $suffix = bin2hex(random_bytes(8));
@@ -79,6 +83,7 @@ DB::table('consultant_client_links')->insert([
     'created_at' => now(), 'updated_at' => now(),
 ]);
 
+DB::table('admin_users')->where('id', $admin->id)->update(['remember_token' => str_repeat('r', 60)]);
 $restoreId = 'native-restore-'.$suffix;
 if (Artisan::call('security:restore-quarantine', [
     '--restore-id' => $restoreId,
@@ -88,17 +93,17 @@ if (Artisan::call('security:restore-quarantine', [
 }
 $generation = (string) $owner->fresh()->session_generation;
 $evidence = DB::table('restore_security_quarantines')->where('restore_reference_hash', hash('sha256', $restoreId))->first();
-if (!Str::isUuid($generation)
+if (! Str::isUuid($generation)
     || $generation === '11111111-1111-4111-8111-111111111111'
     || DB::table('sessions')->exists()
     || DB::table('password_reset_tokens')->exists()
-    || !(bool) DB::table('password_reset_otps')->value('used')
+    || ! (bool) DB::table('password_reset_otps')->value('used')
     || DB::table('password_reset_otps')->value('reset_grant_hash') !== null
     || DB::table('reporting_oauth_grants')->value('revoked_at') === null
     || DB::table('reporting_oauth_access_tokens')->exists()
     || DB::table('reporting_oauth_refresh_tokens')->exists()
     || DB::table('consultant_client_links')->value('status') !== 'revoked'
-    || !$evidence || $evidence->status !== 'completed'
+    || ! $evidence || $evidence->status !== 'completed'
     || $companyBefore !== (array) DB::table('companies')->where('id', $company->id)->first()) {
     throw new RuntimeException('Native restore quarantine revocation or Agent/business preservation failed.');
 }
@@ -110,5 +115,22 @@ if (Artisan::call('security:restore-quarantine', [
     || DB::table('restore_security_quarantines')->where('restore_reference_hash', hash('sha256', $restoreId))->count() !== 1) {
     throw new RuntimeException('Native restore quarantine was not idempotent.');
 }
+
+$request = \Illuminate\Http\Request::create('/admin/restore-fixture', 'GET');
+$request->setLaravelSession(app('session')->driver());
+app()->instance('request', $request);
+auth('admin')->setUser($admin);
+$boundary = app(\App\Http\Middleware\RestoreSessionBoundary::class);
+$refused = $boundary->handle($request, fn () => response('UNEXPECTED'));
+if ($refused->getStatusCode() !== 302 || auth('admin')->check()
+    || DB::table('admin_users')->where('id', $admin->id)->value('remember_token') !== null) {
+    throw new RuntimeException('Native stale external-session or remember-cookie boundary failed.');
+}
+auth('admin')->login($admin->fresh());
+$accepted = $boundary->handle($request, fn () => response('FRESH'));
+if ($accepted->getStatusCode() !== 200 || $accepted->getContent() !== 'FRESH') {
+    throw new RuntimeException('Native fresh-login restore boundary failed.');
+}
+echo "PASS: native restore epoch refuses stale administrator sessions and remember cookies; fresh login succeeds\n";
 
 echo "PASS: native post-restore quarantine revokes browser, reset, reporting and consultant access; company rows and Agent pairing remain exact\n";

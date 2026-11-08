@@ -130,6 +130,29 @@ export async function securityOnboardingWorkflow(page,t,v,{baseUrl,login,saveEvi
   await Promise.all([page.waitForNavigation(),page.getByRole('button',{name:'Turn off two-step login',exact:true}).click()]);
   await page.getByRole('button',{name:'Set up two-step login',exact:true}).waitFor();
 
+  const otherPasswordContext=await page.context().browser().newContext({viewport:v,serviceWorkers:'block'});
+  await otherPasswordContext.route('**/*',r=>loopback(new URL(r.request().url()).hostname)?r.continue():r.abort('blockedbyclient'));
+  try {
+    const otherPasswordPage=await otherPasswordContext.newPage();
+    await login(otherPasswordPage,{...t,login:fixture.reset.email,password:fixture.reset.newPassword});
+    await otherPasswordPage.goto(baseUrl+'/onboarding',{waitUntil:'domcontentloaded'});
+    await otherPasswordPage.getByRole('heading',{name:"Let's set up your account",exact:true}).waitFor();
+    await page.goto(baseUrl+'/profile',{waitUntil:'domcontentloaded'});
+    const passwordForm=page.locator('form[action$="/password"]');
+    const nextPassword=fixture.reset.newPassword+'Updated';
+    await passwordForm.locator('[name="current_password"]').fill(fixture.reset.newPassword);
+    await passwordForm.locator('[name="password"]').fill(nextPassword);
+    await passwordForm.locator('[name="password_confirmation"]').fill(nextPassword);
+    await Promise.all([page.waitForNavigation(),passwordForm.getByRole('button',{name:'Save',exact:true}).click()]);
+    await page.locator('form[action$="/password"]').getByText('Saved.',{exact:true}).waitFor();
+    fixture.reset.newPassword=nextPassword;
+    await otherPasswordPage.goto(baseUrl+'/onboarding',{waitUntil:'domcontentloaded'});
+    if(new URL(otherPasswordPage.url()).pathname!=='/login')throw Error('Other browser retained access after profile password change');
+    await page.goto(baseUrl+'/profile',{waitUntil:'domcontentloaded'});
+    if(new URL(page.url()).pathname!=='/profile')throw Error('Password change revoked its own current session');
+    await saveEvidenceScreenshot(page,'rc-security-password-change-revocation-'+v.width);
+  } finally {await otherPasswordContext.close();}
+
   // The owner-facing delete control must create a verified company request,
   // never delete only the owner's login or silently remove business records.
   await page.goto(baseUrl+'/profile',{waitUntil:'domcontentloaded'});
@@ -357,6 +380,8 @@ export async function securityOnboardingWorkflow(page,t,v,{baseUrl,login,saveEvi
   await page.goto(baseUrl+'/admin/system-control',{waitUntil:'domcontentloaded'});
   await page.getByText('System health is visible, but emergency controls are read-only for this account.',{exact:true}).waitFor();
   if(await page.locator('form[action*="/admin/system-control/"]').count())throw Error('Viewer received emergency system-control form');
+  const adjustmentForbidden=await page.request.post(baseUrl+'/admin/companies/'+fixture.reset.companyId+'/billing/adjustments',{form:{_token:billingCsrf},maxRedirects:0});
+  if(adjustmentForbidden.status()!==403)throw Error('Viewer retained financial-adjustment mutation authority');
   const systemForbidden=await page.request.post(baseUrl+'/admin/system-control/synthetic-browser-refusal/toggle',{form:{_token:billingCsrf},maxRedirects:0});
   if(systemForbidden.status()!==403)throw Error('Viewer emergency system-control POST not refused');
   await saveEvidenceScreenshot(page,'rc-security-system-controls-viewer-'+v.width);
@@ -374,6 +399,11 @@ export async function securityOnboardingWorkflow(page,t,v,{baseUrl,login,saveEvi
   await page.getByText('URGENT',{exact:true}).first().waitFor();
   await page.getByText('Priority changed from NORMAL to URGENT.',{exact:true}).waitFor();
   await page.getByText('SLA due changed from UNSET to 2030-01-01T12:00:00+05:00.',{exact:true}).waitFor();
+  await page.getByLabel('Related case number',{exact:true}).fill(String(fixture.relatedSupportCaseId));
+  await page.getByLabel('Link type',{exact:true}).selectOption('duplicate');
+  await page.getByLabel('Link evidence note',{exact:true}).fill('Synthetic duplicate message, separately retained.');
+  await Promise.all([page.waitForNavigation(),page.getByRole('button',{name:'Link case evidence',exact:true}).click()]);
+  await page.getByRole('link',{name:'Duplicate case #'+fixture.relatedSupportCaseId,exact:true}).waitFor();
   const build='rc-security-'+v.width;
   await page.getByLabel('Resolution build / release',{exact:true}).fill(build);
   await page.getByLabel('Resolution evidence',{exact:true}).fill('Synthetic desktop/mobile support acceptance passed.');
@@ -385,5 +415,5 @@ export async function securityOnboardingWorkflow(page,t,v,{baseUrl,login,saveEvi
   await page.getByText('REOPENED',{exact:true}).waitFor();
   if(await page.getByText('Synthetic recurrence received after explicit resolution.',{exact:true}).count()!==1)throw Error('Support reopen evidence missing from timeline');
   await saveEvidenceScreenshot(page,'rc-security-support-case-'+v.width);
-  pass('SECURITY ONBOARDING PASS: '+v.width+': incomplete setup refused, explicit skip, configured completion, actual password form and independent old-session revocation/fresh login; optional two-step enrollment, fresh authenticator login, single-use recovery and disable; password-verified company deletion request retains the owner/company pending review; Local Bills Viewer password reset revokes the old browser and permits a fresh login; billing, legacy company/feature/configuration mutations, customer-update, tutorial, announcement, survey, sensitive configuration and emergency system controls stay read-only for viewer; Live Ops, Live Activity, agent claims, reporting consent and deployment approval stay super-admin-only; durable support ownership, priority, explicit resolution build and reopen timeline');
+  pass('SECURITY ONBOARDING PASS: '+v.width+': incomplete setup refused, explicit skip, configured completion, actual password form and independent old-session revocation/fresh login; optional two-step enrollment, fresh authenticator login, single-use recovery and disable; password-verified company deletion request retains the owner/company pending review; Local Bills Viewer password reset revokes the old browser and permits a fresh login; billing, legacy company/feature/configuration mutations, customer-update, tutorial, announcement, survey, sensitive configuration and emergency system controls stay read-only for viewer; Live Ops, Live Activity, agent claims, reporting consent and deployment approval stay super-admin-only; durable support ownership, priority, same-company duplicate links, explicit resolution build and reopen timeline');
 }

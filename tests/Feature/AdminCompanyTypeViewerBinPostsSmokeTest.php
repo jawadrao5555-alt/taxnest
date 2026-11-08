@@ -493,6 +493,22 @@ class AdminCompanyTypeViewerBinPostsSmokeTest extends TestCase
 
     // ── Bin: restore / force delete ──────────────────────────────────────
 
+    public function test_deletion_verifies_current_persisted_password_after_cached_identity_rotation(): void
+    {
+        $id = $this->makeCompany(['name'=>'Synthetic current-password owner']);
+        $ownerId = $this->makeViewer($id, 'admin', ['email'=>'fresh-delete@taxnest.test','role'=>'company_admin']);
+        $owner = \App\Models\User::findOrFail($ownerId);
+        $this->actingAs($owner);
+        DB::table('users')->where('id',$ownerId)->update(['password'=>\Illuminate\Support\Facades\Hash::make('CurrentOwner123!')]);
+        $this->from('/profile')->delete('/profile',['password'=>'OldPass@123'])
+            ->assertSessionHasErrorsIn('userDeletion','password');
+        $this->assertSame(0, DB::table('company_deletion_requests')->count());
+        $this->from('/profile')->delete('/profile',['password'=>'CurrentOwner123!'])
+            ->assertSessionHas('success');
+        $this->assertSame(1, DB::table('company_deletion_requests')->count());
+        $this->assertSame(1, DB::table('companies')->where('id',$id)->count());
+    }
+
     public function test_company_owner_password_verified_delete_endpoint_records_request_without_deleting_data(): void
     {
         $id = $this->makeCompany(['name' => 'Owner Request Co']);

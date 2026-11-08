@@ -48,4 +48,20 @@ class PasswordUpdateTest extends TestCase
             ->assertSessionHasErrorsIn('updatePassword', 'current_password')
             ->assertRedirect('/profile');
     }
+    public function test_current_persisted_password_is_required_and_other_browser_generations_are_revoked(): void
+    {
+        $user = \App\Models\User::factory()->create(['password'=>\Illuminate\Support\Facades\Hash::make('OldOwner123!')]);
+        $this->actingAs($user);
+        \Illuminate\Support\Facades\DB::table('users')->where('id',$user->id)->update(['password'=>\Illuminate\Support\Facades\Hash::make('CurrentOwner123!')]);
+        $this->from('/profile')->put('/password',['current_password'=>'OldOwner123!','password'=>'NewOwner123!','password_confirmation'=>'NewOwner123!'])
+            ->assertSessionHasErrorsIn('updatePassword','current_password');
+        $this->put('/password',['current_password'=>'CurrentOwner123!','password'=>'NewOwner123!','password_confirmation'=>'NewOwner123!'])
+            ->assertSessionHas('status','password-updated');
+        $current = $user->fresh();
+        $this->assertTrue(\Illuminate\Support\Facades\Hash::check('NewOwner123!', $current->password));
+        $this->assertTrue(\Illuminate\Support\Str::isUuid($current->session_generation));
+        $this->assertSame($current->session_generation, session(\App\Http\Middleware\CompanySessionGeneration::key('web'))['generation']);
+        $this->assertNotNull($current->remember_token);
+    }
+
 }

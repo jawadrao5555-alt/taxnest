@@ -59,11 +59,12 @@ class DashboardController extends Controller
             ->where('active', true)
             ->with('pricingPlan')
             ->first();
+        $entitlementPlan = $subscription?->entitlementPlan();
 
         // Package quota is per CALENDAR MONTH and only counts invoices that
         // actually reached FBR — the dashboard must show the same number the
         // gate enforces, otherwise a shop reads "limit finished" on day one.
-        $invoiceLimit = $subscription && $subscription->pricingPlan ? $subscription->pricingPlan->invoice_limit : 0;
+        $invoiceLimit = $entitlementPlan?->invoice_limit ?? 0;
         if ($company && $company->invoice_limit_override !== null) {
             $invoiceLimit = (int) $company->invoice_limit_override;
         }
@@ -71,8 +72,8 @@ class DashboardController extends Controller
         $quotaResetsOn = \App\Services\PlanLimitService::quotaResetsOn();
 
         $planTier = 'retail';
-        if ($subscription && $subscription->pricingPlan) {
-            $planName = strtolower($subscription->pricingPlan->name);
+        if ($entitlementPlan) {
+            $planName = strtolower((string) $entitlementPlan->name);
             // Sep 2026 packages sit on the same tiers their predecessors did:
             // Asaan ~ Business, Kaarobar ~ Industrial, Unlimited ~ Enterprise.
             if (in_array($planName, ['enterprise', 'industrial', 'premium', 'kaarobar', 'unlimited'])) {

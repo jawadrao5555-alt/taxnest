@@ -25,7 +25,7 @@
                 @forelse($cases as $case)
                     <tr>
                         <td class="px-4 py-3"><a class="font-semibold text-emerald-300 hover:text-emerald-200" href="{{ route('saas.admin.support-cases.show', $case) }}">#{{ $case->id }} · {{ $case->subject }}</a></td>
-                        <td class="px-4 py-3 text-gray-300">{{ $case->company?->account_code ? $case->company->account_code.' · ' : '' }}{{ $case->company?->name ?? 'Deleted company record' }}</td>
+                        <td class="px-4 py-3 text-gray-300">{{ $case->company?->account_code ? $case->company->account_code.' · ' : '' }}{{ $case->company?->name ?? $case->company_name_snapshot ?? 'Deleted company record' }}</td>
                         <td class="px-4 py-3"><span class="rounded-full border border-gray-700 px-2 py-1 text-xs font-bold text-gray-300">{{ strtoupper($case->status) }}</span></td>
                         <td class="px-4 py-3 text-gray-300">{{ strtoupper($case->priority ?? \App\Models\SupportCase::PRIORITY_NORMAL) }}</td>
                         <td class="px-4 py-3 text-gray-300">{{ $case->sla_due_at?->format('d M Y, h:i A') ?? 'Not set' }}</td>

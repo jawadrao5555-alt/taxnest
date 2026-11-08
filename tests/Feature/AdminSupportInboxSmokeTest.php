@@ -390,6 +390,20 @@ class AdminSupportInboxSmokeTest extends TestCase
         return $case;
     }
 
+    public function test_linked_reply_retains_transport_evidence_without_claiming_customer_acknowledgement_or_resolution(): void
+    {
+        $case = $this->createSupportCase();
+        $this->mock(SupportMailService::class, fn ($m) => $m->shouldReceive('send')->once());
+        $this->actingAsSuperAdmin()->post('/admin/support-inbox/send', [
+            'to'=>'ali@example.com', 'subject'=>'Synthetic acknowledgement', 'body'=>'We are reviewing this.',
+            'reply_box'=>'inbox', 'reply_uid'=>7, 'in_reply_to'=>'<abc@example.com>',
+        ])->assertRedirect('/admin/support-inbox/inbox/7');
+        $this->assertSame(SupportCase::STATUS_OPEN, $case->fresh()->status);
+        $event = $case->events()->where('event_type','reply_submitted')->sole();
+        $this->assertStringContainsString('not confirmed', $event->note);
+        $this->assertNull($event->resolution_build);
+    }
+
     public function test_reply_send_calls_service_and_redirects(): void
     {
         $this->mock(SupportMailService::class, function ($m) {

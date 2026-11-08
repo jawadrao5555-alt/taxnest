@@ -89,6 +89,10 @@ final class McpController extends Controller
                 'get_pra_day_close_evidence' => $this->reports->dayClose($args, $allowed),
                 'get_pra_operations_evidence' => app(\App\Services\Reporting\PraOperationsEvidence::class)->read($args, $allowed),
                 'get_diagnostic_coverage' => app(DiagnosticCoverage::class)->catalog($args),
+                'get_diagnostic_source_evidence' => app(\App\Services\Reporting\DiagnosticSourceEvidence::class)->read($args, $allowed),
+                'export_diagnostic_source_evidence' => app(\App\Services\Reporting\DiagnosticSourceExport::class)->read($args, $allowed),
+                'get_diagnostic_bill_lookup' => app(\App\Services\Reporting\DiagnosticBillLookup::class)->read($args, $allowed),
+                'get_diagnostic_bill_evidence' => app(\App\Services\Reporting\DiagnosticBillEvidence::class)->read($args, $allowed),
                 default => null,
             };
             if ($result === null) {
@@ -128,6 +132,25 @@ final class McpController extends Controller
             'stream' => ['type' => 'string', 'enum' => ['reports', 'openings', 'counter_closes']],
             'branch_id' => ['type' => 'integer', 'minimum' => 0], 'terminal_id' => ['type' => 'integer', 'minimum' => 0]];
         $defs = [
+            ['export_diagnostic_source_evidence', 'Bounded redacted JSON export of registered source evidence. Reuses exact OAuth company/product/branch/date scope, returns at most 250 rows and an explicit continuation cursor; retained rows never prove collection completeness or health.',
+                array_intersect_key($operationsPeriod, array_flip(['company_name', 'company_id', 'date_from', 'date_to'])) + [
+                    'branch_id' => ['type' => 'integer', 'minimum' => 1, 'description' => 'Optional exact company branch. Unsupported branch sources remain unavailable.'],
+                    'source' => ['type' => 'string', 'enum' => array_keys(\App\Services\Reporting\DiagnosticSourceEvidence::SOURCES)],
+                    'after_id' => ['type' => 'integer', 'minimum' => 0],
+                    'max_rows' => ['type' => 'integer', 'minimum' => 1, 'maximum' => \App\Services\Reporting\DiagnosticSourceExport::MAX_ROWS]],
+                ['company_name', 'date_from', 'source']],
+            ['get_diagnostic_bill_lookup', 'Resolve an exact invoice serial or explicitly dated PRA daily L token to immutable bill IDs. Duplicate references remain ambiguous. No printing or fiscal success inference.',
+                array_intersect_key($operationsPeriod, array_flip(['company_name', 'company_id'])) + [
+                    'reference_kind' => ['type' => 'string', 'enum' => ['invoice_serial', 'pra_daily_token']],
+                    'bill_reference' => ['type' => 'string'], 'counter_date' => ['type' => 'string', 'format' => 'date', 'description' => 'Required for PRA daily token; counter date starts at 06:00 in application timezone.'],
+                    'branch_id' => ['type' => 'integer', 'minimum' => 1]], ['company_name', 'reference_kind', 'bill_reference']],
+            ['get_diagnostic_bill_evidence', 'Bounded explicit bill-to-source record associations for PRA, DI, FBR POS or Healthcare. IDs only; missing links and unsupported streams stay unknown. No replay or fiscal acceptance inference.',
+                array_intersect_key($operationsPeriod, array_flip(['company_name', 'company_id'])) + $cursor + [
+                    'bill_id' => ['type' => 'integer', 'minimum' => 1]], ['company_name', 'bill_id']],
+            ['get_diagnostic_source_evidence', 'Registered source metadata for PRA, DI, FBR POS or Healthcare. At most seven dates. IDs/timestamps only; missing sources and incomplete collection remain explicit. No fiscal requests or retries.',
+                array_intersect_key($operationsPeriod, array_flip(['company_name', 'company_id', 'date_from', 'date_to'])) + $cursor + [
+                    'branch_id' => ['type' => 'integer', 'minimum' => 1, 'description' => 'Optional exact company branch. Sources without a retained branch key return BRANCH_SCOPE_UNAVAILABLE.'],
+                    'source' => ['type' => 'string', 'enum' => array_keys(\App\Services\Reporting\DiagnosticSourceEvidence::SOURCES)]], ['company_name', 'date_from', 'source']],
             ['get_pra_operations_evidence', 'PRA cash source reconciliation, print attempt chains or retained Agent collection samples. At most seven dates; cash uses stored business dates, other streams use server receipt dates. Explicit gaps, no business writes or retries. Cash pages allow at most ten reports.',
                 array_intersect_key($operationsPeriod, array_flip(['company_name', 'company_id', 'date_from', 'date_to'])) + $cursor + [
                     'stream' => ['type' => 'string', 'enum' => ['cash_reconciliation', 'print_chains', 'agent_collection']],

@@ -99,6 +99,7 @@ class ConsultantConsoleTest extends TestCase
             $table->integer('free_invoice_limit')->nullable();
             $table->string('override_reason')->nullable();
             $table->unsignedBigInteger('override_by')->nullable();
+            $table->json('purchase_snapshot')->nullable();
             $table->timestamps();
         });
 
@@ -401,6 +402,58 @@ class ConsultantConsoleTest extends TestCase
         $this->assertSame([$active->id], $ids, 'Console must show ONLY active-link companies');
         $this->assertNotContains($pending->id, $ids);
         $this->assertNotContains($stranger->id, $ids);
+    }
+
+    public function test_consultant_health_and_commission_use_the_frozen_purchased_plan(): void
+    {
+        [$consultant, $profile] = $this->makeConsultant();
+        $profile->update(['commission_rate' => 10]);
+        $client = $this->makeCompany(['referred_by_user_id' => $consultant->id]);
+        ConsultantClientLink::create([
+            'consultant_user_id' => $consultant->id,
+            'company_id' => $client->id,
+            'status' => 'active',
+        ]);
+        $plan = PricingPlan::create([
+            'name' => 'Purchased DI Business', 'product_type' => 'di', 'price' => 1200,
+            'is_trial' => false, 'invoice_limit' => 25,
+        ]);
+        $snapshot = [
+            'version' => 1,
+            'company_id' => $client->id,
+            'plan' => [
+                'id' => $plan->id,
+                'name' => 'Purchased DI Business',
+                'product_type' => 'di',
+                'is_trial' => false,
+                'invoice_limit' => 25,
+            ],
+        ];
+        $sub = \App\Models\Subscription::create([
+            'company_id' => $client->id,
+            'pricing_plan_id' => $plan->id,
+            'billing_cycle' => 'annual',
+            'final_price' => 1200,
+            'start_date' => '2026-11-07',
+            'end_date' => '2027-11-07',
+            'active' => true,
+            'purchase_snapshot' => $snapshot,
+        ]);
+
+        // A later catalogue edit must not rewrite what this company bought or
+        // what its consented consultant sees and earns against.
+        $plan->update(['name' => 'Changed catalogue trial', 'is_trial' => true, 'invoice_limit' => 999]);
+
+        $rows = ConsultantService::clientsWithHealth($consultant->id);
+        $this->assertCount(1, $rows);
+        $this->assertSame('Purchased DI Business', $rows[0]['health']['plan_name']);
+        $this->assertFalse($rows[0]['health']['is_trial']);
+        $this->assertSame(25, $rows[0]['health']['quota_limit']);
+
+        $commission = ConsultantService::recordCommissionForSubscription($sub->fresh());
+        $this->assertNotNull($commission);
+        $this->assertSame('Purchased DI Business · annual', $commission->description);
+        $this->assertSame('120.00', (string) $commission->amount);
     }
 
     // ── 2. Full consent flow: request → approve → switch → exit ─────────

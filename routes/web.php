@@ -427,6 +427,8 @@ Route::middleware(['auth', 'company', 'rate_limit_company', 'company.approval'])
     Route::post('/notifications/dismiss-all', [DashboardController::class, 'dismissAllNotifications'])->name('notifications.dismiss-all');
 
     Route::get('/billing/plans', [BillingController::class, 'plans'])->name('billing.plans');
+    Route::get('/billing/documents/invoices/{invoice}', [\App\Http\Controllers\SubscriptionDocumentController::class, 'companyInvoice'])->whereNumber('invoice')->name('billing.documents.invoice');
+    Route::get('/billing/documents/receipts/{payment}', [\App\Http\Controllers\SubscriptionDocumentController::class, 'companyReceipt'])->whereNumber('payment')->name('billing.documents.receipt');
     Route::post('/billing/subscribe', [BillingController::class, 'subscribe']);
     Route::post('/api/billing/calculate', [BillingController::class, 'calculatePrice']);
     // AI Reader page ledger — what was spent, refunded, bought or granted.
@@ -1291,6 +1293,8 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
         // Irreversible standalone→PRA edition flip: admins only.
         Route::post('/api/enable-pra-integration', [PosController::class, 'enablePraIntegration'])->name('pos.api.enable-pra-integration');
         Route::get('/billing', [PosController::class, 'billing'])->name('pos.billing');
+        Route::get('/billing/documents/invoices/{invoice}', [\App\Http\Controllers\SubscriptionDocumentController::class, 'companyInvoice'])->whereNumber('invoice')->name('pos.billing.documents.invoice');
+        Route::get('/billing/documents/receipts/{payment}', [\App\Http\Controllers\SubscriptionDocumentController::class, 'companyReceipt'])->whereNumber('payment')->name('pos.billing.documents.receipt');
         Route::match(['get', 'post'], '/business-profile', [PosController::class, 'businessProfile'])->name('pos.business-profile');
         // F8 — public profile + menu builder (admin-only POSTs, gated in controller)
         Route::post('/public-profile', [\App\Http\Controllers\PublicProfileController::class, 'saveSettings'])->name('pos.public-profile.save');
@@ -1619,6 +1623,10 @@ Route::prefix('admin')->middleware(['admin.auth'])->group(function () {
 
     Route::get('/dashboard', [AdminDashboardController::class, 'index'])->name('saas.admin.dashboard');
     Route::get('/dashboard/invoices/{product}/{company}/{record}/{action}', [\App\Http\Controllers\SaasAdmin\AdminInvoicePreviewController::class, 'show'])->whereIn('product', ['di', 'pos', 'fbrpos'])->whereNumber(['company', 'record'])->whereIn('action', ['preview', 'download'])->name('saas.admin.invoice.document');
+    Route::get('/companies/{company}/billing/invoices/{invoice}', [\App\Http\Controllers\SubscriptionDocumentController::class, 'adminInvoice'])->whereNumber(['company', 'invoice'])->name('saas.admin.billing.documents.invoice');
+    Route::get('/companies/{company}/billing/receipts/{payment}', [\App\Http\Controllers\SubscriptionDocumentController::class, 'adminReceipt'])->whereNumber(['company', 'payment'])->name('saas.admin.billing.documents.receipt');
+    Route::post('/companies/{company}/billing/adjustments', [\App\Http\Controllers\SaasAdmin\AdminSubscriptionAdjustmentController::class, 'store'])
+        ->whereNumber('company')->name('saas.admin.billing.adjustments.store');
     Route::get('/dashboard/details/{metric}', [\App\Http\Controllers\SaasAdmin\AdminDashboardDetailController::class, 'show'])->name('saas.admin.dashboard.detail');
     Route::get('/live-activity', [\App\Http\Controllers\SaasAdmin\AdminLiveActivityController::class, 'index'])->name('saas.admin.live-activity');
 
@@ -1877,6 +1885,7 @@ Route::prefix('admin')->middleware(['admin.auth'])->group(function () {
     Route::get('/support-cases', [\App\Http\Controllers\SaasAdmin\SupportInboxController::class, 'caseIndex'])->name('saas.admin.support-cases');
     Route::get('/support-cases/{supportCase}', [\App\Http\Controllers\SaasAdmin\SupportInboxController::class, 'caseShow'])->whereNumber('supportCase')->name('saas.admin.support-cases.show');
     Route::post('/support-inbox/{box}/{uid}/case', [\App\Http\Controllers\SaasAdmin\SupportInboxController::class, 'storeCase'])->whereNumber('uid')->name('saas.admin.support-inbox.case.store');
+    Route::post('/support-inbox/cases/{supportCase}/links', [\App\Http\Controllers\SaasAdmin\SupportInboxController::class, 'linkCase'])->whereNumber('supportCase')->name('saas.admin.support-inbox.case.link');
     Route::post('/support-inbox/cases/{supportCase}/assign', [\App\Http\Controllers\SaasAdmin\SupportInboxController::class, 'assignCase'])->whereNumber('supportCase')->name('saas.admin.support-inbox.case.assign');
     Route::post('/support-inbox/cases/{supportCase}/resolve', [\App\Http\Controllers\SaasAdmin\SupportInboxController::class, 'resolveCase'])->whereNumber('supportCase')->name('saas.admin.support-inbox.case.resolve');
     Route::post('/support-inbox/cases/{supportCase}/reopen', [\App\Http\Controllers\SaasAdmin\SupportInboxController::class, 'reopenCase'])->whereNumber('supportCase')->name('saas.admin.support-inbox.case.reopen');
@@ -1981,6 +1990,10 @@ Route::prefix('health')->middleware(['health.auth', 'company.approval'])->group(
     // so a forgotten middleware argument here still cannot open the screen.
     Route::get('/settings', [HealthController::class, 'settings'])
         ->middleware('health.can:settings.manage')->name('health.settings');
+    Route::get('/settings/billing/documents/invoices/{invoice}', [\App\Http\Controllers\SubscriptionDocumentController::class, 'companyInvoice'])
+        ->whereNumber('invoice')->middleware('health.can:settings.manage')->name('health.billing.documents.invoice');
+    Route::get('/settings/billing/documents/receipts/{payment}', [\App\Http\Controllers\SubscriptionDocumentController::class, 'companyReceipt'])
+        ->whereNumber('payment')->middleware('health.can:settings.manage')->name('health.billing.documents.receipt');
 
     // Module switchboard: owner only, both here and in HealthAuth's path map.
     Route::get('/settings/modules', [HealthController::class, 'modules'])
@@ -2690,6 +2703,8 @@ Route::prefix('fbr-pos')->middleware(['fbrpos.auth', 'company.approval'])->group
     Route::post('/api/verify-pin', [FbrPosController::class, 'verifyPin'])->name('fbrpos.api.verify-pin');
     Route::get('/api/check-pin-session', [FbrPosController::class, 'checkPinSession'])->name('fbrpos.api.check-pin-session');
     Route::get('/billing', [FbrPosController::class, 'billing'])->name('fbrpos.billing');
+    Route::get('/billing/documents/invoices/{invoice}', [\App\Http\Controllers\SubscriptionDocumentController::class, 'companyInvoice'])->whereNumber('invoice')->name('fbrpos.billing.documents.invoice');
+    Route::get('/billing/documents/receipts/{payment}', [\App\Http\Controllers\SubscriptionDocumentController::class, 'companyReceipt'])->whereNumber('payment')->name('fbrpos.billing.documents.receipt');
     Route::get('/reports', [FbrPosController::class, 'reports'])->name('fbrpos.reports');
     // Staff Hazri — FBR mirror (Task #560) — ADMIN/MANAGER-ONLY (403 in controller).
     Route::get('/reports/hazri', [FbrPosController::class, 'hazriReport'])->name('fbrpos.reports.hazri');

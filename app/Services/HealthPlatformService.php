@@ -186,9 +186,7 @@ class HealthPlatformService
             return null;
         }
 
-        return $subscription->relationLoaded('pricingPlan')
-            ? $subscription->getRelation('pricingPlan')
-            : PricingPlan::find($subscription->pricing_plan_id);
+        return $subscription->entitlementPlan();
     }
 
     /** Every healthcare package still on the shelf, cheapest first. */

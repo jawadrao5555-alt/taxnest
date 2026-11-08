@@ -1,0 +1,373 @@
+<?php
+
+declare(strict_types=1);
+
+$database = getenv('DB_DATABASE') ?: '';
+$socket = getenv('DB_SOCKET') ?: '';
+if (getenv('APP_ENV') !== 'rc-mariadb' || ! getenv('LD_PRELOAD')
+    || ! preg_match('/^taxnest_rc_[a-z0-9_]+_full$/D', $database)
+    || ! preg_match('#^/tmp/taxnest-rc-mariadb-[a-z0-9_]+/run/mariadb.sock$#D', $socket)) {
+    fwrite(STDERR, "FAIL unsafe diagnostic observation target\n");
+    exit(2);
+}
+require dirname(__DIR__, 2).'/vendor/autoload.php';
+$app = require dirname(__DIR__, 2).'/bootstrap/app.php';
+$app->make(\Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+
+use App\Models\Company;
+use App\Services\Reporting\DiagnosticSourceCollection;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+use Symfony\Component\Process\Process;
+
+if (($argv[1] ?? '') === 'worker') {
+    [$companyId, $day, $run, $barrier, $index] = array_slice($argv, 2);
+    if (! ctype_digit($companyId) || ! ctype_digit($index) || ! str_starts_with($barrier, dirname($socket).'/diag-observation-')) {
+        throw new RuntimeException('Unsafe observation worker identity.');
+    }
+    file_put_contents($barrier.'.ready-'.$index, 'ready');
+    $until = microtime(true) + 20;
+    while (! is_file($barrier)) {
+        if (microtime(true) > $until) {
+            throw new RuntimeException('Observation barrier timeout.');
+        } usleep(10000);
+    }
+    if (app(DiagnosticSourceCollection::class)->capture((int) $companyId, 'pra.fiscal', $day, $run) !== 'OBSERVED') {
+        throw new RuntimeException('Native source was not observed.');
+    }
+    exit(0);
+}
+$suffix = bin2hex(random_bytes(8));
+$company = Company::create(['name' => 'Synthetic diagnostic source', 'ntn' => $suffix, 'product_type' => 'pos']);
+$other = Company::create(['name' => 'Other synthetic diagnostic source', 'ntn' => 'x'.$suffix, 'product_type' => 'pos']);
+$day = now(config('reporting_connector.timezone', 'Asia/Karachi'))->subDay()->toDateString();
+$stamp = $day.' 12:00:00';
+DB::table('pra_logs')->insert([
+    ['company_id' => $company->id, 'created_at' => $stamp, 'updated_at' => $stamp, 'request_payload' => '{"synthetic":"PRIVATE"}'],
+    ['company_id' => $other->id, 'created_at' => $stamp, 'updated_at' => $stamp, 'request_payload' => '{"synthetic":"FOREIGN"}'],
+]);
+$before = DB::table('pra_logs')->whereIn('company_id', [$company->id, $other->id])->orderBy('id')->get()->toJson();
+$run = (string) Str::uuid();
+$barrier = dirname($socket).'/diag-observation-'.$suffix;
+$processes = [];
+try {
+    foreach ([1, 2] as $index) {
+        $p = new Process([PHP_BINARY, '-c', php_ini_loaded_file(), __FILE__, 'worker', (string) $company->id, $day, $run, $barrier, (string) $index]);
+        $p->setTimeout(40);
+        $p->start();
+        $processes[] = $p;
+    }
+    $until = microtime(true) + 20;
+    while (count(glob($barrier.'.ready-*')) !== 2) {
+        if (microtime(true) > $until) {
+            throw new RuntimeException('Observation workers did not reach barrier.');
+        }usleep(10000);
+    }
+    file_put_contents($barrier, 'go');
+    foreach ($processes as $p) {
+        $p->wait();
+        if (! $p->isSuccessful()) {
+            throw new RuntimeException('Native observation worker failed.');
+        }
+    }
+    $observation = DB::table('diagnostic_source_observations')->where('company_id', $company->id)->sole();
+    $report = app(DiagnosticSourceCollection::class)->latest($company->id, 'pra.fiscal', $day, $day);
+    if ((int) $observation->retained_rows !== 1 || $report['complete_collection_proven'] !== false
+        || DB::table('diagnostic_source_observations')->where('company_id', $other->id)->count() !== 0
+        || DB::table('pra_logs')->whereIn('company_id', [$company->id, $other->id])->orderBy('id')->get()->toJson() !== $before
+        || str_contains(json_encode($report), 'PRIVATE')) {
+        throw new RuntimeException('Native observation scope, idempotency or source preservation failed.');
+    }
+    echo "PASS: native concurrent source observation is idempotent, scoped and preserves source rows\n";
+    $bill = DB::table('pos_transactions')->insertGetId(['company_id' => $company->id, 'invoice_number' => 'RC-DIAG-'.$suffix,
+        'bill_token' => 42, 'invoice_mode' => 'local', 'pra_status' => 'local', 'status' => 'completed', 'transaction_type' => 'sale', 'subtotal' => 100,
+        'total_amount' => 100, 'payment_method' => 'cash', 'created_at' => $stamp, 'updated_at' => $stamp]);
+    $lookup = app(\App\Services\Reporting\DiagnosticBillLookup::class)->read([
+        'company_name' => $company->name, 'reference_kind' => 'pra_daily_token',
+        'bill_reference' => 'L042', 'counter_date' => $day], [$company->id]);
+    if ($lookup['status'] !== 'RESOLVED' || $lookup['bill_id'] !== (int) $bill
+        || $report['daily_coverage']['all_dates_measured'] !== true
+        || $report['daily_coverage']['complete_collection_proven'] !== false) {
+        throw new RuntimeException('Native daily-token lookup or per-date coverage failed.');
+    }
+    $eventIds = [];
+    foreach ([[$company->id, 'projected', $bill], [$other->id, 'projected', $bill],
+        [$company->id, 'accepted', $bill], [$company->id, 'projected', $bill + 999999]] as [$tenant, $state, $projectedBill]) {
+        $eventIds[] = DB::table('agent_core_events')->insertGetId([
+            'company_id' => $tenant, 'device_uid' => 'synthetic-diagnostic', 'event_id' => (string) Str::uuid(),
+            'idempotency_key' => (string) Str::uuid(), 'event_type' => 'sale.created', 'content_hash' => str_repeat('a', 64),
+            'payload' => json_encode(['transaction_id' => $bill, 'secret' => 'PRIVATE']), 'projection_status' => $state,
+            'projection_result' => json_encode(['transaction_id' => (int) $projectedBill, 'secret' => 'PRIVATE']),
+            'created_at' => $stamp, 'updated_at' => $stamp]);
+    }
+    $jobIds = [];
+    foreach ([[$company->id, 'kot'], [$other->id, 'kot'], [$company->id, 'fbr_kot']] as [$tenant,$type]) {
+        $jobIds[] = DB::table('pos_print_jobs')->insertGetId(['company_id' => $tenant, 'type' => $type,
+            'target_printer' => 'PRIVATE', 'transaction_id' => $bill, 'status' => 'pending', 'created_at' => $stamp, 'updated_at' => $stamp]);
+    }
+    $eventBefore = DB::table('agent_core_events')->whereIn('id', $eventIds)->orderBy('id')->get()->toJson();
+    $jobBefore = DB::table('pos_print_jobs')->whereIn('id', $jobIds)->orderBy('id')->get()->toJson();
+    $linked = app(\App\Services\Reporting\DiagnosticBillEvidence::class)->read([
+        'company_name' => $company->name, 'bill_id' => $bill], [$company->id]);
+    if ($linked['sources']['projected_offline_events']['rows'] !== [['id' => (int) $eventIds[0]]]
+        || $linked['sources']['print_jobs']['rows'] !== [['id' => (int) $jobIds[0]]]
+        || str_contains(json_encode($linked), 'PRIVATE') || $linked['physical_print'] !== 'unknown'
+        || $eventBefore !== DB::table('agent_core_events')->whereIn('id', $eventIds)->orderBy('id')->get()->toJson()
+        || $jobBefore !== DB::table('pos_print_jobs')->whereIn('id', $jobIds)->orderBy('id')->get()->toJson()) {
+        throw new RuntimeException('Native JSON projection attribution, print namespace or preservation failed.');
+    }
+    echo "PASS: native daily-token lookup, daily coverage, JSON offline projection and print-job links are scoped and preserve evidence\n";
+    $immutableBill = (array) DB::table('pos_transactions')->find($bill);
+    $ims = [];
+    foreach ([$company->id, $other->id] as $tenant) {
+        $ims[] = DB::table('pos_ims_submissions')->insertGetId([
+            'company_id' => $tenant, 'source_transaction_id' => $bill, 'environment' => 'sandbox', 'connection_mode' => 'cloud',
+            'snapshot' => '{}', 'payload' => '{"private":"PRIVATE"}', 'state' => 'draft', 'created_by' => 0, 'created_at' => $stamp, 'updated_at' => $stamp]);
+    }
+    $prints = [];
+    foreach (['pos', 'fbrpos'] as $product) {
+        $prints[] = DB::table('pos_print_evidence')->insertGetId([
+            'company_id' => $company->id, 'transaction_id' => $bill, 'product_type' => $product, 'event' => 'result_received',
+            'context' => '{"private":"PRIVATE"}', 'received_at' => $stamp]);
+    }
+    $billReport = app(\App\Services\Reporting\DiagnosticBillEvidence::class)->read(['company_name' => $company->name, 'bill_id' => $bill], [$company->id]);
+    $collection = app(DiagnosticSourceCollection::class);
+    $collection->capture($company->id, 'pos.print_receipts', $day, (string) Str::uuid());
+    $printReport = $collection->latest($company->id, 'pos.print_receipts', $day, $day);
+    $sourceReport = app(\App\Services\Reporting\DiagnosticSourceEvidence::class)->read([
+        'company_name' => $company->name, 'source' => 'pos.print_receipts', 'date_from' => $day], [$company->id]);
+    if ($billReport['sources']['federal_ims_attempts']['rows'] !== [['id' => (int) $ims[0]]]
+        || $billReport['sources']['print_events']['rows'] !== [['id' => (int) $prints[0]]]
+        || $printReport['retained_rows'] !== 1 || $sourceReport['observed']['retained_rows_in_window'] !== 1
+        || str_contains(json_encode([$billReport, $sourceReport]), 'PRIVATE')
+        || $immutableBill !== (array) DB::table('pos_transactions')->find($bill)) {
+        throw new RuntimeException('Native IMS/print attribution or source preservation failed');
+    }
+    echo "PASS: native IMS links and print source read/collection retain exact tenant/product attribution and unchanged bill\n";
+    $notifications = [];
+    foreach ([$company->id, $other->id, null] as $tenant) {
+        $notifications[] = DB::table('notifications')->insertGetId(['company_id' => $tenant,
+            'type' => 'synthetic_diagnostic', 'title' => 'PRIVATE synthetic title', 'message' => 'PRIVATE synthetic message',
+            'read' => false, 'created_at' => $stamp, 'updated_at' => $stamp]);
+    }
+    $notificationBefore = DB::table('notifications')->whereIn('id', $notifications)->orderBy('id')->get()->toJson();
+    $collection->capture($company->id, 'pos.notifications', $day, (string) Str::uuid());
+    $shared = app(\App\Services\Reporting\DiagnosticSourceEvidence::class)->read([
+        'company_name' => $company->name, 'source' => 'pos.notifications', 'date_from' => $day], [$company->id]);
+    $exhausted = app(\App\Services\Reporting\DiagnosticSourceEvidence::class)->read([
+        'company_name' => $company->name, 'source' => 'pos.notifications', 'date_from' => $day, 'after_id' => max($notifications)], [$company->id]);
+    if (array_column($shared['rows'], 'id') !== [(int) $notifications[0]] || $shared['collection_observation']['retained_rows'] !== 1
+        || $exhausted['status'] !== 'PARTIAL' || $exhausted['rows'] !== [] || $exhausted['observed']['retained_rows_in_window'] !== 1
+        || str_contains(json_encode([$shared, $exhausted]), 'PRIVATE')
+        || $notificationBefore !== DB::table('notifications')->whereIn('id', $notifications)->orderBy('id')->get()->toJson()) {
+        throw new RuntimeException('Native shared notification source scope or exhausted cursor proof failed');
+    }
+    echo "PASS: native shared source excludes global and foreign rows; exhausted cursor retains window evidence and original rows\n";
+
+    $liveOpsIds = [];
+    foreach ([[$company->id, 'OWN'], [$other->id, 'FOREIGN'], [null, 'GLOBAL']] as [$tenant, $label]) {
+        $liveOpsIds[] = DB::table('live_ops_autonomous_requests')->insertGetId([
+            'request_id' => 'RC-LIVEOPS-'.$label.'-'.$suffix,
+            'owner_text' => 'PRIVATE '.$label.' owner request',
+            'company_id' => $tenant,
+            'status' => 'FAILED',
+            'operation' => 'diagnose',
+            'fix_commit' => $tenant === $company->id ? str_repeat('a', 40) : null,
+            'pull_request' => $tenant === $company->id ? '#364' : null,
+            'deployment_sha' => $tenant === $company->id ? str_repeat('b', 40) : null,
+            'tests_result' => json_encode(['private' => 'PRIVATE '.$label.' tests']),
+            'deployment_result' => json_encode(['private' => 'PRIVATE '.$label.' deployment']),
+            'error' => 'PRIVATE '.$label.' failure',
+            'created_at' => $stamp,
+            'updated_at' => $stamp,
+        ]);
+    }
+    $liveOpsBefore = DB::table('live_ops_autonomous_requests')->whereIn('id', $liveOpsIds)->orderBy('id')->get()->toJson();
+    $collection->capture($company->id, 'pos.live_ops', $day, (string) Str::uuid());
+    $liveOps = app(\App\Services\Reporting\DiagnosticSourceEvidence::class)->read([
+        'company_name' => $company->name, 'source' => 'pos.live_ops', 'date_from' => $day,
+    ], [$company->id]);
+    if (array_column($liveOps['rows'], 'id') !== [(int) $liveOpsIds[0]]
+        || $liveOps['collection_observation']['retained_rows'] !== 1
+        || $liveOps['rows'][0]['status'] !== 'FAILED'
+        || $liveOps['rows'][0]['operation'] !== 'diagnose'
+        || $liveOps['rows'][0]['fix_commit'] !== str_repeat('a', 40)
+        || $liveOps['rows'][0]['pull_request'] !== '#364'
+        || $liveOps['rows'][0]['deployment_sha'] !== str_repeat('b', 40)
+        || $liveOps['field_coverage']['contract_version'] !== \App\Services\Reporting\DiagnosticSourceEvidence::FIELD_CONTRACT_VERSION
+        || $liveOps['field_coverage']['returned_fields'] !== ['id', 'event_at', 'status', 'operation', 'fix_commit', 'pull_request', 'deployment_sha']
+        || $liveOps['field_coverage']['source_record_complete'] !== false
+        || $liveOps['field_coverage']['non_allowlisted_fields_returned'] !== false
+        || $liveOps['field_coverage']['payload_content'] !== 'NOT_RETURNED'
+        || ! str_contains($liveOps['release_evidence_note'], 'do not prove')
+        || str_contains(json_encode($liveOps), 'PRIVATE')
+        || $liveOpsBefore !== DB::table('live_ops_autonomous_requests')->whereIn('id', $liveOpsIds)->orderBy('id')->get()->toJson()) {
+        throw new RuntimeException('Native Live Ops source scope, redaction or preservation failed');
+    }
+    echo "PASS: native company-linked Live Ops source retains safe job/release identifiers without exposing payloads or claiming deployment\n";
+
+    $collection->capture($company->id, 'pos.backup_evidence', $day, (string) Str::uuid());
+    $backupGap = app(\App\Services\Reporting\DiagnosticSourceEvidence::class)->read([
+        'company_name' => $company->name, 'source' => 'pos.backup_evidence', 'date_from' => $day,
+    ], [$company->id]);
+    if ($backupGap['status'] !== 'UNAVAILABLE'
+        || $backupGap['availability_reason'] !== 'NO_TENANT_BOUND_RETAINED_SOURCE'
+        || $backupGap['collection_observation']['status'] !== 'UNAVAILABLE'
+        || $backupGap['coverage']['complete'] !== false || $backupGap['coverage']['seven_day_complete'] !== false
+        || $backupGap['rows'] !== [] || str_contains(strtolower(json_encode($backupGap)), 'healthy')) {
+        throw new RuntimeException('Native backup evidence gap was not retained as explicit unavailable evidence');
+    }
+    echo "PASS: native tenant backup evidence remains explicitly unavailable without global attribution or health claim\n";
+
+    $branchIds = [
+        'selected' => DB::table('branches')->insertGetId(['company_id' => $company->id, 'name' => 'Synthetic selected '.$suffix,
+            'created_at' => $stamp, 'updated_at' => $stamp]),
+        'sibling' => DB::table('branches')->insertGetId(['company_id' => $company->id, 'name' => 'Synthetic sibling '.$suffix,
+            'created_at' => $stamp, 'updated_at' => $stamp]),
+        'foreign' => DB::table('branches')->insertGetId(['company_id' => $other->id, 'name' => 'Synthetic foreign '.$suffix,
+            'created_at' => $stamp, 'updated_at' => $stamp]),
+    ];
+    $branchSaleIds = [];
+    foreach ($branchIds as $key => $branchId) {
+        $tenant = $key === 'foreign' ? $other->id : $company->id;
+        $branchSaleIds[$key] = DB::table('pos_transactions')->insertGetId([
+            'company_id' => $tenant, 'branch_id' => $branchId, 'invoice_number' => 'RC-BRANCH-'.strtoupper($key).'-'.$suffix,
+            'invoice_mode' => 'local', 'pra_status' => 'local', 'status' => 'completed', 'transaction_type' => 'sale',
+            'subtotal' => 100, 'total_amount' => 100, 'payment_method' => 'cash',
+            'created_at' => $stamp, 'updated_at' => $stamp,
+        ]);
+    }
+    $branchBefore = [
+        'branches' => DB::table('branches')->whereIn('id', array_values($branchIds))->orderBy('id')->get()->toJson(),
+        'sales' => DB::table('pos_transactions')->whereIn('id', array_values($branchSaleIds))->orderBy('id')->get()->toJson(),
+    ];
+    $branchScoped = app(\App\Services\Reporting\DiagnosticSourceEvidence::class)->read([
+        'company_name' => $company->name, 'source' => 'pos.sales', 'date_from' => $day,
+        'branch_id' => $branchIds['selected'],
+    ], [$company->id]);
+    $branchRow = app(\App\Services\Reporting\DiagnosticSourceEvidence::class)->read([
+        'company_name' => $company->name, 'source' => 'pos.branches', 'date_from' => $day,
+        'branch_id' => $branchIds['sibling'],
+    ], [$company->id]);
+    $unsupportedBranch = app(\App\Services\Reporting\DiagnosticSourceEvidence::class)->read([
+        'company_name' => $company->name, 'source' => 'pra.fiscal', 'date_from' => $day,
+        'branch_id' => $branchIds['selected'],
+    ], [$company->id]);
+    $branchExport = app(\App\Services\Reporting\DiagnosticSourceExport::class)->read([
+        'company_name' => $company->name, 'source' => 'pos.sales', 'date_from' => $day,
+        'branch_id' => $branchIds['selected'], 'max_rows' => 1,
+    ], [$company->id]);
+    try {
+        app(\App\Services\Reporting\DiagnosticSourceEvidence::class)->read([
+            'company_name' => $company->name, 'source' => 'pos.sales', 'date_from' => $day,
+            'branch_id' => $branchIds['foreign'],
+        ], [$company->id]);
+        throw new RuntimeException('Foreign branch was accepted.');
+    } catch (\Illuminate\Validation\ValidationException) {
+        // Expected: branch ownership is validated before any source read.
+    }
+    if (array_column($branchScoped['rows'], 'id') !== [(int) $branchSaleIds['selected']]
+        || $branchScoped['collection_observation']['status'] !== 'UNAVAILABLE_FOR_BRANCH_SCOPE'
+        || array_column($branchRow['rows'], 'id') !== [(int) $branchIds['sibling']]
+        || $unsupportedBranch['status'] !== 'BRANCH_SCOPE_UNAVAILABLE' || $unsupportedBranch['rows'] !== []
+        || array_column($branchExport['rows'], 'id') !== [(int) $branchSaleIds['selected']]
+        || $branchExport['export']['row_limit'] !== 1 || $branchExport['export']['truncated'] !== false
+        || $branchExport['export']['retained_window_rows_exhausted'] !== true
+        || $branchExport['export']['source_collection_complete'] !== false
+        || str_contains(json_encode([$branchScoped, $branchRow, $unsupportedBranch, $branchExport]), 'Synthetic selected')
+        || $branchBefore['branches'] !== DB::table('branches')->whereIn('id', array_values($branchIds))->orderBy('id')->get()->toJson()
+        || $branchBefore['sales'] !== DB::table('pos_transactions')->whereIn('id', array_values($branchSaleIds))->orderBy('id')->get()->toJson()) {
+        throw new RuntimeException('Native exact branch source scope or row preservation failed');
+    }
+    echo "PASS: native exact branch source scope excludes sibling and foreign rows; company-wide collection is not branch proof\n";
+    echo "PASS: native bounded source export reuses exact branch scope, redaction and unchanged retained rows\n";
+
+    $health = Company::create(['name' => 'Synthetic health diagnostic '.$suffix, 'ntn' => 'h'.$suffix, 'product_type' => 'erps']);
+    $otherHealth = Company::create(['name' => 'Other health diagnostic '.$suffix, 'ntn' => 'y'.$suffix, 'product_type' => 'erps']);
+    $healthBill = DB::table('health_bills')->insertGetId([
+        'company_id' => $health->id, 'health_patient_id' => 900001, 'bill_no' => 'HB-'.$suffix,
+        'bill_date' => $day, 'created_at' => $stamp, 'updated_at' => $stamp,
+    ]);
+    $healthSources = [
+        'clinical_visits' => ['health_visits', 'visit', [
+            'health_patient_id' => 900001, 'health_doctor_id' => 800001, 'visit_no' => 'HV-'.$suffix, 'visit_date' => $day,
+        ]],
+        'pharmacy_sales' => ['health_pharmacy_sales', 'pharmacy_sale', ['sale_number' => 'HS-'.$suffix]],
+        'admission_charges' => ['health_admission_charges', 'admission_charge', [
+            'health_admission_id' => 700001, 'charge_date' => $day, 'description' => 'PRIVATE admission source',
+        ]],
+        'operations' => ['health_operations', 'operation', [
+            'health_patient_id' => 900001, 'operation_no' => 'HO-'.$suffix, 'title' => 'PRIVATE operation source',
+        ]],
+    ];
+    $healthSourceIds = [];
+    foreach ($healthSources as $key => [$table, $sourceType, $required]) {
+        $healthSourceIds[$key] = DB::table($table)->insertGetId($required + [
+            'company_id' => $health->id, 'created_at' => $stamp, 'updated_at' => $stamp,
+        ]);
+        $foreignId = DB::table($table)->insertGetId($required + [
+            'company_id' => $otherHealth->id, 'created_at' => $stamp, 'updated_at' => $stamp,
+        ]);
+        DB::table('health_charges')->insert([
+            ['company_id' => $health->id, 'health_patient_id' => 900001, 'charge_no' => 'HC-'.substr(hash('sha256', $sourceType.$suffix), 0, 20),
+                'charge_date' => $day, 'description' => 'PRIVATE charge', 'source_type' => $sourceType,
+                'source_id' => $healthSourceIds[$key], 'health_bill_id' => $healthBill, 'created_at' => $stamp, 'updated_at' => $stamp],
+            ['company_id' => $otherHealth->id, 'health_patient_id' => 900002, 'charge_no' => 'HF-'.substr(hash('sha256', $sourceType.$suffix), 0, 20),
+                'charge_date' => $day, 'description' => 'PRIVATE foreign charge', 'source_type' => $sourceType,
+                'source_id' => $foreignId, 'health_bill_id' => $healthBill, 'created_at' => $stamp, 'updated_at' => $stamp],
+        ]);
+    }
+    $stockMovement = DB::table('health_batch_movements')->insertGetId([
+        'company_id' => $health->id, 'medicine_id' => 600001, 'type' => 'dispense', 'direction' => 'out',
+        'reference_type' => 'health_pharmacy_sale', 'reference_id' => $healthSourceIds['pharmacy_sales'],
+        'notes' => 'PRIVATE stock source', 'created_at' => $stamp, 'updated_at' => $stamp,
+    ]);
+    DB::table('health_batch_movements')->insert([
+        ['company_id' => $otherHealth->id, 'medicine_id' => 600002, 'type' => 'dispense', 'direction' => 'out',
+            'reference_type' => 'health_pharmacy_sale', 'reference_id' => $healthSourceIds['pharmacy_sales'],
+            'notes' => 'PRIVATE foreign stock', 'created_at' => $stamp, 'updated_at' => $stamp],
+        ['company_id' => $health->id, 'medicine_id' => 600003, 'type' => 'dispense', 'direction' => 'out',
+            'reference_type' => 'health_pharmacy_return', 'reference_id' => $healthSourceIds['pharmacy_sales'],
+            'notes' => 'PRIVATE wrong stock type', 'created_at' => $stamp, 'updated_at' => $stamp],
+    ]);
+    $healthBefore = collect(array_keys($healthSources))->mapWithKeys(function ($key) use ($healthSources) {
+        $table = $healthSources[$key][0];
+
+        return [$table => DB::table($table)->orderBy('id')->get()->toJson()];
+    })->put('health_charges', DB::table('health_charges')->whereIn('company_id', [$health->id, $otherHealth->id])->orderBy('id')->get()->toJson())
+        ->put('health_batch_movements', DB::table('health_batch_movements')->whereIn('company_id', [$health->id, $otherHealth->id])->orderBy('id')->get()->toJson());
+    $healthReport = app(\App\Services\Reporting\DiagnosticBillEvidence::class)->read([
+        'company_name' => $health->name, 'bill_id' => $healthBill,
+    ], [$health->id]);
+    foreach ($healthSourceIds as $key => $id) {
+        if ($healthReport['sources'][$key]['rows'] !== [['id' => (int) $id]]) {
+            throw new RuntimeException('Native health source attribution failed for '.$key);
+        }
+    }
+    if ($healthReport['sources']['pharmacy_stock']['rows'] !== [['id' => (int) $stockMovement]]) {
+        throw new RuntimeException('Native health pharmacy stock attribution failed');
+    }
+    $healthAfter = collect(array_keys($healthSources))->mapWithKeys(function ($key) use ($healthSources) {
+        $table = $healthSources[$key][0];
+
+        return [$table => DB::table($table)->orderBy('id')->get()->toJson()];
+    })->put('health_charges', DB::table('health_charges')->whereIn('company_id', [$health->id, $otherHealth->id])->orderBy('id')->get()->toJson())
+        ->put('health_batch_movements', DB::table('health_batch_movements')->whereIn('company_id', [$health->id, $otherHealth->id])->orderBy('id')->get()->toJson());
+    if ($healthReport['version'] !== 5 || str_contains(json_encode($healthReport), 'PRIVATE') || $healthBefore->all() !== $healthAfter->all()) {
+        throw new RuntimeException('Native health source report leaked or changed retained rows');
+    }
+    echo "PASS: native healthcare bill follows exact tenant-scoped clinical, pharmacy and stock source IDs without changing rows\n";
+
+} finally {
+    foreach ($processes as $p) {
+        if ($p->isRunning()) {
+            $p->stop(1);
+        }
+    }
+    if (is_file($barrier)) {
+        unlink($barrier);
+    }
+    foreach (glob($barrier.'.ready-*') as $ready) {
+        unlink($ready);
+    }
+}

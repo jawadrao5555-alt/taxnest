@@ -14,8 +14,11 @@ use Illuminate\Support\Str;
 class CompanyDeletionLifecycle
 {
     public const PENDING = 'pending_review';
+
     public const ON_HOLD = 'on_hold';
+
     public const RESTORED = 'restored';
+
     public const PURGED = 'purged';
 
     public function supported(): bool
@@ -25,19 +28,23 @@ class CompanyDeletionLifecycle
     }
 
     /** Password verification happens in ProfileController immediately before this call. */
-    public function requestByOwner(Company $company, User $user, ?string $reason = null): ?object
+    public function requestByOwner(Company $company, User $user, ?string $reason, string $verifiedPassword): ?object
     {
-        if (!$this->supported()) {
+        if (! $this->supported()) {
             return null; // Deploy-before-migrate compatibility; no destructive fallback.
         }
 
-        return DB::transaction(function () use ($company, $user, $reason) {
+        return DB::transaction(function () use ($company, $user, $reason, $verifiedPassword) {
             $currentCompany = Company::query()->lockForUpdate()->findOrFail($company->id);
             $currentUser = User::query()->lockForUpdate()->findOrFail($user->id);
             abort_unless((int) $currentUser->company_id === (int) $currentCompany->id
                 && in_array($currentUser->role, ['company_admin', 'super_admin'], true)
-                && !Auth::guard('admin')->check()
-                && !(request()->hasSession() && request()->session()->has('impersonation')), 403);
+                && ! Auth::guard('admin')->check()
+                && ! (request()->hasSession() && request()->session()->has('impersonation')), 403);
+
+            if (! \Illuminate\Support\Facades\Hash::check($verifiedPassword, $currentUser->password)) {
+                throw \Illuminate\Validation\ValidationException::withMessages(['password' => __('auth.password')])->errorBag('userDeletion');
+            }
 
             if ($existing = $this->active((int) $currentCompany->id, true)) {
                 return $existing;
@@ -51,7 +58,9 @@ class CompanyDeletionLifecycle
     /** Called in the same transaction that moves the company into the bin. */
     public function beginHold(Company $company, AdminUser $actor, ?string $reason): ?object
     {
-        if (!$this->supported()) return null;
+        if (! $this->supported()) {
+            return null;
+        }
 
         $request = $this->active((int) $company->id, true)
             ?: $this->createRequest($company, 'admin', null, (int) $actor->id,
@@ -84,7 +93,9 @@ class CompanyDeletionLifecycle
                     }
                 });
         }
-        if (!$this->supported()) return $rotated;
+        if (! $this->supported()) {
+            return $rotated;
+        }
 
         $request = $this->active((int) $company->id, true)
             ?: $this->createRequest($company, 'admin', null, (int) $actor->id,
@@ -104,7 +115,9 @@ class CompanyDeletionLifecycle
     /** Called inside the database purge transaction so evidence cannot claim a rolled-back purge. */
     public function purged(Company $company, AdminUser $actor): ?int
     {
-        if (!$this->supported()) return null;
+        if (! $this->supported()) {
+            return null;
+        }
         $request = $this->active((int) $company->id, true)
             ?: $this->createRequest($company, 'admin', null, (int) $actor->id,
                 (string) $actor->email, 'Legacy bin entry permanently deleted', self::ON_HOLD);
@@ -115,23 +128,31 @@ class CompanyDeletionLifecycle
             'updated_at' => now(),
         ]);
         $this->event((int) $request->id, (int) $company->id, 'database_purge_committed', 'admin',
-            (int) $actor->id, ['retained_evidence' => ['admin_audit_logs', 'registered_credentials']]);
+            (int) $actor->id, ['retained_evidence' => ['admin_audit_logs', 'registered_credentials', 'support_cases', 'support_case_events', 'support_case_links']]);
+
         return (int) $request->id;
     }
 
     public function recordFileCleanup(?int $requestId, int $companyId, AdminUser $actor, array $results): void
     {
-        if (!$requestId || !$this->supported()) return;
+        if (! $requestId || ! $this->supported()) {
+            return;
+        }
         $this->event($requestId, $companyId, 'private_file_cleanup_attempted', 'admin',
             (int) $actor->id, $results);
     }
 
     public function active(int $companyId, bool $lock = false): ?object
     {
-        if (!$this->supported()) return null;
+        if (! $this->supported()) {
+            return null;
+        }
         $query = DB::table('company_deletion_requests')
             ->where('active_key', $this->activeKey($companyId));
-        if ($lock) $query->lockForUpdate();
+        if ($lock) {
+            $query->lockForUpdate();
+        }
+
         return $query->first();
     }
 
@@ -160,12 +181,13 @@ class CompanyDeletionLifecycle
         ]);
         $this->event($id, (int) $company->id, 'deletion_requested', $guard,
             $userId ?? $adminId, ['requester_verified' => true, 'manifest_sha256' => hash('sha256', $canonical)]);
+
         return DB::table('company_deletion_requests')->where('id', $id)->first();
     }
 
     private function manifest(int $companyId): array
     {
-        $tables = ['users', 'subscriptions', 'invoices', 'payment_proofs', 'audit_packs'];
+        $tables = ['users', 'subscriptions', 'invoices', 'payment_proofs', 'audit_packs', 'support_cases'];
         $counts = [];
         foreach ($tables as $table) {
             if (Schema::hasTable($table) && Schema::hasColumn($table, 'company_id')) {
@@ -173,11 +195,12 @@ class CompanyDeletionLifecycle
             }
         }
         ksort($counts);
+
         return [
             'version' => 1,
             'company_id' => $companyId,
             'scoped_row_counts' => $counts,
-            'retained_after_purge' => ['admin_audit_logs', 'registered_credentials'],
+            'retained_after_purge' => ['admin_audit_logs', 'registered_credentials', 'support_cases', 'support_case_events', 'support_case_links'],
         ];
     }
 

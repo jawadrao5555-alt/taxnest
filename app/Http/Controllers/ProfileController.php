@@ -24,6 +24,7 @@ class ProfileController extends Controller
                 $companyDeletionRequest = app(CompanyDeletionLifecycle::class)->active((int) $company->id);
             }
         }
+
         return view('profile.edit', [
             'user' => $request->user(),
             'company' => $company,
@@ -47,12 +48,12 @@ class ProfileController extends Controller
     public function updateCompany(Request $request): RedirectResponse
     {
         try {
-            if (!in_array($request->user()->role, ['company_admin', 'super_admin'])) {
+            if (! in_array($request->user()->role, ['company_admin', 'super_admin'])) {
                 return Redirect::route('profile.edit')->with('error', 'Only company admins can update business profile.');
             }
 
             $company = Company::find($request->user()->company_id);
-            if (!$company) {
+            if (! $company) {
                 return Redirect::route('profile.edit')->with('error', 'Company not found.');
             }
 
@@ -88,6 +89,7 @@ class ProfileController extends Controller
                         'show_footer' => $request->has('dp_show_footer'),
                         'footer_text' => trim((string) $request->input('dp_footer_text', '')) ?: null,
                     ];
+
                     return $prefs;
                 }, $data);
             } else {
@@ -107,18 +109,23 @@ class ProfileController extends Controller
                 'user_id' => auth()->id(),
                 'company_id' => auth()->user()->company_id ?? null,
             ]);
-            return Redirect::route('profile.edit')->with('error', 'Error updating profile: ' . $e->getMessage());
+
+            return Redirect::route('profile.edit')->with('error', 'Error updating profile: '.$e->getMessage());
         }
     }
 
     public function destroy(Request $request): RedirectResponse
     {
         $request->validateWithBag('userDeletion', [
-            'password' => ['required', 'current_password'],
+            'password' => ['required', 'string'],
             'reason' => ['nullable', 'string', 'max:1000'],
         ]);
 
-        $user = $request->user();
+        $user = $request->user()?->fresh();
+        abort_unless($user, 403);
+        if (! \Illuminate\Support\Facades\Hash::check((string) $request->input('password'), $user->password)) {
+            throw \Illuminate\Validation\ValidationException::withMessages(['password' => __('auth.password')])->errorBag('userDeletion');
+        }
 
         // A business owner cannot safely "delete account" by removing only
         // their login while the company, invoices and fiscal records remain.
@@ -129,10 +136,11 @@ class ProfileController extends Controller
             $deletion = app(CompanyDeletionLifecycle::class)->requestByOwner(
                 $company,
                 $user,
-                trim((string) $request->input('reason')) ?: null
+                trim((string) $request->input('reason')) ?: null,
+                (string) $request->input('password')
             );
 
-            if (!$deletion) {
+            if (! $deletion) {
                 return Redirect::route('profile.edit')->with('error',
                     'Deletion requests are temporarily unavailable while the security update is being installed. No account or data was deleted.');
             }

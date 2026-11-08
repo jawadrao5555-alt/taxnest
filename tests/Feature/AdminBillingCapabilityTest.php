@@ -93,6 +93,7 @@ class AdminBillingCapabilityTest extends TestCase
                 ['POST', '/admin/all-users', []],
                 ['POST', '/admin/companies/'.$sub->company_id.'/approve', []],
                 ['POST', '/admin/companies/'.$sub->company_id.'/limits', ['extra_branch_slots' => 10]],
+                ['POST', '/admin/companies/'.$sub->company_id.'/billing/adjustments', []],
                 ['POST', '/admin/companies/'.$sub->company_id.'/ai-pages', ['pages' => 100]],
                 ['POST', '/admin/companies/'.$sub->company_id.'/change-type', ['product_type' => 'pos']],
                 ['POST', '/admin/companies/'.$sub->company_id.'/clone-product', ['products' => ['pos']]],
@@ -152,6 +153,7 @@ class AdminBillingCapabilityTest extends TestCase
         $this->actingAs($admin, 'admin');
         AdminUser::whereKey($admin->id)->update(['role' => 'viewer']);
         $this->post('/admin/subscriptions/'.$sub->id.'/toggle')->assertForbidden();
+        $this->post('/admin/companies/'.$sub->company_id.'/billing/adjustments', [])->assertForbidden();
         $this->assertTrue((bool) $sub->fresh()->active);
     }
 

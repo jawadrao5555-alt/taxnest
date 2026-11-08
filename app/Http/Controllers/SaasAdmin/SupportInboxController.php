@@ -88,6 +88,7 @@ class SupportInboxController extends Controller
 
         return view('saas-admin.support-inbox.case-show', [
             'supportCase' => $supportCase->load(['company', 'assignedAdmin', 'events.actor']),
+            'caseLinks' => $this->caseLinks($supportCase),
             'supportOwners' => AdminUser::query()
                 ->whereIn('role', ['admin', 'super_admin'])
                 ->orderBy('name')
@@ -348,6 +349,64 @@ class SupportInboxController extends Controller
         return back()->with('success', 'Support case reopened; its earlier resolution remains in the timeline.');
     }
 
+    /** Immutable related/duplicate evidence; never merge or resolve a case automatically. */
+    public function linkCase(Request $request, SupportCase $supportCase)
+    {
+        $actor = $this->guardSuperAdmin();
+        abort_unless(\Illuminate\Support\Facades\Schema::hasTable('support_case_links'), 503);
+        abort_unless($supportCase->company_id, 404);
+        $data = $request->validate([
+            'related_case_id' => ['required', 'integer', 'min:1'],
+            'kind' => ['required', 'in:related,duplicate'],
+            'note' => ['required', 'string', 'min:3', 'max:1000'],
+        ]);
+        abort_if((int) $data['related_case_id'] === (int) $supportCase->id, 422, 'Choose a different case.');
+        DB::transaction(function () use ($supportCase, $actor, $data) {
+            // Lock in canonical order to serialize reversed concurrent requests.
+            $ids = [(int) $supportCase->id, (int) $data['related_case_id']];
+            sort($ids);
+            $cases = SupportCase::query()->whereIn('id', $ids)->orderBy('id')->lockForUpdate()->get();
+            abort_unless($cases->count() === 2 && $cases->every(fn ($c) => (int) $c->company_id === (int) $supportCase->company_id), 404);
+            $created = DB::table('support_case_links')->insertOrIgnore([
+                'company_id' => $supportCase->company_id, 'case_id' => $ids[0], 'related_case_id' => $ids[1],
+                'kind' => $data['kind'], 'note' => $data['note'], 'actor_admin_id' => $actor->id, 'created_at' => now(),
+            ]);
+            if ($created) {
+                foreach ($cases as $case) {
+                    $other = $ids[0] === (int) $case->id ? $ids[1] : $ids[0];
+                    $this->recordCaseEvent($case, $actor, 'case_linked', $case->status, $case->status, null,
+                        ucfirst($data['kind']).' case #'.$other.'. '.$data['note']);
+                }
+            }
+        }, 3);
+
+        return back()->with('success', 'Case link retained. Both case statuses and resolution evidence are unchanged.');
+    }
+
+    private function caseLinks(SupportCase $case): array
+    {
+        if (! \Illuminate\Support\Facades\Schema::hasTable('support_case_links')) {
+            return [];
+        }
+
+        $companyId = $case->company_id ?? $case->company_id_snapshot;
+        if (! $companyId) {
+            return [];
+        }
+        $snapshot = \Illuminate\Support\Facades\Schema::hasColumn('support_cases', 'company_id_snapshot');
+
+        return DB::table('support_case_links as link')
+            ->join('support_cases as left_case', 'left_case.id', '=', 'link.case_id')
+            ->join('support_cases as right_case', 'right_case.id', '=', 'link.related_case_id')
+            ->where('link.company_id', $companyId)
+            ->whereRaw(($snapshot ? 'COALESCE(left_case.company_id, left_case.company_id_snapshot)' : 'left_case.company_id').' = ?', [$companyId])
+            ->whereRaw(($snapshot ? 'COALESCE(right_case.company_id, right_case.company_id_snapshot)' : 'right_case.company_id').' = ?', [$companyId])
+            ->where(fn ($q) => $q->where('link.case_id', $case->id)->orWhere('link.related_case_id', $case->id))
+            ->orderByDesc('link.id')->limit(50)->get(['link.case_id', 'link.related_case_id', 'link.kind', 'link.note', 'link.created_at'])
+            ->map(fn ($link) => ['case_id' => (int) ((int) $link->case_id === (int) $case->id ? $link->related_case_id : $link->case_id),
+                'kind' => $link->kind, 'note' => $link->note, 'created_at' => $link->created_at])->all();
+    }
+
     private function recordCaseEvent(
         SupportCase $case,
         AdminUser $actor,
@@ -399,7 +458,7 @@ class SupportInboxController extends Controller
     /** Reply to an inbox message OR compose a new email (no uid). */
     public function send(Request $request)
     {
-        $this->guardSuperAdmin();
+        $actor = $this->guardSuperAdmin();
         $data = $request->validate([
             'to' => ['required', 'email'],
             'subject' => ['required', 'string', 'max:255'],
@@ -437,10 +496,29 @@ class SupportInboxController extends Controller
             return back()->withInput()->with('error', $e->getMessage());
         }
 
+        $timelineRecorded = true;
+        if (($data['reply_box'] ?? null) === 'inbox' && ! empty($data['reply_uid']) && ! empty($data['in_reply_to'])) {
+            try {
+                DB::transaction(function () use ($data, $actor) {
+                    $case = SupportCase::query()->where('source_box', 'inbox')->where('source_uid', $data['reply_uid'])
+                        ->where('source_message_id', $data['in_reply_to'])->lockForUpdate()->first();
+                    if ($case) {
+                        $this->recordCaseEvent($case, $actor, 'reply_submitted', $case->status, $case->status, null,
+                            'Reply accepted by mail transport. Customer delivery, acknowledgement and resolution are not confirmed.');
+                    }
+                });
+            } catch (QueryException) {
+                // SMTP already accepted the message: never report a failed send
+                // or invite an automatic retry because the evidence write failed.
+                $timelineRecorded = false;
+                \Illuminate\Support\Facades\Log::warning('Support reply accepted but case timeline unavailable.');
+            }
+        }
+
         $backTo = ! empty($data['reply_uid'])
             ? route('saas.admin.support-inbox.show', ['box' => $data['reply_box'] ?? 'inbox', 'uid' => $data['reply_uid']])
             : route('saas.admin.support-inbox');
 
-        return redirect($backTo)->with('success', 'Email bhej di gayi ('.$data['to'].').');
+        return redirect($backTo)->with('success', 'Email bhej di gayi ('.$data['to'].').'.($timelineRecorded ? '' : ' Case timeline could not be saved; do not resend the email.'));
     }
 }

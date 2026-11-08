@@ -10,7 +10,9 @@ return new class extends Migration
     {
         Schema::create('support_cases', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('company_id')->constrained()->restrictOnDelete();
+            $table->foreignId('company_id')->nullable()->constrained()->nullOnDelete();
+            $table->unsignedBigInteger('company_id_snapshot')->nullable()->index();
+            $table->string('company_name_snapshot')->nullable();
             $table->foreignId('assigned_admin_id')->nullable()->constrained('admin_users')->nullOnDelete();
             $table->foreignId('opened_by_admin_id')->nullable()->constrained('admin_users')->nullOnDelete();
             $table->foreignId('resolved_by_admin_id')->nullable()->constrained('admin_users')->nullOnDelete();

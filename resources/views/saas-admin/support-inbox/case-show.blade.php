@@ -5,7 +5,7 @@
         <div class="flex flex-wrap items-start justify-between gap-3">
             <div>
                 <h1 class="text-xl font-bold text-white">Case #{{ $supportCase->id }} · {{ $supportCase->subject }}</h1>
-                <p class="mt-1 text-sm text-gray-400">{{ $supportCase->company?->account_code ? $supportCase->company->account_code.' · ' : '' }}{{ $supportCase->company?->name ?? 'Deleted company record' }}</p>
+                <p class="mt-1 text-sm text-gray-400">{{ $supportCase->company?->account_code ? $supportCase->company->account_code.' · ' : '' }}{{ $supportCase->company?->name ?? $supportCase->company_name_snapshot ?? 'Deleted company record' }}</p>
             </div>
             <span class="rounded-full border border-gray-700 px-3 py-1 text-xs font-bold text-gray-300">{{ strtoupper($supportCase->status) }}</span>
         </div>
@@ -59,6 +59,27 @@
             </form>
         @endif
     </div>
+
+    <section class="mt-4 rounded-xl border border-gray-800 bg-gray-900 p-5" aria-labelledby="case-links-heading">
+        <h2 id="case-links-heading" class="text-sm font-bold text-white">Related evidence and duplicate messages</h2>
+        <p class="mt-2 text-xs text-gray-400">Link another case already attributed to this company. Its source message and timeline remain separate. A link does not resolve either case. The latest 50 links are shown; earlier links remain in the timeline.</p>
+        <ul class="mt-3 space-y-2 text-xs text-gray-300">
+            @forelse($caseLinks as $link)
+                <li><a class="text-blue-300 underline" href="{{ route('saas.admin.support-cases.show', $link['case_id']) }}">{{ ucfirst($link['kind']) }} case #{{ $link['case_id'] }}</a> — {{ $link['note'] }}</li>
+            @empty
+                <li>No linked case evidence.</li>
+            @endforelse
+        </ul>
+        @if($supportCase->company_id)
+        <form method="POST" action="{{ route('saas.admin.support-inbox.case.link', $supportCase) }}" class="mt-4 grid gap-3 sm:grid-cols-2">
+            @csrf
+            <div><label for="related-case-id" class="block text-xs text-gray-400 mb-1">Related case number</label><input id="related-case-id" name="related_case_id" type="number" min="1" required class="w-full rounded-lg bg-gray-800 text-white border border-gray-700 p-2" /></div>
+            <div><label for="case-link-kind" class="block text-xs text-gray-400 mb-1">Link type</label><select id="case-link-kind" name="kind" class="w-full rounded-lg bg-gray-800 text-white border border-gray-700 p-2"><option value="related">Related evidence</option><option value="duplicate">Duplicate message</option></select></div>
+            <div class="sm:col-span-2"><label for="case-link-note" class="block text-xs text-gray-400 mb-1">Link evidence note</label><textarea id="case-link-note" name="note" required minlength="3" maxlength="1000" class="w-full rounded-lg bg-gray-800 text-white border border-gray-700 p-2"></textarea></div>
+            <button class="justify-self-start rounded-lg bg-gray-700 text-white px-4 py-2 text-sm" type="submit">Link case evidence</button>
+        </form>
+        @endif
+    </section>
 
     <section class="mt-4 rounded-xl border border-gray-800 bg-gray-900 p-5" aria-labelledby="case-timeline-heading">
         <h2 id="case-timeline-heading" class="text-sm font-bold text-white">Immutable timeline</h2>

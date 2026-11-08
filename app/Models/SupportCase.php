@@ -53,6 +53,17 @@ class SupportCase extends Model
         'reopened_at' => 'datetime',
     ];
 
+    protected static function booted(): void
+    {
+        static::creating(function (self $case) {
+            if ($case->company_id && \Illuminate\Support\Facades\Schema::hasColumns('support_cases', ['company_id_snapshot', 'company_name_snapshot'])) {
+                $company = Company::withTrashed()->find($case->company_id);
+                $case->company_id_snapshot = $case->company_id;
+                $case->company_name_snapshot = $company?->name;
+            }
+        });
+    }
+
     public function company()
     {
         return $this->belongsTo(Company::class)->withTrashed();

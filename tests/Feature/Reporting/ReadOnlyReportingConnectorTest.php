@@ -142,8 +142,13 @@ class ReadOnlyReportingConnectorTest extends TestCase
     public function test_incident_tool_is_scoped_redacted_audited_and_read_only(): void
     {
         Schema::create('pos_print_evidence', function (Blueprint $t) {
-            $t->id(); $t->unsignedBigInteger('company_id'); $t->unsignedBigInteger('job_id')->nullable();
-            $t->unsignedInteger('attempt')->nullable(); $t->string('event'); $t->json('context'); $t->timestamp('received_at');
+            $t->id();
+            $t->unsignedBigInteger('company_id');
+            $t->unsignedBigInteger('job_id')->nullable();
+            $t->unsignedInteger('attempt')->nullable();
+            $t->string('event');
+            $t->json('context');
+            $t->timestamp('received_at');
         });
         (require database_path('migrations/2026_12_21_090000_add_print_evidence_correlation.php'))->up();
         DB::table('pos_print_evidence')->insert(['company_id' => 1, 'product_type' => 'pos', 'transaction_id' => 1,
@@ -160,6 +165,94 @@ class ReadOnlyReportingConnectorTest extends TestCase
         $this->toolCall($tokens['access_token'], 'get_pra_incident_timeline', ['company_name' => 'Pizza Master Twin', 'date_from' => '2026-10-13'])
             ->assertJsonPath('result.isError', true);
         $this->assertSame(1, DB::table('reporting_read_audits')->count());
+    }
+
+    public function test_source_evidence_is_scoped_paginated_redacted_and_revocable(): void
+    {
+        [, $tokens] = $this->connection();
+        Schema::create('pra_logs', function (Blueprint $t) {
+            $t->id();
+            $t->unsignedBigInteger('company_id');
+            $t->text('request_payload');
+            $t->dateTime('created_at');
+        });
+        DB::table('pra_logs')->insert([
+            ['id' => 1, 'company_id' => 1, 'request_payload' => 'PRIVATE-TOKEN', 'created_at' => '2026-10-13 11:00:00'],
+            ['id' => 2, 'company_id' => 2, 'request_payload' => 'PRIVATE-FOREIGN', 'created_at' => '2026-10-13 12:00:00'],
+            ['id' => 3, 'company_id' => 1, 'request_payload' => 'PRIVATE-BUYER', 'created_at' => '2026-10-13 13:00:00'],
+        ]);
+        $before = DB::table('pra_logs')->orderBy('id')->get()->toJson();
+        $args = $this->period() + ['source' => 'pra.fiscal', 'limit' => 1];
+        $this->toolCall($tokens['access_token'], 'get_diagnostic_source_evidence', $args)
+            ->assertJsonPath('result.isError', false)->assertJsonPath('result.structuredContent.rows.0.id', 1)
+            ->assertJsonPath('result.structuredContent.pagination.next_after_id', 1)
+            ->assertJsonPath('result.structuredContent.coverage.seven_day_complete', false)->assertDontSee('PRIVATE');
+        $this->toolCall($tokens['access_token'], 'get_diagnostic_source_evidence', $args + ['after_id' => 1])
+            ->assertJsonPath('result.structuredContent.rows.0.id', 3)
+            ->assertJsonPath('result.structuredContent.pagination.has_more', false);
+        $this->toolCall($tokens['access_token'], 'export_diagnostic_source_evidence', array_diff_key($args, ['limit' => true]) + ['max_rows' => 1])
+            ->assertJsonPath('result.isError', false)
+            ->assertJsonPath('result.structuredContent.export.format', 'application/json')
+            ->assertJsonPath('result.structuredContent.export.exported_rows', 1)
+            ->assertJsonPath('result.structuredContent.export.truncated', true)
+            ->assertJsonPath('result.structuredContent.export.next_after_id', 1)
+            ->assertJsonPath('result.structuredContent.export.source_collection_complete', false)
+            ->assertJsonPath('result.structuredContent.rows.0.id', 1)
+            ->assertDontSee('PRIVATE');
+        $this->assertSame(1, DB::table('reporting_read_audits')->where('tool', 'export_diagnostic_source_evidence')->where('company_id', 1)->count());
+        $this->toolCall($tokens['access_token'], 'get_diagnostic_source_evidence', array_replace($args, ['company_name' => 'Pizza Master Twin']))
+            ->assertJsonPath('result.isError', true);
+        $this->toolCall($tokens['access_token'], 'get_diagnostic_source_evidence', $args + ['table' => 'users'])
+            ->assertJsonPath('result.isError', true);
+        $this->toolCall($tokens['access_token'], 'get_diagnostic_source_evidence', array_replace($args, ['date_to' => '2026-10-21']))
+            ->assertJsonPath('result.isError', true);
+        $this->assertSame($before, DB::table('pra_logs')->orderBy('id')->get()->toJson());
+        DB::table('reporting_oauth_grants')->update(['revoked_at' => now()]);
+        $this->toolCall($tokens['access_token'], 'get_diagnostic_source_evidence', $args)->assertUnauthorized();
+    }
+
+    public function test_bill_links_reuse_oauth_scope_audit_and_revocation_without_business_writes(): void
+    {
+        [, $tokens] = $this->connection();
+        Schema::create('pra_logs', function (Blueprint $t) {
+            $t->id();
+            $t->unsignedBigInteger('company_id');
+            $t->unsignedBigInteger('transaction_id');
+            $t->text('response_payload');
+        });
+        DB::table('pra_logs')->insert([
+            ['id' => 1, 'company_id' => 1, 'transaction_id' => 1, 'response_payload' => 'PRIVATE-OWN'],
+            ['id' => 2, 'company_id' => 2, 'transaction_id' => 1, 'response_payload' => 'PRIVATE-FOREIGN'],
+        ]);
+        $before = DB::table('pos_transactions')->get()->toJson();
+        $args = ['company_name' => 'Pizza Master Test', 'bill_id' => 1];
+        $this->toolCall($tokens['access_token'], 'get_diagnostic_bill_evidence', $args)->assertOk()
+            ->assertJsonPath('result.isError', false)->assertJsonPath('result.structuredContent.sources.pra_attempts.rows.0.id', 1)
+            ->assertJsonCount(1, 'result.structuredContent.sources.pra_attempts.rows')->assertDontSee('PRIVATE');
+        $this->assertSame(1, DB::table('reporting_read_audits')->where('tool', 'get_diagnostic_bill_evidence')->where('company_id', 1)->count());
+        $this->toolCall($tokens['access_token'], 'get_diagnostic_bill_evidence', array_replace($args, ['bill_id' => 6]))
+            ->assertJsonPath('result.isError', true);
+        $this->toolCall($tokens['access_token'], 'get_diagnostic_bill_evidence', array_replace($args, ['company_name' => 'Pizza Master Twin']))
+            ->assertJsonPath('result.isError', true);
+        $this->assertSame($before, DB::table('pos_transactions')->get()->toJson());
+        DB::table('reporting_oauth_grants')->update(['revoked_at' => now()]);
+        $this->toolCall($tokens['access_token'], 'get_diagnostic_bill_evidence', $args)->assertUnauthorized();
+    }
+
+    public function test_bill_lookup_reuses_real_oauth_scope_audit_and_immediate_revocation(): void
+    {
+        [, $tokens] = $this->connection();
+        $args = ['company_name' => 'Pizza Master Test', 'reference_kind' => 'invoice_serial', 'bill_reference' => 'LOCAL-1'];
+        $before = DB::table('pos_transactions')->get()->toJson();
+        $this->toolCall($tokens['access_token'], 'get_diagnostic_bill_lookup', $args)->assertOk()
+            ->assertJsonPath('result.structuredContent.status', 'RESOLVED')
+            ->assertJsonPath('result.structuredContent.bill_id', 1)->assertDontSee('SECRET');
+        $this->assertSame(1, DB::table('reporting_read_audits')->where('tool', 'get_diagnostic_bill_lookup')->where('company_id', 1)->count());
+        $this->toolCall($tokens['access_token'], 'get_diagnostic_bill_lookup', array_replace($args, ['company_name' => 'Pizza Master Twin']))
+            ->assertJsonPath('result.isError', true);
+        $this->assertSame($before, DB::table('pos_transactions')->get()->toJson());
+        DB::table('reporting_oauth_grants')->update(['revoked_at' => now()]);
+        $this->toolCall($tokens['access_token'], 'get_diagnostic_bill_lookup', $args)->assertUnauthorized();
     }
 
     public function test_day_close_and_coverage_use_existing_revocable_connection_with_no_business_writes(): void
@@ -257,7 +350,9 @@ class ReadOnlyReportingConnectorTest extends TestCase
         $this->toolCall($t['access_token'], 'get_company_tax_items', $this->period() + ['classification' => 'exempt'])->assertJsonPath('result.structuredContent.items.0.description', 'Exempt item');
         $this->toolCall($t['access_token'], 'get_company_payment_summary', $this->period())->assertJsonPath('result.structuredContent.actual_collected_total', null);
         $tools = $this->withToken($t['access_token'])->postJson('/api/reporting/mcp', ['jsonrpc' => '2.0', 'id' => 2, 'method' => 'tools/list'])->json('result.tools');
-        $this->assertCount(11, $tools);
+        $this->assertCount(15, $tools);
+        $this->assertContains('get_diagnostic_bill_evidence', array_column($tools, 'name'));
+        $this->assertContains('export_diagnostic_source_evidence', array_column($tools, 'name'));
         foreach ($tools as $tool) {
             $this->assertTrue($tool['annotations']['readOnlyHint']);
             $this->assertFalse($tool['annotations']['destructiveHint']);
@@ -489,31 +584,33 @@ class ReadOnlyReportingConnectorTest extends TestCase
         $this->assertCount(1, $r['hotel_folio_movements']);
         $this->assertEquals(80, $r['hotel_folio_movements'][0]['stored_amount']);
         $this->toolCall($t['access_token'], 'get_company_payment_summary', $this->period() + ['branch_id' => 3])->assertJsonPath('result.structuredContent.hotel_folio_movements', null);
-        $this->toolCall($t['access_token'], 'get_company_operational_summary', $this->period() + ['branch_id' => 3])->assertJsonPath('result.isError',true);
+        $this->toolCall($t['access_token'], 'get_company_operational_summary', $this->period() + ['branch_id' => 3])->assertJsonPath('result.isError', true);
     }
+
     public function test_combined_operations_are_scoped_read_only_and_immediately_revocable(): void
     {
         (require database_path('migrations/2026_12_22_090000_create_pra_diagnostic_samples.php'))->up();
-        $payload = ['version'=>1,'stream_id'=>'11111111-1111-4111-8111-111111111111','events'=>[
-            ['sequence'=>1,'at'=>'2026-10-13T12:00:00.123Z','pending_callbacks'=>2,'raw_error'=>'PRIVATE-RAW']]];
+        $payload = ['version' => 1, 'stream_id' => '11111111-1111-4111-8111-111111111111', 'events' => [
+            ['sequence' => 1, 'at' => '2026-10-13T12:00:00.123Z', 'pending_callbacks' => 2, 'raw_error' => 'PRIVATE-RAW']]];
         app(\App\Services\PraAgentDiagnosticEvidence::class)->ingest(\App\Models\Company::find(1), 'PRIVATE-DEVICE', $payload);
-        DB::table('pra_diagnostic_samples')->update(['received_at'=>'2026-10-13 12:00:00']);
+        DB::table('pra_diagnostic_samples')->update(['received_at' => '2026-10-13 12:00:00']);
         [$p, $t] = $this->connection([1]);
         $before = DB::table('pos_transactions')->get()->toJson();
-        foreach (['cash_reconciliation','print_chains','agent_collection'] as $stream) {
-            $args = $this->period() + ['stream'=>$stream];
+        foreach (['cash_reconciliation', 'print_chains', 'agent_collection'] as $stream) {
+            $args = $this->period() + ['stream' => $stream];
             $result = $this->toolCall($t['access_token'], 'get_pra_operations_evidence', $args)->assertOk()->json('result.structuredContent');
             $this->assertFalse($result['complete']);
             $this->assertSame(1, $result['company']['id']);
             $this->assertStringNotContainsString('PRIVATE', json_encode($result));
-            if ($stream === 'agent_collection') $this->assertSame(2, $result['samples'][0]['facts']['pending_callbacks']);
-            $this->toolCall($t['access_token'], 'get_pra_operations_evidence', array_replace($args, ['company_name'=>'Pizza Master Twin']))->assertJsonPath('result.isError', true);
-            $this->toolCall($t['access_token'], 'get_pra_operations_evidence', $args + ['arbitrary_sql'=>'SELECT 1'])->assertJsonPath('result.isError', true);
+            if ($stream === 'agent_collection') {
+                $this->assertSame(2, $result['samples'][0]['facts']['pending_callbacks']);
+            }
+            $this->toolCall($t['access_token'], 'get_pra_operations_evidence', array_replace($args, ['company_name' => 'Pizza Master Twin']))->assertJsonPath('result.isError', true);
+            $this->toolCall($t['access_token'], 'get_pra_operations_evidence', $args + ['arbitrary_sql' => 'SELECT 1'])->assertJsonPath('result.isError', true);
         }
         $this->assertSame($before, DB::table('pos_transactions')->get()->toJson());
         $grant = DB::table('reporting_oauth_grants')->first();
         $this->post('/admin/reporting/connections/'.$grant->id.'/revoke')->assertRedirect();
-        $this->toolCall($t['access_token'], 'get_pra_operations_evidence', $this->period() + ['stream'=>'agent_collection'])->assertUnauthorized();
+        $this->toolCall($t['access_token'], 'get_pra_operations_evidence', $this->period() + ['stream' => 'agent_collection'])->assertUnauthorized();
     }
-
 }

@@ -157,6 +157,38 @@ try {
         || $case->events()->count() !== 4) {
         throw new RuntimeException('Support reopen did not retain resolution timeline');
     }
+    $related = $make($company, random_int(2000000, 2999999));
+    $linkRequest = Request::create('/admin/support-inbox/cases/'.$case->id.'/links', 'POST', [
+        'related_case_id' => $related->id, 'kind' => 'duplicate', 'note' => 'Native retained duplicate message evidence.',
+    ]);
+    $linkRequest->setLaravelSession($session);
+    app(SupportInboxController::class)->linkCase($linkRequest, $case);
+    $reverse = Request::create('/admin/support-inbox/cases/'.$related->id.'/links', 'POST', [
+        'related_case_id' => $case->id, 'kind' => 'duplicate', 'note' => 'Native reversed retry.',
+    ]);
+    $reverse->setLaravelSession($session);
+    app(SupportInboxController::class)->linkCase($reverse, $related);
+    if (\Illuminate\Support\Facades\DB::table('support_case_links')->where('company_id', $company->id)->count() !== 1
+        || $case->fresh()->status !== SupportCase::STATUS_REOPENED
+        || $foreignBefore !== $foreign->fresh()->getAttributes()) {
+        throw new RuntimeException('Native duplicate evidence identity or status preservation failed.');
+    }
+    echo "PASS: native support duplicate links remain idempotent and preserve both case states and other tenant\n";
+    $originalCompanyId = (int) $company->id;
+    $company->delete();
+    $company->forceDelete();
+    $case->refresh();
+    if ($case->company_id !== null || (int) $case->company_id_snapshot !== $originalCompanyId
+        || $case->company_name_snapshot !== $company->name
+        || $case->events()->where('event_type', 'resolved')->count() !== 1
+        || $foreignBefore !== $foreign->fresh()->getAttributes()) {
+        throw new RuntimeException('Native support history was lost or blocked reviewed company purge.');
+    }
+    $retainedLinks = app(SupportInboxController::class)->caseShow($case)->getData()['caseLinks'];
+    if (count($retainedLinks) !== 1 || $retainedLinks[0]['case_id'] !== (int) $related->id) {
+        throw new RuntimeException('Native retained links lost original company scope after purge.');
+    }
+    echo "PASS: native reviewed company purge retains support identity and immutable history without cross-tenant loss\n";
     echo "PASS: native support SLA and concurrent resolution retain one exact build; reopen keeps history and other company unchanged\n";
 } finally {
     foreach ($processes as $process) {

@@ -18,7 +18,7 @@ final class RestoreSecurityQuarantine
 {
     public function run(string $restoreReference): array
     {
-        if (!Schema::hasTable('restore_security_quarantines')) {
+        if (! Schema::hasTable('restore_security_quarantines')) {
             throw new RuntimeException('Restore security quarantine migration is not installed.');
         }
 
@@ -35,7 +35,7 @@ final class RestoreSecurityQuarantine
 
             $evidence = DB::table('restore_security_quarantines')
                 ->where('restore_reference_hash', $referenceHash)->lockForUpdate()->first();
-            if (!$evidence) {
+            if (! $evidence) {
                 throw new RuntimeException('Restore security quarantine evidence could not be locked.');
             }
             if ($evidence->status === 'completed') {
@@ -49,6 +49,7 @@ final class RestoreSecurityQuarantine
             $agentBefore = $this->agentPairingDigest();
             $counts = [];
 
+            $counts['remember_tokens_revoked'] = $this->revokeRememberTokens();
             $counts['database_sessions_deleted'] = $this->deleteAll('sessions');
             $counts['browser_generations_rotated'] = $this->rotateBrowserGenerations();
             $counts['password_reset_tokens_deleted'] = $this->deleteAll('password_reset_tokens');
@@ -86,9 +87,24 @@ final class RestoreSecurityQuarantine
         }, 3);
     }
 
+    private function revokeRememberTokens(): int
+    {
+        $count = 0;
+        foreach (array_unique(array_filter(array_map(
+            fn ($provider) => isset($provider['model']) ? (new $provider['model'])->getTable() : null,
+            config('auth.providers', [])
+        ))) as $table) {
+            if (Schema::hasTable($table) && Schema::hasColumn($table, 'remember_token')) {
+                $count += DB::table($table)->whereNotNull('remember_token')->update(['remember_token' => null]);
+            }
+        }
+
+        return $count;
+    }
+
     private function rotateBrowserGenerations(): int
     {
-        if (!Schema::hasTable('users') || !Schema::hasColumn('users', 'session_generation')) {
+        if (! Schema::hasTable('users') || ! Schema::hasColumn('users', 'session_generation')) {
             return 0;
         }
         $count = 0;
@@ -100,34 +116,54 @@ final class RestoreSecurityQuarantine
                 $count++;
             }
         });
+
         return $count;
     }
 
     private function revokePasswordResetGrants(): int
     {
-        if (!Schema::hasTable('password_reset_otps') || !Schema::hasColumn('password_reset_otps', 'used')) {
+        if (! Schema::hasTable('password_reset_otps') || ! Schema::hasColumn('password_reset_otps', 'used')) {
             return 0;
         }
         $update = ['used' => true];
-        if (Schema::hasColumn('password_reset_otps', 'reset_grant_hash')) $update['reset_grant_hash'] = null;
-        if (Schema::hasColumn('password_reset_otps', 'reset_completed_at')) $update['reset_completed_at'] = now();
-        if (Schema::hasColumn('password_reset_otps', 'updated_at')) $update['updated_at'] = now();
+        if (Schema::hasColumn('password_reset_otps', 'reset_grant_hash')) {
+            $update['reset_grant_hash'] = null;
+        }
+        if (Schema::hasColumn('password_reset_otps', 'reset_completed_at')) {
+            $update['reset_completed_at'] = now();
+        }
+        if (Schema::hasColumn('password_reset_otps', 'updated_at')) {
+            $update['updated_at'] = now();
+        }
+
         return DB::table('password_reset_otps')->where('used', false)->update($update);
     }
 
     private function revokeConsultantLinks(): int
     {
-        if (!Schema::hasTable('consultant_client_links')) return 0;
+        if (! Schema::hasTable('consultant_client_links')) {
+            return 0;
+        }
         $update = ['status' => 'revoked'];
-        if (Schema::hasColumn('consultant_client_links', 'revoked_by')) $update['revoked_by'] = 'restore_quarantine';
-        if (Schema::hasColumn('consultant_client_links', 'revoked_at')) $update['revoked_at'] = now();
-        if (Schema::hasColumn('consultant_client_links', 'updated_at')) $update['updated_at'] = now();
+        if (Schema::hasColumn('consultant_client_links', 'revoked_by')) {
+            $update['revoked_by'] = 'restore_quarantine';
+        }
+        if (Schema::hasColumn('consultant_client_links', 'revoked_at')) {
+            $update['revoked_at'] = now();
+        }
+        if (Schema::hasColumn('consultant_client_links', 'updated_at')) {
+            $update['updated_at'] = now();
+        }
+
         return DB::table('consultant_client_links')->whereIn('status', ['pending', 'active'])->update($update);
     }
 
     private function markNow(string $table, string $column): int
     {
-        if (!Schema::hasTable($table) || !Schema::hasColumn($table, $column)) return 0;
+        if (! Schema::hasTable($table) || ! Schema::hasColumn($table, $column)) {
+            return 0;
+        }
+
         return DB::table($table)->whereNull($column)->update([$column => now()]);
     }
 
@@ -138,14 +174,19 @@ final class RestoreSecurityQuarantine
 
     private function agentPairingDigest(): array
     {
-        if (!Schema::hasTable('companies')) return ['rows' => 0, 'sha256' => hash('sha256', '[]')];
+        if (! Schema::hasTable('companies')) {
+            return ['rows' => 0, 'sha256' => hash('sha256', '[]')];
+        }
         $columns = ['id'];
         foreach (['agent_api_key', 'agent_api_key_hash', 'agent_enabled'] as $column) {
-            if (Schema::hasColumn('companies', $column)) $columns[] = $column;
+            if (Schema::hasColumn('companies', $column)) {
+                $columns[] = $column;
+            }
         }
         $rows = DB::table('companies')->select($columns)->orderBy('id')->get()
             ->map(fn ($row) => (array) $row)->all();
         $canonical = AgentCoreSnapshotService::canonicalJson($rows);
+
         return ['rows' => count($rows), 'sha256' => hash('sha256', $canonical)];
     }
 }

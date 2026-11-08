@@ -952,8 +952,27 @@ foreach ([1366,390] as $securityWidth) {
             ]);
             $securityCases[$securityWidth]['supportAdmin']=$admin->email;
             $securityCases[$securityWidth]['supportCaseId']=$supportCase->id;
+            $relatedSupportCase=\App\Models\SupportCase::create([
+                'company_id'=>$setupCompany->id,'assigned_admin_id'=>$admin->id,'opened_by_admin_id'=>$admin->id,
+                'source_box'=>'inbox','source_uid'=>910000+$securityWidth,'subject'=>'Synthetic duplicate message '.$securityWidth,
+                'status'=>'open','opened_at'=>now(),
+            ]);
+            $securityCases[$securityWidth]['relatedSupportCaseId']=$relatedSupportCase->id;
         }
     }
+}
+$billingSelectionCases = [];
+foreach ([1366,390] as $width) {
+    $billingCompany = $company('Synthetic Billing Selection '.$width, 'billing-selection-'.$width.'@rc-browser.invalid', 'RCBILLSEL'.$width, 'di',
+        ['is_internal_account' => false, 'onboarding_completed' => true]);
+    $billingOwner = $user($billingCompany, 'Synthetic Billing Owner', 'billing-owner-'.$width.'@rc-browser.invalid', 'company_admin');
+    $oldPlan = \App\Models\PricingPlan::create(['name' => 'Synthetic Original '.$width, 'product_type' => 'di',
+        'price' => 100, 'invoice_limit' => 25, 'is_trial' => false, 'is_public' => true]);
+    \App\Models\Subscription::create(['company_id' => $billingCompany->id, 'pricing_plan_id' => $oldPlan->id, 'active' => true,
+        'start_date' => now()->subDay(), 'end_date' => now()->addMonths(6), 'billing_cycle' => 'annual', 'final_price' => 1000]);
+    $nextPlan = \App\Models\PricingPlan::create(['name' => 'Synthetic Selected '.$width, 'product_type' => 'di',
+        'price' => 200, 'invoice_limit' => 50, 'is_trial' => false, 'is_public' => true]);
+    $billingSelectionCases[$width] = ['login' => $billingOwner->email, 'planId' => $nextPlan->id, 'original' => $oldPlan->name];
 }
 $fixture = [
     'generated_at' => $now->toIso8601String(), 'synthetic' => true,
@@ -965,7 +984,7 @@ $fixture = [
         ['name'=>'fbr-identity-settings','login'=>$fiscalUser->email,'password'=>$password,'loginPath'=>'/fbr-pos/login','paths'=>['/fbr-pos/settings/identities'],'markers'=>['Branch / terminal FBR identity']],
         ['name' => 'readonly-reporting-connection', 'login' => $admin->email, 'password' => $password, 'loginPath' => '/admin/login',
             'paths' => ['/admin/reporting/connections'], 'markers' => ['Read-only reporting connections'],
-            'reportingConnector' => ['companyId' => $amountCompany->id, 'companyName' => $amountCompany->name, 'foreignCompanyName' => $hotel->name, 'billing' => 646, 'date' => $now->toDateString(), 'dayCloseDate'=>$diagnosticDate, 'diagnosticBillId'=>$amountBill->id, 'diagnosticJobId'=>$diagnosticJob->id]],
+            'reportingConnector' => ['companyId' => $amountCompany->id, 'companyName' => $amountCompany->name, 'foreignCompanyName' => $hotel->name, 'billing' => 646, 'date' => $now->toDateString(), 'dayCloseDate'=>$diagnosticDate, 'diagnosticBillId'=>$amountBill->id, 'diagnosticInvoiceSerial'=>$amountBill->invoice_number, 'diagnosticJobId'=>$diagnosticJob->id]],
         ['name'=>'whatsapp-optional-autosend','login'=>$waOwner->email,'password'=>$password,'loginPath'=>'/pos/login',
             'paths'=>['/pos/settings/whatsapp-delivery'],'markers'=>['WhatsApp auto-send'], 'whatsappAutoSend'=>true],
         ['name'=>'rider-realtime-map','login'=>$tableOwner->email,'password'=>$password,'loginPath'=>'/pos/login',
@@ -997,8 +1016,11 @@ $fixture = [
         ['name' => 'service-work-orders-denied', 'login' => $serviceDenied->email, 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/work-orders', '/pos/work-orders/report.csv'], 'denied' => true],
     ], $categoryJourneys, $optionalArchiveJourneys),
     'transactionalJourneys' => [
+        ['name'=>'restore-session-boundary','login'=>$admin->email,'password'=>$password,'loginPath'=>'/admin/login', 'paths'=>[], 'manualOnly'=>true, 'restoreSessionBoundary'=>true],
         ['name'=>'security-onboarding','login'=>$securityCases[1366]['incomplete'],'password'=>$password,
             'loginPath'=>'/login','paths'=>[], 'securityOnboarding'=>$securityCases],
+        ['name'=>'billing-package-selection','login'=>$billingSelectionCases[1366]['login'],'password'=>$password,'loginPath'=>'/login',
+            'paths'=>[], 'billingSelection'=>$billingSelectionCases],
         ['name'=>'kot-note-visibility','login'=>$kotNoteOwner->email,'password'=>$password,'loginPath'=>'/pos/login','paths'=>['/pos/invoice/create'],'markers'=>['Current Order'],'kotNoteVisibility'=>['orderId'=>$kotNoteOrder->id]],
         ['name'=>'staff-discount-approval','login'=>$staffCases[1366]['cashier'],'password'=>$password,'loginPath'=>'/pos/login','paths'=>['/pos/staff-discounts'],'markers'=>['Staff / family discount requests'],'staffDiscount'=>$staffCases],
         ...$surveyJourneys,

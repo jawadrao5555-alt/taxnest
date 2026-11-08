@@ -10,14 +10,14 @@
                 <p class="text-gray-500 dark:text-gray-400 mt-2">{{ __('pos.simple_annual_billing') }}</p>
             </div>
 
-            @if($currentSubscription && $currentSubscription->pricingPlan)
+            @if($currentSubscription && $currentSubscription->entitlementPlan())
             <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-xl p-4 mb-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                 <div class="flex items-center gap-3">
                     <div class="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-800 flex items-center justify-center">
                         <svg class="w-5 h-5 text-blue-600 dark:text-blue-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                     </div>
                     <div>
-                        <p class="font-semibold text-blue-800 dark:text-blue-200">{{ __('pos.plan_named', ['name' => $currentSubscription->pricingPlan->name]) }}</p>
+                        <p class="font-semibold text-blue-800 dark:text-blue-200">{{ __('pos.plan_named', ['name' => $currentSubscription->entitlementPlan()->name]) }}</p>
                         <p class="text-xs text-blue-600 dark:text-blue-400">{{ __('pos.active_until', ['date' => \Carbon\Carbon::parse($currentSubscription->end_date)->format('d M Y')]) }}</p>
                     </div>
                 </div>
@@ -87,6 +87,8 @@
                 </div>
                 @endforeach
             </div>
+
+            @include('billing._subscription-history')
 
             <div class="mt-8 text-center">
                 <div class="inline-flex flex-wrap items-center justify-center gap-6 text-xs text-gray-400">

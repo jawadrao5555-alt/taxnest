@@ -114,12 +114,43 @@ try {
         || $foreign->fresh()->getAttributes() !== $foreignBefore) {
         throw new RuntimeException('Concurrent renewal changed or duplicated a paid term.');
     }
+    $purchaseSnapshot = $new->purchase_snapshot;
+    $document = \App\Models\SubscriptionInvoice::where('payment_proof_id', $proof->id)->sole();
+    $payment = $document->payments()->sole();
+    $documentSnapshot = $document->document_snapshot;
+    $receiptSnapshot = $payment->receipt_snapshot;
+    if ((int) $document->subscription_id !== (int) $new->id || (int) $document->company_id !== (int) $company->id
+        || $document->status !== 'paid' || (float) $document->amount !== 1000.0 || (float) $payment->amount !== 1000.0
+        || ($receiptSnapshot['invoice_number'] ?? null) !== $document->document_number) {
+        throw new RuntimeException('Concurrent approval did not retain one correctly attributed invoice and receipt.');
+    }
+    if (!is_array($purchaseSnapshot) || ($purchaseSnapshot['version'] ?? null) !== 1
+        || ($purchaseSnapshot['company_id'] ?? null) !== $company->id
+        || ($purchaseSnapshot['plan']['invoice_limit'] ?? null) !== 100
+        || ($purchaseSnapshot['price']['final_price'] ?? null) !== (string) $new->final_price
+        || ($purchaseSnapshot['period']['end'] ?? null) !== $new->end_date->toDateString()) {
+        throw new RuntimeException('Concurrent approval did not retain the purchased plan and period.');
+    }
+    $plan->update(['invoice_limit' => 5, 'price' => 8000]);
+    if ($new->fresh()->purchase_snapshot !== $purchaseSnapshot) {
+        throw new RuntimeException('Catalogue editing changed retained purchase evidence.');
+    }
     approveRenewal($proof->id, $plan->id, $admin->id);
     if (Subscription::where('company_id', $company->id)->count() !== 2
         || AdminAuditLog::where('target_type', 'PaymentProof')->where('target_id', $proof->id)
             ->where('action', 'Payment proof approved')->count() !== 1) {
         throw new RuntimeException('Renewal retry duplicated a subscription or approval audit.');
     }
+    if ($new->fresh()->purchase_snapshot !== $purchaseSnapshot || $old->fresh()->purchase_snapshot !== null) {
+        throw new RuntimeException('Retry changed purchase evidence or backfilled unknown history.');
+    }
+    if ($document->fresh()->document_snapshot !== $documentSnapshot || $payment->fresh()->receipt_snapshot !== $receiptSnapshot
+        || \App\Models\SubscriptionInvoice::where('payment_proof_id', $proof->id)->count() !== 1
+        || $document->payments()->count() !== 1) {
+        throw new RuntimeException('Catalogue change or approval retry altered payment documents.');
+    }
+    echo "PASS: native concurrent reviewed payment retains one immutable invoice and receipt\n";
+    echo "PASS: native purchase snapshot survives catalogue edit and concurrent approval retry\n";
     echo "PASS: native concurrent paid renewal preserves remaining term once; retry and other company preserved\n";
 } finally {
     foreach ($processes as $process) if ($process->isRunning()) $process->stop(1);

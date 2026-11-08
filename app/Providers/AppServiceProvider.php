@@ -105,6 +105,7 @@ class AppServiceProvider extends ServiceProvider
         });
 
         Event::listen(Login::class, function (Login $event) {
+            \App\Services\RestoreSessionEpoch::bindLogin(request(), $event->guard);
             if (request()->hasSession() && in_array($event->guard, \App\Services\TwoStepLogin::PANELS, true)) {
                 request()->session()->forget(['two_step_verified.'.$event->guard, 'two_step_enrollment.'.$event->guard]);
             }

@@ -92,6 +92,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // AFTER StartSession) — a global append would run before sessions boot and
         // silently no-op.
         $middleware->web(append: [
+            \App\Http\Middleware\RestoreSessionBoundary::class,
             \App\Http\Middleware\CompanySessionGeneration::class,
             \App\Http\Middleware\ReadOnlyImpersonation::class,
             \App\Http\Middleware\LogImpersonatedWrites::class,

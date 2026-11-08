@@ -45,7 +45,11 @@ class ConsultantSwitchGuard
             return $next($request);
         }
 
-        // Consent still valid? Link active + consultant profile active + client company active.
+        // Consent still valid? The originating consultant account itself must
+        // still be active as well as the profile/link. A switched session is
+        // authenticated as the client's administrator, so the normal web
+        // user middleware cannot otherwise see that the original consultant
+        // was disabled after switching in.
         $consultantId = (int) ($flag['consultant_user_id'] ?? 0);
         $companyId = (int) ($flag['client_company_id'] ?? 0);
 
@@ -55,6 +59,9 @@ class ConsultantSwitchGuard
                 ->exists()
             && ConsultantProfile::where('user_id', $consultantId)
                 ->where('status', 'active')
+                ->exists()
+            && User::whereKey($consultantId)
+                ->where('is_active', true)
                 ->exists()
             && Company::where('id', $companyId)
                 ->where('company_status', 'active')

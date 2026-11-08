@@ -471,3 +471,24 @@ the implementation; these are disposable tests of the existing runtime path.
 This closes the Desktop Agent cached-key slice only. OAuth/viewer/consultant
 and other companion/background revocation acceptance remains part of the
 broader open matrix.
+
+## Switched consultant principal revocation
+
+The delegated consultant guard already rechecked the client link, consultant
+profile and client company on every switched request. It did not recheck the
+originating consultant user row because the browser is authenticated as the
+client administrator during the switch. Disabling that original user could
+therefore leave the delegated session usable while its link and profile stayed
+active.
+
+The guard now requires the persisted consultant user to remain active on every
+request. A focused actual HTTP regression switches into a fictional client,
+disables the original consultant account from outside that browser identity,
+and requires the very next request to clear the delegation, log out completely
+and retain the forced-exit audit. Existing link revocation still restores an
+active consultant to their own account. No client, company, link, Agent key or
+business record is changed by the middleware correction.
+
+This closes the switched consultant-principal slice only. OAuth refresh,
+remaining companion revocation and the broader security/onboarding checklist
+remain open until their exact runtime paths and hosted acceptance are complete.

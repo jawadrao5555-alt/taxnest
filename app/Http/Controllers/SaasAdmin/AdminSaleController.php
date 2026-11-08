@@ -5,6 +5,7 @@ namespace App\Http\Controllers\SaasAdmin;
 use App\Http\Controllers\Controller;
 use App\Models\SaleCampaign;
 use App\Models\AdminAuditLog;
+use App\Models\AdminUser;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
 use Carbon\Carbon;
@@ -23,6 +24,7 @@ class AdminSaleController extends Controller
 
     public function store(Request $request)
     {
+        AdminUser::requireReleaseAdministrator();
         $data = $request->validate([
             'name' => 'nullable|string|max:100',
             // The product list comes from the catalogue: a new product line must
@@ -62,6 +64,7 @@ class AdminSaleController extends Controller
 
     public function toggle($id)
     {
+        AdminUser::requireReleaseAdministrator();
         $campaign = SaleCampaign::findOrFail($id);
         $campaign->is_active = !$campaign->is_active;
         $campaign->save();
@@ -76,6 +79,7 @@ class AdminSaleController extends Controller
 
     public function destroy($id)
     {
+        AdminUser::requireReleaseAdministrator();
         $campaign = SaleCampaign::findOrFail($id);
         $campaign->delete();
 

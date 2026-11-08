@@ -55,6 +55,7 @@ class PricingController extends Controller
 
     public function applySuggestion(Request $request, Product $product)
     {
+        \App\Models\AdminUser::requireBillingAdministrator();
         $s = $this->pricing->suggestPrice($product->id);
 
         if ($s['suggested_price'] === null || $s['verdict'] === 'insufficient_data') {

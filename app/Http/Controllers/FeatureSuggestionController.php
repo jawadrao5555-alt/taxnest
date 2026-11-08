@@ -411,6 +411,7 @@ class FeatureSuggestionController extends Controller
 
     public function setStatus(Request $request, $id)
     {
+        \App\Models\AdminUser::requireReleaseAdministrator();
         $suggestion = FeatureSuggestion::findOrFail($id);
 
         $request->validate([
@@ -428,6 +429,7 @@ class FeatureSuggestionController extends Controller
 
     public function destroy($id)
     {
+        \App\Models\AdminUser::requireReleaseAdministrator();
         FeatureSuggestion::findOrFail($id)->delete();
 
         return redirect()->back()->with('success', 'Suggestion deleted.');

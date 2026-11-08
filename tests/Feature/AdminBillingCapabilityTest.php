@@ -4,6 +4,8 @@ namespace Tests\Feature;
 
 use App\Models\AdminUser;
 use App\Models\Company;
+use App\Models\Invoice;
+use App\Models\Product;
 use App\Models\PricingPlan;
 use App\Models\Subscription;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -34,7 +36,23 @@ class AdminBillingCapabilityTest extends TestCase
     {
         Mail::fake();
         $sub = $this->paid();
+        $invoice = Invoice::create([
+            'company_id' => $sub->company_id,
+            'invoice_number' => 'CAPABILITY-REFUSAL-ONLY',
+            'buyer_name' => 'Fictional buyer',
+            'status' => 'failed',
+            'fbr_status' => 'failed',
+            'total_amount' => 1,
+        ]);
+        $product = Product::create([
+            'company_id' => $sub->company_id,
+            'name' => 'Fictional retained product',
+            'default_price' => 10,
+            'is_active' => true,
+        ]);
         $before = $sub->fresh()->getAttributes();
+        $companyBefore = Company::findOrFail($sub->company_id)->getAttributes();
+        $invoiceBefore = $invoice->fresh()->getAttributes();
         $plans = DB::table('pricing_plans')->orderBy('id')->get()->toJson();
         foreach (['viewer', 'support', 'unknown_role'] as $role) {
             $this->actingAs($this->admin($role), 'admin');
@@ -50,16 +68,40 @@ class AdminBillingCapabilityTest extends TestCase
                 ['POST', '/admin/companies/'.$sub->company_id.'/override/temporary', []],
                 ['DELETE', '/admin/companies/'.$sub->company_id.'/override', []],
                 ['POST', '/admin/company/'.$sub->company_id.'/approve', []],
+                ['POST', '/admin/company/'.$sub->company_id.'/suspend', []],
+                ['POST', '/admin/company/'.$sub->company_id.'/reject', []],
+                ['POST', '/admin/company/'.$sub->company_id.'/toggle-watermark', []],
                 ['POST', '/admin/company/'.$sub->company_id.'/change-plan', ['pricing_plan_id' => $sub->pricing_plan_id]],
                 ['POST', '/admin/company/'.$sub->company_id.'/toggle-internal', []],
+                ['POST', '/admin/company/'.$sub->company_id.'/toggle-inventory', []],
+                ['POST', '/admin/company/'.$sub->company_id.'/pos-features/extras', []],
+                ['POST', '/admin/company/'.$sub->company_id.'/pos-features/extras/inventory/revoke', []],
+                ['PUT', '/admin/company/'.$sub->company_id.'/pos-features', []],
+                ['POST', '/admin/company/'.$sub->company_id.'/toggle-fbr-pos', []],
                 ['POST', '/admin/company/'.$sub->company_id.'/update-limits', ['invoice_limit_override' => -1]],
                 ['POST', '/admin/company/'.$sub->company_id.'/reset-limits', []],
+                ['POST', '/admin/risk-settings', []],
+                ['POST', '/admin/madadgar-settings', []],
+                ['POST', '/admin/invoice-override/'.$invoice->id, ['action' => 'lock']],
+                ['POST', '/admin/fbr/retry/'.$invoice->id, []],
+                ['POST', '/admin/pricing/apply/'.$product->id, []],
+                ['POST', '/admin/consultants/999999/toggle', []],
+                ['POST', '/admin/consultants/999999/rate', []],
+                ['POST', '/admin/consultant-links/999999/revoke', []],
+                ['POST', '/admin/consultant-commissions/999999/paid', []],
+                ['POST', '/admin/consultants/min-payout', []],
+                ['POST', '/admin/groups/resync', []],
+                ['PUT', '/admin/groups/999999', []],
+                ['POST', '/admin/groups/999999/link', []],
+                ['POST', '/admin/groups/999999/detach/'.$sub->company_id, []],
                 ['POST', '/admin/plans', []], ['POST', '/admin/plans/addons', []], ['PUT', '/admin/plans/'.$sub->pricing_plan_id, []],
             ] as [$method,$url,$input]) {
                 $this->call($method, $url, $input)->assertForbidden();
             }
         }
         $this->assertSame($before, $sub->fresh()->getAttributes());
+        $this->assertSame($companyBefore, Company::findOrFail($sub->company_id)->getAttributes());
+        $this->assertSame($invoiceBefore, $invoice->fresh()->getAttributes());
         $this->assertSame($plans, DB::table('pricing_plans')->orderBy('id')->get()->toJson());
         $this->assertSame(1, Subscription::where('company_id', $sub->company_id)->count());
         Mail::assertNothingSent();

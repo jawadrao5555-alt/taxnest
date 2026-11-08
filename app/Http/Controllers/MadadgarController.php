@@ -280,6 +280,7 @@ class MadadgarController extends Controller
 
     public function adminSettings(Request $request)
     {
+        \App\Models\AdminUser::requireSensitiveConfigurationAdministrator();
         $request->validate([
             'enabled' => 'required|in:0,1',
             'mode' => 'required|in:hybrid,local,openai',

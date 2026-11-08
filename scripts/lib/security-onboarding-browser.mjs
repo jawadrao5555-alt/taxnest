@@ -217,6 +217,28 @@ export async function securityOnboardingWorkflow(page,t,v,{baseUrl,login,saveEvi
   if(await page.locator('form[action="/admin/settings"],form[action="/admin/settings/smtp"],form[action="/admin/settings/whatsapp"],form[action="/admin/settings/test-email"]').count())throw Error('Viewer received sensitive configuration forms');
   const settingsForbidden=await page.request.post(baseUrl+'/admin/settings/test-email',{form:{_token:billingCsrf},maxRedirects:0});
   if(settingsForbidden.status()!==403)throw Error('Viewer sensitive configuration POST not refused');
+  const legacyCompany=fixture.viewer.companyId;
+  for(const path of [
+    '/admin/company/'+legacyCompany+'/suspend',
+    '/admin/company/'+legacyCompany+'/reject',
+    '/admin/company/'+legacyCompany+'/toggle-watermark',
+    '/admin/company/'+legacyCompany+'/toggle-inventory',
+    '/admin/company/'+legacyCompany+'/pos-features/extras',
+    '/admin/company/'+legacyCompany+'/toggle-fbr-pos',
+    '/admin/risk-settings',
+    '/admin/madadgar-settings',
+    '/admin/invoice-override/999999',
+    '/admin/sales',
+    '/admin/consultants/min-payout',
+    '/admin/groups/resync',
+  ]) {
+    const refused=await page.request.post(baseUrl+path,{form:{_token:billingCsrf},maxRedirects:0});
+    if(refused.status()!==403)throw Error('Viewer legacy admin mutation not refused: '+path);
+  }
+  const featureRefused=await page.request.put(baseUrl+'/admin/company/'+legacyCompany+'/pos-features',{form:{_token:billingCsrf},maxRedirects:0});
+  if(featureRefused.status()!==403)throw Error('Viewer legacy POS feature mutation not refused');
+  const groupRefused=await page.request.put(baseUrl+'/admin/groups/999999',{form:{_token:billingCsrf},maxRedirects:0});
+  if(groupRefused.status()!==403)throw Error('Viewer business-group mutation not refused');
   await saveEvidenceScreenshot(page,'rc-security-sensitive-settings-viewer-'+v.width);
   await page.goto(baseUrl+'/admin/system-control',{waitUntil:'domcontentloaded'});
   await page.getByText('System health is visible, but emergency controls are read-only for this account.',{exact:true}).waitFor();
@@ -243,5 +265,5 @@ export async function securityOnboardingWorkflow(page,t,v,{baseUrl,login,saveEvi
   await page.getByText('REOPENED',{exact:true}).waitFor();
   if(await page.getByText('Synthetic recurrence received after explicit resolution.',{exact:true}).count()!==1)throw Error('Support reopen evidence missing from timeline');
   await saveEvidenceScreenshot(page,'rc-security-support-case-'+v.width);
-  pass('SECURITY ONBOARDING PASS: '+v.width+': incomplete setup refused, explicit skip, configured completion, actual password form and independent old-session revocation/fresh login; optional two-step enrollment, fresh authenticator login, single-use recovery and disable; password-verified company deletion request retains the owner/company pending review; Local Bills Viewer password reset revokes the old browser and permits a fresh login; billing, customer-update, tutorial, announcement, survey, sensitive configuration and emergency system controls stay read-only for viewer; Live Ops, agent claims, reporting consent and deployment approval stay super-admin-only; durable support ownership, explicit resolution build and reopen timeline');
+  pass('SECURITY ONBOARDING PASS: '+v.width+': incomplete setup refused, explicit skip, configured completion, actual password form and independent old-session revocation/fresh login; optional two-step enrollment, fresh authenticator login, single-use recovery and disable; password-verified company deletion request retains the owner/company pending review; Local Bills Viewer password reset revokes the old browser and permits a fresh login; billing, legacy company/feature/configuration mutations, customer-update, tutorial, announcement, survey, sensitive configuration and emergency system controls stay read-only for viewer; Live Ops, Live Activity, agent claims, reporting consent and deployment approval stay super-admin-only; durable support ownership, explicit resolution build and reopen timeline');
 }

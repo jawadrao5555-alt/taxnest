@@ -256,6 +256,7 @@ class AdminController extends Controller
 
     public function suspendCompany(Company $company)
     {
+        \App\Models\AdminUser::requireCompanyLifecycleAdministrator();
         // Dual-column flip — POS/FBR panels enforce via `status` (CheckCompanyApproval),
         // DI/admin listings via `company_status`. Flipping only one strands the company
         // half-suspended (mirrors SaasAdmin\AdminCompanyController::suspend/activate).
@@ -275,6 +276,7 @@ class AdminController extends Controller
 
     public function toggleWatermark(Company $company)
     {
+        \App\Models\AdminUser::requireSensitiveConfigurationAdministrator();
         $company->update(['force_watermark' => !$company->force_watermark]);
 
         $status = $company->force_watermark ? 'enabled' : 'removed';
@@ -383,6 +385,7 @@ class AdminController extends Controller
 
     public function rejectCompany(Company $company)
     {
+        \App\Models\AdminUser::requireCompanyLifecycleAdministrator();
         $company->update(['company_status' => 'rejected', 'status' => 'rejected']);
         SecurityLogService::log('company_rejected', auth()->id(), ['company_id' => $company->id, 'name' => $company->name]);
         AuditLogService::log('company_rejected', 'Company', $company->id, null, ['name' => $company->name]);
@@ -803,6 +806,7 @@ class AdminController extends Controller
 
     public function updateRiskSettings(Request $request)
     {
+        $actor = \App\Models\AdminUser::requireSensitiveConfigurationAdministrator();
         $request->validate([
             'mom_spike_threshold' => 'required|numeric|min:50|max:1000',
             'tax_drop_threshold' => 'required|numeric|min:10|max:100',
@@ -815,7 +819,7 @@ class AdminController extends Controller
         \App\Models\SystemSetting::set('critical_score_threshold', $request->critical_score_threshold);
         \App\Models\SystemSetting::set('stability_bonus_weight', $request->stability_bonus_weight);
 
-        \App\Services\SecurityLogService::log('risk_settings_updated', auth()->id(), [
+        \App\Models\AdminAuditLog::log($actor->id, 'Risk settings updated', 'SystemSetting', null, [
             'settings' => $request->only(['mom_spike_threshold', 'tax_drop_threshold', 'critical_score_threshold', 'stability_bonus_weight']),
         ]);
 
@@ -952,6 +956,7 @@ class AdminController extends Controller
 
     public function toggleInventory(Request $request, Company $company)
     {
+        \App\Models\AdminUser::requireBillingAdministrator();
         // The master column is only half the switch: the shop's feature map
         // carries an 'inventory' flag too, and the next features save re-derives
         // the column FROM that map — so a column-only write reverted itself.
@@ -998,6 +1003,7 @@ class AdminController extends Controller
     /** Grant a module that sits outside the company's category profile. */
     public function grantPosFeatureExtra(Request $request, Company $company)
     {
+        \App\Models\AdminUser::requireBillingAdministrator();
         $known = \App\Services\PosCategoryProfiles::knownModules();
         $data = $request->validate([
             'module' => 'required|string|in:' . implode(',', $known),
@@ -1034,6 +1040,7 @@ class AdminController extends Controller
     /** Revoke one explicit category-profile exception. */
     public function revokePosFeatureExtra(Company $company, string $module)
     {
+        \App\Models\AdminUser::requireBillingAdministrator();
         if (!in_array($module, \App\Services\PosCategoryProfiles::knownModules(), true)) {
             abort(404);
         }
@@ -1060,6 +1067,7 @@ class AdminController extends Controller
      */
     public function updatePosFeatures(Request $request, Company $company)
     {
+        $currentAdmin = \App\Models\AdminUser::requireBillingAdministrator();
         // Panel-aware: PRA companies get the service categories, FBR companies
         // the goods ones, and a company still sitting on an off-panel category
         // may keep re-saving its own value (categoriesForCompany pins it).
@@ -1072,7 +1080,7 @@ class AdminController extends Controller
         // role the field is ignored — not validated and not rejected — exactly
         // the way the shop's own Customize handler ignores it: their feature
         // save must still succeed, silently keeping the stored category.
-        $isSuperAdmin = (bool) (auth('admin')->user()?->isSuperAdmin());
+        $isSuperAdmin = $currentAdmin->isSuperAdmin();
 
         $rules = [
             'pos_ui_density'    => 'nullable|in:simple,standard,premium',
@@ -1159,6 +1167,7 @@ class AdminController extends Controller
 
     public function toggleFbrPos(Request $request, Company $company)
     {
+        \App\Models\AdminUser::requireBillingAdministrator();
         $company->update(['fbr_pos_enabled' => !$company->fbr_pos_enabled]);
         AuditLogService::log(
             $company->fbr_pos_enabled ? 'fbr_pos_enabled' : 'fbr_pos_disabled',
@@ -1241,9 +1250,9 @@ class AdminController extends Controller
 
     public function invoiceOverride(Request $request, $id)
     {
+        $actor = \App\Models\AdminUser::requireSensitiveConfigurationAdministrator();
         $invoice = Invoice::findOrFail($id);
         $action = $request->input('action');
-        $user = auth()->user();
 
         $oldValues = [
             'status' => $invoice->status,
@@ -1278,7 +1287,7 @@ class AdminController extends Controller
         }
 
         \App\Models\AuditLog::create([
-            'user_id' => $user->id,
+            'user_id' => $actor->id,
             'company_id' => $invoice->company_id,
             'action' => 'admin_invoice_override',
             'entity_type' => 'invoice',
@@ -1288,8 +1297,8 @@ class AdminController extends Controller
                 'action' => $action,
                 'status' => $invoice->status,
                 'fbr_status' => $invoice->fbr_status,
-                'admin_user' => $user->name,
-                'admin_email' => $user->email,
+                'admin_user' => $actor->name,
+                'admin_email' => $actor->email,
             ],
             'ip_address' => $request->ip(),
         ]);
@@ -1369,6 +1378,7 @@ class AdminController extends Controller
 
     public function retryFbrInvoice(Invoice $invoice)
     {
+        \App\Models\AdminUser::requireSensitiveConfigurationAdministrator();
         if (!config('features.enable_fbr_retry_system', false)) {
             return redirect()->back()->with('error', 'FBR retry system is disabled. Enable FEATURE_FBR_RETRY_SYSTEM env flag first.');
         }

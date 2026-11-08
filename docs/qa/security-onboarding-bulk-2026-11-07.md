@@ -752,3 +752,35 @@ existing ordinary-admin denial and super-admin aggregation behaviour are
 unchanged. The required 1366/390 journey now includes the real dashboard in its
 super-admin-only refusal set; it does not create sales, heartbeats or fiscal
 events.
+
+## Legacy administrator mutation capability
+
+The older administrator routes had several writes which trusted only the
+admin-panel session: company suspend/reject and watermark, POS inventory/FBR
+POS/feature overrides and extra modules, risk and Madadgar configuration,
+invoice override, FBR retry dispatch, pricing suggestion application and
+feature-suggestion status/deletion. They now reload the persisted administrator
+before preserving the established `admin`/`super_admin` authority. Category
+changes still require a persisted super-admin; a cached downgrade to ordinary
+admin may save other allowed feature fields but cannot retain the stale
+super-admin category grant.
+
+Customer-facing sale campaigns, consultant rate/link/payout controls and
+business-group membership/rebuild writes now use the same persisted capability
+boundary. Read paths remain available; only mutation authority changed.
+
+The invoice override now attributes its audit to the authenticated admin guard
+instead of the unrelated default user guard. Risk-setting changes use the
+admin audit ledger, avoiding a foreign-key write into the customer-user
+security log. No FBR retry, invoice override, price change, module grant or
+customer setting was executed outside fictional local fixtures.
+
+PHP8.3/SQLite capability and compatibility coverage passes **59 tests / 1962
+assertions** after the positive risk-setting path exposed and corrected the
+admin/customer audit-ledger mismatch. Sale, consultant and business-group
+compatibility plus negative capability coverage passes **55 tests / 519
+assertions**. The required 1366/390
+journey now sends direct fictional legacy mutation requests as a viewer and
+requires 403 before controller validation, dispatch or state change. Supported
+PHP8.4/full-suite/native/browser acceptance remains required for the published
+exact HEAD.

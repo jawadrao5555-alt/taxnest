@@ -62,6 +62,19 @@ class PraServiceCategoriesTest extends TestCase
         app()->instance('currentCompanyId', $this->companyId);
     }
 
+    private function actAsSaasAdmin(): void
+    {
+        $adminId = DB::table('admin_users')->insertGetId([
+            'name' => 'Fictional SaaS administrator',
+            'email' => uniqid('saas-admin-').'@pracategories.test',
+            'password' => bcrypt('secret'),
+            'role' => 'super_admin',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $this->actingAs(\App\Models\AdminUser::findOrFail($adminId), 'admin');
+    }
+
     private function company(): Company
     {
         return Company::find($this->companyId);
@@ -70,6 +83,7 @@ class PraServiceCategoriesTest extends TestCase
     /** Save the SaaS admin's POS-features override page for this company. */
     private function adminSavesFeatures(array $flags): void
     {
+        $this->actAsSaasAdmin();
         app(\App\Http\Controllers\AdminController::class)->updatePosFeatures(
             Request::create('/admin/company/' . $this->companyId . '/pos-features', 'PUT', [
                 'fs_present'    => '1',
@@ -526,6 +540,7 @@ class PraServiceCategoriesTest extends TestCase
     public function test_the_admin_company_page_inventory_switch_survives_a_features_save(): void
     {
         $this->clearInventory();
+        $this->actAsSaasAdmin();
 
         app(\App\Http\Controllers\AdminController::class)->toggleInventory(
             Request::create('/admin/company/' . $this->companyId . '/toggle-inventory', 'POST'),

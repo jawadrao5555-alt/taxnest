@@ -2,7 +2,8 @@
 
 namespace Tests\Feature;
 
-use App\Models\{AdminAnnouncement, AdminUser, AppUpdate, Survey, SystemSetting, TutorialVideo};
+use App\Models\{AdminAnnouncement, AdminUser, AppUpdate, Company, Survey, SystemSetting, TutorialVideo};
+use App\Models\FeatureSuggestion;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
@@ -16,6 +17,7 @@ class AdminReleaseCapabilityTest extends TestCase
     private TutorialVideo $video;
     private AdminAnnouncement $announcement;
     private Survey $survey;
+    private FeatureSuggestion $suggestion;
 
     protected function setUp(): void
     {
@@ -48,7 +50,12 @@ class AdminReleaseCapabilityTest extends TestCase
             'controls_applied' => true,
             'audience_family' => 'all',
         ]);
-        $announcementCreator = \App\Models\User::factory()->create();
+        $releaseCompany = Company::create([
+            'name' => 'Fictional release history company',
+            'ntn' => 'RELEASE-CAPABILITY-ONLY',
+            'product_type' => 'pos',
+        ]);
+        $announcementCreator = \App\Models\User::factory()->create(['company_id' => $releaseCompany->id]);
         $this->announcement = AdminAnnouncement::create([
             'title' => 'Fictional retained announcement',
             'message' => 'Synthetic release history only',
@@ -68,6 +75,13 @@ class AdminReleaseCapabilityTest extends TestCase
             'audience' => 'pos_all',
             'is_published' => true,
         ]);
+        $this->suggestion = FeatureSuggestion::create([
+            'company_id' => $announcementCreator->company_id,
+            'user_id' => $announcementCreator->id,
+            'product' => 'pos',
+            'title' => 'Fictional retained suggestion',
+            'status' => 'pending',
+        ]);
         SystemSetting::set('pos_whats_new_enabled', '1', 'Synthetic release capability baseline');
         SystemSetting::set('pos_surveys_enabled', '1', 'Synthetic survey capability baseline');
     }
@@ -83,6 +97,7 @@ class AdminReleaseCapabilityTest extends TestCase
         $videoBefore = $this->video->fresh()->getAttributes();
         $announcementBefore = $this->announcement->fresh()->getAttributes();
         $surveyBefore = $this->survey->fresh()->getAttributes();
+        $suggestionBefore = $this->suggestion->fresh()->getAttributes();
         $settingBefore = SystemSetting::get('pos_whats_new_enabled');
         $surveySettingBefore = SystemSetting::get('pos_surveys_enabled');
 
@@ -124,6 +139,13 @@ class AdminReleaseCapabilityTest extends TestCase
             ]),
             fn () => $this->post("/admin/surveys/{$this->survey->id}/toggle-close"),
             fn () => $this->delete("/admin/surveys/{$this->survey->id}"),
+            fn () => $this->post("/admin/feature-suggestions/{$this->suggestion->id}/status", [
+                'status' => 'completed', 'admin_note' => 'Must not persist',
+            ]),
+            fn () => $this->delete("/admin/feature-suggestions/{$this->suggestion->id}/delete"),
+            fn () => $this->post('/admin/sales', []),
+            fn () => $this->post('/admin/sales/999999/toggle'),
+            fn () => $this->delete('/admin/sales/999999'),
         ];
 
         foreach ($requests as $request) {
@@ -134,6 +156,7 @@ class AdminReleaseCapabilityTest extends TestCase
         $this->assertSame($videoBefore, $this->video->fresh()->getAttributes());
         $this->assertSame($announcementBefore, $this->announcement->fresh()->getAttributes());
         $this->assertSame($surveyBefore, $this->survey->fresh()->getAttributes());
+        $this->assertSame($suggestionBefore, $this->suggestion->fresh()->getAttributes());
         $this->assertSame($settingBefore, SystemSetting::get('pos_whats_new_enabled'));
         $this->assertSame($surveySettingBefore, SystemSetting::get('pos_surveys_enabled'));
         $this->assertDatabaseMissing('app_updates', ['title' => 'Unauthorized publication']);

@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Models\{AdminUser, SystemSetting};
+use App\Models\{AdminUser, Company, Invoice, SystemSetting};
 use App\Services\{SmtpRuntimeConfig, WhatsAppBusinessApi};
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\{DB, Mail};
@@ -59,6 +59,8 @@ class AdminSensitiveSettingsCapabilityTest extends TestCase
             fn () => $this->post('/admin/settings/smtp'),
             fn () => $this->post('/admin/settings/whatsapp'),
             fn () => $this->post('/admin/settings/test-email'),
+            fn () => $this->post('/admin/risk-settings'),
+            fn () => $this->post('/admin/madadgar-settings'),
         ] as $request) {
             $request()->assertForbidden();
         }
@@ -95,5 +97,53 @@ class AdminSensitiveSettingsCapabilityTest extends TestCase
             'admin_id' => $actor->id,
             'action' => 'Test email sent',
         ]);
+    }
+
+    public function test_existing_administrator_retains_legacy_operational_configuration_authority(): void
+    {
+        $actor = AdminUser::create([
+            'name' => 'Fictional legacy configuration administrator',
+            'email' => 'legacy-config-admin@example.test',
+            'password' => bcrypt('SyntheticOnly123!'),
+            'role' => 'admin',
+        ]);
+        $company = Company::create([
+            'name' => 'Fictional legacy configuration company',
+            'ntn' => 'LEGACY-CONFIG-ONLY',
+            'product_type' => 'di',
+        ]);
+        $invoice = Invoice::create([
+            'company_id' => $company->id,
+            'invoice_number' => 'LEGACY-CONFIG-INVOICE',
+            'buyer_name' => 'Fictional buyer',
+            'status' => 'draft',
+            'fbr_status' => 'pending',
+            'total_amount' => 1,
+        ]);
+
+        $this->actingAs($actor, 'admin')
+            ->post('/admin/invoice-override/'.$invoice->id, ['action' => 'lock'])
+            ->assertOk();
+        $this->assertSame('locked', $invoice->fresh()->status);
+        $this->assertDatabaseHas('audit_logs', [
+            'user_id' => $actor->id,
+            'entity_type' => 'invoice',
+            'entity_id' => $invoice->id,
+            'action' => 'admin_invoice_override',
+        ]);
+
+        $this->actingAs($actor, 'admin')->post('/admin/risk-settings', [
+            'mom_spike_threshold' => 250,
+            'tax_drop_threshold' => 55,
+            'critical_score_threshold' => 35,
+            'stability_bonus_weight' => 12,
+        ])->assertRedirect('/admin/risk-settings');
+        $this->assertSame('250', (string) SystemSetting::get('mom_spike_threshold'));
+
+        $this->actingAs($actor, 'admin')->post('/admin/madadgar-settings', [
+            'enabled' => '1',
+            'mode' => 'local',
+        ])->assertRedirect(route('admin.madadgar-chats'));
+        $this->assertSame('local', SystemSetting::get(\App\Services\MadadgarService::SETTING_MODE));
     }
 }

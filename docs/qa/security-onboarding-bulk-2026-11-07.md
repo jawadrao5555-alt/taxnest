@@ -68,6 +68,15 @@ this release. Existing policies are preserved, and broad planning trackers
 #320/#321/#337 remain open. The synthetic restore drill establishes access
 containment and preservation only; it does not make those broader claims.
 
+The secret-free CI runtime bootstrap retains locked Electron 42.11.16 and all
+real Electron tests. Three fresh runners encountered HTTP504 from the normal
+release-download front door. On standard installer failure, the helper uses
+only the same official GitHub API asset (657960598), checks its official pinned
+SHA-256 `e27e9ec78d12edc83c817a1454b706530c000eedd217f65aed2a5d9657ec1be0`,
+refuses unsafe archive paths and verifies the extracted version/executable.
+No third-party mirror, version downgrade, unverified binary or skipped test is
+used. Release metadata: [Electron v42.11.16](https://github.com/electron/electron/releases/tag/v42.11.16).
+
 ## Verification gate
 
 Fresh exact-head PHP8.4/full suite, native MariaDB, Chromium at 1366/390, Node/

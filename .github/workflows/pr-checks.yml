@@ -402,8 +402,9 @@ jobs:
       - name: Install patched Electron runtime for real BrowserWindow acceptance
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends xvfb xauth libgtk-3-0 libnss3 libgbm1 libasound2 libatk-bridge2.0-0
-          node pra-agent/node_modules/electron/install.js
+          sudo apt-get install -y --no-install-recommends xvfb xauth unzip libgtk-3-0 libnss3 libgbm1 libasound2 libatk-bridge2.0-0
+          bash scripts/tests/ci-electron-runtime-check.sh
+          bash scripts/ci-electron-runtime.sh
       - name: Exercise thermal receipt paper and Agent settings in real Electron
         timeout-minutes: 3
         run: |

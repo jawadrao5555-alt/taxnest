@@ -159,11 +159,17 @@ class DiSellingPackingTest extends TestCase
         $invoice->save();
         $hash = $invoice->integrity_hash;
         $this->assertSame('verified_current', IntegrityHashService::verificationStatus($invoice));
+        $invoice->update(['status' => 'locked']);
+        $owner = \App\Models\User::create(['name' => 'Synthetic proof owner', 'email' => 'packing-proof@test.invalid',
+            'password' => 'unused', 'role' => 'company_admin', 'is_active' => true, 'company_id' => $this->company->id]);
+        $this->actingAs($owner)->get('/invoice/'.$invoice->id)->assertOk()
+            ->assertSee('current original proof verified')->assertSee('FBR acceptance evidence unavailable');
         $item = $invoice->items()->sole();
         $snapshot = $item->selling_snapshot;
         $snapshot['factor'] = '50';
         $item->update(['selling_snapshot' => $snapshot]);
         $this->assertSame('failed', IntegrityHashService::verificationStatus($invoice));
+        $this->get('/invoice/'.$invoice->id)->assertOk()->assertSee('stored data differs from its original proof');
         $this->assertSame($hash, $invoice->fresh()->integrity_hash);
         $method = new \ReflectionMethod(IntegrityHashService::class, 'generateVersion');
         foreach ([2, 3] as $version) {

@@ -23,14 +23,21 @@ export async function fbrDiBulkWorkflow(page,t,v,{baseUrl,saveEvidenceScreenshot
   const invalid=await product.evaluate(form=>Array.from(form.elements).filter(e=>e.willValidate&&!e.validity.valid).map(e=>({name:e.name,value:e.value,message:e.validationMessage})));
   if(invalid.length)throw new Error('Product packing form invalid: '+JSON.stringify(invalid));
   const submissions=[];
-  const record=response=>{const req=response.request();if(req.method()==='POST'&&new URL(req.url()).pathname==='/products')submissions.push({status:response.status(),location:response.headers().location||'',data:Array.from(new URLSearchParams(req.postData()||'').entries()).filter(([name])=>name!=='_token')});};
+  const record=response=>{const req=response.request();if(req.method()==='POST'&&new URL(req.url()).pathname==='/products')submissions.push({status:response.status(),worker:response.fromServiceWorker(),location:response.headers().location||'',data:Array.from(new URLSearchParams(req.postData()||'').entries()).filter(([name])=>name!=='_token')});};
   page.on('response',record);
   try {
     await Promise.all([page.waitForURL(u=>u.pathname==='/products',{waitUntil:'domcontentloaded'}),product.getByRole('button',{name:'Create Product',exact:true}).click()]);
   } catch(error) {
     const errors=await page.locator('#productForm .text-red-700').allTextContents();
     const fields=await product.evaluate(form=>Array.from(new FormData(form).entries()).filter(([name])=>name!=='_token'));
-    throw new Error('Product packing save failed at '+new URL(page.url()).pathname+': '+errors.join('; ')+'; fields='+JSON.stringify(fields)+'; submissions='+JSON.stringify(submissions)+'; pageErrors='+JSON.stringify(diagnostics?.pageErrors||[])+'; '+error.message);
+    let probe={};
+    if(submissions.length) {
+      const original=Object.fromEntries(submissions[0].data);original.name+=' probe';
+      original._token=await product.locator('[name="_token"]').inputValue();
+      const result=await page.request.post(baseUrl+'/products',{form:original,maxRedirects:0});
+      probe={status:result.status(),location:result.headers().location||'',title:(await result.text()).match(/<title>([^<]+)/)?.[1]||''};
+    }
+    throw new Error('Product packing save failed at '+new URL(page.url()).pathname+': '+errors.join('; ')+'; fields='+JSON.stringify(fields)+'; probe='+JSON.stringify(probe)+'; submissions='+JSON.stringify(submissions)+'; pageErrors='+JSON.stringify(diagnostics?.pageErrors||[])+'; '+error.message);
   } finally { page.off('response',record); }
   await page.getByText('Product created successfully.',{exact:true}).waitFor();
   await page.goto(baseUrl+'/invoice/create',{waitUntil:'domcontentloaded'});

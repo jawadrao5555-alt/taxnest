@@ -76,7 +76,7 @@
                         <div x-show="document_type !== 'Sale Invoice'" x-cloak>
                             <label class="block text-sm font-medium text-amber-600 mb-1">Reference Invoice No *</label>
                             <input type="text" name="reference_invoice_number" x-model="reference_invoice_number" placeholder="Original invoice number"
-                                class="w-full rounded-lg border-amber-300 shadow-sm bg-amber-50 dark:bg-amber-900/30 dark:border-amber-600 dark:text-gray-100 focus:ring-amber-500 focus:border-amber-500">
+                                class="w-full rounded-lg border-amber-300 shadow-sm bg-amber-50 dark:bg-amber-900/30 dark:border-amber-600 dark:text-gray-100 focus:ring-amber-500 focus:border-amber-500"><button type="button" x-show="document_type === 'Credit Note'" @click="loadPackingReturn()" class="mt-2 text-sm text-emerald-700 dark:text-emerald-300 underline">Load original packing lines</button>
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Invoice #</label>
@@ -109,7 +109,12 @@
                         </div>
                     </div>
 
-                    <input type="hidden" name="buyer_registration_type" :value="buyerRegType">
+                    <label class="block text-sm font-medium mb-2">Buyer sales tax registration
+                        <select name="buyer_registration_type" x-model="buyer_reg_type" class="block w-full rounded-lg dark:bg-gray-700" aria-label="Buyer sales tax registration">
+                            <option value="Unregistered">Unregistered</option><option value="Registered">Registered</option>
+                        </select>
+                    </label>
+                    <p class="text-xs text-gray-500">NTN/CNIC identifies the buyer. Choose their actual sales tax registration; entering an identifier is not a registration check.</p>
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Buyer Name *</label>
@@ -130,7 +135,7 @@
                     </div>
                     <div class="mt-2">
                         <p class="text-xs font-medium" :class="buyerRegType === 'Registered' ? 'text-emerald-600' : 'text-amber-600'">
-                            <span x-text="buyerRegType === 'Registered' ? '&#9989; FBR Registered (NTN/CNIC detected)' : '&#9888; Unregistered Buyer (enter NTN or CNIC to mark as registered)'"></span>
+                            <span x-text="buyerRegType === 'Registered' ? 'Declared registered buyer' : 'Declared unregistered buyer'"></span>
                         </p>
                     </div>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
@@ -279,6 +284,18 @@
 
                             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
                                 <div>
+                                    <input type="hidden" :name="'items['+index+'][product_id]'" :value="item.product_id || ''">
+                                    <input type="hidden" :name="'items['+index+'][invoice_item_id]'" :value="item.invoice_item_id || ''">
+                                    <input type="hidden" :name="'items['+index+'][source_invoice_item_id]'" :value="item.source_invoice_item_id || ''">
+                                    <label x-show="item.selling_packing_id" class="text-xs flex gap-2 mb-1"><input type="checkbox" :name="'items['+index+'][price_includes_tax]'" value="1" x-model="item.price_includes_tax" @change="calcTax(index)">Selling rate includes sales tax</label>
+                                    <label class="block text-xs font-medium mb-1" x-show="(item.packings || []).length">Sell By
+                                        <select :name="'items['+index+'][selling_packing_id]'" x-model="item.selling_packing_id" @change="selectPacking(index)" class="block w-full rounded-lg dark:bg-gray-700">
+                                            <option value="">Base UOM</option>
+                                            <template x-for="pack in (item.packings || [])" :key="pack.id"><option :value="pack.id" x-text="pack.label"></option></template>
+                                        </select>
+                                    </label>
+                                    <p class="text-xs text-gray-500" x-show="item.selling_packing_id" x-text="packingQuantity(index)"></p>
+                                    <p class="text-xs text-gray-500" x-show="item.packing_history" x-text="item.packing_history ? 'Original packing: '+item.packing_history.selling_quantity+' '+item.packing_history.label+'; fields below use base UOM.' : ''"></p>
                                     <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Description</label>
                                     <input type="text" :name="'items[' + index + '][description]'" x-model="item.description" required class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm text-sm focus:ring-emerald-500 focus:border-emerald-500">
                                 </div>
@@ -287,6 +304,7 @@
                                     <select :name="'items[' + index + '][default_uom]'" x-model="item.default_uom"
                                         class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm text-sm focus:ring-emerald-500 focus:border-emerald-500">
                                         <option value="Numbers, pieces, units">Numbers, pieces, units</option>
+                                        <option value="KG">KG</option><option value="Liter">Liter</option><option value="Pcs">Pcs</option>
                                         <option value="Kilograms">Kilograms</option>
                                         <option value="Liters">Liters</option>
                                         <option value="Meters">Meters</option>
@@ -519,7 +537,7 @@
                 buyer_name: @js($invoice->buyer_name),
                 buyer_ntn: @js($invoice->buyer_ntn),
                 buyer_cnic: @js($invoice->buyer_cnic ?? ''),
-                buyer_reg_type: @js($invoice->buyer_registration_type ?? ''),
+                buyer_reg_type: @js($invoice->buyer_registration_type ?? 'Unregistered'),
                 buyer_address: @js($invoice->buyer_address ?? ''),
                 document_type: @js($invoice->document_type ?? 'Sale Invoice'),
                 reference_invoice_number: @js($invoice->reference_invoice_number ?? ''),
@@ -532,6 +550,9 @@
                     $rules = \App\Services\ScheduleEngine::resolveValidationRules($scheduleType, $taxRate, $defaultRate);
                     return [
                         'product_id' => '',
+                        'selling_packing_id' => '', 'price_includes_tax' => false, 'source_invoice_item_id' => '', 'packings' => [], 'base_price' => $i->price, 'base_mrp' => $i->mrp,
+                        'invoice_item_id' => $i->id,
+                        'packing_history' => $i->selling_snapshot,
                         'hs_code' => $i->hs_code,
                         'pct_code' => $i->pct_code ?? '',
                         'description' => $i->description,
@@ -578,7 +599,7 @@
 
                 get buyerRegType() {
                     if (this.buyer_reg_type) return this.buyer_reg_type;
-                    return detectRegType(this.buyer_ntn, this.buyer_cnic);
+                    return 'Unregistered';
                 },
 
                 applyScheduleRules(item) {
@@ -593,7 +614,7 @@
 
                 addItem() {
                     let item = {
-                        product_id: '', hs_code: '', pct_code: '', description: '',
+                        product_id: '', selling_packing_id: '', price_includes_tax: false, source_invoice_item_id: '', packings: [], base_price: 0, base_mrp: 0, hs_code: '', pct_code: '', description: '',
                         quantity: 1, price: 0, tax_rate: companyStandardRate, tax: 0,
                         schedule_type: 'standard', sro_schedule_no: '', serial_no: '', mrp: '', mrpManual: false,
                         default_uom: 'Numbers, pieces, units',
@@ -696,7 +717,7 @@
 
                 calcTax(index) {
                     let item = this.items[index];
-                    let unitPrice = parseFloat(item.price || 0);
+                    let unitPrice = this.effectivePrice(item);
                     let qty = Number(parseFloat(item.quantity || 0).toFixed(4));
                     let subtotal = Number((unitPrice * qty).toFixed(2));
                     if (!item.mrpManual && unitPrice > 0) item.mrp = unitPrice.toFixed(2);
@@ -715,17 +736,17 @@
                 },
                 itemSubtotal(index) {
                     let item = this.items[index];
-                    return (parseFloat(item.price || 0) * parseFloat(item.quantity || 0)).toFixed(2);
+                    return (this.effectivePrice(item) * parseFloat(item.quantity || 0)).toFixed(2);
                 },
                 itemTotal(index) {
                     let item = this.items[index];
-                    return ((parseFloat(item.price || 0) * parseFloat(item.quantity || 0)) + parseFloat(item.tax || 0) + parseFloat(item.further_tax || 0)).toFixed(2);
+                    return ((this.effectivePrice(item) * parseFloat(item.quantity || 0)) + parseFloat(item.tax || 0) + parseFloat(item.further_tax || 0)).toFixed(2);
                 },
                 onDocTypeChange() {},
 
                 totalExclST() {
                     return this.items.reduce((total, item) => {
-                        return total + Number((parseFloat(item.price || 0) * Number(parseFloat(item.quantity || 0).toFixed(4))).toFixed(2));
+                        return total + Number((this.effectivePrice(item) * Number(parseFloat(item.quantity || 0).toFixed(4))).toFixed(2));
                     }, 0).toFixed(2);
                 },
                 totalSalesTax() {
@@ -738,7 +759,7 @@
                 },
                 recalcAllFurtherTax() {
                     this.items.forEach((item) => {
-                        let subtotal = parseFloat(item.price || 0) * parseFloat(item.quantity || 0);
+                        let subtotal = this.effectivePrice(item) * parseFloat(item.quantity || 0);
                         if (this.applyFurtherTax) {
                             item.further_tax = parseFloat((subtotal * 0.04).toFixed(2));
                         } else {
@@ -772,7 +793,7 @@
                     this.buyer_ntn = customer.ntn || '';
                     this.buyer_cnic = customer.cnic || '';
                     this.buyer_address = customer.address || '';
-                    this.buyer_reg_type = customer.registration_type || '';
+                    this.buyer_reg_type = customer.registration_type || 'Unregistered';
                     this.customerSearch = customer.name;
                     this.showCustomerDropdown = false;
                 },
@@ -798,9 +819,50 @@
                     } catch(e) { item.showDropdown = false; }
                 },
 
+                effectivePrice(item) {
+                    let rate = Number(item.price || 0);
+                    if (!item.selling_packing_id || !item.price_includes_tax) return rate;
+                    const taxRate = Number(item.tax_rate || 0) / 100;
+                    if (item.schedule_type === '3rd_schedule') return Number((rate - Number(item.mrp || 0) * taxRate).toFixed(6));
+                    if (['exempt', 'zero_rated'].includes(item.schedule_type)) return rate;
+                    return Number((rate / (1 + taxRate)).toFixed(6));
+                },
+                selectPacking(index) {
+                    const item = this.items[index];
+                    const pack = (item.packings || []).find(p => p.id === item.selling_packing_id);
+                    const factor = pack ? Number(pack.factor) : 1;
+                    item.quantity = 1;
+                    item.price = pack && pack.price ? Number(pack.price) : Number(item.base_price || 0) * factor;
+                    item.mrp = Number(item.base_mrp || 0) * factor;
+                    item.mrpManual = true;
+                    this.calcTax(index);
+                },
+                packingQuantity(index) {
+                    const item = this.items[index];
+                    const pack = (item.packings || []).find(p => p.id === item.selling_packing_id);
+                    return pack ? 'Reporting quantity: '+Number((Number(item.quantity || 0)*Number(pack.factor)).toFixed(4))+' '+item.default_uom : '';
+                },
+                async loadPackingReturn() {
+                    try {
+                        const response = await fetch('/invoices/return-items?reference='+encodeURIComponent(this.reference_invoice_number || ''), {headers:{Accept:'application/json'}});
+                        const data = await response.json();
+                        if (!response.ok) throw new Error(data.message || 'Original invoice could not be loaded.');
+                        if (!data.items.length) throw new Error('No unreturned packing lines remain on this invoice.');
+                        const defaults = this.items[0] || {};
+                        this.items = data.items.map(row => ({...defaults, ...row, invoice_item_id:'', showDropdown:false, productSearch:row.description, packing_history:null}));
+                        this.items.forEach((row,index) => this.calcTax(index));
+                    } catch (error) { alert(error.message); }
+                },
                 selectProduct(index, product) {
                     let item = this.items[index];
+                    item.source_invoice_item_id = '';
+                    item.price_includes_tax = false;
                     item.product_id = product.id;
+                    item.packings = product.selling_packings || [];
+                    item.selling_packing_id = '';
+                    item.packing_history = null;
+                    item.base_price = product.default_price;
+                    item.base_mrp = product.mrp || product.default_price;
                     item.hs_code = product.hs_code;
                     item.pct_code = product.pct_code || '';
                     item.description = product.name;
@@ -821,6 +883,7 @@
                     this.calcTax(index);
                     this.validateMixedSchedules();
                     this.lookupHsCode(index, true);
+                    if (product.matched_packing_id) { item.selling_packing_id = product.matched_packing_id; this.selectPacking(index); }
                 },
 
                 mapUom(productUom) {

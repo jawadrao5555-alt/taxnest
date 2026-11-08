@@ -7,7 +7,7 @@
 
     @if($canManageBilling)
     <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-6"
-         x-data="{ showForm: {{ $errors->has('pricing_plan_id') ? 'true' : 'false' }}, companyId: @js((string) old('company_id', '')), planId: @js((string) old('pricing_plan_id', '')), plans: @js($assignmentPlans), get availablePlans() { return this.plans.filter(plan => plan.company_ids.includes(Number(this.companyId))); } }">
+         x-data="{ showForm: {{ $errors->has('pricing_plan_id') ? 'true' : 'false' }}, companyId: @js((string) old('company_id', '')), planId: @js((string) old('pricing_plan_id', '')), plans: @js($assignmentPlans), get availableCycles() { return (this.plans.find(plan => plan.id === Number(this.planId)) || {}).cycles || ['annual']; }, get availablePlans() { return this.plans.filter(plan => plan.company_ids.includes(Number(this.companyId))); } }">
         <div class="flex items-center justify-between mb-3">
             <h3 class="text-sm font-semibold text-white">Assign Subscription</h3>
             <button @click="showForm = !showForm" class="text-xs text-indigo-400 hover:underline" x-text="showForm ? 'Hide' : 'Assign New'"></button>
@@ -26,6 +26,9 @@
             </select>
             <select name="billing_cycle" required class="bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500">
                 <option value="annual">Annual</option>
+                <option x-show="availableCycles.includes('monthly')" value="monthly">Monthly — configured DI plans only</option>
+                <option x-show="availableCycles.includes('quarterly')" value="quarterly">Quarterly — configured DI plans only</option>
+                <option x-show="availableCycles.includes('semi_annual')" value="semi_annual">Semi-Annual — configured DI plans only</option>
             </select>
             <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition whitespace-nowrap">Assign</button>
         </form>

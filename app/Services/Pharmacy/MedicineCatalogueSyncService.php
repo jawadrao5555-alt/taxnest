@@ -271,7 +271,10 @@ class MedicineCatalogueSyncService
                     $stats['price_changes']++;
                 }
             } catch (\Throwable $e) {
-                Log::warning('[medicine-catalogue] row upsert failed', ['row' => $row, 'error' => $e->getMessage()]);
+                if (!$e instanceof \InvalidArgumentException) throw $e;
+                MedicineSourceReview::record($row, MedicineCatalogueEntry::SOURCE_DRAP, $run?->id, null, 'invalid', mb_substr($e->getMessage(), 0, 200));
+                $stats['invalid'] = ($stats['invalid'] ?? 0) + 1;
+                Log::warning('[medicine-catalogue] row rejected', ['reason' => $e->getMessage()]);
             }
         }
 
@@ -288,6 +291,12 @@ class MedicineCatalogueSyncService
      * @return array{entry:MedicineCatalogueEntry,outcome:string,price_changed:bool}
      */
     public function upsertRow(array $row, string $source = MedicineCatalogueEntry::SOURCE_DRAP, ?int $syncId = null, bool $overwriteMrp = true): array
+    {
+        MedicineSourceReview::validate($row);
+        return DB::transaction(fn () => $this->applySourceRow($row, $source, $syncId, $overwriteMrp), 3);
+    }
+
+    private function applySourceRow(array $row, string $source, ?int $syncId, bool $overwriteMrp): array
     {
         $brand = trim((string) ($row['brand_name'] ?? ''));
         $regNo = trim((string) ($row['drap_reg_no'] ?? ''));
@@ -314,6 +323,23 @@ class MedicineCatalogueSyncService
 
         $entry = MedicineCatalogueEntry::where('dedupe_key', $key)->lockForUpdate()->first();
         $now = now();
+        $reviewRow = $row;
+        if ($entry && $source !== MedicineCatalogueEntry::SOURCE_DRAP && !$overwriteMrp
+            && $entry->source === MedicineCatalogueEntry::SOURCE_DRAP) $reviewRow['mrp'] = null;
+        $disposition = MedicineSourceReview::disposition($reviewRow, $entry);
+        // An explicit reviewed manual/import correction retains the existing operator contract.
+        if ($source !== MedicineCatalogueEntry::SOURCE_DRAP && $overwriteMrp
+            && in_array($disposition, ['date_conflict', 'undated_conflict'], true)) $disposition = 'applied';
+        if ($disposition !== 'applied') {
+            if (!$entry) {
+                // Keep the catalogue identity, but a future price is not today's applicable MRP.
+                $entry = $this->applySourceRow(array_replace($row, ['mrp' => null, 'effective_date' => null]), $source, $syncId, $overwriteMrp)['entry'];
+            } elseif ($source === MedicineCatalogueEntry::SOURCE_DRAP) {
+                $entry->forceFill(['last_seen_at' => $now])->save();
+            }
+            MedicineSourceReview::record($row, $source, $syncId, $entry, $disposition, 'Source price retained for date ordering or review.');
+            return ['entry' => $entry, 'outcome' => 'unchanged', 'price_changed' => false];
+        }
 
         if (!$entry) {
             $parsed = $this->parser->parse($brand, $row['composition'] ?? null, $pack);
@@ -329,7 +355,7 @@ class MedicineCatalogueSyncService
                 'category' => $category,
                 'pack_size' => $pack !== '' ? mb_substr($pack, 0, 160) : null,
                 'mrp' => $mrp,
-                'effective_date' => $effective,
+                'effective_date' => $mrp !== null ? $effective : null,
                 'source' => $source,
                 'is_active' => true,
                 'dedupe_key' => $key,
@@ -346,6 +372,7 @@ class MedicineCatalogueSyncService
                 ]);
             }
 
+            MedicineSourceReview::record($row, $source, $syncId, $entry, 'applied');
             return ['entry' => $entry, 'outcome' => 'created', 'price_changed' => false];
         }
 
@@ -400,15 +427,16 @@ class MedicineCatalogueSyncService
         if ($mrp !== null && $mayWriteMrp && ($oldMrp === null || abs($oldMrp - $mrp) >= 0.005)) {
             $update['mrp'] = $mrp;
             $update['effective_date'] = $effective ?? $entry->effective_date?->format('Y-m-d');
-            $this->recordPriceChange($entry, $oldMrp, $mrp, $entry->effective_date?->format('Y-m-d'), $update['effective_date'], $source, $syncId);
+            $this->recordPriceChange($entry, $oldMrp, $mrp, $oldMrp !== null ? $entry->effective_date?->format('Y-m-d') : null, $update['effective_date'], $source, $syncId);
             $priceChanged = true;
-        } elseif ($effective !== null && $mayWriteMrp && $entry->effective_date?->format('Y-m-d') !== $effective) {
+        } elseif ($mrp !== null && $effective !== null && $mayWriteMrp && $entry->effective_date?->format('Y-m-d') !== $effective) {
             $update['effective_date'] = $effective;
         }
         $update['checksum'] = $checksum;
 
         $entry->forceFill($update)->save();
 
+        MedicineSourceReview::record($row, $source, $syncId, $entry, 'applied');
         return ['entry' => $entry, 'outcome' => 'updated', 'price_changed' => $priceChanged];
     }
 

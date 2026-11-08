@@ -12,11 +12,11 @@ final class PendingSubscriptionSelection
         return 'billing.pending_selection.'.$companyId;
     }
 
-    public static function quote(Company $company, PricingPlan $plan): ?array
+    public static function quote(Company $company, PricingPlan $plan, ?string $cycle = null): ?array
     {
         $selection = session(self::key((int) $company->id));
         $value = is_array($selection) ? ($selection['quote'] ?? null) : null;
-        if (!is_array($value) || DistributorDiscountService::validateSnapshot($value, $company, $plan, 'annual') !== null) {
+        if (!is_array($value) || DistributorDiscountService::validateSnapshot($value, $company, $plan, $cycle ?? (string) ($value['cycle'] ?? 'annual')) !== null) {
             return null;
         }
         // A completed purchase ends the earlier first-purchase selection.

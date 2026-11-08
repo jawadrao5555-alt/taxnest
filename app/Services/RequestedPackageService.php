@@ -54,21 +54,13 @@ class RequestedPackageService
         return $plan;
     }
 
-    /** Every product line sells the YEAR and nothing else (owner, 23 Aug 2026). */
+    /** POS product lines remain annual-only. */
     public const POS_CYCLES = SubscriptionAssignmentService::SELLABLE_CYCLES;
 
-    /**
-     * The cycle a requested package is actually charged on.
-     *
-     * Since 23 Aug 2026 that is ALWAYS the year, for all three products. A
-     * stale ?cycle=monthly link, a remembered signup session or a tampered
-     * form value can therefore no longer smuggle a cycle the shop cannot buy
-     * into approval — the admin activates the same annual package the pricing
-     * page advertised.
-     */
+    /** Resolve the chosen DI configuration; all other product lines stay annual. */
     public static function cycleForPlan(PricingPlan $plan, ?string $stored = null): string
     {
-        return SubscriptionAssignmentService::purchaseCycle($stored, $plan->product_type ?? null);
+        return SubscriptionAssignmentService::cycleForPlan($plan, $stored);
     }
 
     /**
@@ -127,7 +119,17 @@ class RequestedPackageService
             return null;
         }
 
-        $cycle = self::cycleForPlan($plan, $company->requested_billing_cycle ?? null);
+        try {
+            $cycle = self::cycleForPlan($plan, $company->requested_billing_cycle ?? null);
+        } catch (\Illuminate\Validation\ValidationException $exception) {
+            // A legacy request or later catalogue removal must not break admin lists
+            // or become an annual sale without the customer's explicit selection.
+            return ['name' => $plan->name, 'cycle' => $company->requested_billing_cycle,
+                'cycle_label' => 'Unavailable period', 'price' => null, 'price_label' => 'Review required',
+                'badge' => $plan->name . ' — requested period unavailable',
+                'note' => 'Configure the requested period or explicitly select a new package before assignment.',
+                'available' => false];
+        }
         $priced = SubscriptionAssignmentService::computePrice($plan, $cycle);
         $cycle = $priced['cycle'];
 

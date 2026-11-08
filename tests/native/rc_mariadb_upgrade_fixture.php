@@ -57,7 +57,21 @@ function snapshotTable(PDO $pdo, string $table, string $where, array $bindings, 
     if ($wantedColumns === []) failUpgrade("no non-secret snapshot columns for {$table}");
     $statement = $pdo->prepare('SELECT '.implode(',', array_map('qi', $wantedColumns)).' FROM '.qi($table).' WHERE '.$where.' ORDER BY id');
     $statement->execute($bindings);
-    return ['columns' => $wantedColumns, 'rows' => $statement->fetchAll(PDO::FETCH_ASSOC)];
+    $rows = $statement->fetchAll(PDO::FETCH_ASSOC);
+    // Widening DECIMAL changes PDO's trailing-zero representation, not its value.
+    // Compare exactly as decimal text for these three deliberately widened fields;
+    // do not round, cast through float, omit fields or normalize other evidence.
+    if ($table === 'invoice_items') {
+        foreach ($rows as &$row) {
+            foreach (['quantity', 'price', 'mrp'] as $field) {
+                if (isset($row[$field]) && str_contains((string) $row[$field], '.')) {
+                    $row[$field] = rtrim(rtrim((string) $row[$field], '0'), '.');
+                }
+            }
+        }
+        unset($row);
+    }
+    return ['columns' => $wantedColumns, 'rows' => $rows];
 }
 
 /** @return array<string, array{columns: array<int,string>, rows: array<int,array<string,mixed>>}> */

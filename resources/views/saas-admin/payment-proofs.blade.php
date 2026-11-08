@@ -102,11 +102,13 @@
                                 @elseif($proof->pricingPlan)
                                     @php
                                         $reqCycle = \App\Services\SubscriptionAssignmentService::normalizeCycle($proof->billing_cycle);
-                                        $reqPriced = \App\Services\SubscriptionAssignmentService::computePrice($proof->pricingPlan, $reqCycle, $proof->company);
+                                        $reqPriced = null;
+                                        try { $reqPriced = \App\Services\SubscriptionAssignmentService::computePrice($proof->pricingPlan, $reqCycle, $proof->company); }
+                                        catch (\Illuminate\Validation\ValidationException $exception) { /* Retain an unavailable historical period for review. */ }
                                     @endphp
                                     <span class="text-white font-medium">{{ $proof->pricingPlan->name }}</span>
                                     <span class="block text-[11px] text-gray-500 dark:text-gray-400">
-                                        {{ \App\Models\Subscription::getCycleLabel($reqCycle) }} · PKR {{ number_format($reqPriced['final_price']) }}
+                                        {{ \App\Models\Subscription::getCycleLabel($reqCycle) }} · {{ $reqPriced ? 'PKR '.number_format($reqPriced['final_price']) : 'Current price unavailable — review original proof' }}
                                         @if(($reqPriced['extra_branch_price'] ?? 0) > 0)
                                             <span class="block">= PKR {{ number_format($reqPriced['base_price']) }} package + PKR {{ number_format($reqPriced['extra_branch_price']) }} for {{ $reqPriced['extra_branch_slots'] }} extra branch(es)</span>
                                         @endif
@@ -336,7 +338,7 @@
                                         <div x-data="{
                                                 slots: {{ $ebReview['slots'] }},
                                                 maxSlots: {{ $ebReview['slots'] }},
-                                                cycle: 'annual',
+                                                cycle: @js($reqCycleSel),
                                                 plan: @js((string) $proof->pricing_plan_id),
                                                 rows: @js($ebPlanRows),
                                                 paid: @js($ebReview['paid']),
@@ -385,6 +387,11 @@
                                             </select>
                                             <select name="billing_cycle" x-model="cycle" required class="w-full bg-gray-900 border border-gray-700 rounded-lg text-white text-xs px-2 py-2">
                                                 <option value="annual">Annual</option>
+                                                @if(($proof->pricingPlan?->product_type ?? '') === 'di')
+                                                    @foreach(\App\Services\SubscriptionAssignmentService::cyclesForPlan($proof->pricingPlan) as $cycleKey)
+                                                        @if($cycleKey !== 'annual')<option value="{{ $cycleKey }}">{{ \App\Models\Subscription::getCycleLabel($cycleKey) }}</option>@endif
+                                                    @endforeach
+                                                @endif
                                             </select>
                                             <div>
                                                 <label class="block text-[11px] text-gray-400 mb-1">Amount verified in bank/receipt (PKR)</label>

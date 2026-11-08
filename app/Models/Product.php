@@ -8,6 +8,7 @@ class Product extends Model
 {
     protected $fillable = [
         'company_id',
+        'selling_packings',
         'name',
         'barcode',
         'sku',
@@ -59,6 +60,7 @@ class Product extends Model
     }
 
     protected $casts = [
+        'selling_packings' => 'array',
         'is_price_editable' => 'boolean',
         'is_active' => 'boolean',
         'show_on_sale' => 'boolean',

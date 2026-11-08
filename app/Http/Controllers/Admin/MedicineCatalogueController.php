@@ -78,6 +78,8 @@ class MedicineCatalogueController extends Controller
             'source' => $source,
             'status' => $status,
             'recentPrices' => $recentPrices,
+            'sourceObservations' => Schema::hasTable('medicine_source_observations')
+                ? \Illuminate\Support\Facades\DB::table('medicine_source_observations')->where('disposition', '!=', 'applied')->latest('id')->limit(30)->get() : collect(),
             'phaseCount' => count(MedicineCatalogueSyncService::phases()),
         ]);
     }

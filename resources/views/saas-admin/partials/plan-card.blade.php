@@ -28,9 +28,15 @@
 
         @if($plan->product_type === 'di')
         <div class="mb-3 pb-3 border-b border-gray-800">
-            <p class="text-[10px] text-gray-500 dark:text-gray-400 uppercase mb-1.5">Annual rate (what checkout charges)</p>
+            <p class="text-[10px] text-gray-500 dark:text-gray-400 uppercase mb-1.5">Configured DI billing totals</p>
+            @foreach(\App\Services\SubscriptionAssignmentService::cyclesForPlan($plan) as $cycleKey)
+                @if($cycleKey !== 'annual')
+                    @php $configuredRate = \App\Services\SubscriptionAssignmentService::computePrice($plan, $cycleKey); @endphp
+                    <div class="flex justify-between gap-2 text-[11px]"><span class="text-gray-400">{{ \App\Models\Subscription::getCycleLabel($cycleKey) }}</span><span class="text-gray-200">{{ number_format($configuredRate['final_price'], 2) }}</span></div>
+                @endif
+            @endforeach
             <div class="flex justify-between gap-2 text-[11px]">
-                <span class="text-gray-400">Annual</span>
+                <span class="text-gray-400">Annual rate</span>
                 <span class="text-gray-200 font-medium whitespace-nowrap">{{ number_format($annualRate['final_price']) }}</span>
             </div>
             @if($plan->explicitCyclePrice('annual') === null)
@@ -40,7 +46,7 @@
         @elseif(in_array($plan->product_type, ['pos', 'fbrpos']) || \App\Support\NestErps::isProductType($plan->product_type ?? null))
         <div class="mb-3 pb-3 border-b border-gray-800">
             <p class="text-[10px] text-gray-500 dark:text-gray-400 uppercase mb-1.5">Annual rate (what checkout charges)</p>
-            <div class="flex justify-between gap-2 text-[11px]"><span class="text-gray-400">Annual</span><span class="text-gray-200 font-medium">{{ number_format($annualRate['final_price']) }}</span></div>
+            <div class="flex justify-between gap-2 text-[11px]"><span class="text-gray-400">Annual rate</span><span class="text-gray-200 font-medium">{{ number_format($annualRate['final_price']) }}</span></div>
         </div>
         @endif
 
@@ -111,9 +117,14 @@
                 <input type="number" name="price" value="{{ intval($plan->price) }}" step="1" required class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-1.5 focus:ring-2 focus:ring-indigo-500">
             </div>
             @if($plan->product_type === 'di')
+            @foreach(['price_monthly' => 'Monthly total', 'price_quarterly' => 'Quarterly total', 'price_semi_annual' => 'Six-month total'] as $cycleField => $cycleLabel)
+                <div><label class="text-[10px] text-gray-500 uppercase">{{ $cycleLabel }} (PKR; blank = unavailable)</label>
+                    <input type="number" name="{{ $cycleField }}" value="{{ $plan->getAttribute($cycleField) }}" min="0" step="0.01" class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-1.5">
+                </div>
+            @endforeach
             <div>
                 <label class="text-[10px] text-gray-500 dark:text-gray-400 uppercase">Annual Price (PKR / 12 mo — blank = monthly × 12 less 6%)</label>
-                <input type="number" name="price_yearly" value="{{ $plan->price_yearly !== null ? intval($plan->price_yearly) : '' }}" step="1" class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-1.5 focus:ring-2 focus:ring-indigo-500">
+                <input type="number" name="price_yearly" value="{{ $plan->price_yearly ?? '' }}" step="1" class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-1.5 focus:ring-2 focus:ring-indigo-500">
             </div>
             @endif
             <div>

@@ -274,3 +274,6 @@ Schedule::command('site:uptime-watch')->everyTwoMinutes()->withoutOverlapping();
 // an account runs past the fair-use figure printed on its package, so a custom
 // arrangement can be discussed instead of it surfacing months later.
 Schedule::command('di:fair-use-alerts')->dailyAt('06:40')->withoutOverlapping();
+
+// Dated source prices become catalogue candidates when due, never automatic shop repricing.
+Schedule::command('catalogue:apply-effective-prices')->hourly()->timezone('Asia/Karachi')->withoutOverlapping();

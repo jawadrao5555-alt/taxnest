@@ -682,7 +682,7 @@ class ConsultantConsoleTest extends TestCase
         ]);
 
         // Admin records a payment (single funnel).
-        $sub1 = SubscriptionAssignmentService::assign($referred->id, $plan->id, 'monthly');
+        $sub1 = SubscriptionAssignmentService::assign($referred->id, $plan->id, 'annual');
 
         $c = ConsultantCommission::where('subscription_id', $sub1->id)->first();
         $this->assertNotNull($c, 'Commission must be created for a referred company payment');
@@ -700,7 +700,7 @@ class ConsultantConsoleTest extends TestCase
 
         // Non-referred companies never generate commissions.
         $normal = $this->makeCompany();
-        SubscriptionAssignmentService::assign($normal->id, $plan->id, 'monthly');
+        SubscriptionAssignmentService::assign($normal->id, $plan->id, 'annual');
         $this->assertSame(2, ConsultantCommission::count());
     }
 
@@ -712,14 +712,14 @@ class ConsultantConsoleTest extends TestCase
         $trial = PricingPlan::create([
             'name' => 'DI Trial', 'product_type' => 'di', 'price' => 0, 'is_trial' => true, 'invoice_limit' => 20,
         ]);
-        SubscriptionAssignmentService::assign($referred->id, $trial->id, 'monthly');
+        SubscriptionAssignmentService::assign($referred->id, $trial->id, 'annual');
         $this->assertSame(0, ConsultantCommission::count(), 'Trials must not earn commissions');
 
         $paid = PricingPlan::create([
             'name' => 'DI Pro', 'product_type' => 'di', 'price' => 2000, 'is_trial' => false, 'invoice_limit' => 500,
         ]);
         $profile->update(['status' => 'disabled']);
-        SubscriptionAssignmentService::assign($referred->id, $paid->id, 'monthly');
+        SubscriptionAssignmentService::assign($referred->id, $paid->id, 'annual');
         $this->assertSame(0, ConsultantCommission::count(), 'Disabled consultants earn nothing new');
     }
 

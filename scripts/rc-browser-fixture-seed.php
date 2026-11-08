@@ -974,6 +974,21 @@ foreach ([1366,390] as $width) {
         'price' => 200, 'invoice_limit' => 50, 'is_trial' => false, 'is_public' => true]);
     $billingSelectionCases[$width] = ['login' => $billingOwner->email, 'planId' => $nextPlan->id, 'original' => $oldPlan->name];
 }
+\App\Models\GlobalHsMaster::updateOrCreate(['hs_code' => '99010000'], ['description' => 'Synthetic unreported packing fixture',
+    'schedule_type' => 'standard', 'tax_rate' => 18, 'default_uom' => 'KG']);
+$diBulkCases = [];
+foreach ([1366, 390] as $width) {
+    $bulkCompany = $company('Synthetic DI Packing '.$width, 'di-packing-company-'.$width.'@rc-browser.invalid', 'RCBULKDI'.$width, 'di',
+        ['is_internal_account' => false, 'onboarding_completed' => true]);
+    $bulkOwner = $user($bulkCompany, 'Synthetic DI Packing Owner', 'di-packing-owner-'.$width.'@rc-browser.invalid', 'company_admin');
+    $bulkPlan = \App\Models\PricingPlan::create(['name' => 'Synthetic DI Cycles '.$width, 'product_type' => 'di',
+        'price' => 1000, 'price_monthly' => 1000, 'price_quarterly' => 2970, 'price_semi_annual' => 5820,
+        'price_yearly' => 11280, 'is_trial' => false, 'invoice_limit' => -1, 'is_public' => true]);
+    \App\Models\Subscription::create(['company_id' => $bulkCompany->id, 'pricing_plan_id' => $bulkPlan->id,
+        'active' => true, 'billing_cycle' => 'annual', 'final_price' => 11280,
+        'start_date' => now()->subDay(), 'end_date' => now()->addYearNoOverflow()]);
+    $diBulkCases[$width] = ['login' => $bulkOwner->email, 'companyId' => $bulkCompany->id, 'planId' => $bulkPlan->id];
+}
 $fixture = [
     'generated_at' => $now->toIso8601String(), 'synthetic' => true,
     'readOnlyJourneys' => array_merge([
@@ -1019,6 +1034,8 @@ $fixture = [
         ['name'=>'restore-session-boundary','login'=>$admin->email,'password'=>$password,'loginPath'=>'/admin/login', 'paths'=>[], 'manualOnly'=>true, 'restoreSessionBoundary'=>true],
         ['name'=>'security-onboarding','login'=>$securityCases[1366]['incomplete'],'password'=>$password,
             'loginPath'=>'/login','paths'=>[], 'securityOnboarding'=>$securityCases],
+        ['name'=>'fbr-di-bulk','login'=>$diBulkCases[1366]['login'],'password'=>$password,'loginPath'=>'/login',
+            'paths'=>[], 'manualOnly'=>true, 'fbrDiBulk'=>$diBulkCases],
         ['name'=>'billing-package-selection','login'=>$billingSelectionCases[1366]['login'],'password'=>$password,'loginPath'=>'/login',
             'paths'=>[], 'billingSelection'=>$billingSelectionCases],
         ['name'=>'kot-note-visibility','login'=>$kotNoteOwner->email,'password'=>$password,'loginPath'=>'/pos/login','paths'=>['/pos/invoice/create'],'markers'=>['Current Order'],'kotNoteVisibility'=>['orderId'=>$kotNoteOrder->id]],

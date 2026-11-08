@@ -1142,3 +1142,28 @@ with Blade compilation, Node syntax and diff checks. The required 1366/390
 journey now exercises both retained read-only screens and directly refuses the
 legacy create form; fresh exact-HEAD hosted PHP8.4/browser evidence remains
 required.
+
+
+## PR #365 integration after #367 — 8 November 2026
+
+Updated against deployed main `9355a37742a487bcd8f77025ce171e1c03f112be`
+(#367), preserving #365 history and all security/onboarding/support changes.
+Five content conflicts were reproduced by an ordinary merge. Both sets of
+mandatory PHP, native and real-browser journeys remain enabled: DI quarterly
+billing/packing and medicine ordering from main, and security/onboarding and
+restored-session checks from #365. General browser discovery continues to
+exclude manual-only restoration journeys; explicit isolated lanes execute them.
+The restore drill rebuilds its disposable DB and browser cache before subsequent
+journeys. Billing permission guards wrap the current DI cycle/quote behavior,
+and medicine source observation/ordering remains unchanged.
+
+The evidence-uploader extractor now retains #365's long-job and adjacent-job
+regressions plus main's exact always/sanitization guard requirement. It refuses
+missing, next-job and unguarded uploaders. The release announcement describes
+this security/support release; #367's DI announcement has already been deployed.
+
+Local MariaDB/Chromium cannot run in this host because Unix sockets are denied;
+full acceptance must use the existing guarded, synthetic, loopback-only hosted
+CI. Prior #365 acceptance on `6047062` is historical evidence only; the updated
+head requires all eight fresh gates before owner approval. No merge, relay or
+production action is performed as part of this PR preparation.

@@ -27,7 +27,13 @@ class DiApiRequestIdentity
             }
             $row['schedule_type'] = $row['schedule_type'] ?: 'standard';
             foreach (['quantity', 'price', 'tax', 'tax_rate', 'mrp', 'petroleum_levy', 'further_tax', 'st_withheld_amount'] as $key) {
-                $row[$key] = isset($item[$key]) && $item[$key] !== '' ? number_format((float) $item[$key], 4, '.', '') : null;
+                $row[$key] = isset($item[$key]) && $item[$key] !== '' ? number_format((float) $item[$key], !empty($item['selling_packing_id']) ? 6 : 4, '.', '') : null;
+            }
+            if (!empty($item['selling_packing_id'])) {
+                $row['product_id'] = (int) ($item['product_id'] ?? 0);
+                $row['selling_packing_id'] = (string) $item['selling_packing_id'];
+                $row['price_includes_tax'] = filter_var($item['price_includes_tax'] ?? false, FILTER_VALIDATE_BOOLEAN);
+                if (!empty($item['source_invoice_item_id'])) $row['source_invoice_item_id'] = (int) $item['source_invoice_item_id'];
             }
             $row['st_withheld_at_source'] = !empty($item['st_withheld_at_source']);
             return $row;
@@ -54,7 +60,7 @@ class DiApiRequestIdentity
                 if (!array_key_exists($key, $item)) continue;
                 $stored = $rows[$index]->$key;
                 if (in_array($key, ['quantity', 'price', 'tax', 'tax_rate', 'mrp', 'petroleum_levy', 'further_tax', 'st_withheld_amount'])) {
-                    if (number_format((float) $stored, 4, '.', '') !== number_format((float) $item[$key], 4, '.', '')) return false;
+                    if (number_format((float) $stored, 4, '.', '') !== number_format((float) $item[$key], !empty($item['selling_packing_id']) ? 6 : 4, '.', '')) return false;
                 } elseif ($key === 'st_withheld_at_source') {
                     if ((bool) $stored !== $value) return false;
                 } elseif (trim((string) $stored) !== $value) return false;

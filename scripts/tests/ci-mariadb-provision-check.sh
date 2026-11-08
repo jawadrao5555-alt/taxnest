@@ -70,26 +70,33 @@ job_block() {
     ' "$2"
 }
 
+has_evidence() {
+    python3 -c 'import re,sys; text=sys.stdin.read(); sys.exit(0 if re.search(r"if: always\(\) && steps\.sanitize_evidence\.outcome == \x27success\x27\n\s+uses: actions/upload-artifact@v4",text) else 1)'
+}
+
 for lane in workflow-safety dependency-audit-build fullphpunit native-mariadb-di \
     browserdesktopmobile jsagentrealtime manifest-provenance; do
-    # Consume the full pipe: grep -q can close early and SIGPIPE the producer.
-    job_block "$lane" "$workflow" |
-        grep -F 'actions/upload-artifact@v4' >/dev/null ||
+    job_block "$lane" "$workflow" | has_evidence ||
         fail "$lane lacks its always-uploaded evidence artifact"
 done
 
-# The real extractor must accept an uploader beyond line 120, while refusing
-# a missing uploader even when the next job has one. No false cross-job green.
+# The same real parser accepts long jobs and refuses uploaders from another job
+# or without the required always/sanitization guard.
 {
     printf '  long-lane:\n'
     for ((i=0;i<130;i++)); do printf '      # synthetic acceptance line\n'; done
-    printf '      uses: actions/upload-artifact@v4\n  missing-lane:\n      steps: []\n  following-lane:\n      uses: actions/upload-artifact@v4\n'
+    printf "      if: always() && steps.sanitize_evidence.outcome == 'success'\n      uses: actions/upload-artifact@v4\n"
+    printf '  missing-lane:\n      steps: []\n  following-lane:\n'
+    printf "      if: always() && steps.sanitize_evidence.outcome == 'success'\n      uses: actions/upload-artifact@v4\n"
+    printf '  unguarded-lane:\n      uses: actions/upload-artifact@v4\n'
 } >"$tmp/evidence-workflow.yml"
-job_block long-lane "$tmp/evidence-workflow.yml" | grep -F 'actions/upload-artifact@v4' >/dev/null || fail 'long-job evidence extraction regressed'
-if job_block missing-lane "$tmp/evidence-workflow.yml" | grep -F 'actions/upload-artifact@v4' >/dev/null; then
-    fail 'evidence from another job was accepted'
-fi
-printf 'PASS: evidence extraction accepts long jobs and rejects next-job uploaders.\n'
+job_block long-lane "$tmp/evidence-workflow.yml" | has_evidence || fail 'long-job evidence extraction regressed'
+for rejected in missing-lane unguarded-lane; do
+    if job_block "$rejected" "$tmp/evidence-workflow.yml" | has_evidence; then
+        fail 'unguarded evidence or evidence from another job was accepted'
+    fi
+done
+printf 'PASS: evidence extraction accepts long jobs and rejects next-job or unguarded uploaders.\n'
 
 python3 "$(dirname "${BASH_SOURCE[0]}")/rc-mariadb-discovery-check.py"
 python3 "$(dirname "${BASH_SOURCE[0]}")/rc-mariadb-startup-check.py"

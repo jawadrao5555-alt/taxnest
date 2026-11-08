@@ -37,6 +37,7 @@ class DiInvoiceApiController extends Controller
     {
         $company = $request->attributes->get('di_api_company');
         $companyId = $company->id;
+        $request->attributes->set('di_original_input', $request->all());
 
         $validator = Validator::make($request->all(), [
             'client_reference' => 'required|string|max:100',
@@ -57,7 +58,7 @@ class DiInvoiceApiController extends Controller
             'items' => 'required|array|min:1',
             'items.*.hs_code' => 'required|string|max:50',
             'items.*.description' => 'required|string|max:255',
-            'items.*.quantity' => 'required|numeric|min:0.01',
+            'items.*.quantity' => 'required|numeric|min:0.0001',
             'items.*.price' => 'required|numeric|min:0.01',
             'items.*.tax' => 'required|numeric|min:0',
             'items.*.schedule_type' => 'nullable|string|in:standard,reduced,3rd_schedule,exempt,zero_rated,fed_services,services',
@@ -103,6 +104,8 @@ class DiInvoiceApiController extends Controller
         if ($existing) {
             return $this->duplicateResponse($existing, $request);
         }
+
+        $request->merge(['items' => \App\Services\DiSellingPacking::normalizeRequest($request, (int) $companyId)]);
 
         // ── FBR schedule rules — same engine as the panel ───────────────────
         $standardTaxRate = $company->getStandardTaxRateValue();
@@ -155,6 +158,7 @@ class DiInvoiceApiController extends Controller
         // ── Create invoice + items (mirrors InvoiceController::store) ───────
         try {
             $invoice = DB::transaction(function () use ($request, $company, $companyId, $selectedBranch, $documentType, $buyerRegType, $clientReference, $standardTaxRate) {
+                \App\Services\DiSellingPacking::validateReturns($request->input('items'), (int) $companyId);
                 $totals = \App\Services\DiInvoiceMath::totals($request->input('items'));
             $totalValueExcludingST = $totals['value'];
             $totalSalesTax = $totals['tax'];
@@ -164,7 +168,7 @@ class DiInvoiceApiController extends Controller
                 $supplierProvince = $selectedBranch?->province ?? $company->province ?? null;
 
                 $invoice = Invoice::create([
-                    'di_api_request_hash' => \App\Services\DiApiRequestIdentity::fingerprint($request->all()),
+                    'di_api_request_hash' => \App\Services\DiApiRequestIdentity::fingerprint($request->attributes->get('di_original_input', $request->all())),
                     'company_id' => $companyId,
                     'invoice_number' => $invoiceNumber,
                     'internal_invoice_number' => $invoiceNumber,
@@ -201,6 +205,7 @@ class DiInvoiceApiController extends Controller
 
                     InvoiceItem::create([
                         'invoice_id' => $invoice->id,
+                        ...(!empty($item['selling_snapshot']) ? ['selling_snapshot' => $item['selling_snapshot']] : []),
                         'hs_code' => $item['hs_code'],
                         'schedule_type' => $scheduleType,
                         'pct_code' => $item['pct_code'] ?? ($hsResolved['pct_code'] ?? null),
@@ -223,6 +228,9 @@ class DiInvoiceApiController extends Controller
 
                 return $invoice;
             });
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json(['status' => 'error', 'error' => 'validation_failed',
+                'message' => 'Invoice lines require correction.', 'errors' => $e->errors()], 422);
         } catch (\Illuminate\Database\QueryException $e) {
             // Unique (company_id, client_reference) race — a concurrent retry
             // won; return the winner's invoice instead of an error.
@@ -397,7 +405,7 @@ class DiInvoiceApiController extends Controller
 
     private function duplicateResponse(Invoice $invoice, Request $request)
     {
-        if (!\App\Services\DiApiRequestIdentity::matches($invoice, $request->all())) {
+        if (!\App\Services\DiApiRequestIdentity::matches($invoice, $request->attributes->get('di_original_input', $request->all()))) {
             return response()->json([
                 'status' => 'error', 'error' => 'client_reference_conflict',
                 'message' => 'This reference belongs to a different invoice request. Retrieve its status; use a new reference for a new bill.',

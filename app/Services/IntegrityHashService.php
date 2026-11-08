@@ -8,7 +8,7 @@ class IntegrityHashService
 {
     public static function generate(Invoice $invoice): string
     {
-        return self::generateVersion($invoice, 3);
+        return self::generateVersion($invoice, 4);
     }
 
     private static function generateVersion(Invoice $invoice, int $version): string
@@ -23,11 +23,12 @@ class IntegrityHashService
                 'tax_rate' => self::amount($item->tax_rate),
                 'sro_schedule_no' => (string) $item->sro_schedule_no,
                 'serial_no' => (string) $item->serial_no,
-                'mrp' => self::amount($item->mrp),
+                'mrp' => self::amount($item->mrp, $version >= 4 ? 6 : 4),
                 'description' => (string) $item->description,
-                'quantity' => self::amount($item->quantity),
-                'price' => self::amount($item->price),
+                'quantity' => self::amount($item->quantity, $version >= 4 ? 6 : 4),
+                'price' => self::amount($item->price, $version >= 4 ? 6 : 4),
                 'tax' => self::amount($item->tax),
+                ...($version >= 4 ? ['selling_snapshot' => $item->selling_snapshot] : []),
                 ...($version >= 3 ? [
                     'default_uom' => (string) $item->default_uom,
                     'sale_type' => (string) $item->sale_type,
@@ -71,20 +72,23 @@ class IntegrityHashService
         ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRESERVE_ZERO_FRACTION));
     }
 
-    private static function amount($value): string
+    private static function amount($value, int $scale = 4): string
     {
-        return number_format((float) ($value ?? 0), 4, '.', '');
+        return number_format((float) ($value ?? 0), $scale, '.', '');
+    }
+
+    public static function verificationStatus(Invoice $invoice): string
+    {
+        if (!$invoice->integrity_hash) return 'missing';
+        $invoice->load('items');
+        foreach ([4 => 'verified_current', 3 => 'verified_legacy_v3', 2 => 'verified_legacy_v2'] as $version => $status) {
+            if (hash_equals((string) $invoice->integrity_hash, self::generateVersion($invoice, $version))) return $status;
+        }
+        return 'failed';
     }
 
     public static function verify(Invoice $invoice): bool
     {
-        if (!$invoice->integrity_hash) {
-            return false;
-        }
-
-        $invoice->load('items');
-        return hash_equals((string) $invoice->integrity_hash, self::generate($invoice))
-            // Existing locked invoices keep their original v2 proof; never rewrite history.
-            || hash_equals((string) $invoice->integrity_hash, self::generateVersion($invoice, 2));
+        return str_starts_with(self::verificationStatus($invoice), 'verified_');
     }
 }

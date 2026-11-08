@@ -37,22 +37,36 @@ class SubscriptionAssignmentService
             : 'monthly';
     }
 
-    /**
-     * Owner, 23 Aug 2026: PRA POS, FBR POS aur Digital Invoice — teeno ab SIRF
-     * SALANA (annual) bikte hain. Monthly / quarterly / semi-annual har
-     * kharidne wale raste se hat gaye hain.
-     *
-     * This is the ONE predicate every buying path asks. normalizeCycle() stays
-     * as the READER for cycles already stored on live subscriptions (a shop
-     * that bought a monthly package before today keeps its own history and
-     * expiry) — only what can be SOLD is narrowed here.
-     */
+    /** POS/FBR POS/ERPS remain annual-only; DI short periods require configured prices. */
     public const SELLABLE_CYCLES = ['annual'];
 
     /** The cycle any new purchase / renewal / approval is charged on. */
     public static function purchaseCycle(?string $requested = null, ?string $productType = null): string
     {
-        return 'annual';
+        if ($productType !== 'di' || $requested === null || $requested === '') return 'annual';
+        if (!in_array($requested, ['monthly', 'quarterly', 'semi_annual', 'annual', 'yearly'], true)) {
+            throw \Illuminate\Validation\ValidationException::withMessages(['billing_cycle' => 'Choose a supported billing period.']);
+        }
+        return self::normalizeCycle($requested);
+    }
+
+    /** DI short cycles require an explicitly configured price; other panels remain annual. */
+    public static function cyclesForPlan(PricingPlan $plan): array
+    {
+        if ($plan->product_type !== 'di') return self::SELLABLE_CYCLES;
+        return array_values(array_filter(['monthly', 'quarterly', 'semi_annual', 'annual'],
+            fn ($cycle) => $cycle === 'annual' || $plan->explicitCyclePrice($cycle) !== null));
+    }
+
+    public static function cycleForPlan(PricingPlan $plan, ?string $requested): string
+    {
+        $cycle = self::purchaseCycle($requested, $plan->product_type);
+        if (!in_array($cycle, self::cyclesForPlan($plan), true)) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'billing_cycle' => 'That billing cycle has no configured price for this package.',
+            ]);
+        }
+        return $cycle;
     }
 
     /**
@@ -94,13 +108,8 @@ class SubscriptionAssignmentService
     {
         $type = $plan->product_type ?? 'di';
 
-        // Annual-only (owner, 23 Aug 2026). Whatever cycle a caller asks for,
-        // a purchase is charged by the YEAR — so the price quoted here and the
-        // expiry assign() derives from it can never describe a cycle the shop
-        // is no longer able to buy. The hand-set price_quarterly /
-        // price_monthly columns stay in the table (old subscriptions' history)
-        // but nothing reads them for a sale anymore.
-        $cycle = self::purchaseCycle($cycle, $type);
+        // Keep non-DI annual prices intact; DI can select only a configured short period.
+        $cycle = self::cycleForPlan($plan, $cycle);
 
         if ($type === 'pos' || $type === 'fbrpos' || $type === 'standalone' || NestErps::isProductType($type)) {
             // Both POS lines, standalone and Nest ERPS store the ANNUAL total
@@ -127,9 +136,9 @@ class SubscriptionAssignmentService
     /**
      * @param  string  $billingCycle  monthly | quarterly | semi_annual | annual (legacy 'yearly' ok)
      */
-    public static function assign(int $companyId, int $pricingPlanId, string $billingCycle = 'monthly', bool $reuseCurrentPlan = false, bool $paidRenewal = false): Subscription
+    public static function assign(int $companyId, int $pricingPlanId, string $billingCycle = 'annual', bool $reuseCurrentPlan = false, bool $paidRenewal = false, ?array $approvedQuote = null): Subscription
     {
-        return DB::transaction(function () use ($companyId, $pricingPlanId, $billingCycle, $reuseCurrentPlan, $paidRenewal) {
+        return DB::transaction(function () use ($companyId, $pricingPlanId, $billingCycle, $reuseCurrentPlan, $paidRenewal, $approvedQuote) {
             // This is the subscription-replacement mutex. Add-on approval takes
             // the same company lock, so it can never attach a paid feature to a
             // package renewal that is being replaced at the same moment.
@@ -166,6 +175,14 @@ class SubscriptionAssignmentService
             // extra-branch slots it has already bought (Rs 10,000/branch/year).
             $priced = self::computePrice($plan, $billingCycle, $company);
             $cycle = $priced['cycle'];
+            if ($approvedQuote !== null) {
+                $error = DistributorDiscountService::validateSnapshot($approvedQuote, $company, $plan, $cycle);
+                if ($error) throw \Illuminate\Validation\ValidationException::withMessages(['billing_cycle' => $error]);
+                $priced['discount_percent'] = (float) ($approvedQuote['pricing_snapshot']['discount_percent'] ?? $priced['discount_percent']);
+                $priced['base_price'] = round((float) $approvedQuote['gross_package_price'] - (float) $approvedQuote['discount_amount'], 2);
+                $priced['extra_branch_price'] = round((float) ($approvedQuote['undiscounted_addon_amount'] ?? 0), 2);
+                $priced['final_price'] = round((float) $approvedQuote['net_quote'], 2);
+            }
             $months = Subscription::getMonthsForCycle($cycle);
 
             $active = Subscription::where('company_id', $companyId)
@@ -178,7 +195,7 @@ class SubscriptionAssignmentService
                 ]);
             }
 
-            $endDate = now()->addMonths($months);
+            $endDate = now()->addMonthsNoOverflow($months);
             $previous = $active->first();
             if ($paidRenewal && $previous
                 && (int) $previous->pricing_plan_id === $pricingPlanId
@@ -206,7 +223,7 @@ class SubscriptionAssignmentService
             // existing assignment path until the migration is applied.
             if (\Illuminate\Support\Facades\Schema::hasColumn('subscriptions', 'purchase_snapshot')) {
                 $attributes['purchase_snapshot'] = SubscriptionPurchaseSnapshot::capture(
-                    $company, $plan, $priced, $attributes['start_date'], $attributes['end_date'], $paidRenewal
+                    $company, $plan, $priced, $attributes['start_date'], $attributes['end_date'], $paidRenewal, $approvedQuote['plan_snapshot'] ?? null
                 );
             }
             $subscription = Subscription::create($attributes);
@@ -266,7 +283,13 @@ class SubscriptionAssignmentService
         // assign() deactivates the 3-day trial row and prices the plan for this
         // cycle → end_date = start + the cycle's months. After that the shop
         // must renew (expiry is enforced by PlanLimitService).
-        $cycle = RequestedPackageService::cycleForPlan($plan, $company->requested_billing_cycle ?? null);
+        try {
+            $cycle = RequestedPackageService::cycleForPlan($plan, $company->requested_billing_cycle ?? null);
+        } catch (\Illuminate\Validation\ValidationException $exception) {
+            // Retain the original request for explicit operator review; never
+            // silently substitute a different paid period during company approval.
+            return null;
+        }
 
         return self::assign($company->id, $plan->id, $cycle);
     }

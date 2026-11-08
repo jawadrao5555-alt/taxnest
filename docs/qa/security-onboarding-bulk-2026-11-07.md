@@ -514,3 +514,19 @@ outside the disposable test database.
 Hosted PHP8.4/full-suite acceptance is required for the published exact HEAD.
 This closes the company-lifecycle Agent slice only; OAuth refresh and the wider
 companion/security/onboarding checklist remain open.
+
+## DI API dual-column lifecycle revocation
+
+The DI API re-read its company on every request, but its rejected check covered
+only `status` and neither lifecycle column handled `inactive`. That allowed a
+valid machine key to continue through the read-only status endpoint when the
+administrator persisted one of those states in the other authoritative column.
+
+The middleware now applies pending, suspended, rejected and inactive to both
+persisted lifecycle columns before tenant binding or telemetry. Existing
+structured errors remain and an explicit `company_inactive` response covers the
+new state. Actual HTTP coverage exercises both columns and every inactive value
+against the status endpoint, then restores the fictional company between cases.
+No subscription, invoice, API key or business record is changed outside the
+disposable test database. Hosted PHP8.4/full-suite acceptance is required for
+the published exact HEAD; other companion and OAuth acceptance remains open.

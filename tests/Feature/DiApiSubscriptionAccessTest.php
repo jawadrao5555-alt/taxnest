@@ -195,4 +195,30 @@ class DiApiSubscriptionAccessTest extends TestCase
             ->assertStatus(403)
             ->assertJsonPath('error', 'company_suspended');
     }
+
+    public function test_each_inactive_lifecycle_state_in_either_company_column_revokes_the_api_key(): void
+    {
+        $this->subscription();
+
+        $states = [
+            'pending' => 'company_pending_approval',
+            'suspended' => 'company_suspended',
+            'rejected' => 'company_rejected',
+            'inactive' => 'company_inactive',
+        ];
+
+        foreach (['status', 'company_status'] as $column) {
+            foreach ($states as $state => $error) {
+                $this->company->forceFill([$column => $state])->save();
+
+                $this->api()->getJson('/api/di/v1/invoices/status?client_reference=missing')
+                    ->assertStatus(403)
+                    ->assertJsonPath('error', $error);
+
+                $this->company->forceFill([
+                    $column => $column === 'status' ? 'approved' : 'active',
+                ])->save();
+            }
+        }
+    }
 }

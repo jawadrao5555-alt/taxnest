@@ -40,6 +40,14 @@ class DiagnosticSourceEvidenceTest extends TestCase
         $this->assertSame('2026-11-07T01:00:00+05:00', $r['rows'][0]['event_at']);
         $this->assertStringNotContainsString('PRIVATE', json_encode($r));
         $this->assertFalse($r['coverage']['seven_day_complete']);
+        $this->assertSame(DiagnosticSourceEvidence::FIELD_CONTRACT_VERSION, $r['field_coverage']['contract_version']);
+        $this->assertSame(['id', 'event_at'], $r['field_coverage']['returned_fields']);
+        $this->assertFalse($r['field_coverage']['source_record_complete']);
+        $this->assertFalse($r['field_coverage']['non_allowlisted_fields_returned']);
+        $this->assertSame('NOT_RETURNED', $r['field_coverage']['payload_content']);
+        $this->assertSame('NOT_RETURNED', $r['field_coverage']['personal_data']);
+        $this->assertSame('NOT_RETURNED', $r['field_coverage']['financial_values']);
+        $this->assertSame('NOT_RETURNED', $r['field_coverage']['regulator_response']);
     }
 
     public function test_health_metadata_and_missing_fbr_source_remain_explicit(): void
@@ -77,6 +85,8 @@ class DiagnosticSourceEvidenceTest extends TestCase
             $this->assertSame(DiagnosticSourceEvidence::REGISTRY_VERSION, $r['registry_version']);
             $this->assertStringNotContainsString('PRIVATE', json_encode($r));
             $this->assertFalse($r['coverage']['complete']);
+            $this->assertSame(['id', 'event_at'], $r['field_coverage']['returned_fields'], $source);
+            $this->assertFalse($r['field_coverage']['source_record_complete'], $source);
         }
 
         foreach ([

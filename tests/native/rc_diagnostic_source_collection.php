@@ -159,6 +159,11 @@ try {
         || $liveOps['rows'][0]['fix_commit'] !== str_repeat('a', 40)
         || $liveOps['rows'][0]['pull_request'] !== '#364'
         || $liveOps['rows'][0]['deployment_sha'] !== str_repeat('b', 40)
+        || $liveOps['field_coverage']['contract_version'] !== \App\Services\Reporting\DiagnosticSourceEvidence::FIELD_CONTRACT_VERSION
+        || $liveOps['field_coverage']['returned_fields'] !== ['id', 'event_at', 'status', 'operation', 'fix_commit', 'pull_request', 'deployment_sha']
+        || $liveOps['field_coverage']['source_record_complete'] !== false
+        || $liveOps['field_coverage']['non_allowlisted_fields_returned'] !== false
+        || $liveOps['field_coverage']['payload_content'] !== 'NOT_RETURNED'
         || ! str_contains($liveOps['release_evidence_note'], 'do not prove')
         || str_contains(json_encode($liveOps), 'PRIVATE')
         || $liveOpsBefore !== DB::table('live_ops_autonomous_requests')->whereIn('id', $liveOpsIds)->orderBy('id')->get()->toJson()) {

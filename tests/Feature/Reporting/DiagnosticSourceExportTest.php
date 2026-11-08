@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Reporting;
 
+use App\Services\Reporting\DiagnosticSourceEvidence;
 use App\Services\Reporting\DiagnosticSourceExport;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\{DB, Schema};
@@ -70,6 +71,12 @@ class DiagnosticSourceExportTest extends TestCase
         $this->assertSame(120, $first['export']['next_after_id']);
         $this->assertFalse($first['export']['retained_window_rows_exhausted']);
         $this->assertFalse($first['export']['source_collection_complete']);
+        $this->assertSame(DiagnosticSourceEvidence::FIELD_CONTRACT_VERSION, $first['field_coverage']['contract_version']);
+        $this->assertSame(['id', 'event_at'], $first['field_coverage']['returned_fields']);
+        $this->assertFalse($first['field_coverage']['source_record_complete']);
+        $this->assertFalse($first['field_coverage']['non_allowlisted_fields_returned']);
+        $this->assertSame('NOT_RETURNED', $first['field_coverage']['payload_content']);
+        $this->assertSame(['id', 'event_at'], array_keys($first['rows'][0]));
         $this->assertStringNotContainsString('PRIVATE', json_encode($first));
 
         $second = app(DiagnosticSourceExport::class)->read(array_replace($args, ['after_id' => 120, 'max_rows' => 50]), [1]);

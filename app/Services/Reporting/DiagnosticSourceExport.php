@@ -79,6 +79,7 @@ final class DiagnosticSourceExport
             'source' => $first['source'],
             'status' => $terminalFailure ?? $sourceStatus,
             'coverage' => $first['coverage'],
+            'field_coverage' => $first['field_coverage'],
             'collection_observation' => $first['collection_observation'],
             'export' => [
                 'version' => 1,

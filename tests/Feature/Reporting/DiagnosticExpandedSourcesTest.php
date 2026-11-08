@@ -218,6 +218,9 @@ class DiagnosticExpandedSourcesTest extends TestCase
             $this->assertSame(1, $report['collection_observation']['retained_rows']);
             $this->assertCount(1, $report['rows']);
             $this->assertSame(['id', 'event_at', 'status', 'operation', 'fix_commit', 'pull_request', 'deployment_sha'], array_keys($report['rows'][0]));
+            $this->assertSame(['id', 'event_at', 'status', 'operation', 'fix_commit', 'pull_request', 'deployment_sha'], $report['field_coverage']['returned_fields']);
+            $this->assertFalse($report['field_coverage']['source_record_complete']);
+            $this->assertFalse($report['field_coverage']['non_allowlisted_fields_returned']);
             $this->assertSame('FAILED', $report['rows'][0]['status']);
             $this->assertSame('diagnose', $report['rows'][0]['operation']);
             $this->assertSame('commit-'.$id, $report['rows'][0]['fix_commit']);

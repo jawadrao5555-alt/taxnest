@@ -10,7 +10,9 @@ use Illuminate\Validation\ValidationException;
 /** Registered, SELECT-only source metadata. Never returns stored payloads or unrestricted columns. */
 final class DiagnosticSourceEvidence
 {
-    public const REGISTRY_VERSION = 9;
+    public const REGISTRY_VERSION = 10;
+
+    public const FIELD_CONTRACT_VERSION = 1;
 
     public const SOURCES = [
         'pra.fiscal' => ['pos', 'pra_logs', 'created_at'],
@@ -115,6 +117,7 @@ final class DiagnosticSourceEvidence
         $fixed = self::SOURCES[$v['source']][3] ?? [];
         $unavailableReason = self::SOURCES[$v['source']][4] ?? null;
         $safeColumns = self::SOURCES[$v['source']][5] ?? [];
+        $returnedFields = array_merge(['id', 'event_at'], $safeColumns);
         if (\App\Support\NestErps::canonicalProductType($company->product_type) !== $product) {
             throw ValidationException::withMessages(['source' => 'This source does not apply to the selected product.']);
         }
@@ -128,6 +131,15 @@ final class DiagnosticSourceEvidence
                     'reason' => 'Stored collection observations are company-wide and are not proof of branch collection.'],
             'coverage' => ['complete' => false, 'seven_day_complete' => false, 'collection_status' => 'UNKNOWN',
                 'deleted_or_never_collected_events' => 'UNKNOWN', 'sequence_gaps' => 'UNAVAILABLE', 'client_clock_skew' => 'UNAVAILABLE'],
+            'field_coverage' => ['contract_version' => self::FIELD_CONTRACT_VERSION,
+                'returned_fields' => $returnedFields,
+                'source_record_complete' => false,
+                'non_allowlisted_fields_returned' => false,
+                'payload_content' => 'NOT_RETURNED',
+                'personal_data' => 'NOT_RETURNED',
+                'financial_values' => 'NOT_RETURNED',
+                'regulator_response' => 'NOT_RETURNED',
+                'note' => 'Returned fields are the complete allow-list for each row, not a complete source record or proof of complete collection.'],
             'notes' => ['Stored event presence does not establish complete collection, regulator acceptance or product health.',
                 'Missing tables are unavailable; an empty window proves only that no retained rows matched.',
                 'Rows contain IDs/timestamps and only source-specific allow-listed operational identifiers. Regulatory payloads, patient data, customer details and credentials are excluded.',

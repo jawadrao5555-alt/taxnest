@@ -340,3 +340,23 @@ payload redaction, tenant isolation and byte-for-byte preservation of all Live
 Ops rows. Hosted exact-HEAD PHP8.4/full-suite/native/browser/Node/final validate
 remains required. This is read-only evidence and never retries a job, deploys,
 messages a customer or changes company/business state.
+
+## Truthful returned-field contract (registry v10)
+
+Every registered source response and bounded export now carries a versioned
+field-coverage contract. It lists the exact row keys the adapter can return:
+ID and event time for metadata-only sources, plus only the existing explicit
+Live Ops allow-list where applicable. The contract separately states that a
+returned row is not a complete source record, no non-allow-listed field is
+returned, and payload content, personal data, financial values and regulator
+responses are not returned.
+
+This makes the API's field boundary machine-readable without turning redaction
+into a false completeness claim. It does not establish that all original rows
+were collected, that seven days are complete, or that deleted/unobserved
+events, per-bill offline activity, physical output, fiscal acceptance or
+tenant-bound backup/restore proof exist. Those gaps remain explicit. Focused
+SQLite and mandatory native MariaDB coverage require the exact declared keys,
+false source-record completeness, redaction and unchanged source rows. Fresh
+exact-HEAD hosted PHP8.4/full-suite/native/browser/Node/final validate remains
+required.

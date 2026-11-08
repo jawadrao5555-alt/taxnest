@@ -42,6 +42,13 @@ database with file sessions, proves stale-admin refusal and fresh login at both
 viewports, then rebuilds that fixture. It is not run inside a general journey
 that would invalidate another viewport's prepared reset grant.
 
+Support lifecycle/SLA instants use explicit DATETIME columns in the first
+undeployed migration. This avoids MariaDB 10.6's implicit first-TIMESTAMP
+ON UPDATE behavior changing an original opened time during assignment or
+status changes. The native probe starts with a deliberately older opening
+instant and requires it to survive assignment, resolution/reopen and company
+purge. See [MariaDB's TIMESTAMP automatic-value contract](https://mariadb.com/docs/server/reference/data-types/date-and-time-data-types/timestamp).
+
 ## Data-flow and preservation boundaries
 
 | Data family | Existing boundary retained by this release |

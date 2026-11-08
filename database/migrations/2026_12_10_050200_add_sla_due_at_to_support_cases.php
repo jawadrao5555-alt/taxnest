@@ -9,7 +9,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('support_cases', function (Blueprint $table) {
-            $table->timestamp('sla_due_at')->nullable()->after('priority');
+            $table->dateTime('sla_due_at')->nullable()->after('priority');
             $table->index(['sla_due_at', 'status'], 'support_cases_sla_status');
         });
     }

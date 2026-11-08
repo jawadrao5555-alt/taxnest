@@ -46,6 +46,7 @@ class SupportCaseLifecycleSchemaTest extends TestCase
             ->assertRedirect('/admin/support-inbox/inbox/901');
 
         $case = SupportCase::query()->sole();
+        $originalOpenedAt = $case->opened_at->copy();
         $this->assertSame($company->id, $case->company_id);
         $this->assertSame($admin->id, $case->assigned_admin_id);
         $this->assertSame(SupportCase::PRIORITY_URGENT, $case->priority);
@@ -62,6 +63,7 @@ class SupportCaseLifecycleSchemaTest extends TestCase
         ])->assertRedirect();
 
         $case->refresh();
+        $this->assertTrue($originalOpenedAt->equalTo($case->opened_at));
         $this->assertSame(SupportCase::STATUS_REOPENED, $case->status);
         $this->assertSame('synthetic.1', $case->resolution_build);
         $this->assertTrue($resolvedAt->equalTo($case->resolved_at));

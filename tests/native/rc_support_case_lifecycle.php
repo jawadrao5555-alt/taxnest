@@ -75,7 +75,7 @@ $make = function (Company $tenant, int $uid) use ($admin): SupportCase {
         'source_uid' => $uid,
         'subject' => 'Synthetic native support case',
         'status' => SupportCase::STATUS_OPEN,
-        'opened_at' => now(),
+        'opened_at' => '2026-01-01 12:00:00',
     ]);
     SupportCaseEvent::create([
         'support_case_id' => $case->id,
@@ -103,7 +103,8 @@ app()->instance('request', $slaRequest);
 auth('admin')->login($admin);
 app(SupportInboxController::class)->assignCase($slaRequest, $case);
 $case->refresh();
-if ($case->sla_due_at?->format('Y-m-d H:i:s') !== '2030-01-01 12:00:00'
+if ($case->opened_at?->format('Y-m-d H:i:s') !== '2026-01-01 12:00:00'
+    || $case->sla_due_at?->format('Y-m-d H:i:s') !== '2030-01-01 12:00:00'
     || $case->events()->where('event_type', 'sla_changed')->count() !== 1) {
     throw new RuntimeException('Support SLA deadline or timeline evidence was not retained');
 }
@@ -178,7 +179,8 @@ try {
     $company->delete();
     $company->forceDelete();
     $case->refresh();
-    if ($case->company_id !== null || (int) $case->company_id_snapshot !== $originalCompanyId
+    if ($case->opened_at?->format('Y-m-d H:i:s') !== '2026-01-01 12:00:00'
+        || $case->company_id !== null || (int) $case->company_id_snapshot !== $originalCompanyId
         || $case->company_name_snapshot !== $company->name
         || $case->events()->where('event_type', 'resolved')->count() !== 1
         || $foreignBefore !== $foreign->fresh()->getAttributes()) {

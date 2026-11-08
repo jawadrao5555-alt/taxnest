@@ -23,9 +23,9 @@ return new class extends Migration
             $table->string('subject');
             $table->string('status', 24)->default('open');
             $table->string('resolution_build', 100)->nullable();
-            $table->timestamp('opened_at');
-            $table->timestamp('resolved_at')->nullable();
-            $table->timestamp('reopened_at')->nullable();
+            $table->dateTime('opened_at');
+            $table->dateTime('resolved_at')->nullable();
+            $table->dateTime('reopened_at')->nullable();
             $table->timestamps();
 
             $table->unique(['source_box', 'source_uid'], 'support_cases_source_unique');
@@ -42,7 +42,7 @@ return new class extends Migration
             $table->string('to_status', 24)->nullable();
             $table->string('resolution_build', 100)->nullable();
             $table->text('note')->nullable();
-            $table->timestamp('occurred_at');
+            $table->dateTime('occurred_at');
             $table->timestamps();
 
             $table->index(['support_case_id', 'occurred_at'], 'support_case_events_timeline');

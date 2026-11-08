@@ -279,17 +279,36 @@ class ReadOnlyReportingConnectorTest extends TestCase
         $this->assertNotNull(DB::table('reporting_oauth_grants')->first()->revoked_at);
     }
 
-    public function test_owner_revocation_and_owner_demotion_block_existing_tokens(): void
+    public function test_owner_revocation_and_owner_demotion_block_existing_and_refresh_tokens(): void
     {
         [$p,$t] = $this->connection();
         $grant = DB::table('reporting_oauth_grants')->first();
         $this->get('/admin/reporting/connections')->assertOk()->assertSee('Synthetic reporting client')->assertDontSee($t['access_token']);
         $this->post('/admin/reporting/connections/'.$grant->id.'/revoke')->assertRedirect();
         $this->toolCall($t['access_token'], 'get_company_billing_summary', $this->period())->assertUnauthorized();
+        $this->postJson('/api/reporting/oauth/token', [
+            'grant_type' => 'refresh_token', 'client_id' => $p['client_id'],
+            'resource' => $p['resource'], 'refresh_token' => $t['refresh_token'],
+        ])->assertStatus(400);
+
         [$p,$t] = $this->connection();
         $this->owner->update(['role' => 'support']);
         $this->toolCall($t['access_token'], 'get_company_billing_summary', $this->period())->assertUnauthorized();
+        $this->postJson('/api/reporting/oauth/token', [
+            'grant_type' => 'refresh_token', 'client_id' => $p['client_id'],
+            'resource' => $p['resource'], 'refresh_token' => $t['refresh_token'],
+        ])->assertStatus(400);
         $this->get('/admin/reporting/connections')->assertForbidden();
+    }
+
+    public function test_owner_demotion_blocks_a_preissued_authorization_code(): void
+    {
+        [, $input] = $this->authorize();
+        $this->owner->update(['role' => 'support']);
+
+        $this->postJson('/api/reporting/oauth/token', $input)->assertStatus(400);
+        $this->assertSame(0, DB::table('reporting_oauth_grants')->count());
+        $this->assertNull(DB::table('reporting_oauth_codes')->first()->used_at);
     }
 
     public function test_metadata_redirect_origin_bearer_and_protocol_guards(): void

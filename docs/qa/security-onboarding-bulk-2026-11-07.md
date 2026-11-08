@@ -530,3 +530,20 @@ against the status endpoint, then restores the fictional company between cases.
 No subscription, invoice, API key or business record is changed outside the
 disposable test database. Hosted PHP8.4/full-suite acceptance is required for
 the published exact HEAD; other companion and OAuth acceptance remains open.
+
+## Reporting OAuth cached-authorization revocation acceptance
+
+The read-only reporting connector already re-reads the persisted super-admin
+actor for every bearer request and token exchange. Acceptance now exercises
+that same authority at the token endpoint: an explicit connection revocation
+refuses its unused refresh token, a persisted owner-role downgrade refuses both
+the existing access token and unused refresh token, and a code issued before
+the downgrade cannot be exchanged afterward. Failed exchanges do not create a
+replacement grant or mark the untrusted code as consumed.
+
+These are actual authorization-code and refresh-token HTTP paths with fictional
+companies and no external connector or message. Existing PKCE, one-use refresh
+rotation/replay revocation, resource binding and read-audit tests remain in
+place. Hosted PHP8.4/full-suite acceptance is required for the exact published
+HEAD. This closes the reporting OAuth cached-authority slice only; broader
+companion revocation and the remaining security/onboarding matrix stay open.

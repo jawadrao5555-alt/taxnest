@@ -77,6 +77,29 @@ refuses unsafe archive paths and verifies the extracted version/executable.
 No third-party mirror, version downgrade, unverified binary or skipped test is
 used. Release metadata: [Electron v42.11.16](https://github.com/electron/electron/releases/tag/v42.11.16).
 
+The same release-front-door outage also affected PHP cached builds and Gradle.
+The two MariaDB-container setup-php steps use the action's supported packaged
+PHP mode (`use_builds_cache=false`), retaining PHP8.4 and the existing runtime/
+extension verification. Gradle remains 8.11.1: its official distribution/API
+asset 207876967 is pinned to the official checksum
+`f397b287023acdba1e9f6fc5ea72d22dd63669d59ed4a289a29b1a76eee151c6`.
+The existing pinned setup-gradle action discovers that verified executable on
+PATH and still performs wrapper/cache checks. Every Android build/unit test
+remains mandatory. Offline counterfeit-byte acceptance requires Gradle to
+refuse extraction/PATH changes. Sources:
+[setup-php Linux installer](https://github.com/shivammathur/setup-php/blob/v2/src/scripts/linux.sh),
+[Gradle checksum](https://downloads.gradle.org/distributions/gradle-8.11.1-bin.zip.sha256),
+[Gradle action provisioning](https://github.com/gradle/actions/blob/ed408507eac070d1f99cc633dbcf757c94c7933a/sources/src/execution/provision.ts).
+
+Hosted security acceptance reached the viewer survey history after exercising
+setup/recovery/profile password change, two-step, deletion request and viewer
+revocation. The next locator incorrectly required a relative href, while the
+actual Results link is generated as an absolute route URL. The journey now
+clicks the real labelled Results link and verifies its exact route, retaining
+the no-close/reopen-form assertion. Related form assertions use suffix/contains
+path matching so absolute routes cannot make a forbidden form invisible to the
+test. No permission or application assertion is removed.
+
 ## Verification gate
 
 Fresh exact-head PHP8.4/full suite, native MariaDB, Chromium at 1366/390, Node/

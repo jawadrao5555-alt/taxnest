@@ -104,6 +104,8 @@ concurrency(){
     grep -Fqx "PASS: native concurrent audit export expiry retains history and invoices; foreign paths and current exports preserved" "$EVIDENCE_DIR/audit-export-retention.log" || fail audit-export-retention-missing-success-proof
     clean_php php "$ROOT/tests/native/rc_company_deletion_lifecycle.php" | tee "$EVIDENCE_DIR/company-deletion-lifecycle.log"
     grep -Fqx "PASS: native concurrent verified company deletion request creates one exact hold; restore revokes only browser sessions and preserves foreign tenant and Agent pairing" "$EVIDENCE_DIR/company-deletion-lifecycle.log" || fail company-deletion-lifecycle-missing-success-proof
+    clean_php php "$ROOT/tests/native/rc_restore_security_quarantine.php" | tee "$EVIDENCE_DIR/restore-security-quarantine.log"
+    grep -Fqx "PASS: native post-restore quarantine revokes browser, reset, reporting and consultant access; company rows and Agent pairing remain exact" "$EVIDENCE_DIR/restore-security-quarantine.log" || fail restore-security-quarantine-missing-success-proof
     clean_php php "$ROOT/tests/native/rc_support_case_lifecycle.php" | tee "$EVIDENCE_DIR/support-case-lifecycle.log"
     grep -Fqx "PASS: native concurrent support resolution records one exact build; reopen retains history and other company unchanged" "$EVIDENCE_DIR/support-case-lifecycle.log" || fail support-case-lifecycle-missing-success-proof
     grep -Fqx "PASS: native concurrent two-step controller permits one TOTP and one recovery use; other account unchanged" "$EVIDENCE_DIR/two-step-login.log" || fail two-step-single-use-missing-success-proof

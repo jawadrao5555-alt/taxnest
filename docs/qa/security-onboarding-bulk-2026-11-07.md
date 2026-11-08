@@ -39,6 +39,38 @@ request/hold/restore/purge evidence slice. Full customer data export, statutory
 retention disposition, production backup verification and tenant-scoped restore
 replay remain open; no production company or business record was touched.
 
+## Post-restore access quarantine continuation
+
+An older database restore can resurrect browser sessions, password-reset grants,
+read-only reporting OAuth tokens and consultant access that was revoked after the
+backup was taken. The existing restore quarantine covered only optional encrypted
+support copies. A new explicitly confirmed operator command now applies the wider
+fail-closed access quarantine to a migrated restored database. It deletes restored
+database sessions and legacy reset tokens, rotates every company user's browser
+generation, consumes outstanding reset grants, revokes reporting codes/grants and
+removes reporting token hashes, revokes pending/active consultant links and unused
+invites, and invokes the existing optional-copy key/copy quarantine.
+
+The operator supplies a unique restore identifier which is retained only as a
+SHA-256 digest. One identifier is idempotent, with durable completion counts and
+an Agent-pairing digest. The command hashes Agent key/enabled rows before and after
+the transaction and fails if they differ; company rows, subscriptions, sales,
+payments, stock, fiscal references and Agent pairing are not rewritten. Explicit
+confirmation and an 8–160 character restore identifier are mandatory.
+
+The focused migrated SQLite test passes **1 test / 29 assertions**, covering the
+real command, confirmation refusal, session/reset/reporting/consultant revocation,
+optional-copy key destruction, exact company-row preservation and retry
+idempotency. A mandatory native MariaDB probe exercises the same command and exact
+Agent/company preservation. Fresh exact-HEAD hosted native/full/browser/Node/final
+validate remains required.
+
+This is post-restore containment and synthetic acceptance only. It does not create
+or validate a backup, prove backup freshness, perform a production restore, prove
+external session-store invalidation, or replay a deletion absent from the restored
+backup. Production backup verification and a controlled tenant restore drill remain
+open and must not be inferred from this command or its tests.
+
 ## Persisted customer-release authority continuation
 
 Actual route reconciliation found that an admin-panel login alone could publish,

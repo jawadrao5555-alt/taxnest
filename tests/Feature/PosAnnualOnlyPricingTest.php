@@ -215,7 +215,7 @@ class PosAnnualOnlyPricingTest extends TestCase
         }
     }
 
-    public function test_di_annual_formula_is_unchanged_for_quarterly_request(): void
+    public function test_di_annual_formula_is_unchanged(): void
     {
         $plan = PricingPlan::create([
             'name' => 'DI Plan',
@@ -225,7 +225,7 @@ class PosAnnualOnlyPricingTest extends TestCase
             'invoice_limit' => -1,
         ]);
 
-        $priced = SubscriptionAssignmentService::computePrice($plan, 'quarterly');
+        $priced = SubscriptionAssignmentService::computePrice($plan, 'annual');
         $expected = Subscription::calculateFinalPrice(1000.0, 'annual');
 
         $this->assertSame('annual', $priced['cycle']);

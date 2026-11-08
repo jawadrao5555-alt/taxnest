@@ -42,7 +42,7 @@ Customer uploads proof → admin approve/reject → may grant temporary access (
 
 | Product | Cadence note |
 |---------|--------------|
-| DI | Monthly↔Annual toggles with discounts |
+| DI | Annual default; monthly/quarterly/semiannual available only with explicitly configured positive cycle prices. Shared quote/assignment policy; existing subscriptions remain immutable. |
 | NestPOS | Annual-only packages |
 | FBR POS | Annual-style packages |
 | Nest ERPS | Plans via `erps` + vertical |
@@ -50,3 +50,7 @@ Customer uploads proof → admin approve/reject → may grant temporary access (
 ## Enforcement surfaces
 
 Middleware / billing pages / feature services (`PosFeatureService`, `DiFeatureService`) / registration gates.
+
+## Implementation checkpoint — PR #338 continuation, 8 Nov 2026
+
+Configured DI cycles are resolved by `SubscriptionAssignmentService::cyclesForPlan/cycleForPlan`; this does not enable short POS/FBR/ERPS sales. `price_monthly`, `price_quarterly` and `price_semi_annual` are explicit totals; absent short rates are unavailable. Existing annual fallback/campaign rules are preserved. Prices take effect when the catalogue is saved; an earlier server quote captures original plan/pricing terms for later reviewed payment/receipt creation. There is no new foreign-currency, subscription-tax, automatic refund or proration policy. Period arithmetic is calendar-month/no-overflow. Same-plan/same-cycle paid renewal extends a current paid term; a deliberate package/cycle change retains the existing new-term policy. Deployment/live acceptance is a separate owner step.

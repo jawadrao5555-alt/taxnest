@@ -57,18 +57,10 @@ class RequestedPackageService
     /** Every product line sells the YEAR and nothing else (owner, 23 Aug 2026). */
     public const POS_CYCLES = SubscriptionAssignmentService::SELLABLE_CYCLES;
 
-    /**
-     * The cycle a requested package is actually charged on.
-     *
-     * Since 23 Aug 2026 that is ALWAYS the year, for all three products. A
-     * stale ?cycle=monthly link, a remembered signup session or a tampered
-     * form value can therefore no longer smuggle a cycle the shop cannot buy
-     * into approval — the admin activates the same annual package the pricing
-     * page advertised.
-     */
+    /** Resolve the chosen DI configuration; all other product lines stay annual. */
     public static function cycleForPlan(PricingPlan $plan, ?string $stored = null): string
     {
-        return SubscriptionAssignmentService::purchaseCycle($stored, $plan->product_type ?? null);
+        return SubscriptionAssignmentService::cycleForPlan($plan, $stored);
     }
 
     /**

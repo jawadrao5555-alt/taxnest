@@ -9,6 +9,7 @@ class InvoiceItem extends Model
     protected $fillable = [
         'st_withheld_amount',
         'invoice_id',
+        'selling_snapshot',
         'hs_code',
         'schedule_type',
         'pct_code',
@@ -28,6 +29,7 @@ class InvoiceItem extends Model
     ];
 
     protected $casts = [
+        'selling_snapshot' => 'array',
         'st_withheld_amount' => 'float',
         'st_withheld_at_source' => 'boolean',
         'petroleum_levy' => 'float',

@@ -101,6 +101,9 @@
                     </select>
                 </div>
                 <input type="number" name="price" placeholder="Price (PKR — DI = stored monthly base, POS/FBR POS = annual)" step="1" required class="bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500">
+                @foreach(['price_monthly' => 'Monthly total', 'price_quarterly' => 'Quarterly total', 'price_semi_annual' => 'Six-month total'] as $field => $label)
+                    <input type="number" name="{{ $field }}" aria-label="DI {{ $label }}" placeholder="DI {{ $label }} (blank = unavailable)" step="0.01" min="0" class="bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2">
+                @endforeach
                 <input type="number" name="price_yearly" placeholder="Annual Price (DI only — blank = monthly × 12 less 6%)" step="1" class="bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500">
                 <input type="number" name="invoice_limit" placeholder="Invoice Limit (-1=unlimited)" required class="bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500">
                 <input type="number" name="max_terminals" placeholder="Max Terminals (-1=unlimited)" class="bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500">
@@ -127,7 +130,7 @@
         <div class="flex items-center gap-2 mb-4">
             <div class="w-2 h-2 rounded-full bg-emerald-500"></div>
             <h2 class="text-lg font-bold text-white">Digital Invoice Plans</h2>
-            <span class="text-xs text-gray-500 dark:text-gray-400">({{ $diPlans->count() }} plans — sold annually; base prices are stored monthly)</span>
+            <span class="text-xs text-gray-500 dark:text-gray-400">({{ $diPlans->count() }} plans — configured DI billing periods; existing prices are preserved)</span>
         </div>
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             @foreach($diPlans as $plan)

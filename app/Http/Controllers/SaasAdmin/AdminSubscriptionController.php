@@ -46,6 +46,7 @@ class AdminSubscriptionController extends Controller
 
         $assignmentPlans = $plans->map(fn (PricingPlan $plan) => [
             'id' => (int) $plan->id,
+            'cycles' => SubscriptionAssignmentService::cyclesForPlan($plan),
             'label' => $plan->name . ' · ' . PlanSellabilityService::productLabel($plan)
                 . ' · PKR ' . number_format(SubscriptionAssignmentService::computePrice($plan, 'annual')['base_price']) . '/year (base)',
             'company_ids' => $companies->filter(fn (Company $company) => PlanCompanyCompatibility::matches($company, $plan))
@@ -62,10 +63,13 @@ class AdminSubscriptionController extends Controller
             'pricing_plan_id' => 'required|exists:pricing_plans,id',
             // Annual-only since 23 Aug 2026 (owner). 'yearly' stays accepted as
             // the legacy spelling of the same thing.
-            'billing_cycle' => 'required|in:annual,yearly',
+            'billing_cycle' => 'required|in:monthly,quarterly,semi_annual,annual,yearly',
         ]);
 
         $plan = PricingPlan::findOrFail($request->pricing_plan_id);
+        if (!in_array(SubscriptionAssignmentService::normalizeCycle($request->billing_cycle), SubscriptionAssignmentService::cyclesForPlan($plan), true)) {
+            throw \Illuminate\Validation\ValidationException::withMessages(['billing_cycle' => 'Choose a configured billing period for this package.']);
+        }
         if (PlanSellabilityService::isRetired($plan)) {
             return back()->with('error', PlanSellabilityService::retiredMessage($plan));
         }

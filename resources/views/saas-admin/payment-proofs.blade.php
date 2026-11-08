@@ -333,7 +333,7 @@
                                         <div x-data="{
                                                 slots: {{ $ebReview['slots'] }},
                                                 maxSlots: {{ $ebReview['slots'] }},
-                                                cycle: 'annual',
+                                                cycle: @js($reqCycleSel),
                                                 plan: @js((string) $proof->pricing_plan_id),
                                                 rows: @js($ebPlanRows),
                                                 paid: @js($ebReview['paid']),
@@ -382,6 +382,11 @@
                                             </select>
                                             <select name="billing_cycle" x-model="cycle" required class="w-full bg-gray-900 border border-gray-700 rounded-lg text-white text-xs px-2 py-2">
                                                 <option value="annual">Annual</option>
+                                                @if(($proof->pricingPlan?->product_type ?? '') === 'di')
+                                                    @foreach(\App\Services\SubscriptionAssignmentService::cyclesForPlan($proof->pricingPlan) as $cycleKey)
+                                                        @if($cycleKey !== 'annual')<option value="{{ $cycleKey }}">{{ \App\Models\Subscription::getCycleLabel($cycleKey) }}</option>@endif
+                                                    @endforeach
+                                                @endif
                                             </select>
                                             <div>
                                                 <label class="block text-[11px] text-gray-400 mb-1">Amount verified in bank/receipt (PKR)</label>

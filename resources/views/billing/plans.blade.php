@@ -12,7 +12,7 @@
                 <form method="POST" action="{{ route('payment-proof.store') }}" enctype="multipart/form-data" class="mt-4 space-y-3">
                     @csrf
                     <input type="hidden" name="pricing_plan_id" value="{{ $pendingSelectionPlan->id }}">
-                    <input type="hidden" name="billing_cycle" value="annual">
+                    <input type="hidden" name="billing_cycle" value="{{ $pendingSelection['cycle'] ?? 'annual' }}">
                     <div><label for="selected-package-amount" class="block text-sm">Amount you paid (PKR)</label><input id="selected-package-amount" name="amount" type="number" min="0" step="0.01" value="{{ old('amount') }}" class="rounded border-gray-300 dark:bg-gray-900"></div>
                     <div><label for="selected-package-method" class="block text-sm">Payment method</label><select id="selected-package-method" name="payment_method" class="rounded border-gray-300 dark:bg-gray-900"><option value="bank">Bank transfer</option><option value="jazzcash">JazzCash</option><option value="easypaisa">EasyPaisa</option><option value="other">Other</option></select></div>
                     <div><label for="selected-package-reference" class="block text-sm">Transaction reference</label><input id="selected-package-reference" name="reference" maxlength="120" value="{{ old('reference') }}" class="rounded border-gray-300 dark:bg-gray-900"></div>
@@ -251,8 +251,8 @@
             <div x-data="{
                 cycle: 'annual',
                 pricing: {{ \Illuminate\Support\Js::from($planPricing) }},
-                months: { annual: 12 },
-                cycleLabels: { annual: 'year' },
+                months: { monthly: 1, quarterly: 3, semi_annual: 6, annual: 12 },
+                cycleLabels: { monthly: 'month', quarterly: '3 months', semi_annual: '6 months', annual: 'year' },
                 row(planId) { return (this.pricing[planId] || {})[this.cycle] || null; },
                 total(planId) { let r = this.row(planId); return r ? Math.round(r.final_price) : 0; },
                 perMonth(planId) { let r = this.row(planId); return r ? Math.round(r.monthly_effective) : 0; },
@@ -263,7 +263,14 @@
                      the row just states how the packages are billed. --}}
                 <div class="flex justify-center mb-8">
                     <span class="inline-flex items-center gap-2 bg-gray-100 dark:bg-gray-800 rounded-xl px-4 py-2 border border-gray-200 dark:border-gray-700 text-sm text-gray-700 dark:text-gray-300">
-                        Billed annually
+                        <label for="di-billing-cycle" class="font-medium">Billing period</label>
+                        <select id="di-billing-cycle" x-model="cycle" class="rounded-lg dark:bg-gray-800" aria-label="Billing period">
+                            @foreach(['monthly' => 'Monthly', 'quarterly' => 'Quarterly', 'semi_annual' => 'Semi-Annual', 'annual' => 'Annual'] as $key => $label)
+                                @if(collect($planPricing)->contains(fn($rows) => isset($rows[$key])))
+                                    <option value="{{ $key }}">{{ $label }}</option>
+                                @endif
+                            @endforeach
+                        </select>
                     </span>
                 </div>
 
@@ -301,7 +308,7 @@
                                 <span class="text-3xl font-bold text-gray-900 dark:text-gray-100">PKR <span x-text="fmt(perMonth({{ $plan->id }}))"></span></span>
                                 <span class="text-gray-500 dark:text-gray-400 text-sm">/mo</span>
                                 <p class="text-xs text-gray-400 mt-1">
-                                    PKR <span x-text="fmt(total({{ $plan->id }}))"></span> billed every year
+                                    PKR <span x-text="fmt(total({{ $plan->id }}))"></span> billed every <span x-text="cycleLabels[cycle]"></span>
                                     <template x-if="saving({{ $plan->id }}) > 0">
                                         <span class="text-emerald-600 font-semibold"> &middot; save PKR <span x-text="fmt(saving({{ $plan->id }}))"></span></span>
                                     </template>
@@ -320,6 +327,7 @@
                                 @csrf
                                 <input type="hidden" name="plan_id" value="{{ $plan->id }}">
                                 <input type="hidden" name="billing_cycle" :value="cycle">
+                                <p x-show="!row({{ $plan->id }})" class="text-amber-700 text-sm">This period is not configured for this package.</p>
                                 <button type="submit" class="w-full py-2.5 rounded-lg font-semibold text-sm transition shadow-sm
                                     {{ $isFeatured ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'bg-gray-900 text-white hover:bg-gray-800' }}">
                                     Select package &amp; upload receipt

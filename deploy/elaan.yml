@@ -1,7 +1,9 @@
-title: "Bill aur printing ki jaanch mein mazeed tafseel"
-audience: all
+title: "DI billing periods aur selling packings"
+audience: di
 type: improvement
 points:
-  - "Ijazat wali reporting connection se bill, order aur printing ke mehfooz records ki jaanch zyada asani se ho sakti hai."
-  - "Roz badalne wale L number ka bill dhoondhne ke liye us ki tareekh bhi dein; ek jaisa number dobara ho to dono mumkin bills alag nazar aayenge."
-  - "Jis din ka record ya printing ka saboot mojood nahi, report usay wazeh karegi. Purane missing records ya kagaz nikalne ki tasdeeq khud se nahi ki jati."
+  - "Billing page par jis package ke rates set hon, us ke monthly, quarterly, six-month ya annual period ko usi total ke saath select kar sakte hain."
+  - "Product mein optional bag, box ya carton ki packing banayein; invoice par Sell By se chunain. Reporting mein us ki asal base quantity aur raqam mehfooz rehti hai."
+  - "Packing wali credit note ke liye original invoice ki lines load karein; baad mein packing badalne se purane bill ki conversion nahi badalti."
+  - "Buyer ka NTN/CNIC aur sales tax registration alag maloomat hain. Invoice par us ka asal registration status select karein."
+  - "Purane bill ki checking ab current, legacy, missing ya failed proof ko alag dikhati hai; sirf bill lock hona tasdeeq ka saboot nahi."

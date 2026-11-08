@@ -401,8 +401,8 @@
                 <td class="code">{{ $item->hs_code }}</td>
                 <td class="product">{{ $item->description }}</td>
                 <td class="unit">{{ $item->default_uom ?? 'PCS' }}</td>
-                <td class="ar">{{ number_format($item->quantity, $item->quantity == intval($item->quantity) ? 0 : 2) }}</td>
-                <td class="ar">{{ number_format($item->price, 2) }}</td>
+                <td class="ar">{{ number_format($item->quantity, $item->quantity == intval($item->quantity) ? 0 : 4) }}</td>
+                <td class="ar">{{ number_format($item->price, $item->selling_snapshot ? 6 : 2) }}</td>
                 <td class="ar" style="font-weight: 700;">{{ number_format($item->price * $item->quantity, 2) }}</td>
                 <td class="ar" style="font-size: 9px;">{{ number_format($item->tax_rate ?? 0, 0) }}%</td>
             </tr>

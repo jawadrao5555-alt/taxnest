@@ -48,11 +48,12 @@
                     @php
                         $allSubs = $companySubscriptions->get($company->id, collect());
                         $sub = $allSubs->first();
+                        $displayPlan = $sub?->entitlementPlan();
                         $activeCount = $allSubs->where('active', true)->count();
                     @endphp
                     <tr class="hover:bg-gray-800/50">
                         <td class="px-4 py-3 text-white font-medium">{{ $company->name }}@if($company->trashed()) <span class="text-xs text-gray-400">(archived)</span>@endif</td>
-                        <td class="px-4 py-3 text-gray-300">{{ $sub->pricingPlan->name ?? '—' }}</td>
+                        <td class="px-4 py-3 text-gray-300">{{ $displayPlan?->name ?? '—' }}</td>
                         <td class="px-4 py-3 text-gray-400 hidden sm:table-cell">{{ ucfirst($sub->billing_cycle ?? 'monthly') }}</td>
                         <td class="px-4 py-3 text-gray-400 text-xs hidden md:table-cell">{{ optional($sub->start_date)->format('d M Y') ?? '—' }}</td>
                         <td class="px-4 py-3 text-gray-400 text-xs hidden md:table-cell">{{ optional($sub->end_date)->format('d M Y') ?? '—' }}</td>
@@ -93,8 +94,9 @@
                                     <thead><tr class="text-left"><th class="py-1">Plan</th><th>Cycle</th><th>Start</th><th>End</th><th>Status</th></tr></thead>
                                     <tbody>
                                     @foreach($allSubs->skip(1) as $past)
+                                    @php($pastDisplayPlan = $past->entitlementPlan())
                                     <tr class="border-t border-gray-800">
-                                        <td class="py-1">{{ $past->pricingPlan->name ?? '—' }}</td>
+                                        <td class="py-1">{{ $pastDisplayPlan?->name ?? '—' }}</td>
                                         <td>{{ ucfirst($past->billing_cycle ?? 'monthly') }}</td>
                                         <td>{{ optional($past->start_date)->format('d M Y') ?? '—' }}</td>
                                         <td>{{ optional($past->end_date)->format('d M Y') ?? '—' }}</td>

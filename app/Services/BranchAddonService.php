@@ -124,11 +124,11 @@ class BranchAddonService
         }
 
         $sub = self::activeSubscription($company);
-        if (!$sub || !self::supportsPlan($sub->pricingPlan)) {
+        if (!$sub || !self::supportsPlan($sub->entitlementPlan())) {
             return false;
         }
 
-        $included = $sub->pricingPlan->branch_limit;
+        $included = $sub->entitlementPlan()->branch_limit;
 
         return $included !== null && (int) $included !== -1;
     }
@@ -155,11 +155,11 @@ class BranchAddonService
         }
 
         $sub ??= self::activeSubscription($company);
-        if (!$sub || !self::supportsPlan($sub->pricingPlan)) {
+        if (!$sub || !self::supportsPlan($sub->entitlementPlan())) {
             return 0;
         }
 
-        $included = $sub->pricingPlan->branch_limit;
+        $included = $sub->entitlementPlan()->branch_limit;
         if ($included === null || (int) $included === -1) {
             return 0;
         }
@@ -430,21 +430,21 @@ class BranchAddonService
         }
 
         $sub = self::activeSubscription($company);
-        if (!$sub || !$sub->pricingPlan) {
+        if (!$sub || !$sub->entitlementPlan()) {
             return ['allowed' => false, 'reason_key' => 'pos.eb_reason_no_plan'];
         }
 
         // Trial wali company pehle package le — add-on trial par nahi milta.
-        if ($sub->pricingPlan->is_trial) {
+        if ($sub->entitlementPlan()->is_trial) {
             return ['allowed' => false, 'reason_key' => 'pos.eb_reason_trial'];
         }
 
-        if (!self::supportsPlan($sub->pricingPlan)) {
+        if (!self::supportsPlan($sub->entitlementPlan())) {
             return ['allowed' => false, 'reason_key' => 'pos.eb_reason_unsupported'];
         }
 
         // Jis package ki branches pehle hi unlimited hain, us par add-on bemani hai.
-        $included = $sub->pricingPlan->branch_limit;
+        $included = $sub->entitlementPlan()->branch_limit;
         if ($included === null || (int) $included === -1) {
             return ['allowed' => false, 'reason_key' => 'pos.eb_reason_unlimited'];
         }
@@ -485,7 +485,7 @@ class BranchAddonService
     public static function status(?Company $company): array
     {
         $sub = self::activeSubscription($company);
-        $plan = $sub?->pricingPlan;
+        $plan = $sub?->entitlementPlan();
         // Raw = what the shop OWNS (always shown, they paid for it);
         // applicable = what actually widens the limit today. The page must
         // quote the same ceiling the gate enforces, never a rosier one.

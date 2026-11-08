@@ -1,10 +1,7 @@
-title: "Kitchen parchi par order note ka wazeh status"
-audience: pos
-categories:
-  - restaurant
-  - hotel
+title: "Bill aur printing ki jaanch mein mazeed tafseel"
+audience: all
 type: improvement
 points:
-  - "Order note likhte waqt ab nazar aayega ke woh kitchen parchi par aayega ya notes ka switch band hai."
-  - "Ijazat rakhne wala owner ya manager note ke paas se hi shop ki KOT par order notes ON kar sakta hai."
-  - "Pehle bheji hui kitchen parchi par naya note khud nahi pohanchta; aisi tabdeeli kitchen ko alag se batayein."
+  - "Ijazat wali reporting connection se bill, order aur printing ke mehfooz records ki jaanch zyada asani se ho sakti hai."
+  - "Roz badalne wale L number ka bill dhoondhne ke liye us ki tareekh bhi dein; ek jaisa number dobara ho to dono mumkin bills alag nazar aayenge."
+  - "Jis din ka record ya printing ka saboot mojood nahi, report usay wazeh karegi. Purane missing records ya kagaz nikalne ki tasdeeq khud se nahi ki jati."

@@ -89,20 +89,65 @@ final class DiagnosticSourceCollection
                 'registry_version', 'collected_at', 'status', 'retained_rows', 'first_source_at', 'last_source_at'])) {
                 return ['status' => 'COLLECTION_READ_FAILED', 'complete_collection_proven' => false];
             }
+            $coverage = $this->dailyCoverage($companyId, $source, $from, $to);
             $r = DB::table('diagnostic_source_observations')->where('company_id', $companyId)->where('source', $source)
                 ->whereBetween('business_date', [$from, $to])->orderByDesc('collected_at')->orderByDesc('id')
                 ->first(['business_date', 'registry_version', 'collected_at', 'status', 'retained_rows', 'first_source_at', 'last_source_at']);
             if (! $r) {
-                return ['status' => 'NOT_OBSERVED', 'complete_collection_proven' => false];
+                return ['status' => 'NOT_OBSERVED', 'complete_collection_proven' => false, 'daily_coverage' => $coverage];
             }
 
             return ['status' => $r->status, 'registry_version' => (int) $r->registry_version, 'business_date' => $r->business_date, 'collected_at' => $r->collected_at,
                 'retained_rows' => $r->retained_rows === null ? null : (int) $r->retained_rows,
                 'first_source_at' => $r->first_source_at, 'last_source_at' => $r->last_source_at,
-                'timestamp_storage_timezone' => config('app.timezone'), 'complete_collection_proven' => false,
+                'timestamp_storage_timezone' => config('app.timezone'), 'complete_collection_proven' => false, 'daily_coverage' => $coverage,
                 'note' => 'Latest retained-source observation only; does not prove original collection, deleted events, completeness or regulator acceptance.'];
         } catch (\Illuminate\Database\QueryException) {
             return ['status' => 'COLLECTION_READ_FAILED', 'complete_collection_proven' => false];
         }
+    }
+
+    /** Latest receipt per date, never a claim that original events were all collected. */
+    private function dailyCoverage(int $companyId, string $source, string $from, string $to): array
+    {
+        $start = Carbon::createFromFormat('!Y-m-d', $from);
+        $end = Carbon::createFromFormat('!Y-m-d', $to);
+        if ($start->format('Y-m-d') !== $from || $end->format('Y-m-d') !== $to
+            || $start->gt($end) || $start->diffInDays($end) > 6) {
+            throw new \InvalidArgumentException('At most seven calendar dates are supported.');
+        }
+        $latestIds = DB::table('diagnostic_source_observations')
+            ->where('company_id', $companyId)->where('source', $source)
+            ->whereBetween('business_date', [$from, $to])
+            ->selectRaw('MAX(id)')->groupBy('business_date');
+        $rows = DB::table('diagnostic_source_observations')->whereIn('id', $latestIds)
+            ->get(['business_date', 'registry_version', 'collected_at', 'status', 'retained_rows'])
+            ->keyBy('business_date');
+        $days = [];
+        $measured = [];
+        $missing = [];
+        $failed = [];
+        for ($day = $start->copy(); $day->lte($end); $day->addDay()) {
+            $date = $day->format('Y-m-d');
+            $row = $rows->get($date);
+            $status = $row ? ((int) $row->registry_version === DiagnosticSourceEvidence::REGISTRY_VERSION
+                ? $row->status : 'INCOMPATIBLE_REGISTRY') : 'NOT_OBSERVED';
+            $days[] = ['business_date' => $date, 'status' => $status,
+                'registry_version' => $row ? (int) $row->registry_version : null,
+                'collected_at' => $row?->collected_at,
+                'retained_rows' => $row && $row->retained_rows !== null ? (int) $row->retained_rows : null];
+            if (in_array($status, ['OBSERVED', 'NO_RETAINED_EVENTS'], true)) {
+                $measured[] = $date;
+            } elseif ($status === 'NOT_OBSERVED') {
+                $missing[] = $date;
+            } else {
+                $failed[] = $date;
+            }
+        }
+
+        return ['version' => 1, 'days' => $days, 'measured_dates' => $measured,
+            'missing_dates' => $missing, 'unavailable_or_failed_dates' => $failed,
+            'all_dates_measured' => count($measured) === count($days),
+            'complete_collection_proven' => false];
     }
 }

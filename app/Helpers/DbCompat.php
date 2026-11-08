@@ -72,17 +72,38 @@ class DbCompat
 
     public static function extractYear(string $column): string
     {
-        return self::isMySQL() ? "YEAR({$column})" : "EXTRACT(YEAR FROM {$column}::date)";
+        if (self::isMySQL()) {
+            return "YEAR({$column})";
+        }
+        if (self::isSqlite()) {
+            return "CAST(strftime('%Y', {$column}) AS INTEGER)";
+        }
+
+        return "EXTRACT(YEAR FROM {$column}::date)";
     }
 
     public static function extractMonth(string $column): string
     {
-        return self::isMySQL() ? "MONTH({$column})" : "EXTRACT(MONTH FROM {$column}::date)";
+        if (self::isMySQL()) {
+            return "MONTH({$column})";
+        }
+        if (self::isSqlite()) {
+            return "CAST(strftime('%m', {$column}) AS INTEGER)";
+        }
+
+        return "EXTRACT(MONTH FROM {$column}::date)";
     }
 
     public static function extractDay(string $column): string
     {
-        return self::isMySQL() ? "DAY({$column})" : "EXTRACT(DAY FROM {$column}::date)";
+        if (self::isMySQL()) {
+            return "DAY({$column})";
+        }
+        if (self::isSqlite()) {
+            return "CAST(strftime('%d', {$column}) AS INTEGER)";
+        }
+
+        return "EXTRACT(DAY FROM {$column}::date)";
     }
 
     public static function extractHour(string $column): string

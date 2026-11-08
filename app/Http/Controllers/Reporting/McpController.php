@@ -91,6 +91,7 @@ final class McpController extends Controller
                 'get_diagnostic_coverage' => app(DiagnosticCoverage::class)->catalog($args),
                 'get_diagnostic_source_evidence' => app(\App\Services\Reporting\DiagnosticSourceEvidence::class)->read($args, $allowed),
                 'export_diagnostic_source_evidence' => app(\App\Services\Reporting\DiagnosticSourceExport::class)->read($args, $allowed),
+                'get_diagnostic_bill_lookup' => app(\App\Services\Reporting\DiagnosticBillLookup::class)->read($args, $allowed),
                 'get_diagnostic_bill_evidence' => app(\App\Services\Reporting\DiagnosticBillEvidence::class)->read($args, $allowed),
                 default => null,
             };
@@ -138,6 +139,11 @@ final class McpController extends Controller
                     'after_id' => ['type' => 'integer', 'minimum' => 0],
                     'max_rows' => ['type' => 'integer', 'minimum' => 1, 'maximum' => \App\Services\Reporting\DiagnosticSourceExport::MAX_ROWS]],
                 ['company_name', 'date_from', 'source']],
+            ['get_diagnostic_bill_lookup', 'Resolve an exact invoice serial or explicitly dated PRA daily L token to immutable bill IDs. Duplicate references remain ambiguous. No printing or fiscal success inference.',
+                array_intersect_key($operationsPeriod, array_flip(['company_name', 'company_id'])) + [
+                    'reference_kind' => ['type' => 'string', 'enum' => ['invoice_serial', 'pra_daily_token']],
+                    'bill_reference' => ['type' => 'string'], 'counter_date' => ['type' => 'string', 'format' => 'date', 'description' => 'Required for PRA daily token; counter date starts at 06:00 in application timezone.'],
+                    'branch_id' => ['type' => 'integer', 'minimum' => 1]], ['company_name', 'reference_kind', 'bill_reference']],
             ['get_diagnostic_bill_evidence', 'Bounded explicit bill-to-source record associations for PRA, DI, FBR POS or Healthcare. IDs only; missing links and unsupported streams stay unknown. No replay or fiscal acceptance inference.',
                 array_intersect_key($operationsPeriod, array_flip(['company_name', 'company_id'])) + $cursor + [
                     'bill_id' => ['type' => 'integer', 'minimum' => 1]], ['company_name', 'bill_id']],

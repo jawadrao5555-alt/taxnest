@@ -5,6 +5,7 @@ import { b03DesignsWorkflow, b03DeliveryNavigationWorkflow, b03AutoKotWorkflow }
 import { b02DealWorkflow } from './lib/pra-b02-browser.mjs';
 import { mixedFulfillmentWorkflow } from './lib/mixed-fulfillment-browser.mjs';
 import { staffDiscountWorkflow } from './lib/pra-staff-discount-browser.mjs';
+import { billingSelectionWorkflow } from './lib/billing-selection-browser.mjs';
 import { createHash } from 'node:crypto';
 import { lstatSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -35,7 +36,7 @@ const ordered = [...regular.filter(x=>x.mixedFulfillment), ...regular.filter(x=>
 // Exercise the new B02 payment contract before the broad screen sweep so a
 // checkout regression produces evidence promptly. Every original case remains.
 const cases = requested.length ? ordered.filter(x => requested.includes(x.name))
-  : [...ordered.filter(x=>x.b01Account), ...ordered.filter(x=>x.b02Deal), ...ordered.filter(x=>!x.b01Account&&!x.b02Deal)];
+  : [...ordered.filter(x=>x.billingSelection), ...ordered.filter(x=>x.b01Account), ...ordered.filter(x=>x.b02Deal), ...ordered.filter(x=>!x.billingSelection&&!x.b01Account&&!x.b02Deal)];
 const requestedIsolation = requested.includes('health-isolation');
 const unknown = requested.filter(name => name !== 'health-isolation' && ![...regular, ...di].some(x => x.name === name));
 if (unknown.length) throw new Error(`unknown requested journey: ${unknown.join(', ')}`);
@@ -1269,6 +1270,12 @@ async function reportingConnectorWorkflow(page,t,v) {
   if(timeline.result?.isError||evidence?.events?.length!==2||evidence.events[1].job_id!==f.diagnosticJobId||evidence.events[1].details.outcome!=='spool_accepted'||evidence.physical_print!=='unknown'||evidence.coverage.complete!==false||JSON.stringify(evidence).includes('FICTIONAL_DIAGNOSTIC_SECRET'))throw new Error('Correlated diagnostic evidence/redaction/gaps failed');
   if(!(await (await incident(f.foreignCompanyName)).json()).result?.isError)throw new Error('Foreign diagnostic scope leaked');
   const diagnostic=async(name,args)=>request.post(baseUrl+'/api/reporting/mcp',{headers:{Authorization:'Bearer '+tokens.access_token},data:{jsonrpc:'2.0',id:2,method:'tools/call',params:{name,arguments:args}}});
+  const lookupArgs={company_name:f.companyName,reference_kind:'invoice_serial',bill_reference:f.diagnosticInvoiceSerial};
+  const lookup=await(await diagnostic('get_diagnostic_bill_lookup',lookupArgs)).json();
+  if(lookup.result?.isError||lookup.result?.structuredContent?.bill_id!==f.diagnosticBillId||lookup.result?.structuredContent?.physical_print!=='unknown')throw new Error('Exact native bill lookup failed');
+  if(!(await(await diagnostic('get_diagnostic_bill_lookup',{...lookupArgs,company_name:f.foreignCompanyName})).json()).result?.isError)throw new Error('Native lookup crossed consent scope');
+  const billLinks=await(await diagnostic('get_diagnostic_bill_evidence',{company_name:f.companyName,bill_id:f.diagnosticBillId})).json();
+  if(billLinks.result?.isError||!billLinks.result?.structuredContent?.sources?.print_events?.rows?.length||billLinks.result?.structuredContent?.sources?.print_jobs?.rows?.length!==0||billLinks.result?.structuredContent?.physical_print!=='unknown')throw new Error('Native retained print evidence or deleted-job uncertainty failed');
   const cashArgs={company_name:f.companyName,date_from:f.dayCloseDate};
   const cash=await(await diagnostic('get_pra_day_close_evidence',cashArgs)).json();
   if(cash.result?.isError||cash.result?.structuredContent?.records?.[0]?.arithmetic?.calculated_expected!==750||cash.result?.structuredContent?.coverage?.complete!==false)throw new Error('Scoped native cash snapshot was not returned as partial evidence');
@@ -1288,13 +1295,15 @@ async function reportingConnectorWorkflow(page,t,v) {
   await page.goto(baseUrl+'/admin/reporting/connections',{waitUntil:'domcontentloaded'});
   await page.locator('[data-reporting-onboarding]').waitFor();
   const card=page.locator('article').filter({has:page.getByRole('heading',{name:client.client_name,exact:true})});
-  if(!(await card.locator('[data-report-read-evidence]').innerText()).includes('Successful report reads: 7.'))throw new Error('Successful read evidence missing or failed foreign read counted');
+  if(!(await card.locator('[data-report-read-evidence]').innerText()).includes('Successful report reads: 9.'))throw new Error('Successful read evidence missing or failed foreign read counted');
   await saveEvidenceScreenshot(page,'rc-'+v.width+'-reporting-read-evidence');
   await Promise.all([page.waitForNavigation({waitUntil:'domcontentloaded'}),card.getByRole('button',{name:'Revoke connection',exact:true}).click()]);
   if(!(await card.innerText()).includes('Revoked'))throw new Error('Owner revocation did not persist');
   if((await report(f.companyName)).status()!==401)throw new Error('Revoked token retained billing access');
   if((await incident(f.companyName)).status()!==401)throw new Error('Revoked token retained diagnostic access');
   if((await diagnostic('get_pra_day_close_evidence',cashArgs)).status()!==401)throw new Error('Revoked token retained cash evidence access');
+  if((await diagnostic('get_diagnostic_bill_lookup',lookupArgs)).status()!==401)throw new Error('Revoked token retained bill lookup access');
+  if((await diagnostic('get_diagnostic_bill_evidence',{company_name:f.companyName,bill_id:f.diagnosticBillId})).status()!==401)throw new Error('Revoked token retained bill links access');
   if((await diagnostic('get_diagnostic_coverage',{})).status()!==401)throw new Error('Revoked token retained diagnostic catalog access');
   for(const stream of ['cash_reconciliation','print_chains','agent_collection']) if((await operations(stream)).status()!==401)throw new Error('Revoked token retained combined operational access');
   pass(t.name+'/'+v.width+': real consent, PKCE, native independent cash difference, print attempts, offline upload deduplication/gaps, foreign-company denial and immediate revoke');
@@ -1625,6 +1634,7 @@ async function workflow(page,t,v,diagnostics) {
   }
   if(t.b02Deal)return b02DealWorkflow(page,t,v,{baseUrl,waitForOperationalSurface,dismiss,saveEvidenceScreenshot,pass});
   if(t.staffDiscount)return staffDiscountWorkflow(page,t,v,{baseUrl,login,dismiss,waitForOperationalSurface,saveEvidenceScreenshot,pass,loopback});
+  if(t.billingSelection)return billingSelectionWorkflow(page,t,v,{baseUrl,saveEvidenceScreenshot,pass});
   if(t.smartImport)return smartImportWorkflow(page,t,v);
   if(t.ingredientUnitAudit)return ingredientUnitAudit(page,t,v);
   if (t.mixedFulfillment) return mixedFulfillmentWorkflow(page,t,v,{baseUrl,waitForOperationalSurface,dismiss,openMobileCart,saveEvidenceScreenshot,pass});
@@ -2339,6 +2349,7 @@ async function customerBulkNavigation(page,t,v) {
 async function one(browser,label,v,t) {
   if(t.taxIntegrations)t={...t,login:t.taxIntegrations[v.width].login};
   if(t.staffDiscount)t={...t,login:t.staffDiscount[v.width].cashier};
+  if(t.billingSelection)t={...t,login:t.billingSelection[v.width].login};
   if(t.surveyJourney) t={...t,login:t.surveyJourney.logins[v.width]};
   if(t.optionalArchive) t={...t, login:t.optionalArchive.cases[v.width].login};
   valid(t); const failuresBefore = failures;

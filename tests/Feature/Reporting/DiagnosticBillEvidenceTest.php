@@ -75,6 +75,57 @@ class DiagnosticBillEvidenceTest extends TestCase
         $service->read($args, [2]);
     }
 
+    public function test_print_jobs_and_projected_offline_events_require_tenant_product_and_server_identity(): void
+    {
+        $this->table('pos_transactions', 'unused');
+        DB::table('pos_transactions')->insert(['id' => 10, 'company_id' => 1, 'unused' => 0]);
+        Schema::create('pos_print_jobs', function (Blueprint $t) {
+            $t->id();
+            $t->unsignedBigInteger('company_id');
+            $t->unsignedBigInteger('transaction_id')->nullable();
+            $t->unsignedBigInteger('restaurant_order_id')->nullable();
+            $t->string('type');
+            $t->text('error')->nullable();
+        });
+        $this->table('restaurant_orders', 'pos_transaction_id');
+        DB::table('restaurant_orders')->insert(['id' => 7, 'company_id' => 1, 'pos_transaction_id' => 10]);
+        DB::table('pos_print_jobs')->insert([
+            ['id' => 1, 'company_id' => 1, 'transaction_id' => 10, 'restaurant_order_id' => null, 'type' => 'kot', 'error' => 'PRIVATE'],
+            ['id' => 2, 'company_id' => 1, 'transaction_id' => 10, 'restaurant_order_id' => null, 'type' => 'fbr_kot', 'error' => 'PRIVATE'],
+            ['id' => 3, 'company_id' => 2, 'transaction_id' => 10, 'restaurant_order_id' => null, 'type' => 'kot', 'error' => 'PRIVATE'],
+            ['id' => 4, 'company_id' => 1, 'transaction_id' => null, 'restaurant_order_id' => 7, 'type' => 'kot', 'error' => 'PRIVATE'],
+        ]);
+        Schema::create('agent_core_events', function (Blueprint $t) {
+            $t->id();
+            $t->unsignedBigInteger('company_id');
+            $t->string('event_type');
+            $t->string('projection_status');
+            $t->json('projection_result');
+            $t->json('payload');
+        });
+        foreach ([
+            [1, 1, 'sale.created', 'projected', 10], [2, 2, 'sale.created', 'projected', 10],
+            [3, 1, 'sale.created', 'accepted', 10], [4, 1, 'sale.created', 'projected', 99],
+            [5, 1, 'order.settled', 'projected', 10], [6, 1, 'print.completed', 'projected', 10],
+        ] as [$id,$company,$type,$status,$transaction]) {
+            DB::table('agent_core_events')->insert(['id' => $id, 'company_id' => $company, 'event_type' => $type,
+                'projection_status' => $status, 'projection_result' => json_encode(['transaction_id' => $transaction, 'secret' => 'PRIVATE']),
+                'payload' => json_encode(['transaction_id' => 10, 'secret' => 'PRIVATE'])]);
+        }
+        $before = DB::table('agent_core_events')->get()->toJson();
+        $r = app(DiagnosticBillEvidence::class)->read(['company_name' => 'Synthetic PRA', 'bill_id' => 10, 'limit' => 1], [1]);
+        $this->assertSame([['id' => 1]], $r['sources']['print_jobs']['rows']);
+        $this->assertSame([['id' => 4]], $r['sources']['order_only_print_jobs']['rows']);
+        $this->assertSame([['id' => 1]], $r['sources']['projected_offline_events']['rows']);
+        $this->assertTrue($r['sources']['projected_offline_events']['has_more']);
+        $next = app(DiagnosticBillEvidence::class)->read(['company_name' => 'Synthetic PRA', 'bill_id' => 10, 'after_id' => 1], [1]);
+        $this->assertSame([['id' => 5]], $next['sources']['projected_offline_events']['rows']);
+        $this->assertSame([], $next['sources']['print_jobs']['rows']);
+        $this->assertSame('unknown', $r['physical_print']);
+        $this->assertStringNotContainsString('PRIVATE', json_encode($r));
+        $this->assertSame($before, DB::table('agent_core_events')->get()->toJson());
+    }
+
     public function test_other_products_follow_actual_parent_links_and_reject_wrong_tenant_bills(): void
     {
         foreach ([
@@ -223,7 +274,7 @@ class DiagnosticBillEvidenceTest extends TestCase
             $this->assertSame([['id' => 100]], $report['sources'][$key]['rows'], $key);
             $this->assertSame('PARTIAL', $report['sources'][$key]['status']);
             $this->assertStringNotContainsString('PRIVATE', json_encode($report));
-            $this->assertSame(4, $report['version']);
+            $this->assertSame(5, $report['version']);
             $this->assertSame($sourceBefore, DB::table($table)->orderBy('id')->get()->toJson());
             $this->assertSame($chargesBefore, DB::table('health_charges')->orderBy('id')->get()->toJson());
         }
@@ -244,7 +295,7 @@ class DiagnosticBillEvidenceTest extends TestCase
         $report = app(DiagnosticBillEvidence::class)->read(['company_name' => 'Synthetic Health', 'bill_id' => 10], [4]);
         $this->assertSame([['id' => 200]], $report['sources']['pharmacy_stock']['rows']);
         $this->assertSame('PARTIAL', $report['sources']['pharmacy_stock']['status']);
-        $this->assertSame(4, $report['version']);
+        $this->assertSame(5, $report['version']);
         $this->assertStringNotContainsString('PRIVATE', json_encode($report));
         $this->assertSame($movementsBefore, DB::table('health_batch_movements')->orderBy('id')->get()->toJson());
         $report = app(DiagnosticBillEvidence::class)->read([
@@ -277,7 +328,7 @@ class DiagnosticBillEvidenceTest extends TestCase
         $r = app(DiagnosticBillEvidence::class)->read(['company_name' => 'Synthetic PRA', 'bill_id' => 10], [1]);
         $this->assertSame('SOURCE_QUERY_FAILED', $r['sources']['federal_ims_attempts']['status']);
         $this->assertSame([['id' => 1]], $r['sources']['pra_attempts']['rows']);
-        $this->assertStringNotContainsString('PRIVATE',json_encode($r));
-        $this->assertStringNotContainsString('select',json_encode($r));
+        $this->assertStringNotContainsString('PRIVATE', json_encode($r));
+        $this->assertStringNotContainsString('select', json_encode($r));
     }
 }

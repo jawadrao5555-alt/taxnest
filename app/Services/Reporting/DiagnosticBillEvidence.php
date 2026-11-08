@@ -37,7 +37,7 @@ final class DiagnosticBillEvidence
             'pos' => 'pos_transactions', 'di' => 'invoices', 'fbrpos' => 'fbr_pos_transactions', 'erps' => 'health_bills',
             default => null,
         };
-        $base = ['version' => 4, 'company' => ['id' => (int) $company->id, 'name' => $company->name, 'product' => $product],
+        $base = ['version' => 5, 'company' => ['id' => (int) $company->id, 'name' => $company->name, 'product' => $product],
             'bill_id' => (int) $v['bill_id'], 'complete' => false, 'physical_print' => 'unknown', 'fiscal_acceptance' => 'not_assessed',
             'notes' => ['Only explicit stored foreign-key/reference links are included. Matching numbers, amounts or timestamps are never treated as associations.',
                 'Each source has its own immutable ID cursor and may have late arrivals. Missing/deleted/uncollected evidence remains unknown.',
@@ -60,12 +60,16 @@ final class DiagnosticBillEvidence
                 'federal_ims_attempts' => ['pos_ims_submissions', 'source_transaction_id', true, []],
                 'federal_di_attempts' => ['pos_di_sandbox_submissions', 'source_transaction_id', true, []],
                 'order_only_print_events' => ['pos_print_evidence', 'order_id', true, ['product_type' => 'pos']],
+                'print_jobs' => ['pos_print_jobs', 'transaction_id', true, []],
+                'order_only_print_jobs' => ['pos_print_jobs', 'restaurant_order_id', true, []],
+                'projected_offline_events' => ['agent_core_events', 'projection_result', true, []],
             ],
             'di' => ['fbr_attempts' => ['fbr_logs', 'invoice_id', false, []]],
             'fbrpos' => [
                 'fbr_attempts' => ['fbr_pos_logs', 'transaction_id', true, []],
                 'stock' => ['inventory_movements', 'reference_id', true, ['reference_type' => 'fbr_pos_transaction']],
                 'callbacks' => ['fbr_pos_callback_diagnostics', 'transaction_id', true, []],
+                'print_jobs' => ['pos_print_jobs', 'transaction_id', true, []],
                 'print_events' => ['pos_print_evidence', 'transaction_id', true, ['product_type' => 'fbrpos']],
             ],
             'erps' => [
@@ -88,7 +92,15 @@ final class DiagnosticBillEvidence
                 // No-company child tables are scoped by the already-verified parent
                 // identity; tables carrying company_id must satisfy both links.
                 $query = DB::table($table)->where('id', '>', $v['after_id'] ?? 0);
-                if ($key === 'order_only_print_events') {
+                if ($key === 'projected_offline_events') {
+                    if (! $this->columns($table, ['event_type', 'projection_status'])) {
+                        $sources[$key] = ['status' => 'UNAVAILABLE', 'rows' => [], 'has_more' => false, 'next_after_id' => null];
+
+                        continue;
+                    }
+                    $query->where('projection_status', 'projected')->whereIn('event_type', ['sale.created', 'order.settled'])
+                        ->where('projection_result->transaction_id', (int) $v['bill_id']);
+                } elseif (in_array($key, ['order_only_print_events', 'order_only_print_jobs'], true)) {
                     if (! $this->columns('restaurant_orders', ['id', 'company_id', 'pos_transaction_id'])
                         || ! $this->columns($table, ['transaction_id'])) {
                         $sources[$key] = ['status' => 'UNAVAILABLE', 'rows' => [], 'has_more' => false, 'next_after_id' => null];
@@ -96,9 +108,17 @@ final class DiagnosticBillEvidence
                         continue;
                     }
                     $orders = DB::table('restaurant_orders')->where('company_id', $company->id)->where('pos_transaction_id', $v['bill_id'])->select('id');
-                    $query->whereNull('transaction_id')->whereIn('order_id', $orders);
+                    $query->whereNull('transaction_id')->whereIn($foreign, $orders);
                 } else {
                     $query->where($foreign, $v['bill_id']);
+                }
+                if (in_array($key, ['print_jobs', 'order_only_print_jobs'], true)) {
+                    if (! $this->columns($table, ['type'])) {
+                        $sources[$key] = ['status' => 'UNAVAILABLE', 'rows' => [], 'has_more' => false, 'next_after_id' => null];
+
+                        continue;
+                    }
+                    $query->whereIn('type', $product === 'pos' ? ['bill', 'kot', 'kot_void'] : ['fbr_bill', 'fbr_kot']);
                 }
                 if ($tenantColumn) {
                     $query->where('company_id', $company->id);
@@ -199,7 +219,7 @@ final class DiagnosticBillEvidence
 
         return $base + ['status' => 'PARTIAL', 'sources' => $sources,
             'unimplemented_links' => match ($product) {
-                'pos' => ['offline_agent_events'],
+                'pos' => ['unuploaded_or_unattributed_offline_events'],
                 'di' => ['payments', 'stock', 'print_events'],
                 'fbrpos' => ['payments', 'offline_agent_events'],
                 'erps' => ['lab_orders', 'print_events'],

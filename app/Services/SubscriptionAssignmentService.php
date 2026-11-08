@@ -129,18 +129,19 @@ class SubscriptionAssignmentService
      */
     public static function assign(int $companyId, int $pricingPlanId, string $billingCycle = 'monthly', bool $reuseCurrentPlan = false, bool $paidRenewal = false): Subscription
     {
-        $plan = PricingPlan::findOrFail($pricingPlanId);
-        if (PlanSellabilityService::isRetired($plan)) {
-            throw \Illuminate\Validation\ValidationException::withMessages([
-                'pricing_plan_id' => PlanSellabilityService::retiredMessage($plan),
-            ]);
-        }
-
-        return DB::transaction(function () use ($companyId, $pricingPlanId, $billingCycle, $plan, $reuseCurrentPlan, $paidRenewal) {
+        return DB::transaction(function () use ($companyId, $pricingPlanId, $billingCycle, $reuseCurrentPlan, $paidRenewal) {
             // This is the subscription-replacement mutex. Add-on approval takes
             // the same company lock, so it can never attach a paid feature to a
             // package renewal that is being replaced at the same moment.
             $company = Company::whereKey($companyId)->lockForUpdate()->firstOrFail();
+            // Price and stored plan terms must describe the same catalogue
+            // revision, including when an admin edits a plan concurrently.
+            $plan = PricingPlan::whereKey($pricingPlanId)->lockForUpdate()->firstOrFail();
+            if (PlanSellabilityService::isRetired($plan)) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'pricing_plan_id' => PlanSellabilityService::retiredMessage($plan),
+                ]);
+            }
             // Validate under the company lock, before touching the current
             // subscription, payment attribution or commission history.
             PlanCompanyCompatibility::assertMatches($company, $plan);
@@ -191,7 +192,7 @@ class SubscriptionAssignmentService
                 ->where('active', true)
                 ->update(['active' => false]);
 
-            $subscription = Subscription::create([
+            $attributes = [
                 'company_id' => $companyId,
                 'pricing_plan_id' => $pricingPlanId,
                 'start_date' => now()->toDateString(),
@@ -200,7 +201,15 @@ class SubscriptionAssignmentService
                 'billing_cycle' => $cycle,
                 'discount_percent' => $priced['discount_percent'],
                 'final_price' => $priced['final_price'],
-            ]);
+            ];
+            // Additive schema rollout: older installations retain their
+            // existing assignment path until the migration is applied.
+            if (\Illuminate\Support\Facades\Schema::hasColumn('subscriptions', 'purchase_snapshot')) {
+                $attributes['purchase_snapshot'] = SubscriptionPurchaseSnapshot::capture(
+                    $company, $plan, $priced, $attributes['start_date'], $attributes['end_date'], $paidRenewal
+                );
+            }
+            $subscription = Subscription::create($attributes);
 
             // Affiliate program: every admin-recorded payment of a referred company
             // earns its consultant a commission. Internally duplicate-safe and

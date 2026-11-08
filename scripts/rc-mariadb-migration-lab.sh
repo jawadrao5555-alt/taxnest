@@ -97,6 +97,9 @@ concurrency(){
     clean_php php "$ROOT/tests/native/rc_notification_concurrency.php"
     clean_php php "$ROOT/tests/native/rc_staff_discount_concurrency.php"
     clean_php php "$ROOT/tests/native/rc_paid_renewal.php" | tee "$EVIDENCE_DIR/paid-renewal.log"
+    clean_php php "$ROOT/tests/native/rc_trial_signup.php" | tee "$EVIDENCE_DIR/trial-signup.log"
+    clean_php php "$ROOT/tests/native/rc_subscription_financial_adjustments.php" | tee "$EVIDENCE_DIR/subscription-financial-adjustments.log"
+    grep -Fqx "PASS: native concurrent trial creation returns one frozen zero-price term; paid company and documents unchanged" "$EVIDENCE_DIR/trial-signup.log" || fail trial-signup-missing-success-proof
     grep -Fqx "PASS: native concurrent paid renewal preserves remaining term once; retry and other company preserved" "$EVIDENCE_DIR/paid-renewal.log" || fail paid-renewal-missing-success-proof
     clean_php php "$ROOT/tests/native/rc_diagnostic_source_collection.php" | tee "$EVIDENCE_DIR/diagnostic-source-observations.log"
     grep -Fqx "PASS: native IMS links and print source read/collection retain exact tenant/product attribution and unchanged bill" "$EVIDENCE_DIR/diagnostic-source-observations.log" || fail diagnostic-ims-print-attribution-missing-success-proof
@@ -106,6 +109,8 @@ concurrency(){
     grep -Fqx "PASS: native bounded source export reuses exact branch scope, redaction and unchanged retained rows" "$EVIDENCE_DIR/diagnostic-source-observations.log" || fail diagnostic-bounded-source-export-missing-success-proof
     grep -Fqx "PASS: native healthcare bill follows exact tenant-scoped clinical, pharmacy and stock source IDs without changing rows" "$EVIDENCE_DIR/diagnostic-source-observations.log" || fail diagnostic-health-source-attribution-missing-success-proof
     grep -Fqx "PASS: native concurrent source observation is idempotent, scoped and preserves source rows" "$EVIDENCE_DIR/diagnostic-source-observations.log" || fail diagnostic-source-observations-missing-success-proof
+    grep -Fqx "PASS: native concurrent reviewed payment retains one immutable invoice and receipt" "$EVIDENCE_DIR/paid-renewal.log" || fail paid-renewal-documents-missing-success-proof
+    grep -Fqx "PASS: native concurrent refund evidence stays bounded, idempotent and append-only; reversal, billing records and second tenant preserved" "$EVIDENCE_DIR/subscription-financial-adjustments.log" || fail subscription-financial-adjustments-missing-success-proof
     clean_php php "$ROOT/tests/native/rc_elaan_scope.php"
     clean_php php "$ROOT/tests/native/rc_pra_incident_timeline.php"
     clean_php php "$ROOT/tests/native/rc_survey_company_response.php"

@@ -31,7 +31,7 @@ class PlanLimitService
             return false;
         }
 
-        $plan = $subscription->pricingPlan;
+        $plan = $subscription->entitlementPlan();
 
         return !$plan || (bool) $plan->is_trial;
     }
@@ -135,11 +135,11 @@ class PlanLimitService
             return ['allowed' => false, 'reason' => 'Your subscription has expired. Please renew your plan.'];
         }
 
-        if ($sub->pricingPlan->is_trial && $sub->isTrialExpired()) {
+        if ($sub->entitlementPlan()->is_trial && $sub->isTrialExpired()) {
             return ['allowed' => false, 'reason' => 'Your free trial has expired. Please subscribe to a plan.'];
         }
 
-        $limit = $sub->pricingPlan->invoice_limit;
+        $limit = $sub->entitlementPlan()->invoice_limit;
         if ($limit === -1) {
             return ['allowed' => true];
         }
@@ -255,13 +255,13 @@ class PlanLimitService
         if (self::grantWaivesPackageLimits($sub)) {
             return ['allowed' => true, 'unlimited' => true, 'blanket_grant' => true];
         }
-        if (!$sub || !$sub->pricingPlan) {
+        if (!$sub || !$sub->entitlementPlan()) {
             // Access/subscription gating is owned by SubscriptionAccessService —
             // don't double-block here.
             return ['allowed' => true];
         }
 
-        $plan = $sub->pricingPlan;
+        $plan = $sub->entitlementPlan();
         if ($plan->is_trial) {
             return ['allowed' => true]; // trial cap handled by SubscriptionAccessService
         }
@@ -319,13 +319,13 @@ class PlanLimitService
         if (self::grantWaivesPackageLimits($sub)) {
             return ['allowed' => true, 'unlimited' => true, 'blanket_grant' => true];
         }
-        if (!$sub || !$sub->pricingPlan) {
+        if (!$sub || !$sub->entitlementPlan()) {
             // Access/subscription gating is owned by SubscriptionAccessService —
             // don't double-block here.
             return ['allowed' => true];
         }
 
-        $plan = $sub->pricingPlan;
+        $plan = $sub->entitlementPlan();
         if ($plan->is_trial) {
             return ['allowed' => true]; // trial cap handled by SubscriptionAccessService
         }
@@ -426,17 +426,17 @@ class PlanLimitService
         if (self::grantWaivesPackageLimits($sub)) {
             return ['allowed' => true, 'unlimited' => true, 'blanket_grant' => true];
         }
-        if (!$sub || !$sub->pricingPlan) {
+        if (!$sub || !$sub->entitlementPlan()) {
             return ['allowed' => true];
         }
 
-        $limit = self::teamAccountLimit($sub->pricingPlan);
+        $limit = self::teamAccountLimit($sub->entitlementPlan());
         if ($limit === null) {
             return ['allowed' => true];
         }
 
         if ($count >= (int) $limit) {
-            return ['allowed' => false, 'reason' => "Team account limit reached ({$count}/{$limit} on the {$sub->pricingPlan->name} plan). Please upgrade your plan to add more accounts."];
+            return ['allowed' => false, 'reason' => "Team account limit reached ({$count}/{$limit} on the {$sub->entitlementPlan()->name} plan). Please upgrade your plan to add more accounts."];
         }
 
         return ['allowed' => true, 'remaining' => (int) $limit - $count];
@@ -471,7 +471,7 @@ class PlanLimitService
             return ['allowed' => false, 'reason' => 'No active subscription.'];
         }
 
-        $limit = $sub->pricingPlan->user_limit;
+        $limit = $sub->entitlementPlan()->user_limit;
         if ($limit === null || $limit === -1) {
             return ['allowed' => true];
         }
@@ -499,14 +499,14 @@ class PlanLimitService
         }
 
         $sub = self::getActiveSubscription($companyId);
-        if (!$sub || !$sub->pricingPlan) {
+        if (!$sub || !$sub->entitlementPlan()) {
             return ['allowed' => true];
         }
         if (self::grantWaivesPackageLimits($sub)) {
             return ['allowed' => true, 'unlimited' => true, 'blanket_grant' => true];
         }
 
-        $limit = $sub->pricingPlan->max_terminals;
+        $limit = $sub->entitlementPlan()->max_terminals;
         if ($limit === null || (int) $limit < 0) {
             return ['allowed' => true];
         }
@@ -548,7 +548,7 @@ class PlanLimitService
             return ['allowed' => false, 'reason' => 'No active subscription.'];
         }
 
-        $included = $sub->pricingPlan->branch_limit;
+        $included = $sub->entitlementPlan()->branch_limit;
         if ($included === null || $included === -1) {
             return ['allowed' => true];
         }
@@ -567,7 +567,7 @@ class PlanLimitService
         if ($count >= $limit) {
             // PRA POS shops can buy their way past this — point them at the
             // add-on instead of a package upgrade (own localized string).
-            $reason = \App\Services\BranchAddonService::supportsPlan($sub->pricingPlan)
+            $reason = \App\Services\BranchAddonService::supportsPlan($sub->entitlementPlan())
                 ? "Branch limit reached ({$count}/{$limit}). Buy an extra branch to add more."
                 : "Branch limit reached ({$count}/{$limit}). Please upgrade your plan.";
 
@@ -629,7 +629,7 @@ class PlanLimitService
         if (self::grantWaivesPackageLimits($sub)) {
             return null;
         }
-        $plan = $sub?->pricingPlan;
+        $plan = $sub?->entitlementPlan();
         if (!$plan || $plan->max_products === null || (int) $plan->max_products < 0) {
             return null;
         }
@@ -649,7 +649,7 @@ class PlanLimitService
     {
         $company = \App\Models\Company::find($companyId);
         $sub = self::getActiveSubscription($companyId);
-        $plan = $sub?->pricingPlan;
+        $plan = $sub?->entitlementPlan();
         $blanketGrant = self::grantWaivesPackageLimits($sub);
 
         $invoiceLimit = $company?->invoice_limit_override

@@ -80,8 +80,43 @@ try {
     }
     echo "PASS: native concurrent source observation is idempotent, scoped and preserves source rows\n";
     $bill = DB::table('pos_transactions')->insertGetId(['company_id' => $company->id, 'invoice_number' => 'RC-DIAG-'.$suffix,
-        'invoice_mode' => 'local', 'pra_status' => 'local', 'status' => 'completed', 'transaction_type' => 'sale', 'subtotal' => 100,
+        'bill_token' => 42, 'invoice_mode' => 'local', 'pra_status' => 'local', 'status' => 'completed', 'transaction_type' => 'sale', 'subtotal' => 100,
         'total_amount' => 100, 'payment_method' => 'cash', 'created_at' => $stamp, 'updated_at' => $stamp]);
+    $lookup = app(\App\Services\Reporting\DiagnosticBillLookup::class)->read([
+        'company_name' => $company->name, 'reference_kind' => 'pra_daily_token',
+        'bill_reference' => 'L042', 'counter_date' => $day], [$company->id]);
+    if ($lookup['status'] !== 'RESOLVED' || $lookup['bill_id'] !== (int) $bill
+        || $report['daily_coverage']['all_dates_measured'] !== true
+        || $report['daily_coverage']['complete_collection_proven'] !== false) {
+        throw new RuntimeException('Native daily-token lookup or per-date coverage failed.');
+    }
+    $eventIds = [];
+    foreach ([[$company->id, 'projected', $bill], [$other->id, 'projected', $bill],
+        [$company->id, 'accepted', $bill], [$company->id, 'projected', $bill + 999999]] as [$tenant, $state, $projectedBill]) {
+        $eventIds[] = DB::table('agent_core_events')->insertGetId([
+            'company_id' => $tenant, 'device_uid' => 'synthetic-diagnostic', 'event_id' => (string) Str::uuid(),
+            'idempotency_key' => (string) Str::uuid(), 'event_type' => 'sale.created', 'content_hash' => str_repeat('a', 64),
+            'payload' => json_encode(['transaction_id' => $bill, 'secret' => 'PRIVATE']), 'projection_status' => $state,
+            'projection_result' => json_encode(['transaction_id' => (int) $projectedBill, 'secret' => 'PRIVATE']),
+            'created_at' => $stamp, 'updated_at' => $stamp]);
+    }
+    $jobIds = [];
+    foreach ([[$company->id, 'kot'], [$other->id, 'kot'], [$company->id, 'fbr_kot']] as [$tenant,$type]) {
+        $jobIds[] = DB::table('pos_print_jobs')->insertGetId(['company_id' => $tenant, 'type' => $type,
+            'target_printer' => 'PRIVATE', 'transaction_id' => $bill, 'status' => 'pending', 'created_at' => $stamp, 'updated_at' => $stamp]);
+    }
+    $eventBefore = DB::table('agent_core_events')->whereIn('id', $eventIds)->orderBy('id')->get()->toJson();
+    $jobBefore = DB::table('pos_print_jobs')->whereIn('id', $jobIds)->orderBy('id')->get()->toJson();
+    $linked = app(\App\Services\Reporting\DiagnosticBillEvidence::class)->read([
+        'company_name' => $company->name, 'bill_id' => $bill], [$company->id]);
+    if ($linked['sources']['projected_offline_events']['rows'] !== [['id' => (int) $eventIds[0]]]
+        || $linked['sources']['print_jobs']['rows'] !== [['id' => (int) $jobIds[0]]]
+        || str_contains(json_encode($linked), 'PRIVATE') || $linked['physical_print'] !== 'unknown'
+        || $eventBefore !== DB::table('agent_core_events')->whereIn('id', $eventIds)->orderBy('id')->get()->toJson()
+        || $jobBefore !== DB::table('pos_print_jobs')->whereIn('id', $jobIds)->orderBy('id')->get()->toJson()) {
+        throw new RuntimeException('Native JSON projection attribution, print namespace or preservation failed.');
+    }
+    echo "PASS: native daily-token lookup, daily coverage, JSON offline projection and print-job links are scoped and preserve evidence\n";
     $immutableBill = (array) DB::table('pos_transactions')->find($bill);
     $ims = [];
     foreach ([$company->id, $other->id] as $tenant) {
@@ -318,7 +353,7 @@ try {
         return [$table => DB::table($table)->orderBy('id')->get()->toJson()];
     })->put('health_charges', DB::table('health_charges')->whereIn('company_id', [$health->id, $otherHealth->id])->orderBy('id')->get()->toJson())
         ->put('health_batch_movements', DB::table('health_batch_movements')->whereIn('company_id', [$health->id, $otherHealth->id])->orderBy('id')->get()->toJson());
-    if ($healthReport['version'] !== 4 || str_contains(json_encode($healthReport), 'PRIVATE') || $healthBefore->all() !== $healthAfter->all()) {
+    if ($healthReport['version'] !== 5 || str_contains(json_encode($healthReport), 'PRIVATE') || $healthBefore->all() !== $healthAfter->all()) {
         throw new RuntimeException('Native health source report leaked or changed retained rows');
     }
     echo "PASS: native healthcare bill follows exact tenant-scoped clinical, pharmacy and stock source IDs without changing rows\n";

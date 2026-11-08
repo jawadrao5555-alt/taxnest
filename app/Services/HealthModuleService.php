@@ -243,9 +243,7 @@ class HealthModuleService
                 return self::PLAN_FALLBACK_MODULES;
             }
 
-            $plan = $subscription->relationLoaded('pricingPlan')
-                ? $subscription->getRelation('pricingPlan')
-                : \App\Models\PricingPlan::find($subscription->pricing_plan_id);
+            $plan = $subscription->entitlementPlan();
 
             if (!$plan) {
                 return self::PLAN_FALLBACK_MODULES;

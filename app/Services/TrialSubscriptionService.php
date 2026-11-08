@@ -2,8 +2,11 @@
 
 namespace App\Services;
 
+use App\Models\Company;
 use App\Models\PricingPlan;
 use App\Models\Subscription;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * Guarantees that a freshly-created company ALWAYS ends up with a usable
@@ -25,31 +28,51 @@ class TrialSubscriptionService
      */
     public static function ensureTrial(int $companyId, string $productType, int $days = 3): Subscription
     {
-        $existing = Subscription::where('company_id', $companyId)
-            ->where('active', true)
-            ->orderByDesc('id')
-            ->first();
-        if ($existing) {
-            return $existing;
-        }
+        return DB::transaction(function () use ($companyId, $productType, $days) {
+            // Same replacement mutex as paid assignment: retries/concurrent signup
+            // cannot stack trials or race a paid term into being replaced.
+            $company = Company::whereKey($companyId)->lockForUpdate()->firstOrFail();
+            $existing = Subscription::where('company_id', $companyId)
+                ->where('active', true)
+                ->orderByDesc('id')
+                ->lockForUpdate()
+                ->first();
+            if ($existing) {
+                return $existing;
+            }
+            $actualProduct = \App\Support\NestErps::canonicalProductType($company->product_type);
+            if ($actualProduct && $actualProduct !== \App\Support\NestErps::canonicalProductType($productType)) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'product_type' => 'The trial must belong to the company product.',
+                ]);
+            }
 
-        // Prefer the product's own trial plan; fall back to any trial plan so a
-        // missing seed row never leaves the company subscription-less.
-        $trialPlan = PricingPlan::whereIn('product_type', \App\Support\NestErps::storedTypesFor($productType))
-            ->where('is_trial', true)
-            ->first()
-            ?? PricingPlan::where('is_trial', true)->first();
+            // A missing product seed retains the existing bounded, plan-less trial;
+            // another product's feature/limit catalogue is never an entitlement.
+            $trialPlan = PricingPlan::whereIn('product_type', \App\Support\NestErps::storedTypesFor($productType))
+                ->where('is_trial', true)
+                ->orderBy('id')->lockForUpdate()->first();
 
-        return Subscription::create([
-            'company_id' => $companyId,
-            'pricing_plan_id' => $trialPlan?->id,
-            'billing_cycle' => 'monthly',
-            'discount_percent' => 0,
-            'final_price' => 0,
-            'start_date' => now(),
-            'end_date' => now()->addDays($days),
-            'trial_ends_at' => now()->addDays($days),
-            'active' => true,
-        ]);
+            $attributes = [
+                'company_id' => $companyId,
+                'pricing_plan_id' => $trialPlan?->id,
+                'billing_cycle' => 'monthly',
+                'discount_percent' => 0,
+                'final_price' => 0,
+                'start_date' => now(),
+                'end_date' => now()->addDays($days),
+                'trial_ends_at' => now()->addDays($days),
+                'active' => true,
+            ];
+            if ($trialPlan && Schema::hasColumn('subscriptions', 'purchase_snapshot')) {
+                $attributes['purchase_snapshot'] = SubscriptionPurchaseSnapshot::capture($company, $trialPlan,
+                    ['cycle' => 'monthly', 'final_price' => 0, 'base_price' => 0, 'extra_branch_price' => 0,
+                        'extra_branch_slots' => 0, 'discount_percent' => 0],
+                    $attributes['start_date']->toDateString(), $attributes['end_date']->toDateString(), false);
+                $attributes['purchase_snapshot']['source'] = 'trial_assignment';
+            }
+
+            return Subscription::create($attributes);
+        });
     }
 }

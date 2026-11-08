@@ -71,6 +71,35 @@ class DiagnosticSourceCollectionTest extends TestCase
         $this->assertSame(4, DB::table('pra_logs')->count());
     }
 
+    public function test_daily_coverage_preserves_missing_failed_incompatible_and_late_arrival_receipts(): void
+    {
+        $collector = app(DiagnosticSourceCollection::class);
+        foreach (['2026-11-03', '2026-11-04', '2026-11-05', '2026-11-06'] as $date) {
+            $collector->capture(1, 'pra.fiscal', $date, (string) Str::uuid());
+        }
+        DB::table('diagnostic_source_observations')->where('business_date', '2026-11-04')->update(['status' => 'SOURCE_QUERY_FAILED']);
+        DB::table('diagnostic_source_observations')->where('business_date', '2026-11-05')->update(['registry_version' => 0]);
+        DB::table('pra_logs')->insert(['company_id' => 1, 'created_at' => '2026-11-05 22:00:00', 'payload' => 'PRIVATE']);
+        $collector->capture(1, 'pra.fiscal', '2026-11-06', (string) Str::uuid());
+        $collector->capture(2, 'pra.fiscal', '2026-11-07', (string) Str::uuid());
+        $before = DB::table('diagnostic_source_observations')->get()->toJson();
+        $r = $collector->latest(1, 'pra.fiscal', '2026-11-01', '2026-11-07')['daily_coverage'];
+        $this->assertCount(7, $r['days']);
+        $this->assertSame(['2026-11-03', '2026-11-06'], $r['measured_dates']);
+        $this->assertSame(['2026-11-01', '2026-11-02', '2026-11-07'], $r['missing_dates']);
+        $this->assertSame(['2026-11-04', '2026-11-05'], $r['unavailable_or_failed_dates']);
+        $this->assertSame('INCOMPATIBLE_REGISTRY', $r['days'][4]['status']);
+        $this->assertSame(1, $r['days'][5]['retained_rows']);
+        $this->assertFalse($r['all_dates_measured']);
+        $this->assertFalse($r['complete_collection_proven']);
+        $this->assertSame($before, DB::table('diagnostic_source_observations')->get()->toJson());
+        $single = $collector->latest(1, 'pra.fiscal', '2026-11-03', '2026-11-03')['daily_coverage'];
+        $this->assertTrue($single['all_dates_measured']);
+        $this->assertFalse($single['complete_collection_proven']);
+        $this->expectException(\InvalidArgumentException::class);
+        $collector->latest(1, 'pra.fiscal', '2026-10-01', '2026-11-07');
+    }
+
     public function test_missing_empty_and_legacy_health_sources_remain_distinct(): void
     {
         $collector = app(DiagnosticSourceCollection::class);

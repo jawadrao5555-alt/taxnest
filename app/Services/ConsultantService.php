@@ -8,7 +8,6 @@ use App\Models\ConsultantCommission;
 use App\Models\ConsultantInvite;
 use App\Models\ConsultantProfile;
 use App\Models\Invoice;
-use App\Models\PricingPlan;
 use App\Models\Subscription;
 use App\Models\User;
 use Carbon\Carbon;
@@ -281,7 +280,7 @@ class ConsultantService
         foreach ($links as $link) {
             $company = $link->company;
             $sub = $company->activeSubscription;
-            $plan = $sub?->pricingPlan;
+            $plan = $sub?->entitlementPlan();
 
             // Quota: DI plans cap TOTAL invoices (company override wins; -1 = unlimited).
             $limit = $company->invoice_limit_override ?? $plan?->invoice_limit ?? null;
@@ -361,7 +360,7 @@ class ConsultantService
                 return null; // disabled/removed consultants earn nothing new
             }
 
-            $plan = PricingPlan::find($sub->pricing_plan_id);
+            $plan = $sub->entitlementPlan();
             if (!$plan || $plan->is_trial) {
                 return null;
             }

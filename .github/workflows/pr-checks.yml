@@ -303,6 +303,8 @@ jobs:
           RC_BROWSER_ONLY=security-onboarding bash scripts/rc-browser-fixture.sh run
           RC_BROWSER_ONLY=restore-session-boundary bash scripts/rc-browser-fixture.sh run
           bash scripts/rc-browser-fixture.sh stop
+          # stop removes the entire disposable state, including its pinned browser cache.
+          bash scripts/rc-playwright-install.sh
           bash scripts/rc-browser-fixture.sh setup
       - name: Seed and verify authenticated Smart DI source import
         id: browser-preflight

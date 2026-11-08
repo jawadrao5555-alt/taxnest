@@ -437,6 +437,8 @@ class AdminController extends Controller
 
     public function storeUser(Request $request)
     {
+        \App\Models\AdminUser::requireCompanyLifecycleAdministrator();
+
         $request->validate([
             'name' => 'required|string|max:255',
             'email' => ['required', 'email', \App\Support\IdentityScope::uniqueEmail(\App\Support\IdentityScope::ofCompanyId($request->input('company_id')))],

@@ -8,6 +8,7 @@ use App\Models\Invoice;
 use App\Models\Product;
 use App\Models\PricingPlan;
 use App\Models\Subscription;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
@@ -54,6 +55,7 @@ class AdminBillingCapabilityTest extends TestCase
         $companyBefore = Company::findOrFail($sub->company_id)->getAttributes();
         $invoiceBefore = $invoice->fresh()->getAttributes();
         $plans = DB::table('pricing_plans')->orderBy('id')->get()->toJson();
+        $usersBefore = User::count();
         foreach (['viewer', 'support', 'unknown_role'] as $role) {
             $this->actingAs($this->admin($role), 'admin');
             foreach ([
@@ -62,6 +64,7 @@ class AdminBillingCapabilityTest extends TestCase
                 ['POST', '/admin/payment-proofs/999999/approve', []], ['POST', '/admin/payment-proofs/999999/reject', []],
                 ['POST', '/admin/companies', []],
                 ['POST', '/admin/di-companies/store', []],
+                ['POST', '/admin/all-users', []],
                 ['POST', '/admin/companies/'.$sub->company_id.'/approve', []],
                 ['POST', '/admin/companies/'.$sub->company_id.'/limits', ['extra_branch_slots' => 10]],
                 ['POST', '/admin/companies/'.$sub->company_id.'/override/lifetime', []],
@@ -103,6 +106,7 @@ class AdminBillingCapabilityTest extends TestCase
         $this->assertSame($companyBefore, Company::findOrFail($sub->company_id)->getAttributes());
         $this->assertSame($invoiceBefore, $invoice->fresh()->getAttributes());
         $this->assertSame($plans, DB::table('pricing_plans')->orderBy('id')->get()->toJson());
+        $this->assertSame($usersBefore, User::count());
         $this->assertSame(1, Subscription::where('company_id', $sub->company_id)->count());
         Mail::assertNothingSent();
     }
@@ -138,5 +142,24 @@ class AdminBillingCapabilityTest extends TestCase
             $this->post('/admin/subscriptions/'.$sub->id.'/toggle')->assertRedirect();
             $this->assertFalse((bool) $sub->fresh()->active);
         }
+    }
+
+    public function test_existing_administrator_can_create_a_fictional_company_user(): void
+    {
+        $sub = $this->paid();
+        $this->actingAs($this->admin('admin'), 'admin')
+            ->post('/admin/all-users', [
+                'name' => 'Fictional retained viewer',
+                'email' => 'fictional-retained-viewer@example.test',
+                'password' => 'SyntheticOnly123!',
+                'role' => 'viewer',
+                'company_id' => $sub->company_id,
+            ])->assertRedirect('/admin/users');
+
+        $this->assertDatabaseHas('users', [
+            'company_id' => $sub->company_id,
+            'email' => 'fictional-retained-viewer@example.test',
+            'role' => 'viewer',
+        ]);
     }
 }

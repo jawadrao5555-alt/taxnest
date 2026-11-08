@@ -820,3 +820,11 @@ across the sensitive, billing and release boundaries; Node syntax and diff
 checks pass. This is supplemental evidence below the supported PHP8.4/native
 and real-Chromium contract. Fresh exact-HEAD hosted acceptance remains required,
 and no live tax mapping, medicine catalogue or customer configuration changed.
+
+The legacy cross-company user-create route also trusted only the admin-panel
+session. It now reloads the persisted company-lifecycle authority before
+validation or credential creation. Viewer/support/unmapped and cached
+downgraded administrators receive 403 with the complete customer-user table
+unchanged; an existing administrator still creates a fictional company-bound
+viewer through the actual route. The same 1366/390 journey sends the denied
+POST. Focused billing/capability coverage passes **5 tests / 150 assertions**.

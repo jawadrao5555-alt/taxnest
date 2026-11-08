@@ -231,6 +231,7 @@ export async function securityOnboardingWorkflow(page,t,v,{baseUrl,login,saveEvi
     '/admin/sales',
     '/admin/consultants/min-payout',
     '/admin/groups/resync',
+    '/admin/all-users',
     '/admin/hs-rate-links',
     '/admin/hs-rate-links-import',
     '/admin/hs-master',

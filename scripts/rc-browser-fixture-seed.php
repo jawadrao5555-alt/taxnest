@@ -908,11 +908,15 @@ foreach ([1366,390] as $width) {
     'schedule_type' => 'standard', 'tax_rate' => 18, 'default_uom' => 'KG']);
 $diBulkCases = [];
 foreach ([1366, 390] as $width) {
-    $bulkCompany = $company('Synthetic DI Packing '.$width, 'di-packing-company-'.$width.'@rc-browser.invalid', 'RCBULKDI'.$width, 'di');
+    $bulkCompany = $company('Synthetic DI Packing '.$width, 'di-packing-company-'.$width.'@rc-browser.invalid', 'RCBULKDI'.$width, 'di',
+        ['is_internal_account' => false, 'onboarding_completed' => true]);
     $bulkOwner = $user($bulkCompany, 'Synthetic DI Packing Owner', 'di-packing-owner-'.$width.'@rc-browser.invalid', 'company_admin');
     $bulkPlan = \App\Models\PricingPlan::create(['name' => 'Synthetic DI Cycles '.$width, 'product_type' => 'di',
         'price' => 1000, 'price_monthly' => 1000, 'price_quarterly' => 2970, 'price_semi_annual' => 5820,
         'price_yearly' => 11280, 'is_trial' => false, 'invoice_limit' => -1, 'is_public' => true]);
+    \App\Models\Subscription::create(['company_id' => $bulkCompany->id, 'pricing_plan_id' => $bulkPlan->id,
+        'active' => true, 'billing_cycle' => 'annual', 'final_price' => 11280,
+        'start_date' => now()->subDay(), 'end_date' => now()->addYearNoOverflow()]);
     $diBulkCases[$width] = ['login' => $bulkOwner->email, 'companyId' => $bulkCompany->id, 'planId' => $bulkPlan->id];
 }
 $fixture = [

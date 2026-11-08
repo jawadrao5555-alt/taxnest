@@ -1,7 +1,7 @@
-title: "Package ki khareedi hui sahulatain aur payment receipts"
+title: "Bill aur printing ki jaanch mein mazeed tafseel"
 audience: all
 type: improvement
 points:
-  - "Package khareedne ke baad us waqt ki sahulatain aur limits mehfooz rehti hain; baad ki package-list tabdeeli se aap ka chalta package nahi badalta."
-  - "Tasdeeq-shuda package aur add-on payment ki invoice aur receipt Billing mein dekhein aur download karein."
-  - "Digital Invoice mein sirf package chunne se chalta hua paid package khatam nahi hota; payment ki tasdeeq ka mojooda tareeqa istemal hota hai."
+  - "Ijazat wali reporting connection se bill, order aur printing ke mehfooz records ki jaanch zyada asani se ho sakti hai."
+  - "Roz badalne wale L number ka bill dhoondhne ke liye us ki tareekh bhi dein; ek jaisa number dobara ho to dono mumkin bills alag nazar aayenge."
+  - "Jis din ka record ya printing ka saboot mojood nahi, report usay wazeh karegi. Purane missing records ya kagaz nikalne ki tasdeeq khud se nahi ki jati."

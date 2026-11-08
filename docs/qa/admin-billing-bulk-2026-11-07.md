@@ -432,3 +432,19 @@ history and correction context while preserving both records.
 This closes another administrator companion-display slice only. Existing-policy
 upgrade/proration and remaining mobile/Agent/API companion parity remain open;
 fresh exact-HEAD hosted PHP8.4/full-suite/browser acceptance is required.
+
+## DI push API purchased-access parity
+
+The billable DI push endpoint already calls the shared subscription access
+service after machine-key and company-lifecycle authentication. An actual HTTP
+regression now freezes a one-invoice DI trial purchase, edits the live catalogue
+into a paid 100-invoice package, and requires the connected ERP to create only
+the one purchased invoice. The second request receives the existing structured
+subscription-lock response and creates no invoice row.
+
+This verifies that browser/backend and stateless DI API callers share the same
+immutable purchased entitlement while the read-only status endpoint and legacy
+snapshot fallback remain unchanged. No API key, price, term, proration, credit
+or refund policy changed. Hosted PHP8.4/full-suite acceptance is required for
+the exact published HEAD. Mobile/Agent companion acceptance and existing-policy
+upgrade/proration behavior remain open.

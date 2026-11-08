@@ -153,6 +153,41 @@ class DiApiSubscriptionAccessTest extends TestCase
             ->assertJsonPath('invoice.client_reference', 'active-1');
     }
 
+    public function test_api_trial_limit_uses_the_frozen_purchase_after_catalogue_edit(): void
+    {
+        $subscription = $this->subscription([
+            'end_date' => null,
+            'trial_ends_at' => now()->addDays(10),
+            'purchase_snapshot' => [
+                'version' => 1,
+                'company_id' => $this->company->id,
+                'plan' => [
+                    'id' => $this->plan->id,
+                    'name' => 'Purchased DI API trial',
+                    'product_type' => 'di',
+                    'is_trial' => true,
+                    'invoice_limit' => 1,
+                ],
+            ],
+        ]);
+
+        // Catalogue edits govern later sales only. The connected ERP must see
+        // the same purchased access decision as the browser/backend readers.
+        $this->plan->update(['name' => 'Changed paid catalogue', 'is_trial' => false, 'invoice_limit' => 100]);
+
+        $this->api()->postJson('/api/di/v1/invoices', $this->payload('snapshot-first'))
+            ->assertStatus(201)
+            ->assertJsonPath('status', 'ok');
+        $this->api()->postJson('/api/di/v1/invoices', $this->payload('snapshot-over-limit'))
+            ->assertStatus(402)
+            ->assertJsonPath('error', DiApiSubscriptionAccess::ERROR_CODE)
+            ->assertJsonPath('message', __('pos.tl_reason_trial_limit', ['used' => 1, 'limit' => 1]));
+
+        $this->assertSame(1, Invoice::withoutGlobalScopes()->where('company_id', $this->company->id)->count());
+        $this->assertSame(1, $subscription->fresh()->entitlementPlan()->invoice_limit);
+        $this->assertSame(100, $this->plan->fresh()->invoice_limit);
+    }
+
     public function test_lifetime_override_unlocks_an_expired_plan(): void
     {
         $this->subscription([

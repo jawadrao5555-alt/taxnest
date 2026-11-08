@@ -392,3 +392,23 @@ leaving the catalogue row unchanged. This changes no price, term, upgrade,
 proration, credit or refund policy. Hosted PHP8.4/full-suite/browser acceptance
 must verify the published exact HEAD.
 for the exact published HEAD; no local PHP runtime is available here.
+
+## SaaS admin subscription-history purchased-name parity
+
+The SaaS administrator subscription table and its retained history still
+rendered names directly from the mutable catalogue relationship. Editing a
+catalogue label after purchase could therefore rewrite what the administrator
+saw for an existing frozen term even though runtime access already used the
+immutable purchase snapshot.
+
+Current and historical subscription labels now use the same read-only
+`entitlementPlan()` view. The new-assignment selector and reactivation checks
+continue to use the live catalogue and existing sellability policy; no price,
+term, access, upgrade or proration rule changed. A focused actual admin-page
+regression freezes a purchased name, edits the catalogue name and requires the
+purchased label on the subscription page.
+
+This closes this administrator display slice only. Existing-policy
+upgrade/proration and remaining mobile/Agent/API companion parity remain open,
+and exact hosted full-suite/browser acceptance is required for the published
+HEAD.

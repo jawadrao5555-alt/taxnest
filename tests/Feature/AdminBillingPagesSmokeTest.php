@@ -75,6 +75,7 @@ class AdminBillingPagesSmokeTest extends TestCase
             $table->integer('free_invoice_limit')->nullable();
             $table->text('override_reason')->nullable();
             $table->unsignedBigInteger('override_by')->nullable();
+            $table->json('purchase_snapshot')->nullable();
             $table->timestamps();
         });
 
@@ -179,6 +180,39 @@ class AdminBillingPagesSmokeTest extends TestCase
 
         $response->assertStatus(200);
         $response->assertSee('Smoke Co');
+    }
+
+    public function test_admin_subscription_history_displays_frozen_purchased_plan_name(): void
+    {
+        $this->seedPlans();
+        $companyId = DB::table('companies')->insertGetId([
+            'name' => 'Frozen Package Co',
+            'product_type' => 'di',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $planId = (int) DB::table('pricing_plans')->where('product_type', 'di')->value('id');
+        DB::table('subscriptions')->insert([
+            'company_id' => $companyId,
+            'pricing_plan_id' => $planId,
+            'billing_cycle' => 'annual',
+            'start_date' => now()->toDateString(),
+            'end_date' => now()->addYear()->toDateString(),
+            'active' => true,
+            'purchase_snapshot' => json_encode([
+                'version' => 1,
+                'company_id' => $companyId,
+                'plan' => ['id' => $planId, 'name' => 'Purchased DI Basic', 'product_type' => 'di'],
+            ], JSON_THROW_ON_ERROR),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('pricing_plans')->where('id', $planId)->update(['name' => 'Edited Catalogue Name']);
+
+        $this->actingAsAdmin()->get('/admin/subscriptions')
+            ->assertOk()
+            ->assertSee('Purchased DI Basic');
     }
 
     /** Subscriptions status filter must not break the page either. */

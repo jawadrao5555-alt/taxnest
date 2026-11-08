@@ -56,7 +56,7 @@ class AgentAuth
 
         $company = $this->resolveCompany((string) $key);
 
-        if (!$company) {
+        if (!$company || !$this->companyMayUseAgent($company)) {
             RateLimiter::hit($failKey, 60);
             if (RateLimiter::tooManyAttempts($failKey, self::FAIL_LIMIT_PER_MINUTE)) {
                 return $this->tooManyFailures($failKey);
@@ -68,6 +68,21 @@ class AgentAuth
         $request->attributes->set('agent_company', $company);
 
         return $next($request);
+    }
+
+    /**
+     * Agent keys are device credentials, not a way around company lifecycle
+     * revocation.  The browser guards already refuse these explicit inactive
+     * states; re-read them here on every poll as well.  Older installations
+     * used `approved` in company_status, so fail only the states which the
+     * current lifecycle controllers persist as inactive.
+     */
+    private function companyMayUseAgent(Company $company): bool
+    {
+        $inactive = ['pending', 'suspended', 'rejected', 'inactive'];
+
+        return !in_array((string) $company->getAttribute('company_status'), $inactive, true)
+            && !in_array((string) $company->getAttribute('status'), $inactive, true);
     }
 
     private function tooManyFailures(string $failKey): Response

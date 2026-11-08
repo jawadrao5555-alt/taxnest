@@ -39,6 +39,7 @@ class AgentAuthHardeningTest extends TestCase
             $table->id();
             $table->string('name');
             $table->string('company_status')->default('approved');
+            $table->string('status')->default('approved');
             $table->string('agent_api_key')->nullable();
             $table->string('agent_api_key_hash', 64)->nullable()->index();
             $table->boolean('agent_enabled')->default(false);
@@ -191,6 +192,33 @@ class AgentAuthHardeningTest extends TestCase
         $this->poll(self::KEY)->assertOk();
         Company::findOrFail($id)->delete();
         $this->poll(self::KEY)->assertStatus(401);
+    }
+
+    public function test_cached_agent_key_is_revoked_by_each_inactive_company_lifecycle_state(): void
+    {
+        $id = $this->insertCompany([
+            'company_status' => 'active',
+            'agent_api_key' => self::KEY,
+            'agent_api_key_hash' => hash('sha256', self::KEY),
+        ]);
+
+        $this->poll(self::KEY)->assertOk();
+        $this->assertTrue(Cache::has('agent-auth-ok:'.sha1(self::KEY)));
+
+        foreach (['company_status', 'status'] as $column) {
+            foreach (['pending', 'suspended', 'rejected', 'inactive'] as $status) {
+                DB::table('companies')->where('id', $id)->update([$column => $status]);
+
+                $this->poll(self::KEY)
+                    ->assertStatus(401)
+                    ->assertExactJson(['error' => 'Invalid or disabled agent key']);
+
+                DB::table('companies')->where('id', $id)->update([
+                    $column => $column === 'status' ? 'approved' : 'active',
+                ]);
+                $this->poll(self::KEY)->assertOk();
+            }
+        }
     }
 
     // ── Model behaviour ───────────────────────────────────────────────────

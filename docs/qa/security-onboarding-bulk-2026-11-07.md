@@ -492,3 +492,25 @@ business record is changed by the middleware correction.
 This closes the switched consultant-principal slice only. OAuth refresh,
 remaining companion revocation and the broader security/onboarding checklist
 remain open until their exact runtime paths and hosted acceptance are complete.
+
+## Company lifecycle revocation for Desktop Agent credentials
+
+The Desktop Agent middleware already re-read key rotation, `agent_enabled` and
+soft deletion for every request, but it did not apply the company lifecycle
+state which the browser and DI API guards enforce. A cached healthy Agent key
+could therefore keep polling after either status column was changed to pending,
+suspended, rejected or inactive.
+
+The middleware now re-reads both persisted lifecycle columns after proving key
+possession and refuses every explicit inactive state before setting the request
+tenant. The known-good cache remains only a shared-IP rate-limit exemption and
+never authorizes the request. Legacy installations which used `approved` in
+`company_status` remain compatible. Focused actual-route coverage authenticates
+first, retains the known-good cache, then checks every inactive value in each
+column and requires immediate refusal followed by recovery only after the state
+is restored. No key, pairing, printer, company state or business row is changed
+outside the disposable test database.
+
+Hosted PHP8.4/full-suite acceptance is required for the published exact HEAD.
+This closes the company-lifecycle Agent slice only; OAuth refresh and the wider
+companion/security/onboarding checklist remain open.

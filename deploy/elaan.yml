@@ -1,10 +1,7 @@
-title: "Kitchen parchi par order note ka wazeh status"
-audience: pos
-categories:
-  - restaurant
-  - hotel
+title: "Package ki khareedi hui sahulatain aur payment receipts"
+audience: all
 type: improvement
 points:
-  - "Order note likhte waqt ab nazar aayega ke woh kitchen parchi par aayega ya notes ka switch band hai."
-  - "Ijazat rakhne wala owner ya manager note ke paas se hi shop ki KOT par order notes ON kar sakta hai."
-  - "Pehle bheji hui kitchen parchi par naya note khud nahi pohanchta; aisi tabdeeli kitchen ko alag se batayein."
+  - "Package khareedne ke baad us waqt ki sahulatain aur limits mehfooz rehti hain; baad ki package-list tabdeeli se aap ka chalta package nahi badalta."
+  - "Tasdeeq-shuda package aur add-on payment ki invoice aur receipt Billing mein dekhein aur download karein."
+  - "Digital Invoice mein sirf package chunne se chalta hua paid package khatam nahi hota; payment ki tasdeeq ka mojooda tareeqa istemal hota hai."

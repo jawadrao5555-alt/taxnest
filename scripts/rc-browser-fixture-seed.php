@@ -891,6 +891,19 @@ foreach ([1366,390] as $staffWidth) {
     $staffCashier=$user($staffCompany,'Synthetic Staff Cashier','staff-cashier-'.$staffWidth.'@rc-browser.invalid','user','pos_cashier');
     $staffCases[$staffWidth]=['owner'=>$staffOwner->email,'cashier'=>$staffCashier->email,'employee'=>$staffCashier->id];
 }
+$billingSelectionCases = [];
+foreach ([1366,390] as $width) {
+    $billingCompany = $company('Synthetic Billing Selection '.$width, 'billing-selection-'.$width.'@rc-browser.invalid', 'RCBILLSEL'.$width, 'di',
+        ['is_internal_account' => false, 'onboarding_completed' => true]);
+    $billingOwner = $user($billingCompany, 'Synthetic Billing Owner', 'billing-owner-'.$width.'@rc-browser.invalid', 'company_admin');
+    $oldPlan = \App\Models\PricingPlan::create(['name' => 'Synthetic Original '.$width, 'product_type' => 'di',
+        'price' => 100, 'invoice_limit' => 25, 'is_trial' => false, 'is_public' => true]);
+    \App\Models\Subscription::create(['company_id' => $billingCompany->id, 'pricing_plan_id' => $oldPlan->id, 'active' => true,
+        'start_date' => now()->subDay(), 'end_date' => now()->addMonths(6), 'billing_cycle' => 'annual', 'final_price' => 1000]);
+    $nextPlan = \App\Models\PricingPlan::create(['name' => 'Synthetic Selected '.$width, 'product_type' => 'di',
+        'price' => 200, 'invoice_limit' => 50, 'is_trial' => false, 'is_public' => true]);
+    $billingSelectionCases[$width] = ['login' => $billingOwner->email, 'planId' => $nextPlan->id, 'original' => $oldPlan->name];
+}
 $fixture = [
     'generated_at' => $now->toIso8601String(), 'synthetic' => true,
     'readOnlyJourneys' => array_merge([
@@ -933,6 +946,8 @@ $fixture = [
         ['name' => 'service-work-orders-denied', 'login' => $serviceDenied->email, 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/work-orders', '/pos/work-orders/report.csv'], 'denied' => true],
     ], $categoryJourneys, $optionalArchiveJourneys),
     'transactionalJourneys' => [
+        ['name'=>'billing-package-selection','login'=>$billingSelectionCases[1366]['login'],'password'=>$password,'loginPath'=>'/login',
+            'paths'=>[], 'billingSelection'=>$billingSelectionCases],
         ['name'=>'kot-note-visibility','login'=>$kotNoteOwner->email,'password'=>$password,'loginPath'=>'/pos/login','paths'=>['/pos/invoice/create'],'markers'=>['Current Order'],'kotNoteVisibility'=>['orderId'=>$kotNoteOrder->id]],
         ['name'=>'staff-discount-approval','login'=>$staffCases[1366]['cashier'],'password'=>$password,'loginPath'=>'/pos/login','paths'=>['/pos/staff-discounts'],'markers'=>['Staff / family discount requests'],'staffDiscount'=>$staffCases],
         ...$surveyJourneys,

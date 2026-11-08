@@ -2,7 +2,7 @@
 
 namespace App\Services;
 
-use App\Models\{AdminAuditLog, Branch, Company, PaymentProof, Subscription, SubscriptionInvoice, SubscriptionPayment};
+use App\Models\{AdminAuditLog, Branch, Company, PaymentProof, Subscription, SubscriptionFinancialAdjustment, SubscriptionInvoice, SubscriptionPayment};
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Schema;
 
@@ -57,6 +57,12 @@ final class CompanyAccountOverview
             'payments_available' => Schema::hasTable('subscription_invoices') && Schema::hasTable('subscription_payments'),
             'payments' => Schema::hasTable('subscription_invoices') && Schema::hasTable('subscription_payments')
                 ? SubscriptionPayment::whereHas('invoice', fn ($q) => $q->where('company_id', $id))->orderByDesc('id')->paginate(10, ['*'], 'payment_page')->withQueryString() : collect(),
+            'adjustments_available' => Schema::hasTable('subscription_financial_adjustments'),
+            'adjustments' => Schema::hasTable('subscription_financial_adjustments')
+                ? SubscriptionFinancialAdjustment::with(['actor', 'invoice', 'payment'])
+                    ->where('company_id', $id)->orderByDesc('id')
+                    ->paginate(10, ['*'], 'adjustment_page')->withQueryString()
+                : collect(),
             'as_of' => now(),
         ];
     }

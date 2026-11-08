@@ -174,21 +174,20 @@ class DistributorPaymentApprovalLifecycleTest extends TestCase
 
         $this->actingAs($user)->post('/billing/subscribe', [
             'plan_id'=>$plan->id, 'billing_cycle'=>'annual',
-        ])->assertRedirect('/dashboard');
-        $first = Subscription::where('company_id', $company->id)->where('active', true)->firstOrFail();
-        $snapshot = $first->distributor_quote_snapshot;
+        ])->assertRedirect('/billing/plans');
+        $this->assertSame(0, Subscription::where('company_id', $company->id)->count(), 'Selection must not activate unpaid access.');
+        $snapshot = session(\App\Services\PendingSubscriptionSelection::key($company->id).'.quote');
         $this->assertNotNull($snapshot);
         $this->assertSame(10.0, (float)$snapshot['discount_percent']);
-        $firstPrice = (float)$first->final_price;
+        $firstPrice = (float)$snapshot['net_quote'];
 
         $agent->update(['discount_percent'=>1]);
         SystemSetting::set('distributor_max_discount', 1);
         $this->actingAs($user)->post('/billing/subscribe', [
             'plan_id'=>$plan->id, 'billing_cycle'=>'annual',
-        ])->assertRedirect('/dashboard');
-        $repeated = Subscription::where('company_id', $company->id)->where('active', true)->firstOrFail();
-        $this->assertEquals($snapshot, $repeated->distributor_quote_snapshot);
-        $this->assertSame($firstPrice, (float)$repeated->final_price);
+        ])->assertRedirect('/billing/plans');
+        $this->assertSame(0, Subscription::where('company_id', $company->id)->count());
+        $this->assertEquals($snapshot, session(\App\Services\PendingSubscriptionSelection::key($company->id).'.quote'));
 
         $this->actingAs($user)->from('/billing/plans')->post('/payment-proof', [
             'pricing_plan_id'=>$plan->id, 'billing_cycle'=>'annual', 'amount'=>1,
@@ -221,5 +220,26 @@ class DistributorPaymentApprovalLifecycleTest extends TestCase
             11000.0,
             (float)AgentCommission::where('payment_proof_id', $proof->id)->firstOrFail()->base_amount
         );
+    }
+
+    public function test_di_selection_preserves_existing_paid_term_and_refuses_staff(): void
+    {
+        [, $company, $plan] = $this->fixture('selection-existing');
+        $company->update(['status' => 'approved', 'company_status' => 'active']);
+        $oldPlan = PricingPlan::create(['name' => 'Prior paid package', 'product_type' => 'di', 'price' => 100,
+            'invoice_limit' => 25, 'is_trial' => false]);
+        $old = Subscription::create(['company_id' => $company->id, 'pricing_plan_id' => $oldPlan->id,
+            'active' => true, 'start_date' => now()->subMonth(), 'end_date' => now()->addMonths(6), 'final_price' => 999]);
+        $before = $old->fresh()->getAttributes();
+        $owner = User::create(['name' => 'Selection owner', 'email' => 'selection-owner@example.test',
+            'password' => 'password', 'company_id' => $company->id, 'role' => 'company_admin', 'is_active' => true]);
+        $this->actingAs($owner)->post('/billing/subscribe', ['plan_id' => $plan->id, 'billing_cycle' => 'annual'])
+            ->assertRedirect('/billing/plans');
+        $this->assertSame($before, $old->fresh()->getAttributes());
+        $this->assertSame(1, Subscription::where('company_id', $company->id)->count());
+        $this->assertSame(0, PaymentProof::where('company_id', $company->id)->count());
+        $owner->update(['role' => 'user']);
+        $this->actingAs($owner->fresh())->post('/billing/subscribe', ['plan_id' => $plan->id])->assertForbidden();
+        $this->assertSame($before, $old->fresh()->getAttributes());
     }
 }

@@ -23,6 +23,7 @@ class Subscription extends Model
         'override_reason',
         'override_by',
         'distributor_quote_snapshot',
+        'purchase_snapshot',
     ];
 
     protected $casts = [
@@ -35,7 +36,19 @@ class Subscription extends Model
         'override_granted_at' => 'datetime',
         'free_invoice_limit' => 'integer',
         'distributor_quote_snapshot' => 'array',
+        'purchase_snapshot' => 'array',
     ];
+
+    protected static function booted(): void
+    {
+        static::updating(function (self $subscription) {
+            // Assignment owns creation. Historical rows remain unknown; a
+            // later update must not mint or replace their purchase evidence.
+            if ($subscription->isDirty('purchase_snapshot')) {
+                throw new \LogicException('Subscription purchase evidence cannot be changed after creation.');
+            }
+        });
+    }
 
     public function hasActiveOverride(): bool
     {
@@ -84,6 +97,33 @@ class Subscription extends Model
     public function pricingPlan()
     {
         return $this->belongsTo(PricingPlan::class);
+    }
+
+    /** A read-only plan view for access checks; quotes still use the catalogue. */
+    public function entitlementPlan(): ?PricingPlan
+    {
+        $plan = $this->pricingPlan;
+        $snapshot = $this->purchase_snapshot;
+        if (!is_array($snapshot) || ($snapshot['version'] ?? null) !== 1
+            || (int) ($snapshot['company_id'] ?? 0) !== (int) $this->company_id
+            || (int) ($snapshot['plan']['id'] ?? 0) !== (int) $this->pricing_plan_id
+            || !is_array($snapshot['plan'] ?? null)) {
+            return $plan;
+        }
+
+        // Missing legacy fields retain their existing catalogue meaning. Never
+        // mutate the related catalogue model or overlay price/campaign fields.
+        $view = $plan ? clone $plan : new PricingPlan();
+        $fields = ['id', 'name', 'product_type', 'erps_vertical', 'is_trial', 'features', 'health_modules',
+            'invoice_limit', 'user_limit', 'branch_limit', 'max_terminals', 'max_users', 'max_products',
+            'ai_page_limit', 'fair_use_limit', 'health_department_limit'];
+        foreach ($snapshot['plan'] as $key => $value) {
+            if (in_array($key, $fields, true) || str_ends_with($key, '_enabled')) {
+                $view->setAttribute($key, $value);
+            }
+        }
+
+        return $view;
     }
 
     public function company()

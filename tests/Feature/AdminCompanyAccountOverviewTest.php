@@ -11,12 +11,14 @@ class AdminCompanyAccountOverviewTest extends TestCase
 {
     use RefreshDatabase;
 
-    private function fixture(): array
+    private function fixture(?string $purchasedPlanName = null): array
     {
         $admin = AdminUser::create(['name'=>'Synthetic account reviewer','email'=>uniqid().'@b01.invalid','password'=>bcrypt('SyntheticOnly123!'),'role'=>'super_admin']);
         $company = Company::create(['name'=>'Synthetic B01 account','email'=>uniqid().'@b01.invalid','ntn'=>uniqid(),'product_type'=>'pos','status'=>'approved','company_status'=>'active']);
         $plan = PricingPlan::create(['name'=>'Synthetic current catalogue price','product_type'=>'pos','price'=>9999,'invoice_limit'=>100,'user_limit'=>2,'branch_limit'=>1,'is_active'=>true,'is_trial'=>false]);
-        $sub = Subscription::create(['company_id'=>$company->id,'pricing_plan_id'=>$plan->id,'billing_cycle'=>'annual','start_date'=>'2025-01-01','end_date'=>'2025-12-31','final_price'=>12499,'active'=>true]);
+        $sub = Subscription::create(['company_id'=>$company->id,'pricing_plan_id'=>$plan->id,'billing_cycle'=>'annual','start_date'=>'2025-01-01','end_date'=>'2025-12-31','final_price'=>12499,'active'=>true,
+            'purchase_snapshot'=>$purchasedPlanName === null ? null : ['version'=>1,'company_id'=>$company->id,
+                'plan'=>['id'=>$plan->id,'name'=>$purchasedPlanName,'product_type'=>'pos']]]);
         return [$admin,$company,$sub];
     }
 
@@ -27,6 +29,20 @@ class AdminCompanyAccountOverviewTest extends TestCase
         $this->actingAs($admin,'admin')->get('/admin/companies/'.$company->id)->assertOk()
             ->assertSee('Subscription and access')->assertSee('01 Jan 2025')->assertSee('31 Dec 2025')->assertSee('12,499.00')->assertSee('Your plan has expired');
         $this->assertSame($before,$sub->fresh()->getAttributes());
+    }
+
+    public function test_manage_company_uses_frozen_purchased_name_for_current_history_and_correction_context(): void
+    {
+        [$admin,$company,$sub] = $this->fixture('Purchased B01 Package');
+        $plan = $sub->pricingPlan;
+        $plan->update(['name' => 'Later Catalogue Label']);
+
+        $before = $sub->fresh()->getAttributes();
+        $response = $this->actingAs($admin,'admin')->get('/admin/companies/'.$company->id)->assertOk();
+
+        $this->assertGreaterThanOrEqual(4, substr_count($response->getContent(), 'Purchased B01 Package'));
+        $this->assertSame($before,$sub->fresh()->getAttributes());
+        $this->assertSame('Later Catalogue Label',$plan->fresh()->name);
     }
 
     public function test_suspension_records_reason_and_restore_condition_atomically_with_company_state(): void

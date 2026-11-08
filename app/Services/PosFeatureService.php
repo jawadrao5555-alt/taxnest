@@ -1249,7 +1249,7 @@ class PosFeatureService
             if ($sub->hasActiveOverride() && self::overrideGrantsEverything($sub)) {
                 return 'override';
             }
-            if ($sub->pricingPlan && !empty($sub->pricingPlan->pharmacy_enabled)) {
+            if ($sub->entitlementPlan() && !empty($sub->entitlementPlan()->pharmacy_enabled)) {
                 return $sub->hasActiveOverride() ? 'override' : 'plan';
             }
             if ($sub->isTrialActive()) {
@@ -1309,7 +1309,7 @@ class PosFeatureService
             if ($sub->hasActiveOverride() && self::overrideGrantsEverything($sub)) {
                 return 'override';
             }
-            if ($sub->pricingPlan && $sub->pricingPlan->restaurant_enabled) {
+            if ($sub->entitlementPlan() && $sub->entitlementPlan()->restaurant_enabled) {
                 return $sub->hasActiveOverride() ? 'override' : 'plan';
             }
             if ($sub->hasActiveOverride()) {
@@ -1337,7 +1337,7 @@ class PosFeatureService
      */
     private static function overrideGrantsEverything(\App\Models\Subscription $sub): bool
     {
-        $plan = $sub->pricingPlan;
+        $plan = $sub->entitlementPlan();
 
         return !$plan || (bool) $plan->is_trial;
     }
@@ -1423,11 +1423,11 @@ class PosFeatureService
                             // companies always carry their own type)
                             || (($company->product_type ?? 'pos') === 'pos' && self::isAddonOnlyGate($planColumn))
                             || !\Illuminate\Support\Facades\Schema::hasColumn('pricing_plans', $planColumn)
-                            || !empty($sub->pricingPlan->{$planColumn});
-                    } elseif ($sub->pricingPlan) {
+                            || !empty($sub->entitlementPlan()->{$planColumn});
+                    } elseif ($sub->entitlementPlan()) {
                         if (!\Illuminate\Support\Facades\Schema::hasColumn('pricing_plans', $planColumn)) {
                             $allowed = true; // fail open until migration lands
-                        } elseif (!empty($sub->pricingPlan->{$planColumn})) {
+                        } elseif (!empty($sub->entitlementPlan()->{$planColumn})) {
                             $allowed = true;
                         }
                     }

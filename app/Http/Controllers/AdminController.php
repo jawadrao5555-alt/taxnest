@@ -854,7 +854,7 @@ class AdminController extends Controller
         $activePlan = null;
         $sub = Subscription::where('company_id', $company->id)->where('active', true)->first();
         if ($sub) {
-            $plan = PricingPlan::find($sub->pricing_plan_id);
+            $plan = $sub->entitlementPlan();
             $activePlan = $plan ? $plan->name : 'Unknown';
         }
 

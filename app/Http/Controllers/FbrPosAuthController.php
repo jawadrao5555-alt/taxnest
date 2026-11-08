@@ -204,59 +204,65 @@ class FbrPosAuthController extends Controller
             \App\Services\RequestedPackageService::resolvePlan($request->input('requested_plan'), 'fbrpos')
         );
 
-        $company = Company::create([
-            'name' => $request->company_name,
-            'ntn' => $request->company_ntn,
-            'cnic' => \App\Services\LoginIdentifierResolver::normalizeCnic($request->company_cnic),
-            'email' => $request->email,
-            'phone' => $request->phone,
-            'company_status' => 'pending',
-            // Keep BOTH status columns coherent: the admin panel's Approve button
-            // and the CheckCompanyApproval view-only gate key off `status`.
-            'status' => 'pending',
-            'product_type' => 'fbrpos',
-            'pos_type' => $posType,
-            'fbr_pos_enabled' => true,
-            'fbr_pos_environment' => 'sandbox',
-            // Optional FBR integration (Sep 2026): a new shop starts WITHOUT
-            // FBR reporting — nothing is configured yet, so ON would only make
-            // every first bill fail as config_error. The owner is asked once
-            // (decision card) and can turn it ON from FBR Settings any time.
-            'fbr_reporting_enabled' => false,
-        ]
-            // Same rule as the PRA panel: the business type chosen here is the
-            // shop's category, and it arrives with its own modules already
-            // switched on (a pharmacy gets prescriptions and batch/expiry, a
-            // grocery gets barcodes and weight) instead of an empty POS.
-            + \App\Services\PosFeatureService::registrationAttributes($posType)
-            + ($distributor ? ['agent_id' => $distributor->id] : []) + $storeSlipDefault + $requestedPackage);
+        // Company, owner, credential ledger and zero-price trial are one unit.
+        // Never sign in or consume the referral session after a partial signup.
+        $user = \Illuminate\Support\Facades\DB::transaction(function () use ($request, $posType, $distributor, $storeSlipDefault, $requestedPackage) {
+            $company = Company::create([
+                'name' => $request->company_name,
+                'ntn' => $request->company_ntn,
+                'cnic' => \App\Services\LoginIdentifierResolver::normalizeCnic($request->company_cnic),
+                'email' => $request->email,
+                'phone' => $request->phone,
+                'company_status' => 'pending',
+                // Keep BOTH status columns coherent: the admin panel's Approve button
+                // and the CheckCompanyApproval view-only gate key off `status`.
+                'status' => 'pending',
+                'product_type' => 'fbrpos',
+                'pos_type' => $posType,
+                'fbr_pos_enabled' => true,
+                'fbr_pos_environment' => 'sandbox',
+                // Optional FBR integration (Sep 2026): a new shop starts WITHOUT
+                // FBR reporting — nothing is configured yet, so ON would only make
+                // every first bill fail as config_error. The owner is asked once
+                // (decision card) and can turn it ON from FBR Settings any time.
+                'fbr_reporting_enabled' => false,
+            ]
+                // Same rule as the PRA panel: the business type chosen here is the
+                // shop's category, and it arrives with its own modules already
+                // switched on (a pharmacy gets prescriptions and batch/expiry, a
+                // grocery gets barcodes and weight) instead of an empty POS.
+                + \App\Services\PosFeatureService::registrationAttributes($posType)
+                + ($distributor ? ['agent_id' => $distributor->id] : []) + $storeSlipDefault + $requestedPackage);
+
+            $userData = [
+                'name' => $request->name,
+                'email' => $request->email,
+                'phone' => $request->phone,
+                'password' => Hash::make($request->password),
+                'company_id' => $company->id,
+                'role' => 'company_admin',
+                'is_active' => true,
+            ];
+            // Guest language picker on the register page: keep the language the
+            // user chose before signing up. hasColumn = PROD schema-drift guard.
+            $guestLang = $request->session()->get(\App\Support\PosLocale::SESSION_KEY);
+            if (\App\Support\PosLocale::isValid($guestLang)
+                && \Illuminate\Support\Facades\Schema::hasColumn('users', 'language')) {
+                $userData['language'] = $guestLang;
+            }
+            $user = User::create($userData);
+
+            CredentialLedgerService::record([
+                'email' => $request->email,
+                'phone' => $request->phone,
+                'ntn' => $request->company_ntn,
+            ], $company->id, 'fbrpos');
+
+            $this->startTrial($company->id, 'fbrpos');
+
+            return $user;
+        });
         $request->session()->forget(\App\Services\AgentReferralService::SESSION_KEY);
-
-        $userData = [
-            'name' => $request->name,
-            'email' => $request->email,
-            'phone' => $request->phone,
-            'password' => Hash::make($request->password),
-            'company_id' => $company->id,
-            'role' => 'company_admin',
-            'is_active' => true,
-        ];
-        // Guest language picker on the register page: keep the language the
-        // user chose before signing up. hasColumn = PROD schema-drift guard.
-        $guestLang = $request->session()->get(\App\Support\PosLocale::SESSION_KEY);
-        if (\App\Support\PosLocale::isValid($guestLang)
-            && \Illuminate\Support\Facades\Schema::hasColumn('users', 'language')) {
-            $userData['language'] = $guestLang;
-        }
-        $user = User::create($userData);
-
-        CredentialLedgerService::record([
-            'email' => $request->email,
-            'phone' => $request->phone,
-            'ntn' => $request->company_ntn,
-        ], $company->id, 'fbrpos');
-
-        $this->startTrial($company->id, 'fbrpos');
 
         Auth::guard('fbrpos')->login($user);
 

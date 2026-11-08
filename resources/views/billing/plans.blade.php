@@ -5,6 +5,24 @@
                 <h2 class="font-bold text-xl text-gray-800 dark:text-gray-100 leading-tight">Billing & Plans</h2>
             </div>
 
+            @if(($pendingSelection ?? null) && ($pendingSelectionPlan ?? null))
+            <section class="bg-white dark:bg-gray-900 border border-emerald-300 rounded-xl p-6 mb-6" aria-labelledby="selected-package-payment">
+                <h3 id="selected-package-payment" class="font-semibold text-lg">Selected: {{ $pendingSelectionPlan->name }}</h3>
+                <p class="text-sm mt-2">Annual package total: PKR {{ number_format((float) $pendingSelection['net_quote'], 2) }}. Upload your receipt for review. Selecting a package does not activate or replace your subscription.</p>
+                <form method="POST" action="{{ route('payment-proof.store') }}" enctype="multipart/form-data" class="mt-4 space-y-3">
+                    @csrf
+                    <input type="hidden" name="pricing_plan_id" value="{{ $pendingSelectionPlan->id }}">
+                    <input type="hidden" name="billing_cycle" value="annual">
+                    <div><label for="selected-package-amount" class="block text-sm">Amount you paid (PKR)</label><input id="selected-package-amount" name="amount" type="number" min="0" step="0.01" value="{{ old('amount') }}" class="rounded border-gray-300 dark:bg-gray-900"></div>
+                    <div><label for="selected-package-method" class="block text-sm">Payment method</label><select id="selected-package-method" name="payment_method" class="rounded border-gray-300 dark:bg-gray-900"><option value="bank">Bank transfer</option><option value="jazzcash">JazzCash</option><option value="easypaisa">EasyPaisa</option><option value="other">Other</option></select></div>
+                    <div><label for="selected-package-reference" class="block text-sm">Transaction reference</label><input id="selected-package-reference" name="reference" maxlength="120" value="{{ old('reference') }}" class="rounded border-gray-300 dark:bg-gray-900"></div>
+                    <div><label for="selected-package-proof" class="block text-sm">Payment receipt (JPG, PNG or PDF; up to 5 MB)</label><input id="selected-package-proof" name="proof" type="file" accept=".jpg,.jpeg,.png,.pdf" required class="block mt-1"></div>
+                    @if($errors->any())<div role="alert" class="text-red-600 text-sm">{{ $errors->first() }}</div>@endif
+                    <button class="px-4 py-3 rounded bg-emerald-700 text-white font-semibold" type="submit">Submit receipt for review</button>
+                </form>
+            </section>
+            @endif
+
             @if($currentSubscription && $usageData)
                 @if($usageData['trial'] && $usageData['trial']['is_trial'])
                 <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-xl p-6 mb-6">
@@ -35,7 +53,7 @@
                             <svg class="w-8 h-8 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                             <div>
                                 <h3 class="text-lg font-semibold text-yellow-800">Subscription Expiring Soon</h3>
-                                <p class="text-sm text-yellow-600">@if((int) $usageData['days_left'] === 0) <span class="font-bold">Expires today</span> on your @elseif((int) $usageData['days_left'] === 1) <span class="font-bold">1</span> day remaining on your @else <span class="font-bold">{{ (int) $usageData['days_left'] }}</span> days remaining on your @endif {{ $currentSubscription->pricingPlan->name }} plan</p>
+                                <p class="text-sm text-yellow-600">@if((int) $usageData['days_left'] === 0) <span class="font-bold">Expires today</span> on your @elseif((int) $usageData['days_left'] === 1) <span class="font-bold">1</span> day remaining on your @else <span class="font-bold">{{ (int) $usageData['days_left'] }}</span> days remaining on your @endif {{ $currentSubscription->entitlementPlan()->name }} plan</p>
                             </div>
                         </div>
                     </div>
@@ -45,7 +63,7 @@
                 <div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6 mb-8">
                     <div class="flex items-center justify-between mb-4">
                         <div>
-                            <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100">Current Plan: {{ $currentSubscription->pricingPlan->name }}</h3>
+                            <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100">Current Plan: {{ $currentSubscription->entitlementPlan()->name }}</h3>
                             <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
                                 {{ \App\Models\Subscription::getCycleLabel($usageData['billing_cycle']) }} billing
                                 &middot; Active until {{ \Carbon\Carbon::parse($currentSubscription->end_date)->format('d M Y') }}
@@ -220,6 +238,8 @@
             </div>
             @endif
 
+            @include('billing._subscription-history')
+
             <div class="text-center mb-8">
                 <h3 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Choose Your Plan</h3>
                 <p class="text-gray-500 dark:text-gray-400 mt-2">Every package includes FBR digital invoicing, the AI Invoice Reader and the 6-year audit archive.</p>
@@ -302,7 +322,7 @@
                                 <input type="hidden" name="billing_cycle" :value="cycle">
                                 <button type="submit" class="w-full py-2.5 rounded-lg font-semibold text-sm transition shadow-sm
                                     {{ $isFeatured ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'bg-gray-900 text-white hover:bg-gray-800' }}">
-                                    Subscribe
+                                    Select package &amp; upload receipt
                                 </button>
                             </form>
                             @else

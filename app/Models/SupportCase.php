@@ -39,6 +39,7 @@ class SupportCase extends Model
         'subject',
         'status',
         'priority',
+        'sla_due_at',
         'resolution_build',
         'opened_at',
         'resolved_at',
@@ -46,6 +47,7 @@ class SupportCase extends Model
     ];
 
     protected $casts = [
+        'sla_due_at' => 'datetime',
         'opened_at' => 'datetime',
         'resolved_at' => 'datetime',
         'reopened_at' => 'datetime',

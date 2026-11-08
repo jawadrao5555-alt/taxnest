@@ -369,9 +369,11 @@ export async function securityOnboardingWorkflow(page,t,v,{baseUrl,login,saveEvi
   await page.goto(baseUrl+'/admin/support-cases/'+fixture.supportCaseId,{waitUntil:'domcontentloaded'});
   await page.getByRole('heading',{name:new RegExp('^Case #'+fixture.supportCaseId)}).waitFor();
   await page.getByLabel('Case priority',{exact:true}).selectOption('urgent');
-  await Promise.all([page.waitForNavigation(),page.getByRole('button',{name:'Update owner and priority',exact:true}).click()]);
+  await page.getByLabel('SLA due (optional)',{exact:true}).fill('2030-01-01T12:00');
+  await Promise.all([page.waitForNavigation(),page.getByRole('button',{name:'Update owner, priority and SLA',exact:true}).click()]);
   await page.getByText('URGENT',{exact:true}).first().waitFor();
   await page.getByText('Priority changed from NORMAL to URGENT.',{exact:true}).waitFor();
+  await page.getByText('SLA due changed from UNSET to 2030-01-01T12:00:00+05:00.',{exact:true}).waitFor();
   const build='rc-security-'+v.width;
   await page.getByLabel('Resolution build / release',{exact:true}).fill(build);
   await page.getByLabel('Resolution evidence',{exact:true}).fill('Synthetic desktop/mobile support acceptance passed.');

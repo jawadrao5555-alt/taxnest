@@ -13,6 +13,7 @@
         <dl class="mt-5 grid gap-3 sm:grid-cols-2 text-xs">
             <div><dt class="text-gray-500">Owner</dt><dd class="mt-1 font-semibold text-gray-200">{{ $supportCase->assignedAdmin?->name ?? 'Unassigned' }}</dd></div>
             <div><dt class="text-gray-500">Priority</dt><dd class="mt-1 font-semibold text-gray-200">{{ strtoupper($supportCase->priority ?? \App\Models\SupportCase::PRIORITY_NORMAL) }}</dd></div>
+            <div><dt class="text-gray-500">SLA due</dt><dd class="mt-1 font-semibold text-gray-200">{{ $supportCase->sla_due_at?->format('d M Y, h:i A') ?? 'Not set' }}</dd></div>
             <div><dt class="text-gray-500">Opened</dt><dd class="mt-1 text-gray-300">{{ $supportCase->opened_at?->format('d M Y, h:i A') }}</dd></div>
             <div><dt class="text-gray-500">Source</dt><dd class="mt-1 font-mono text-gray-300">{{ $supportCase->source_box }} / {{ $supportCase->source_uid }}</dd></div>
             <div><dt class="text-gray-500">Last resolution build</dt><dd class="mt-1 font-mono text-gray-300">{{ $supportCase->resolution_build ?? 'Not resolved yet' }}</dd></div>
@@ -36,7 +37,11 @@
                     @endforeach
                 </select>
             </div>
-            <button type="submit" class="px-4 py-2 rounded-lg bg-gray-700 hover:bg-gray-600 text-white text-sm font-semibold">Update owner and priority</button>
+            <div>
+                <label for="case-sla" class="block text-xs font-medium text-gray-400 mb-1">SLA due (optional)</label>
+                <input id="case-sla" name="sla_due_at" type="datetime-local" value="{{ old('sla_due_at', $supportCase->sla_due_at?->format('Y-m-d\\TH:i')) }}" class="w-full rounded-lg bg-gray-800 border border-gray-700 text-white text-sm px-3 py-2" />
+            </div>
+            <button type="submit" class="px-4 py-2 rounded-lg bg-gray-700 hover:bg-gray-600 text-white text-sm font-semibold">Update owner, priority and SLA</button>
         </form>
 
         @if($supportCase->status !== 'resolved')

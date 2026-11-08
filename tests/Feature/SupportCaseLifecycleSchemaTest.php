@@ -38,13 +38,18 @@ class SupportCaseLifecycleSchemaTest extends TestCase
         });
 
         $this->actingAs($admin, 'admin')
-            ->post('/admin/support-inbox/inbox/901/case', ['company_id' => $company->id, 'priority' => SupportCase::PRIORITY_URGENT])
+            ->post('/admin/support-inbox/inbox/901/case', [
+                'company_id' => $company->id,
+                'priority' => SupportCase::PRIORITY_URGENT,
+                'sla_due_at' => '2030-01-01T12:00',
+            ])
             ->assertRedirect('/admin/support-inbox/inbox/901');
 
         $case = SupportCase::query()->sole();
         $this->assertSame($company->id, $case->company_id);
         $this->assertSame($admin->id, $case->assigned_admin_id);
         $this->assertSame(SupportCase::PRIORITY_URGENT, $case->priority);
+        $this->assertSame('2030-01-01 12:00:00', $case->sla_due_at->format('Y-m-d H:i:s'));
 
         $this->post("/admin/support-inbox/cases/{$case->id}/resolve", [
             'resolution_build' => 'synthetic.1',

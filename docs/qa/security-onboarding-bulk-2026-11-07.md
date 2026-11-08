@@ -106,6 +106,16 @@ release or product setting changes. Focused local schema/controller coverage is
 20 tests / 97 assertions; the real browser journey still requires fresh hosted
 exact-HEAD execution.
 
+Support cases now also retain an explicit optional SLA due timestamp selected by
+the administrator rather than an invented response-time policy. Opening and
+owner/priority updates persist it; changes run under the case row lock and add
+an SLA timeline event without resolving the case. Queue and detail screens show
+the deadline. The 1366/390 journey uses the actual datetime form and verifies
+the exact retained timeline value. Current combined focused coverage is 20
+tests / 100 assertions. Customer acknowledgement and additional
+evidence/duplicate message links remain separate unimplemented B08-R05/T40
+work; no outbound message is sent by this increment.
+
 ## Password-verified company deletion lifecycle continuation
 
 The ordinary profile delete endpoint previously removed only the signed-in user

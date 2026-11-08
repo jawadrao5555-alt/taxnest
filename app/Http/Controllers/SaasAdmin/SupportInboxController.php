@@ -10,6 +10,7 @@ use App\Models\SupportCaseEvent;
 use App\Services\SupportMailService;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -18,9 +19,7 @@ use Illuminate\Support\Facades\DB;
  */
 class SupportInboxController extends Controller
 {
-    public function __construct(protected SupportMailService $mail)
-    {
-    }
+    public function __construct(protected SupportMailService $mail) {}
 
     protected function guardSuperAdmin(): AdminUser
     {
@@ -172,6 +171,7 @@ class SupportInboxController extends Controller
         $data = $request->validate([
             'company_id' => ['required', 'integer'],
             'priority' => ['nullable', 'in:'.implode(',', SupportCase::PRIORITIES)],
+            'sla_due_at' => ['nullable', 'date'],
         ]);
 
         $company = Company::query()->findOrFail((int) $data['company_id']);
@@ -196,6 +196,7 @@ class SupportInboxController extends Controller
                     'subject' => mb_substr((string) ($message['subject'] ?? '(no subject)'), 0, 255),
                     'status' => SupportCase::STATUS_OPEN,
                     'priority' => $data['priority'] ?? SupportCase::PRIORITY_NORMAL,
+                    'sla_due_at' => ! empty($data['sla_due_at']) ? Carbon::parse($data['sla_due_at']) : null,
                     'opened_at' => now(),
                 ]);
                 $this->recordCaseEvent(
@@ -206,6 +207,7 @@ class SupportInboxController extends Controller
                     SupportCase::STATUS_OPEN,
                     null,
                     'Linked to company by administrator with '.strtoupper($case->priority).' priority.'
+                        .($case->sla_due_at ? ' SLA due '.$case->sla_due_at->toIso8601String().'.' : '')
                 );
 
                 return $case;
@@ -228,6 +230,7 @@ class SupportInboxController extends Controller
         $data = $request->validate([
             'assigned_admin_id' => ['required', 'integer'],
             'priority' => ['nullable', 'in:'.implode(',', SupportCase::PRIORITIES)],
+            'sla_due_at' => ['nullable', 'date'],
         ]);
         $owner = AdminUser::query()
             ->whereKey((int) $data['assigned_admin_id'])
@@ -237,14 +240,20 @@ class SupportInboxController extends Controller
         DB::transaction(function () use ($supportCase, $actor, $owner, $data) {
             $case = SupportCase::query()->lockForUpdate()->findOrFail($supportCase->id);
             $priority = $data['priority'] ?? $case->priority ?? SupportCase::PRIORITY_NORMAL;
+            $nextSla = array_key_exists('sla_due_at', $data)
+                ? (! empty($data['sla_due_at']) ? Carbon::parse($data['sla_due_at']) : null)
+                : $case->sla_due_at;
             $ownerChanged = (int) $case->assigned_admin_id !== (int) $owner->id;
             $priorityChanged = $case->priority !== $priority;
-            if (! $ownerChanged && ! $priorityChanged) {
+            $slaChanged = $case->sla_due_at?->getTimestamp() !== $nextSla?->getTimestamp();
+            if (! $ownerChanged && ! $priorityChanged && ! $slaChanged) {
                 return;
             }
             $previousPriority = $case->priority;
+            $previousSla = $case->sla_due_at;
             $case->assigned_admin_id = $owner->id;
             $case->priority = $priority;
+            $case->sla_due_at = $nextSla;
             $case->save();
             if ($ownerChanged) {
                 $this->recordCaseEvent($case, $actor, 'assigned', $case->status, $case->status, null, "Assigned to {$owner->name}.");
@@ -260,9 +269,21 @@ class SupportInboxController extends Controller
                     'Priority changed from '.strtoupper($previousPriority).' to '.strtoupper($priority).'.'
                 );
             }
+            if ($slaChanged) {
+                $this->recordCaseEvent(
+                    $case,
+                    $actor,
+                    'sla_changed',
+                    $case->status,
+                    $case->status,
+                    null,
+                    'SLA due changed from '.($previousSla?->toIso8601String() ?? 'UNSET')
+                        .' to '.($nextSla?->toIso8601String() ?? 'UNSET').'.'
+                );
+            }
         }, 3);
 
-        return back()->with('success', "Support case owner and priority updated.");
+        return back()->with('success', 'Support case owner, priority and SLA updated.');
     }
 
     public function resolveCase(Request $request, SupportCase $supportCase)

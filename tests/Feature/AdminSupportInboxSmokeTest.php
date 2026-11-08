@@ -6,8 +6,8 @@ use App\Models\AdminUser;
 use App\Models\SupportCase;
 use App\Services\SupportMailService;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
@@ -60,6 +60,7 @@ class AdminSupportInboxSmokeTest extends TestCase
             $table->string('subject');
             $table->string('status', 24)->default('open');
             $table->string('priority', 16)->default('normal');
+            $table->timestamp('sla_due_at')->nullable();
             $table->string('resolution_build', 100)->nullable();
             $table->timestamp('opened_at');
             $table->timestamp('resolved_at')->nullable();
@@ -305,13 +306,20 @@ class AdminSupportInboxSmokeTest extends TestCase
         $this->actingAsSuperAdmin()->post("/admin/support-inbox/cases/{$case->id}/assign", [
             'assigned_admin_id' => $owner->id,
             'priority' => SupportCase::PRIORITY_HIGH,
+            'sla_due_at' => '2030-01-01T12:00',
         ])->assertRedirect();
         $this->assertSame($owner->id, $case->fresh()->assigned_admin_id);
         $this->assertSame(SupportCase::PRIORITY_HIGH, $case->fresh()->priority);
+        $this->assertSame('2030-01-01 12:00:00', $case->fresh()->sla_due_at->format('Y-m-d H:i:s'));
         $this->assertDatabaseHas('support_case_events', [
             'support_case_id' => $case->id,
             'event_type' => 'priority_changed',
             'note' => 'Priority changed from NORMAL to HIGH.',
+        ]);
+        $this->assertDatabaseHas('support_case_events', [
+            'support_case_id' => $case->id,
+            'event_type' => 'sla_changed',
+            'note' => 'SLA due changed from UNSET to 2030-01-01T12:00:00+05:00.',
         ]);
 
         $viewer = AdminUser::where('role', 'viewer')->first();

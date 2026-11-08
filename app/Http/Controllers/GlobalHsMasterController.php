@@ -16,6 +16,8 @@ class GlobalHsMasterController extends Controller
 {
     public function index(Request $request)
     {
+        $currentAdmin = auth('admin')->user()?->fresh();
+        $canManageSensitiveConfiguration = (bool) $currentAdmin?->canManageSensitiveConfiguration();
         $tab = $request->get('tab', 'all');
         $search = $request->get('search');
 
@@ -57,7 +59,7 @@ class GlobalHsMasterController extends Controller
 
         return view('admin.hs-master', compact(
             'tab', 'allHs', 'unmappedHs', 'insights', 'search',
-            'scheduleTypes', 'sectors'
+            'scheduleTypes', 'sectors', 'canManageSensitiveConfiguration'
         ));
     }
 

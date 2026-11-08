@@ -15,6 +15,10 @@
                 <div class="mb-4 p-4 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 rounded-lg">{{ session('success') }}</div>
             @endif
 
+            @unless($canManageSensitiveConfiguration)
+                <div class="mb-4 p-4 rounded-xl bg-amber-100 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/60 text-sm text-amber-800 dark:text-amber-200">Unmapped HS evidence and prior decisions are read-only for this account.</div>
+            @endunless
+
             <div class="space-y-6">
                 @forelse($records as $r)
                     @php
@@ -141,6 +145,7 @@
                                 </div>
                             @endif
 
+                            @if($canManageSensitiveConfiguration)
                             <div class="mt-4 flex flex-wrap gap-2">
                                 <button @click="mapOpen = !mapOpen" class="inline-flex items-center px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition">
                                     <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
@@ -255,6 +260,9 @@
                                     <button type="submit" class="w-full sm:w-auto px-6 py-2.5 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition">Create & Remove from Queue</button>
                                 </form>
                             </div>
+                            @else
+                            <div class="mt-4 text-xs text-gray-400">Mapping, rejection and regeneration controls require a configuration administrator.</div>
+                            @endif
                         </div>
                     </div>
                 @empty

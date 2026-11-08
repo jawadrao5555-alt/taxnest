@@ -13,6 +13,8 @@ class HsCodeMappingController extends Controller
 {
     public function index(Request $request)
     {
+        $currentAdmin = auth('admin')->user()?->fresh();
+        $canManageSensitiveConfiguration = (bool) $currentAdmin?->canManageSensitiveConfiguration();
         $search = $request->get('search', '');
         $saleTypeFilter = $request->get('sale_type', '');
         $statusFilter = $request->get('status', '');
@@ -68,7 +70,7 @@ class HsCodeMappingController extends Controller
             $historyData = $this->getHistoryData($request);
         }
 
-        return view('admin.hs-mapping-engine', compact('mappings', 'stats', 'search', 'saleTypeFilter', 'statusFilter', 'tab', 'analyticsData', 'historyData'));
+        return view('admin.hs-mapping-engine', compact('mappings', 'stats', 'search', 'saleTypeFilter', 'statusFilter', 'tab', 'analyticsData', 'historyData', 'canManageSensitiveConfiguration'));
     }
 
     public function store(Request $request)

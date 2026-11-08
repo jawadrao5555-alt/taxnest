@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Models\{AdminUser, Company, Invoice, SystemSetting};
+use App\Models\{AdminUser, Company, HsMasterGlobal, Invoice, SystemSetting};
 use App\Services\{SmtpRuntimeConfig, WhatsAppBusinessApi};
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\{DB, Mail};
@@ -33,6 +33,12 @@ class AdminSensitiveSettingsCapabilityTest extends TestCase
         ], 'NeverDeliveredSyntheticPassword!');
         SystemSetting::set(WhatsAppBusinessApi::CENTRAL_PHONE_ID_KEY, '998877665544332211');
         SystemSetting::set(WhatsAppBusinessApi::CENTRAL_TOKEN_KEY, 'synthetic-encrypted-token-placeholder');
+        $hsMaster = HsMasterGlobal::create([
+            'hs_code' => '99999991',
+            'description' => 'Fictional retained HS history',
+            'schedule_type' => 'standard',
+            'default_tax_rate' => 18,
+        ]);
 
         $this->actingAs($actor, 'admin');
         // Preserve the cached super-admin model while another administrator
@@ -79,6 +85,28 @@ class AdminSensitiveSettingsCapabilityTest extends TestCase
             ->assertDontSee('action="http://localhost/admin/madadgar-settings"', false)
             ->assertDontSee('OpenAI API Key (leave blank to keep current)')
             ->assertDontSee('Save Settings');
+
+        $this->get('/admin/hs-rate-links')->assertOk()
+            ->assertSee('HS rate-link history is read-only for this account.')
+            ->assertDontSee('action="'.route('admin.hs-rate-links.store').'"', false)
+            ->assertDontSee('action="'.route('admin.hs-rate-links.import').'"', false);
+        $this->get('/admin/hs-master')->assertOk()
+            ->assertSee('Global HS intelligence and unmapped evidence are read-only for this account.')
+            ->assertDontSee('method="POST" action="/admin/hs-master"', false)
+            ->assertDontSee('action="/admin/hs-master/seed"', false)
+            ->assertDontSee('action="/admin/hs-master/map-unmapped"', false);
+        $this->get('/admin/hs-master-global')->assertOk()
+            ->assertSee('HS master records are read-only for this account.')
+            ->assertSee('Fictional retained HS history')
+            ->assertDontSee(route('admin.hs-master-global.edit', $hsMaster->id), false);
+        $this->get('/admin/hs-unmapped')->assertOk()
+            ->assertSee('Unmapped HS evidence and prior decisions are read-only for this account.')
+            ->assertDontSee('/admin/hs-unmapped/', false);
+        $this->get('/admin/hs-mapping-engine')->assertOk()
+            ->assertSee('HS mapping configuration and change history are read-only for this account.')
+            ->assertDontSee('method="POST" action="'.route('admin.hs-mapping-engine.store').'"', false)
+            ->assertDontSee('method="POST" action="'.route('admin.hs-mapping-engine.import').'"', false);
+        $this->get('/admin/hs-master-global/'.$hsMaster->id.'/edit')->assertForbidden();
 
         foreach ([
             fn () => $this->post('/admin/settings'),
@@ -183,9 +211,29 @@ class AdminSensitiveSettingsCapabilityTest extends TestCase
             'fbr_status' => 'pending',
             'total_amount' => 1,
         ]);
+        $hsMaster = HsMasterGlobal::create([
+            'hs_code' => '99999992',
+            'description' => 'Fictional editable HS history',
+            'schedule_type' => 'standard',
+            'default_tax_rate' => 18,
+        ]);
 
-        $this->actingAs($actor, 'admin')
-            ->post('/admin/invoice-override/'.$invoice->id, ['action' => 'lock'])
+        $this->actingAs($actor, 'admin')->get('/admin/hs-rate-links')->assertOk()
+            ->assertDontSee('HS rate-link history is read-only for this account.')
+            ->assertSee('action="'.route('admin.hs-rate-links.store').'"', false);
+        $this->get('/admin/hs-master')->assertOk()
+            ->assertDontSee('Global HS intelligence and unmapped evidence are read-only for this account.')
+            ->assertSee('action="/admin/hs-master/seed"', false);
+        $this->get('/admin/hs-master-global')->assertOk()
+            ->assertDontSee('HS master records are read-only for this account.')
+            ->assertSee(route('admin.hs-master-global.edit', $hsMaster->id), false);
+        $this->get('/admin/hs-master-global/'.$hsMaster->id.'/edit')->assertOk()
+            ->assertSee('action="'.route('admin.hs-master-global.update', $hsMaster->id).'"', false);
+        $this->get('/admin/hs-mapping-engine')->assertOk()
+            ->assertDontSee('HS mapping configuration and change history are read-only for this account.')
+            ->assertSee('method="POST" action="'.route('admin.hs-mapping-engine.store').'"', false);
+
+        $this->post('/admin/invoice-override/'.$invoice->id, ['action' => 'lock'])
             ->assertOk();
         $this->assertSame('locked', $invoice->fresh()->status);
         $this->assertDatabaseHas('audit_logs', [

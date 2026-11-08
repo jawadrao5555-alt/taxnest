@@ -14,6 +14,8 @@ class HsRateLinksController extends Controller
 
     public function index(Request $request)
     {
+        $currentAdmin = auth('admin')->user()?->fresh();
+        $canManageSensitiveConfiguration = (bool) $currentAdmin?->canManageSensitiveConfiguration();
         $q = trim((string) $request->input('q', ''));
         $schedule = $request->input('schedule', '');
         $status = $request->input('status', '');
@@ -45,6 +47,7 @@ class HsRateLinksController extends Controller
             'stats'     => $stats,
             'schedules' => $this->schedules,
             'filters'   => compact('q', 'schedule', 'status'),
+            'canManageSensitiveConfiguration' => $canManageSensitiveConfiguration,
         ]);
     }
 

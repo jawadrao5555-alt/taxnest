@@ -7,6 +7,7 @@
                     <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
                     Export CSV
                 </a>
+                @if($canManageSensitiveConfiguration)
                 <button onclick="document.getElementById('importModal').classList.remove('hidden')" class="inline-flex items-center px-3 py-2 bg-amber-600 text-white rounded-lg text-sm font-medium hover:bg-amber-700 transition">
                     <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
                     Import CSV
@@ -15,6 +16,7 @@
                     <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                     Add Mapping
                 </button>
+                @endif
             </div>
         </div>
     </x-slot>
@@ -27,6 +29,10 @@
             @if(session('error'))
                 <div class="mb-4 p-4 bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300 rounded-lg">{{ session('error') }}</div>
             @endif
+
+            @unless($canManageSensitiveConfiguration)
+                <div class="mb-4 p-4 rounded-xl bg-amber-100 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/60 text-sm text-amber-800 dark:text-amber-200">HS mapping configuration and change history are read-only for this account.</div>
+            @endunless
 
             <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 mb-6">
                 <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-3 text-center">
@@ -168,6 +174,7 @@
                                         @endif
                                     </td>
                                     <td class="px-4 py-3">
+                                        @if($canManageSensitiveConfiguration)
                                         <div class="flex items-center gap-1.5">
                                             <button onclick="openEditModal({{ $mapping->id }}, {{ json_encode($mapping) }})" class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300" title="Edit">
                                                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
@@ -185,6 +192,9 @@
                                                 </button>
                                             </form>
                                         </div>
+                                        @else
+                                        <span class="text-xs text-gray-400">Read only</span>
+                                        @endif
                                     </td>
                                 </tr>
                             @empty
@@ -360,6 +370,7 @@
         </div>
     </div>
 
+    @if($canManageSensitiveConfiguration)
     <div id="importModal" class="hidden fixed inset-0 z-50 overflow-y-auto">
         <div class="flex items-center justify-center min-h-screen px-4">
             <div class="fixed inset-0 bg-black/50" onclick="document.getElementById('importModal').classList.add('hidden')"></div>
@@ -647,4 +658,5 @@
             spinner.classList.add('hidden');
         }
     </script>
+    @endif
 </x-admin-layout>

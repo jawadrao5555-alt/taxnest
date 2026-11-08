@@ -15,6 +15,10 @@
                 <div class="mb-4 p-4 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 rounded-lg">{{ session('success') }}</div>
             @endif
 
+            @unless($canManageSensitiveConfiguration)
+                <div class="mb-4 p-4 rounded-xl bg-amber-100 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/60 text-sm text-amber-800 dark:text-amber-200">HS master records are read-only for this account.</div>
+            @endunless
+
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
                 <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-4 text-center">
                     <p class="text-3xl font-bold text-emerald-600 dark:text-emerald-400">{{ $stats['total'] }}</p>
@@ -101,10 +105,14 @@
                                         @endif
                                     </td>
                                     <td class="px-4 py-3 text-center">
+                                        @if($canManageSensitiveConfiguration)
                                         <a href="{{ route('admin.hs-master-global.edit', $r->id) }}" class="inline-flex items-center px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-medium hover:bg-blue-700 transition">
                                             <svg class="w-3.5 h-3.5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                                             Edit
                                         </a>
+                                        @else
+                                        <span class="text-xs text-gray-400">Read only</span>
+                                        @endif
                                     </td>
                                 </tr>
                             @empty

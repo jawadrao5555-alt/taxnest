@@ -34,6 +34,24 @@ required 1366/390 journey now visits the three real history screens and refuses
 any rendered write control. Fresh exact-HEAD hosted PHP8.4/browser acceptance
 remains required.
 
+The global fiscal catalogue had an equivalent split between protected POSTs
+and writable HTML. HS rate links, global HS intelligence, the canonical HS
+master, its unmapped decision queue and the mapping engine now all derive their
+rendering authority from a fresh persisted administrator row. Viewer/support
+sessions retain source rows, counts, mapping status, confidence, prior
+rejections, analytics, change history and read-only exports. They receive no
+add, import, seed, edit, toggle, delete, clone, map, reject or regenerate forms;
+direct canonical-master edit GETs are also refused. Existing administrators
+retain the established controls and no fiscal catalogue or unmapped row was
+changed by this work.
+
+Focused sensitive-configuration HTTP coverage passes **3 tests / 120
+assertions**, with Blade compilation, Node syntax and diff checks. The required
+1366/390 journey now visits all five real catalogue reads and fails if any POST
+form or edit link is rendered. This is synthetic authorization evidence only,
+not live fiscal, invoice or statutory mapping acceptance; fresh exact-HEAD
+hosted PHP8.4/browser acceptance remains required.
+
 ## Password-verified company deletion lifecycle continuation
 
 The ordinary profile delete endpoint previously removed only the signed-in user

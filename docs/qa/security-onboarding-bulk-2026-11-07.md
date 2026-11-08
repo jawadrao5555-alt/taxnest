@@ -69,6 +69,23 @@ rendered mutation surfaces. This does not claim a live FBR retry, submission or
 customer communication; fresh exact-HEAD hosted PHP8.4/browser acceptance
 remains required.
 
+Smart-pricing reads had the same billing-authority presentation gap: apply was
+refused server-side after a persisted-role check, while the actionable price
+form was still rendered. The screen now derives billing authority from the
+fresh administrator row, keeps company/product velocity, current price,
+verdict and suggested-price evidence visible, and shows no apply form to
+viewer/support/unmapped roles. Existing administrators retain the established
+apply action. Fictional completed POS rows make the regression genuinely
+actionable; no product price, sale, invoice or stock record was changed.
+
+The complete focused billing-capability file passes **6 tests / 253
+assertions**, including cached-role revocation, three read-only roles, the real
+actionable pricing form, preserved admin/super-admin controls and unchanged
+company/invoice/subscription ledgers. The 1366/390 journey now visits the real
+pricing page and refuses any apply form. This remains synthetic authorization
+evidence, not approval of a new pricing formula or commercial policy; fresh
+exact-HEAD hosted PHP8.4/browser acceptance remains required.
+
 ## Password-verified company deletion lifecycle continuation
 
 The ordinary profile delete endpoint previously removed only the signed-in user

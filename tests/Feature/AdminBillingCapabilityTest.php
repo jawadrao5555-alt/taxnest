@@ -33,6 +33,29 @@ class AdminBillingCapabilityTest extends TestCase
             'start_date' => now(), 'end_date' => now()->addYear(), 'final_price' => 12000]);
     }
 
+    private function actionablePricingProduct(Subscription $sub): Product
+    {
+        $product = Product::create([
+            'company_id' => $sub->company_id,
+            'name' => 'Fictional actionable pricing '.uniqid(),
+            'default_price' => 100,
+            'is_active' => true,
+        ]);
+        $transactionId = DB::table('fbr_pos_transactions')->insertGetId([
+            'company_id' => $sub->company_id,
+            'invoice_number' => 'PRICE-'.uniqid(),
+            'status' => 'completed',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        DB::table('fbr_pos_transaction_items')->insert([
+            ['transaction_id' => $transactionId, 'product_id' => $product->id, 'item_name' => $product->name, 'quantity' => 10, 'created_at' => now(), 'updated_at' => now()],
+            ['transaction_id' => $transactionId, 'product_id' => null, 'item_name' => 'Fictional comparison item', 'quantity' => 1, 'created_at' => now(), 'updated_at' => now()],
+        ]);
+
+        return $product;
+    }
+
     public function test_read_only_support_and_unknown_roles_cannot_change_billing(): void
     {
         Mail::fake();
@@ -135,6 +158,7 @@ class AdminBillingCapabilityTest extends TestCase
     public function test_read_only_billing_pages_keep_history_but_do_not_offer_write_forms(): void
     {
         $sub = $this->paid();
+        $pricingProduct = $this->actionablePricingProduct($sub);
         User::create([
             'company_id' => $sub->company_id,
             'name' => 'Fictional retained user history',
@@ -168,6 +192,10 @@ class AdminBillingCapabilityTest extends TestCase
         $this->get('/admin/groups')->assertOk()
             ->assertSee('Business-group membership and notes are read-only for this account.')
             ->assertDontSee('action="'.route('saas.admin.groups.resync').'"', false);
+        $this->get('/admin/pricing/suggestions')->assertOk()
+            ->assertSee($pricingProduct->name)
+            ->assertSee('Pricing evidence and suggestions are read-only for this account.')
+            ->assertDontSee('action="/admin/pricing/apply/'.$pricingProduct->id.'"', false);
         $this->get('/admin/company/'.$sub->company_id)->assertOk()
             ->assertSee('Legacy company history is read-only for this account.')
             ->assertSee('Fictional capability company')
@@ -190,6 +218,7 @@ class AdminBillingCapabilityTest extends TestCase
     {
         foreach (['admin', 'super_admin'] as $role) {
             $sub = $this->paid();
+            $pricingProduct = $this->actionablePricingProduct($sub);
             $this->actingAs($this->admin($role), 'admin');
             $this->post('/admin/subscriptions/'.$sub->id.'/toggle')->assertRedirect();
             $this->assertFalse((bool) $sub->fresh()->active);
@@ -206,6 +235,9 @@ class AdminBillingCapabilityTest extends TestCase
             $this->get('/admin/consultants')->assertOk()
                 ->assertDontSee('Consultant, link and payout history is read-only for this account.')
                 ->assertSee('action="'.route('saas.admin.consultants.min-payout').'"', false);
+            $this->get('/admin/pricing/suggestions')->assertOk()
+                ->assertDontSee('Pricing evidence and suggestions are read-only for this account.')
+                ->assertSee('action="/admin/pricing/apply/'.$pricingProduct->id.'"', false);
         }
     }
 

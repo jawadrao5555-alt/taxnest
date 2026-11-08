@@ -4,6 +4,10 @@
         @if(session('success'))<div class="bg-emerald-100 border-l-4 border-emerald-500 text-emerald-800 p-4 mb-4 rounded">{{ session('success') }}</div>@endif
         @if($errors->any())<div class="bg-rose-100 border-l-4 border-rose-500 text-rose-800 p-4 mb-4 rounded">{{ $errors->first() }}</div>@endif
 
+        @unless($canManageBilling)
+            <div class="bg-amber-100 border border-amber-300 text-amber-900 p-4 mb-4 rounded">Pricing evidence and suggestions are read-only for this account.</div>
+        @endunless
+
         <form method="GET" class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 mb-6 flex flex-wrap items-end gap-3">
             <div>
                 <label class="block text-xs font-bold uppercase tracking-wide mb-1">Company</label>
@@ -62,13 +66,15 @@
                             @endif
                         </td>
                         <td class="px-3 py-2 text-center">
-                            @if($s['verdict'] !== 'insufficient_data' && $s['suggested_price'] !== $s['current_price'])
+                            @if($canManageBilling && $s['verdict'] !== 'insufficient_data' && $s['suggested_price'] !== $s['current_price'])
                                 <form method="POST" action="/admin/pricing/apply/{{ $s['product_id'] }}" class="inline" onsubmit="return confirm('Apply suggested price PKR {{ number_format($s['suggested_price'], 2) }} to {{ $s['name'] }}?')">
                                     @csrf
                                     <button type="submit" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1 rounded">Apply</button>
                                 </form>
-                            @else
+                            @elseif($canManageBilling)
                                 <span class="text-slate-400 text-xs">—</span>
+                            @else
+                                <span class="text-slate-400 text-xs">read only</span>
                             @endif
                         </td>
                     </tr>

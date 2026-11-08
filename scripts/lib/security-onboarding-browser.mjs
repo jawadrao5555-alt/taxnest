@@ -266,6 +266,9 @@ export async function securityOnboardingWorkflow(page,t,v,{baseUrl,login,saveEvi
   await page.goto(baseUrl+'/admin/feature-suggestions',{waitUntil:'domcontentloaded'});
   await page.getByText('Feature-suggestion demand, responses and decision history are read-only for this account.',{exact:true}).waitFor();
   if(await page.locator('form[action*="/admin/feature-suggestions/"]').count())throw Error('Viewer received feature-suggestion decision form');
+  await page.goto(baseUrl+'/admin/pricing/suggestions',{waitUntil:'domcontentloaded'});
+  await page.getByText('Pricing evidence and suggestions are read-only for this account.',{exact:true}).waitFor();
+  if(await page.locator('form[action*="/admin/pricing/apply/"]').count())throw Error('Viewer received pricing-apply form');
   await saveEvidenceScreenshot(page,'rc-security-operational-history-viewer-'+v.width);
   const legacyCompany=fixture.viewer.companyId;
   await page.goto(baseUrl+'/admin/company/'+legacyCompany,{waitUntil:'domcontentloaded'});

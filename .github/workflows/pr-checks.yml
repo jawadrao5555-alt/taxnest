@@ -148,6 +148,8 @@ jobs:
         run: bash scripts/rc-safe-run -- vendor/bin/phpunit tests/Feature/DiApiSubscriptionAccessTest.php tests/Feature/PurchasedCompanionAccessTest.php tests/Feature/SubscriptionPurchaseSnapshotTest.php tests/Feature/VerifiedSubscriptionDocumentsTest.php tests/Feature/SubscriptionFinancialAdjustmentTest.php tests/Feature/PosPaidAddonFlowTest.php tests/Feature/PosRenewalBranchSlotReviewTest.php tests/Feature/PaidRenewalSchemaTest.php --testdox
       - name: Check DI cycles, packing, proof versions and medicine source ordering
         run: bash scripts/rc-safe-run -- vendor/bin/phpunit tests/Feature/DiBillingCyclesTest.php tests/Feature/DiSellingPackingTest.php tests/Feature/DiIntegrityCoverageTest.php tests/Feature/MedicineSourceOrderingTest.php tests/Feature/MedicineCatalogueTest.php --testdox
+      - name: Check DI billing compatibility and historical invoice rendering
+        run: bash scripts/rc-safe-run -- vendor/bin/phpunit tests/Feature/AdminPlanCycleRatesTest.php tests/Feature/AdminPlanStorePostTest.php tests/Feature/AdminPagesSmokeTest.php tests/Feature/PaymentProofInstantAccessTest.php tests/Feature/InvoicePdfDecimalQuantityTest.php tests/Feature/FbrLogTenantIsolationTest.php tests/Feature/RequestedPackageSignupTest.php
       - name: Run full suite in clean loopback-only environment
         run: bash scripts/rc-safe-run -- vendor/bin/phpunit
       - name: Sanitize CI evidence
@@ -279,21 +281,22 @@ jobs:
         env:
           RC_BROWSER_STATE_ROOT: /tmp/taxnest-rc-browser-${{ github.run_id }}-${{ github.job }}
         run: bash scripts/rc-safe-run -- env PLAYWRIGHT_BROWSERS_PATH="$RC_BROWSER_STATE_ROOT/playwright-cache" node --test scripts/tests/sale-online-recovery-browser.test.mjs
-      - name: Verify Tax Integrations at desktop and 390px mobile
+      - name: Verify DI billing periods and Smart Packing at desktop and 390px
         env:
           RC_MARIADB_PORT: '33117'
           RC_BROWSER_PORT: '5911'
           RC_BROWSER_STATE_ROOT: /tmp/taxnest-rc-browser-${{ github.run_id }}-${{ github.job }}
         run: |
           bash scripts/rc-browser-fixture.sh setup
-          RC_BROWSER_ONLY=kot-note-visibility bash scripts/rc-browser-fixture.sh run
-          RC_BROWSER_ONLY=tax-integrations bash scripts/rc-browser-fixture.sh run
-      - name: Verify DI billing periods and Smart Packing at desktop and 390px
+          RC_BROWSER_ONLY=fbr-di-bulk bash scripts/rc-browser-fixture.sh run
+      - name: Verify Tax Integrations at desktop and 390px mobile
         env:
           RC_MARIADB_PORT: '33117'
           RC_BROWSER_PORT: '5911'
           RC_BROWSER_STATE_ROOT: /tmp/taxnest-rc-browser-${{ github.run_id }}-${{ github.job }}
-        run: RC_BROWSER_ONLY=fbr-di-bulk bash scripts/rc-browser-fixture.sh run
+        run: |
+          RC_BROWSER_ONLY=kot-note-visibility bash scripts/rc-browser-fixture.sh run
+          RC_BROWSER_ONLY=tax-integrations bash scripts/rc-browser-fixture.sh run
       - name: Verify staff discount owner approval at desktop and 390px
         env:
           RC_MARIADB_PORT: '33117'

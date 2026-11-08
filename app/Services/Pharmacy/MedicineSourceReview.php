@@ -16,7 +16,7 @@ final class MedicineSourceReview
         }
         $price = $row['mrp'] ?? null;
         if ($price !== null && $price !== '' && (! is_numeric($price) || ! is_finite((float) $price)
-            || (float) $price <= 0 || (float) $price > 999999999999.99)) {
+            || round((float) $price, 2) <= 0 || (float) $price > 999999999999.99)) {
             throw new \InvalidArgumentException('MRP must be a positive numeric source value or explicitly absent.');
         }
         $date = $row['effective_date'] ?? null;

@@ -199,7 +199,6 @@ class SubscriptionAssignmentService
             $previous = $active->first();
             if ($paidRenewal && $previous
                 && (int) $previous->pricing_plan_id === $pricingPlanId
-                && self::normalizeCycle($previous->billing_cycle) === $cycle
                 && !$previous->trial_ends_at
                 && !$previous->hasActiveOverride()
                 && (float) $previous->final_price > 0

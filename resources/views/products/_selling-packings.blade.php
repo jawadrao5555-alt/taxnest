@@ -1,4 +1,4 @@
-@php($packingRows = old('selling_packings', isset($product) ? ($product->selling_packings ?? []) : []))
+@php $packingRows = old('selling_packings', isset($product) ? ($product->selling_packings ?? []) : []); @endphp
 <section class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-6 space-y-4"
     x-data="{ rows: {{ \Illuminate\Support\Js::from($packingRows) }} }">
     <input type="hidden" name="selling_packings_present" value="1">

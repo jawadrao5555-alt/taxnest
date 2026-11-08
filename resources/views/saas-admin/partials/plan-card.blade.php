@@ -29,12 +29,12 @@
             <p class="text-[10px] text-gray-500 dark:text-gray-400 uppercase mb-1.5">Configured DI billing totals</p>
             @foreach(\App\Services\SubscriptionAssignmentService::cyclesForPlan($plan) as $cycleKey)
                 @if($cycleKey !== 'annual')
-                    @php($configuredRate = \App\Services\SubscriptionAssignmentService::computePrice($plan, $cycleKey))
+                    @php $configuredRate = \App\Services\SubscriptionAssignmentService::computePrice($plan, $cycleKey); @endphp
                     <div class="flex justify-between gap-2 text-[11px]"><span class="text-gray-400">{{ \App\Models\Subscription::getCycleLabel($cycleKey) }}</span><span class="text-gray-200">{{ number_format($configuredRate['final_price'], 2) }}</span></div>
                 @endif
             @endforeach
             <div class="flex justify-between gap-2 text-[11px]">
-                <span class="text-gray-400">Annual</span>
+                <span class="text-gray-400">Annual rate</span>
                 <span class="text-gray-200 font-medium whitespace-nowrap">{{ number_format($annualRate['final_price']) }}</span>
             </div>
             @if($plan->explicitCyclePrice('annual') === null)
@@ -44,7 +44,7 @@
         @elseif(in_array($plan->product_type, ['pos', 'fbrpos']) || \App\Support\NestErps::isProductType($plan->product_type ?? null))
         <div class="mb-3 pb-3 border-b border-gray-800">
             <p class="text-[10px] text-gray-500 dark:text-gray-400 uppercase mb-1.5">Annual rate (what checkout charges)</p>
-            <div class="flex justify-between gap-2 text-[11px]"><span class="text-gray-400">Annual</span><span class="text-gray-200 font-medium">{{ number_format($annualRate['final_price']) }}</span></div>
+            <div class="flex justify-between gap-2 text-[11px]"><span class="text-gray-400">Annual rate</span><span class="text-gray-200 font-medium">{{ number_format($annualRate['final_price']) }}</span></div>
         </div>
         @endif
 

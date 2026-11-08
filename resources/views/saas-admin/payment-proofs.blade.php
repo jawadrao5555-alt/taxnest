@@ -99,11 +99,13 @@
                                 @elseif($proof->pricingPlan)
                                     @php
                                         $reqCycle = \App\Services\SubscriptionAssignmentService::normalizeCycle($proof->billing_cycle);
-                                        $reqPriced = \App\Services\SubscriptionAssignmentService::computePrice($proof->pricingPlan, $reqCycle, $proof->company);
+                                        $reqPriced = null;
+                                        try { $reqPriced = \App\Services\SubscriptionAssignmentService::computePrice($proof->pricingPlan, $reqCycle, $proof->company); }
+                                        catch (\Illuminate\Validation\ValidationException $exception) { /* Retain an unavailable historical period for review. */ }
                                     @endphp
                                     <span class="text-white font-medium">{{ $proof->pricingPlan->name }}</span>
                                     <span class="block text-[11px] text-gray-500 dark:text-gray-400">
-                                        {{ \App\Models\Subscription::getCycleLabel($reqCycle) }} · PKR {{ number_format($reqPriced['final_price']) }}
+                                        {{ \App\Models\Subscription::getCycleLabel($reqCycle) }} · {{ $reqPriced ? 'PKR '.number_format($reqPriced['final_price']) : 'Current price unavailable — review original proof' }}
                                         @if(($reqPriced['extra_branch_price'] ?? 0) > 0)
                                             <span class="block">= PKR {{ number_format($reqPriced['base_price']) }} package + PKR {{ number_format($reqPriced['extra_branch_price']) }} for {{ $reqPriced['extra_branch_slots'] }} extra branch(es)</span>
                                         @endif

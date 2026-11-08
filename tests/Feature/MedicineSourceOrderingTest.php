@@ -30,10 +30,10 @@ class MedicineSourceOrderingTest extends TestCase
     {
         $svc = app(MedicineCatalogueSyncService::class);
         $base = ['brand_name' => 'Synthetic invalid medicine', 'drap_reg_no' => 'SYNMEDINVALID', 'mrp' => 100];
-        $svc->ingestPage([array_replace($base, ['mrp' => -4]), array_replace($base, ['mrp' => 'unknown']),
+        $svc->ingestPage([array_replace($base, ['mrp' => -4]), array_replace($base, ['mrp' => 'unknown']), array_replace($base, ['mrp' => '0.001']),
             array_replace($base, ['effective_date' => '2026-02-31'])]);
         $this->assertSame(0, MedicineCatalogueEntry::count());
-        $this->assertSame(3, DB::table('medicine_source_observations')->where('disposition', 'invalid')->count());
+        $this->assertSame(4, DB::table('medicine_source_observations')->where('disposition', 'invalid')->count());
     }
 
     public function test_future_prices_wait_until_due_and_conflicting_same_date_sources_require_review(): void

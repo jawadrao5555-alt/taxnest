@@ -334,7 +334,7 @@
         <p class="text-sm text-gray-400 mb-3">Conflicting, undated and invalid prices are retained for review. Future prices enter the catalogue only when due. Shop prices still require the normal price-update approval.</p>
         <table class="w-full text-sm text-left"><thead><tr><th>Source</th><th>Medicine</th><th>Effective date</th><th>MRP</th><th>State</th></tr></thead><tbody>
             @foreach($sourceObservations as $observation)
-                @php($sourceRow = json_decode($observation->payload, true) ?: [])
+                @php $sourceRow = json_decode($observation->payload, true) ?: []; @endphp
                 <tr class="border-t border-gray-700"><td>{{ $observation->source }}</td><td>{{ $sourceRow['brand_name'] ?? 'Invalid source row' }}</td>
                     <td>{{ $observation->effective_date ?? 'Unknown' }}</td><td>{{ $observation->mrp ?? 'Unknown' }}</td><td>{{ str_replace('_', ' ', $observation->disposition) }}</td></tr>
             @endforeach

@@ -531,7 +531,7 @@
                         <div class="mb-4"><p class="font-medium">{{ $cyclePlan->name }}</p><div class="flex flex-wrap gap-3 mt-2">
                         @foreach(\App\Services\SubscriptionAssignmentService::cyclesForPlan($cyclePlan) as $cycleKey)
                             @if($cycleKey !== 'annual')
-                                @php($cycleRate = \App\Models\Subscription::priceForPlanCycle($cyclePlan, $cycleKey))
+                                @php $cycleRate = \App\Models\Subscription::priceForPlanCycle($cyclePlan, $cycleKey); @endphp
                                 <a class="rounded-lg border border-emerald-700 px-3 py-2 text-sm text-emerald-800" href="{{ route('register', ['plan' => $cyclePlan->name, 'cycle' => $cycleKey]) }}">
                                     {{ \App\Models\Subscription::getCycleLabel($cycleKey) }} · PKR {{ number_format($cycleRate['final_price'], 2) }} total
                                 </a>

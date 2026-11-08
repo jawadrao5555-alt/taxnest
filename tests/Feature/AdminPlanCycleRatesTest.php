@@ -5,10 +5,10 @@ namespace Tests\Feature;
 use App\Models\PricingPlan;
 use Tests\TestCase;
 
-/** Admin plan surfaces expose the annual sellable rate only. */
+/** Admin plan surfaces expose configured DI periods and annual-only POS rates. */
 class AdminPlanCycleRatesTest extends TestCase
 {
-    public function test_a_di_card_shows_only_the_annual_sellable_rate(): void
+    public function test_a_di_card_shows_its_configured_period_rates(): void
     {
         $plan = new PricingPlan([
             'name' => 'Kaarobar',
@@ -25,8 +25,8 @@ class AdminPlanCycleRatesTest extends TestCase
 
         $this->assertStringContainsString('Annual rate', $html);
         $this->assertStringContainsString('24,990', $html);
-        $this->assertStringNotContainsString('6,999', $html);
-        $this->assertStringNotContainsString('13,799', $html);
+        $this->assertStringContainsString('6,999', $html);
+        $this->assertStringContainsString('13,799', $html);
     }
 
     public function test_a_hand_set_annual_rate_is_not_flagged_as_derived(): void

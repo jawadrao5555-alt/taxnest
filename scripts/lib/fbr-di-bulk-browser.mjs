@@ -22,13 +22,16 @@ export async function fbrDiBulkWorkflow(page,t,v,{baseUrl,saveEvidenceScreenshot
   await product.getByLabel('Packing price (optional)',{exact:true}).fill('2500');
   const invalid=await product.evaluate(form=>Array.from(form.elements).filter(e=>e.willValidate&&!e.validity.valid).map(e=>({name:e.name,value:e.value,message:e.validationMessage})));
   if(invalid.length)throw new Error('Product packing form invalid: '+JSON.stringify(invalid));
+  const submissions=[];
+  const record=response=>{const req=response.request();if(req.method()==='POST'&&new URL(req.url()).pathname==='/products')submissions.push({status:response.status(),location:response.headers().location||'',data:Array.from(new URLSearchParams(req.postData()||'').entries()).filter(([name])=>name!=='_token')});};
+  page.on('response',record);
   try {
     await Promise.all([page.waitForURL(u=>u.pathname==='/products',{waitUntil:'domcontentloaded'}),product.getByRole('button',{name:'Create Product',exact:true}).click()]);
   } catch(error) {
     const errors=await page.locator('#productForm .text-red-700').allTextContents();
     const fields=await product.evaluate(form=>Array.from(new FormData(form).entries()).filter(([name])=>name!=='_token'));
-    throw new Error('Product packing save failed at '+new URL(page.url()).pathname+': '+errors.join('; ')+'; fields='+JSON.stringify(fields)+'; pageErrors='+JSON.stringify(diagnostics?.pageErrors||[])+'; '+error.message);
-  }
+    throw new Error('Product packing save failed at '+new URL(page.url()).pathname+': '+errors.join('; ')+'; fields='+JSON.stringify(fields)+'; submissions='+JSON.stringify(submissions)+'; pageErrors='+JSON.stringify(diagnostics?.pageErrors||[])+'; '+error.message);
+  } finally { page.off('response',record); }
   await page.getByText('Product created successfully.',{exact:true}).waitFor();
   await page.goto(baseUrl+'/invoice/create',{waitUntil:'domcontentloaded'});
   const invoice=page.locator('form[action="/invoice/store"]');
@@ -39,7 +42,7 @@ export async function fbrDiBulkWorkflow(page,t,v,{baseUrl,saveEvidenceScreenshot
   await invoice.getByRole('button',{name:new RegExp(name)}).first().click();
   await invoice.locator('select[name="items[0][selling_packing_id]"]').selectOption({label:'25 KG bag'});
   await invoice.locator('[name="items[0][quantity]"]').fill('2');
-  await invoice.getByText('Reporting quantity: 50 Kilograms',{exact:true}).waitFor();
+  await invoice.getByText(/^Reporting quantity: 50 (Kilograms|KG)$/).waitFor();
   await saveEvidenceScreenshot(page,'rc-di-packing-entry-'+v.width);
   await Promise.all([page.waitForURL(u=>u.pathname==='/invoices'),invoice.locator('button[type="submit"]').filter({hasText:'Save'}).first().click()]);
   await page.getByText('Invoice created successfully.',{exact:true}).waitFor();

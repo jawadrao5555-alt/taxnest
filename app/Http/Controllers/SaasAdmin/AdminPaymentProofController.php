@@ -107,7 +107,7 @@ class AdminPaymentProofController extends Controller
         $allowedCycles = SubscriptionAssignmentService::cyclesForPlan($plan);
         $requestedCycle = SubscriptionAssignmentService::normalizeCycle($request->billing_cycle);
         if (!in_array($requestedCycle, $allowedCycles, true)) {
-            return back()->with('error', 'That billing cycle is not available for the selected package.');
+            throw \Illuminate\Validation\ValidationException::withMessages(['billing_cycle' => 'That billing cycle is not available for the selected package.']);
         }
 
         // Single source of truth: the cycle actually enforced by pricing (every

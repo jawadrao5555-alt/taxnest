@@ -538,7 +538,7 @@
     <div class="py-8">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             @if($invoice->status === 'locked')
-            @php($proofStatus = \App\Services\IntegrityHashService::verificationStatus($invoice))
+            @php $proofStatus = \App\Services\IntegrityHashService::verificationStatus($invoice); @endphp
             <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-4 mb-6" x-data="{ editingFbr: false, fbrNum: '{{ $invoice->fbr_invoice_number ?? '' }}' }">
                 <div class="flex items-start gap-3">
                     <svg class="w-6 h-6 text-emerald-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>

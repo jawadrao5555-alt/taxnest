@@ -99,6 +99,14 @@
                         </select>
                         @error('company_id') <p class="text-xs text-red-400 mt-1">{{ $message }}</p> @enderror
                     </div>
+                    <div>
+                        <label for="support-priority-new" class="block text-xs font-medium text-gray-400 mb-1">Case priority</label>
+                        <select id="support-priority-new" name="priority" class="w-full rounded-lg bg-gray-800 border border-gray-700 text-white text-sm px-3 py-2">
+                            @foreach(\App\Models\SupportCase::PRIORITIES as $priority)
+                                <option value="{{ $priority }}" @selected(old('priority', \App\Models\SupportCase::PRIORITY_NORMAL) === $priority)>{{ strtoupper($priority) }}</option>
+                            @endforeach
+                        </select>
+                    </div>
                     <button type="submit" class="px-4 py-2 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-sm font-semibold">Open linked case</button>
                 </form>
                 @if($supportCompanies->isEmpty())
@@ -108,6 +116,7 @@
                 <dl class="mt-4 grid gap-3 sm:grid-cols-2 text-xs">
                     <div><dt class="text-gray-500">Company</dt><dd class="mt-0.5 font-semibold text-gray-200">{{ $supportCase->company?->account_code ? $supportCase->company->account_code.' · ' : '' }}{{ $supportCase->company?->name ?? 'Deleted company record' }}</dd></div>
                     <div><dt class="text-gray-500">Owner</dt><dd class="mt-0.5 font-semibold text-gray-200">{{ $supportCase->assignedAdmin?->name ?? 'Unassigned' }}</dd></div>
+                    <div><dt class="text-gray-500">Priority</dt><dd class="mt-0.5 font-semibold text-gray-200">{{ strtoupper($supportCase->priority ?? \App\Models\SupportCase::PRIORITY_NORMAL) }}</dd></div>
                     <div><dt class="text-gray-500">Opened</dt><dd class="mt-0.5 text-gray-300">{{ $supportCase->opened_at?->format('d M Y, h:i A') }}</dd></div>
                     <div><dt class="text-gray-500">Last resolution build</dt><dd class="mt-0.5 font-mono text-gray-300">{{ $supportCase->resolution_build ?? 'Not resolved yet' }}</dd></div>
                 </dl>
@@ -122,7 +131,15 @@
                             @endforeach
                         </select>
                     </div>
-                    <button type="submit" class="px-4 py-2 rounded-lg bg-gray-700 hover:bg-gray-600 text-white text-sm font-semibold">Update owner</button>
+                    <div>
+                        <label for="support-priority" class="block text-xs font-medium text-gray-400 mb-1">Case priority</label>
+                        <select id="support-priority" name="priority" class="w-full rounded-lg bg-gray-800 border border-gray-700 text-white text-sm px-3 py-2">
+                            @foreach(\App\Models\SupportCase::PRIORITIES as $priority)
+                                <option value="{{ $priority }}" @selected(old('priority', $supportCase->priority ?? \App\Models\SupportCase::PRIORITY_NORMAL) === $priority)>{{ strtoupper($priority) }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <button type="submit" class="px-4 py-2 rounded-lg bg-gray-700 hover:bg-gray-600 text-white text-sm font-semibold">Update owner and priority</button>
                 </form>
 
                 @if($supportCase->status !== 'resolved')

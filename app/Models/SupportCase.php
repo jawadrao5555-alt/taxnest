@@ -12,6 +12,21 @@ class SupportCase extends Model
 
     public const STATUS_REOPENED = 'reopened';
 
+    public const PRIORITY_LOW = 'low';
+
+    public const PRIORITY_NORMAL = 'normal';
+
+    public const PRIORITY_HIGH = 'high';
+
+    public const PRIORITY_URGENT = 'urgent';
+
+    public const PRIORITIES = [
+        self::PRIORITY_LOW,
+        self::PRIORITY_NORMAL,
+        self::PRIORITY_HIGH,
+        self::PRIORITY_URGENT,
+    ];
+
     protected $fillable = [
         'company_id',
         'assigned_admin_id',
@@ -23,6 +38,7 @@ class SupportCase extends Model
         'source_message_id',
         'subject',
         'status',
+        'priority',
         'resolution_build',
         'opened_at',
         'resolved_at',

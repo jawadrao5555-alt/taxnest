@@ -19,7 +19,7 @@
     <div class="overflow-x-auto rounded-xl border border-gray-800 bg-gray-900">
         <table class="min-w-full text-sm">
             <thead class="bg-gray-800/70 text-xs uppercase tracking-wide text-gray-400">
-                <tr><th class="px-4 py-3 text-left">Case</th><th class="px-4 py-3 text-left">Company</th><th class="px-4 py-3 text-left">Status</th><th class="px-4 py-3 text-left">Owner</th><th class="px-4 py-3 text-left">Updated</th></tr>
+                <tr><th class="px-4 py-3 text-left">Case</th><th class="px-4 py-3 text-left">Company</th><th class="px-4 py-3 text-left">Status</th><th class="px-4 py-3 text-left">Priority</th><th class="px-4 py-3 text-left">Owner</th><th class="px-4 py-3 text-left">Updated</th></tr>
             </thead>
             <tbody class="divide-y divide-gray-800">
                 @forelse($cases as $case)
@@ -27,11 +27,12 @@
                         <td class="px-4 py-3"><a class="font-semibold text-emerald-300 hover:text-emerald-200" href="{{ route('saas.admin.support-cases.show', $case) }}">#{{ $case->id }} · {{ $case->subject }}</a></td>
                         <td class="px-4 py-3 text-gray-300">{{ $case->company?->account_code ? $case->company->account_code.' · ' : '' }}{{ $case->company?->name ?? 'Deleted company record' }}</td>
                         <td class="px-4 py-3"><span class="rounded-full border border-gray-700 px-2 py-1 text-xs font-bold text-gray-300">{{ strtoupper($case->status) }}</span></td>
+                        <td class="px-4 py-3 text-gray-300">{{ strtoupper($case->priority ?? \App\Models\SupportCase::PRIORITY_NORMAL) }}</td>
                         <td class="px-4 py-3 text-gray-300">{{ $case->assignedAdmin?->name ?? 'Unassigned' }}</td>
                         <td class="px-4 py-3 text-gray-500">{{ $case->updated_at?->format('d M Y, h:i A') }}</td>
                     </tr>
                 @empty
-                    <tr><td colspan="5" class="px-4 py-10 text-center text-gray-500">No support cases in this view.</td></tr>
+                    <tr><td colspan="6" class="px-4 py-10 text-center text-gray-500">No support cases in this view.</td></tr>
                 @endforelse
             </tbody>
         </table>

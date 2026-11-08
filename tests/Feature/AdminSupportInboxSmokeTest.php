@@ -59,6 +59,7 @@ class AdminSupportInboxSmokeTest extends TestCase
             $table->string('source_message_id', 512)->nullable();
             $table->string('subject');
             $table->string('status', 24)->default('open');
+            $table->string('priority', 16)->default('normal');
             $table->string('resolution_build', 100)->nullable();
             $table->timestamp('opened_at');
             $table->timestamp('resolved_at')->nullable();
@@ -211,7 +212,7 @@ class AdminSupportInboxSmokeTest extends TestCase
             'product_type' => 'pos', 'created_at' => now(), 'updated_at' => now(),
         ]);
 
-        $this->actingAsSuperAdmin()->post('/admin/support-inbox/inbox/7/case', ['company_id' => 17])
+        $this->actingAsSuperAdmin()->post('/admin/support-inbox/inbox/7/case', ['company_id' => 17, 'priority' => 'urgent'])
             ->assertRedirect('/admin/support-inbox/inbox/7');
         $this->actingAsSuperAdmin()->post('/admin/support-inbox/inbox/7/case', ['company_id' => 17])
             ->assertRedirect('/admin/support-inbox/inbox/7');
@@ -226,6 +227,7 @@ class AdminSupportInboxSmokeTest extends TestCase
             'source_message_id' => '<abc@example.com>',
             'subject' => 'Login masla',
             'status' => SupportCase::STATUS_OPEN,
+            'priority' => SupportCase::PRIORITY_URGENT,
             'assigned_admin_id' => AdminUser::where('role', 'super_admin')->value('id'),
         ]);
         $this->assertDatabaseCount('support_case_events', 1);
@@ -302,8 +304,15 @@ class AdminSupportInboxSmokeTest extends TestCase
 
         $this->actingAsSuperAdmin()->post("/admin/support-inbox/cases/{$case->id}/assign", [
             'assigned_admin_id' => $owner->id,
+            'priority' => SupportCase::PRIORITY_HIGH,
         ])->assertRedirect();
         $this->assertSame($owner->id, $case->fresh()->assigned_admin_id);
+        $this->assertSame(SupportCase::PRIORITY_HIGH, $case->fresh()->priority);
+        $this->assertDatabaseHas('support_case_events', [
+            'support_case_id' => $case->id,
+            'event_type' => 'priority_changed',
+            'note' => 'Priority changed from NORMAL to HIGH.',
+        ]);
 
         $viewer = AdminUser::where('role', 'viewer')->first();
         $this->actingAs($viewer, 'admin')->post("/admin/support-inbox/cases/{$case->id}/resolve", [

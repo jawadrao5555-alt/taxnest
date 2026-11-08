@@ -368,6 +368,10 @@ export async function securityOnboardingWorkflow(page,t,v,{baseUrl,login,saveEvi
   await login(page,{...t,loginPath:'/admin/login',login:fixture.supportAdmin,password:t.password});
   await page.goto(baseUrl+'/admin/support-cases/'+fixture.supportCaseId,{waitUntil:'domcontentloaded'});
   await page.getByRole('heading',{name:new RegExp('^Case #'+fixture.supportCaseId)}).waitFor();
+  await page.getByLabel('Case priority',{exact:true}).selectOption('urgent');
+  await Promise.all([page.waitForNavigation(),page.getByRole('button',{name:'Update owner and priority',exact:true}).click()]);
+  await page.getByText('URGENT',{exact:true}).first().waitFor();
+  await page.getByText('Priority changed from NORMAL to URGENT.',{exact:true}).waitFor();
   const build='rc-security-'+v.width;
   await page.getByLabel('Resolution build / release',{exact:true}).fill(build);
   await page.getByLabel('Resolution evidence',{exact:true}).fill('Synthetic desktop/mobile support acceptance passed.');
@@ -379,5 +383,5 @@ export async function securityOnboardingWorkflow(page,t,v,{baseUrl,login,saveEvi
   await page.getByText('REOPENED',{exact:true}).waitFor();
   if(await page.getByText('Synthetic recurrence received after explicit resolution.',{exact:true}).count()!==1)throw Error('Support reopen evidence missing from timeline');
   await saveEvidenceScreenshot(page,'rc-security-support-case-'+v.width);
-  pass('SECURITY ONBOARDING PASS: '+v.width+': incomplete setup refused, explicit skip, configured completion, actual password form and independent old-session revocation/fresh login; optional two-step enrollment, fresh authenticator login, single-use recovery and disable; password-verified company deletion request retains the owner/company pending review; Local Bills Viewer password reset revokes the old browser and permits a fresh login; billing, legacy company/feature/configuration mutations, customer-update, tutorial, announcement, survey, sensitive configuration and emergency system controls stay read-only for viewer; Live Ops, Live Activity, agent claims, reporting consent and deployment approval stay super-admin-only; durable support ownership, explicit resolution build and reopen timeline');
+  pass('SECURITY ONBOARDING PASS: '+v.width+': incomplete setup refused, explicit skip, configured completion, actual password form and independent old-session revocation/fresh login; optional two-step enrollment, fresh authenticator login, single-use recovery and disable; password-verified company deletion request retains the owner/company pending review; Local Bills Viewer password reset revokes the old browser and permits a fresh login; billing, legacy company/feature/configuration mutations, customer-update, tutorial, announcement, survey, sensitive configuration and emergency system controls stay read-only for viewer; Live Ops, Live Activity, agent claims, reporting consent and deployment approval stay super-admin-only; durable support ownership, priority, explicit resolution build and reopen timeline');
 }

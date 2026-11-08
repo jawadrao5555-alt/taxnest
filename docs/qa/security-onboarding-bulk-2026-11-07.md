@@ -95,6 +95,17 @@ close/reopen form is absent. Existing administrator release authority is
 unchanged. The real 1366/390 journey follows the survey-results link and
 refuses the form there as well as on the list page.
 
+Durable support cases now also retain an explicit LOW/NORMAL/HIGH/URGENT
+priority. Opening a case validates and records the selected priority; a later
+owner/priority update runs under the same row lock and appends a separate
+priority-change timeline event without changing resolution state. Queue,
+mailbox-linked detail and standalone case views show the current priority. The
+desktop1366/mobile390 journey changes a fictional case to URGENT through the
+actual form before resolving and reopening it. No email is sent and no company,
+release or product setting changes. Focused local schema/controller coverage is
+20 tests / 97 assertions; the real browser journey still requires fresh hosted
+exact-HEAD execution.
+
 ## Password-verified company deletion lifecycle continuation
 
 The ordinary profile delete endpoint previously removed only the signed-in user

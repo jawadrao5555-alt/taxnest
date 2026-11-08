@@ -171,6 +171,7 @@ class SupportInboxController extends Controller
         abort_unless($box === 'inbox', 404);
         $data = $request->validate([
             'company_id' => ['required', 'integer'],
+            'priority' => ['nullable', 'in:'.implode(',', SupportCase::PRIORITIES)],
         ]);
 
         $company = Company::query()->findOrFail((int) $data['company_id']);
@@ -181,7 +182,7 @@ class SupportInboxController extends Controller
         }
 
         try {
-            $case = DB::transaction(function () use ($actor, $box, $uid, $company, $message) {
+            $case = DB::transaction(function () use ($actor, $box, $uid, $company, $message, $data) {
                 Company::query()->whereKey($company->id)->lockForUpdate()->firstOrFail();
                 $case = SupportCase::query()->create([
                     'company_id' => $company->id,
@@ -194,9 +195,18 @@ class SupportInboxController extends Controller
                         : null,
                     'subject' => mb_substr((string) ($message['subject'] ?? '(no subject)'), 0, 255),
                     'status' => SupportCase::STATUS_OPEN,
+                    'priority' => $data['priority'] ?? SupportCase::PRIORITY_NORMAL,
                     'opened_at' => now(),
                 ]);
-                $this->recordCaseEvent($case, $actor, 'opened', null, SupportCase::STATUS_OPEN, null, 'Linked to company by administrator.');
+                $this->recordCaseEvent(
+                    $case,
+                    $actor,
+                    'opened',
+                    null,
+                    SupportCase::STATUS_OPEN,
+                    null,
+                    'Linked to company by administrator with '.strtoupper($case->priority).' priority.'
+                );
 
                 return $case;
             }, 3);
@@ -217,23 +227,42 @@ class SupportInboxController extends Controller
         $actor = $this->guardSuperAdmin();
         $data = $request->validate([
             'assigned_admin_id' => ['required', 'integer'],
+            'priority' => ['nullable', 'in:'.implode(',', SupportCase::PRIORITIES)],
         ]);
         $owner = AdminUser::query()
             ->whereKey((int) $data['assigned_admin_id'])
             ->whereIn('role', ['admin', 'super_admin'])
             ->firstOrFail();
 
-        DB::transaction(function () use ($supportCase, $actor, $owner) {
+        DB::transaction(function () use ($supportCase, $actor, $owner, $data) {
             $case = SupportCase::query()->lockForUpdate()->findOrFail($supportCase->id);
-            if ((int) $case->assigned_admin_id === (int) $owner->id) {
+            $priority = $data['priority'] ?? $case->priority ?? SupportCase::PRIORITY_NORMAL;
+            $ownerChanged = (int) $case->assigned_admin_id !== (int) $owner->id;
+            $priorityChanged = $case->priority !== $priority;
+            if (! $ownerChanged && ! $priorityChanged) {
                 return;
             }
+            $previousPriority = $case->priority;
             $case->assigned_admin_id = $owner->id;
+            $case->priority = $priority;
             $case->save();
-            $this->recordCaseEvent($case, $actor, 'assigned', $case->status, $case->status, null, "Assigned to {$owner->name}.");
+            if ($ownerChanged) {
+                $this->recordCaseEvent($case, $actor, 'assigned', $case->status, $case->status, null, "Assigned to {$owner->name}.");
+            }
+            if ($priorityChanged) {
+                $this->recordCaseEvent(
+                    $case,
+                    $actor,
+                    'priority_changed',
+                    $case->status,
+                    $case->status,
+                    null,
+                    'Priority changed from '.strtoupper($previousPriority).' to '.strtoupper($priority).'.'
+                );
+            }
         }, 3);
 
-        return back()->with('success', "Support case assigned to {$owner->name}.");
+        return back()->with('success', "Support case owner and priority updated.");
     }
 
     public function resolveCase(Request $request, SupportCase $supportCase)

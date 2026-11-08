@@ -1,3 +1,4 @@
+import { fbrDiBulkWorkflow } from './lib/fbr-di-bulk-browser.mjs';
 import { kotNoteVisibilityWorkflow } from './lib/kot-note-visibility-browser.mjs';
 import { taxIntegrationsWorkflow } from './lib/tax-integrations-browser.mjs';
 import { b01CompanyAccountWorkflow } from './lib/b01-company-account-browser.mjs';
@@ -36,7 +37,7 @@ const ordered = [...regular.filter(x=>x.mixedFulfillment), ...regular.filter(x=>
 // Exercise the new B02 payment contract before the broad screen sweep so a
 // checkout regression produces evidence promptly. Every original case remains.
 const cases = requested.length ? ordered.filter(x => requested.includes(x.name))
-  : [...ordered.filter(x=>x.billingSelection), ...ordered.filter(x=>x.b01Account), ...ordered.filter(x=>x.b02Deal), ...ordered.filter(x=>!x.billingSelection&&!x.b01Account&&!x.b02Deal)];
+  : [...ordered.filter(x=>x.billingSelection), ...ordered.filter(x=>x.b01Account), ...ordered.filter(x=>x.b02Deal), ...ordered.filter(x=>!x.billingSelection&&!x.b01Account&&!x.b02Deal)].filter(x=>!x.manualOnly);
 const requestedIsolation = requested.includes('health-isolation');
 const unknown = requested.filter(name => name !== 'health-isolation' && ![...regular, ...di].some(x => x.name === name));
 if (unknown.length) throw new Error(`unknown requested journey: ${unknown.join(', ')}`);
@@ -1634,6 +1635,7 @@ async function workflow(page,t,v,diagnostics) {
   }
   if(t.b02Deal)return b02DealWorkflow(page,t,v,{baseUrl,waitForOperationalSurface,dismiss,saveEvidenceScreenshot,pass});
   if(t.staffDiscount)return staffDiscountWorkflow(page,t,v,{baseUrl,login,dismiss,waitForOperationalSurface,saveEvidenceScreenshot,pass,loopback});
+  if(t.fbrDiBulk)return fbrDiBulkWorkflow(page,t,v,{baseUrl,saveEvidenceScreenshot,pass,diagnostics});
   if(t.billingSelection)return billingSelectionWorkflow(page,t,v,{baseUrl,saveEvidenceScreenshot,pass});
   if(t.smartImport)return smartImportWorkflow(page,t,v);
   if(t.ingredientUnitAudit)return ingredientUnitAudit(page,t,v);
@@ -2349,6 +2351,7 @@ async function customerBulkNavigation(page,t,v) {
 async function one(browser,label,v,t) {
   if(t.taxIntegrations)t={...t,login:t.taxIntegrations[v.width].login};
   if(t.staffDiscount)t={...t,login:t.staffDiscount[v.width].cashier};
+  if(t.fbrDiBulk)t={...t,login:t.fbrDiBulk[v.width].login};
   if(t.billingSelection)t={...t,login:t.billingSelection[v.width].login};
   if(t.surveyJourney) t={...t,login:t.surveyJourney.logins[v.width]};
   if(t.optionalArchive) t={...t, login:t.optionalArchive.cases[v.width].login};

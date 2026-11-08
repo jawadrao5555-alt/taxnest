@@ -56,11 +56,13 @@ class DistributorDiscountService
         $net = round($grossPackage - $discountAmount + $addon, 2);
         return [
             'version'=>self::VERSION, 'agent_id'=>$attributedAgentId, 'company_id'=>$company->id,
-            'plan_id'=>$plan->id, 'product_type'=>$plan->product_type ?? 'di', 'cycle'=>'annual',
+            'plan_id'=>$plan->id, 'product_type'=>$plan->product_type ?? 'di', 'cycle'=>$cycle,
             'gross_package_price'=>$grossPackage, 'undiscounted_addon_amount'=>$addon,
             'discount_percent'=>$discount, 'discount_amount'=>$discountAmount,
             'net_quote'=>$net, 'policy_cap'=>(float)DistributorPolicyService::policy()['max_discount'],
             'created_at'=>now()->toIso8601String(),
+            'plan_snapshot'=>SubscriptionPurchaseSnapshot::planTerms($plan),
+            'pricing_snapshot'=>$price,
         ];
     }
 
@@ -68,7 +70,8 @@ class DistributorDiscountService
     {
         if (($s['version'] ?? null) !== self::VERSION) return 'Unsupported distributor quote version.';
         if ((int)($s['company_id'] ?? 0) !== $company->id || (int)($s['plan_id'] ?? 0) !== $plan->id) return 'Distributor quote does not belong to this company/package.';
-        if (($s['product_type'] ?? null) !== ($plan->product_type ?? 'di') || ($s['cycle'] ?? null) !== 'annual' || $cycle !== 'annual') return 'Distributor quote product or billing cycle is inconsistent.';
+        if (($s['product_type'] ?? null) !== ($plan->product_type ?? 'di') || ($s['cycle'] ?? null) !== $cycle || !in_array($cycle, SubscriptionAssignmentService::cyclesForPlan($plan), true)) return 'Distributor quote product or billing cycle is inconsistent.';
+        if ($cycle !== 'annual' && ((float) ($s['discount_percent'] ?? 0) !== 0.0 || (float) ($s['discount_amount'] ?? 0) !== 0.0)) return 'Distributor discounts apply only to annual purchases.';
         $snapshotAgent = ($s['agent_id'] ?? null) === null ? null : (int)$s['agent_id'];
         $companyAgent = $company->agent_id === null ? null : (int)$company->agent_id;
         if ($snapshotAgent !== $companyAgent) return 'Distributor attribution changed after this quote. Submit a fresh payment proof.';

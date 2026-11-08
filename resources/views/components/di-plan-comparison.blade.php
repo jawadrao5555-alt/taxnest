@@ -43,7 +43,7 @@
     popular-label="Most complete"
     current-label="Your plan"
     tick-label="Included"
-    note="Every package is billed annually. The smaller figure is the monthly equivalent of the yearly total."
+    note="Annual totals are shown here. The smaller figure is the monthly equivalent; other configured periods are listed separately."
     tip="Scroll sideways to see all packages."
     included-title="Included in every package"
     included-sub="These never depend on which package you pick."

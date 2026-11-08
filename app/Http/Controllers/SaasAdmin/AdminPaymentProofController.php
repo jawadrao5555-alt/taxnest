@@ -77,7 +77,7 @@ class AdminPaymentProofController extends Controller
         $request->validate([
             'pricing_plan_id' => 'required|exists:pricing_plans,id',
             // Annual-only since 23 Aug 2026 (owner); 'yearly' = legacy spelling.
-            'billing_cycle' => 'required|in:annual,yearly',
+            'billing_cycle' => 'required|in:monthly,quarterly,semi_annual,annual,yearly',
             // This is independently checked against the bank receipt by the
             // approver. It becomes the immutable commission base.
             'verified_received_amount' => 'required|numeric|min:0.01|max:1000000000',
@@ -104,10 +104,10 @@ class AdminPaymentProofController extends Controller
 
         // Cycle guard: same rule as customer submission — since 23 Aug 2026
         // every product line is sold by the YEAR only (owner).
-        $allowedCycles = SubscriptionAssignmentService::SELLABLE_CYCLES;
+        $allowedCycles = SubscriptionAssignmentService::cyclesForPlan($plan);
         $requestedCycle = SubscriptionAssignmentService::normalizeCycle($request->billing_cycle);
         if (!in_array($requestedCycle, $allowedCycles, true)) {
-            return back()->with('error', 'That billing cycle is not available for the selected package.');
+            throw \Illuminate\Validation\ValidationException::withMessages(['billing_cycle' => 'That billing cycle is not available for the selected package.']);
         }
 
         // Single source of truth: the cycle actually enforced by pricing (every
@@ -197,7 +197,8 @@ class AdminPaymentProofController extends Controller
                 $locked->company_id,
                 $plan->id,
                 $enforcedCycle,
-                paidRenewal: true
+                paidRenewal: true,
+                approvedQuote: $discountSnapshot
             );
 
             $proofAttrs = [

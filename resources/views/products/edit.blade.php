@@ -82,7 +82,7 @@
                                 <option value="zero_rated">Zero Rated (0% &mdash; Reportable)</option>
                             </select>
                             <p class="text-[11px] text-gray-500 dark:text-gray-400 mt-1">
-                                <strong>Exempt</strong> = no tax, no FBR submission needed &middot; <strong>Zero Rated</strong> = 0% but reported to FBR
+                                Sales tax treatment and reporting are separate. Exempt and zero-rated lines still need the applicable scenario and supporting classification; do not infer reporting status from the rate alone.
                             </p>
                         </div>
                         <div>
@@ -218,6 +218,7 @@
                         Update Product
                     </button>
                 </div>
+                @include('products._selling-packings')
             </form>
         </div>
     </div>

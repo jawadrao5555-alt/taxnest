@@ -538,12 +538,13 @@
     <div class="py-8">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             @if($invoice->status === 'locked')
+            @php $proofStatus = \App\Services\IntegrityHashService::verificationStatus($invoice); @endphp
             <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-4 mb-6" x-data="{ editingFbr: false, fbrNum: '{{ $invoice->fbr_invoice_number ?? '' }}' }">
                 <div class="flex items-start gap-3">
                     <svg class="w-6 h-6 text-emerald-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                     <div class="flex-1 min-w-0">
                         <p class="text-sm font-bold text-emerald-800">
-                            FBR {{ $invoice->fiscal_submission_environment === 'sandbox' ? 'Sandbox acknowledgement' : 'Accepted' }} — Invoice Locked
+                            {{ $invoice->fiscal_submission_state === 'accepted' && $invoice->fbr_invoice_number ? ($invoice->fiscal_submission_environment === 'sandbox' ? 'FBR Sandbox acknowledgement — Invoice Locked' : 'FBR acceptance recorded — Invoice Locked') : 'Invoice Locked — FBR acceptance evidence unavailable' }}
                         </p>
                         <div class="mt-1">
                             <template x-if="!editingFbr">
@@ -570,6 +571,14 @@
                                 </form>
                             </template>
                         </div>
+                        <p class="mt-2 text-xs {{ $proofStatus === 'failed' ? 'font-bold text-red-700' : 'text-gray-700' }}">
+                            {{ match($proofStatus) {
+                                'verified_current' => 'Integrity: current original proof verified, including selling-unit evidence.',
+                                'verified_legacy_v3', 'verified_legacy_v2' => 'Integrity: original legacy proof verified; newer fields were not part of that proof.',
+                                'missing' => 'Integrity: original proof unavailable. An editing lock is not verification evidence.',
+                                default => 'Integrity: FAILED — stored data differs from its original proof. Evidence has not been rewritten.',
+                            } }}
+                        </p>
                         @if($invoice->fbr_submission_date)
                         <p class="text-xs text-emerald-600 mt-1">Submitted: {{ \Carbon\Carbon::parse($invoice->fbr_submission_date)->format('d-M-Y h:i A') }}</p>
                         @endif
@@ -792,13 +801,13 @@
                                 <td class="px-2 py-2 text-xs font-mono text-gray-700 dark:text-gray-300">{{ $item->hs_code }}</td>
                                 <td class="px-2 py-2 text-xs text-gray-700 dark:text-gray-300 max-w-[200px] truncate" title="{{ $item->description }}">{{ $item->description }}</td>
                                 <td class="px-2 py-2 text-xs text-gray-700 dark:text-gray-300 text-right">{{ $item->quantity }}</td>
-                                <td class="px-2 py-2 text-xs text-gray-700 dark:text-gray-300 text-right whitespace-nowrap">{{ number_format($item->price, 2) }}</td>
+                                <td class="px-2 py-2 text-xs text-gray-700 dark:text-gray-300 text-right whitespace-nowrap">{{ number_format($item->price, $item->selling_snapshot ? 6 : 2) }}</td>
                                 <td class="px-2 py-2 text-xs text-gray-700 dark:text-gray-300 text-right whitespace-nowrap">{{ number_format($item->tax, 2) }}</td>
-                                @if($hasMrp)<td class="px-2 py-2 text-xs text-gray-700 dark:text-gray-300 text-right whitespace-nowrap">{{ ($item->schedule_type === '3rd_schedule' && $item->mrp) ? number_format($item->mrp, 2) : '—' }}</td>@endif
+                                @if($hasMrp)<td class="px-2 py-2 text-xs text-gray-700 dark:text-gray-300 text-right whitespace-nowrap">{{ ($item->schedule_type === '3rd_schedule' && $item->mrp) ? number_format($item->mrp, $item->selling_snapshot ? 6 : 2) : '—' }}</td>@endif
                                 @if($hasStWht)<td class="px-2 py-2 text-xs text-center">@if($item->st_withheld_at_source)<span class="text-emerald-600 font-medium">{{ $item->st_withheld_amount !== null ? number_format($item->st_withheld_amount, 2) : 'Amount required' }}</span>@else<span class="text-gray-400">—</span>@endif</td>@endif
                                 @if($hasPetLevy)<td class="px-2 py-2 text-xs text-gray-700 dark:text-gray-300 text-right whitespace-nowrap">{{ $item->petroleum_levy ? number_format($item->petroleum_levy, 2) : '—' }}</td>@endif
                                 @if($hasFurtherTax)<td class="px-2 py-2 text-xs text-orange-600 text-right whitespace-nowrap">{{ ($item->further_tax ?? 0) > 0 ? number_format($item->further_tax, 2) : '—' }}</td>@endif
-                                <td class="px-2 py-2 text-xs font-bold text-gray-900 dark:text-white text-right whitespace-nowrap">{{ number_format(($item->price * $item->quantity) + $item->tax, 2) }}</td>
+                                <td class="px-2 py-2 text-xs font-bold text-gray-900 dark:text-white text-right whitespace-nowrap">{{ number_format(($item->price * $item->quantity) + $item->tax + ($item->further_tax ?? 0), 2) }}</td>
                             </tr>
                             @endforeach
                         </tbody>

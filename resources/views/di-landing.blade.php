@@ -208,7 +208,7 @@
                 "name": "How is Digital Invoice billed?",
                 "acceptedAnswer": {
                     "@@type": "Answer",
-                    "text": "Digital Invoice is billed annually at one clear price. Every package card shows the full yearly total and its monthly equivalent."
+                    "text": "Annual totals are shown in the comparison. Other configured billing periods are listed with their exact totals below it; your selected period is carried into signup and checkout."
                 }
             },
             {
@@ -498,7 +498,7 @@
             <div class="text-center mb-16 reveal-on-scroll">
                 <h2 class="text-sm font-bold tracking-widest uppercase text-gray-500 mb-4">Investment</h2>
                 <h3 class="text-3xl sm:text-4xl font-serif text-[#052730] mb-6">Simple, predictable pricing.</h3>
-                <p class="text-lg text-gray-600 max-w-2xl mx-auto font-light">One clear annual price for every package. All plans include a 3-day free trial.</p>
+                <p class="text-lg text-gray-600 max-w-2xl mx-auto font-light">Choose an available billing period at its configured total. All plans include a 3-day free trial.</p>
             </div>
 
             @php
@@ -525,6 +525,21 @@
                      DiFeatureService::planIncludes() — the same matrix lookup the
                      panel's gate ends on. Nothing here is hand-typed. --}}
                 <x-di-plan-comparison :plans="$plans" surface="landing" />
+                <section class="mt-6 rounded-xl border border-gray-200 bg-white p-4" aria-label="Other Digital Invoice billing periods">
+                    <h4 class="font-semibold mb-3">Other configured billing periods</h4>
+                    @foreach($plans as $cyclePlan)
+                        <div class="mb-4"><p class="font-medium">{{ $cyclePlan->name }}</p><div class="flex flex-wrap gap-3 mt-2">
+                        @foreach(\App\Services\SubscriptionAssignmentService::cyclesForPlan($cyclePlan) as $cycleKey)
+                            @if($cycleKey !== 'annual')
+                                @php $cycleRate = \App\Models\Subscription::priceForPlanCycle($cyclePlan, $cycleKey); @endphp
+                                <a class="rounded-lg border border-emerald-700 px-3 py-2 text-sm text-emerald-800" href="{{ route('register', ['plan' => $cyclePlan->name, 'cycle' => $cycleKey]) }}">
+                                    {{ \App\Models\Subscription::getCycleLabel($cycleKey) }} · PKR {{ number_format($cycleRate['final_price'], 2) }} total
+                                </a>
+                            @endif
+                        @endforeach
+                        </div></div>
+                    @endforeach
+                </section>
                 @endif
             </div>
         </div>
@@ -679,7 +694,7 @@
                         <span class="font-bold text-gray-900 text-sm uppercase tracking-wide">How is Digital Invoice billed?</span>
                         <svg class="w-5 h-5 text-gray-400 transition-transform flex-shrink-0 ml-4" :class="open === 2 ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                     </button>
-                    <div x-show="open === 2" x-collapse class="px-2 pb-6 text-sm text-gray-600 leading-relaxed">Digital Invoice is billed annually at one clear price. Every package card shows the full yearly total and its monthly equivalent.</div>
+                    <div x-show="open === 2" x-collapse class="px-2 pb-6 text-sm text-gray-600 leading-relaxed">Annual totals are shown in the comparison. Other configured billing periods are listed with their exact totals below it; your selected period is carried into signup and checkout.</div>
                 </div>
                 <div class="bg-white">
                     <button @click="open = (open === 3 ? null : 3)" class="w-full flex items-center justify-between py-6 text-left hover:bg-gray-50 px-2 transition-colors">

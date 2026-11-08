@@ -1227,7 +1227,7 @@ function invoiceKeyboardNav() {
                     if (d.batch.active) this.scheduleBulkPoll();
                 })
                 .catch(() => {
-                    // 404 on first load just means "nothing has ever run".
+                    // Empty discovery is a successful response. Retry only a failed read.
                     if (!initial) this.scheduleBulkPoll(8000);
                 });
         },

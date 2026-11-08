@@ -55,7 +55,7 @@ class PaymentProofController extends Controller
         $productType = $this->resolveProductType($company);
         // Owner, 23 Aug 2026: every product line is sold by the YEAR only, so
         // a stale form or a hand-crafted POST can no longer buy a short cycle.
-        $allowedCycles = \App\Services\SubscriptionAssignmentService::SELLABLE_CYCLES;
+        $allowedCycles = $productType === 'di' ? ['monthly', 'quarterly', 'semi_annual', 'annual'] : \App\Services\SubscriptionAssignmentService::SELLABLE_CYCLES;
 
         $validated = $request->validate([
             'pricing_plan_id' => 'required|exists:pricing_plans,id',
@@ -94,7 +94,7 @@ class PaymentProofController extends Controller
                 return null;
             }
             $hasSnapshotColumn = Schema::hasColumn('payment_proofs', 'distributor_quote_snapshot');
-            $snapshot = \App\Services\PendingSubscriptionSelection::quote($lockedCompany, $plan)
+            $snapshot = \App\Services\PendingSubscriptionSelection::quote($lockedCompany, $plan, $validated['billing_cycle'])
                 ?? \App\Services\DistributorDiscountService::quote(
                 $lockedCompany,
                 $plan,

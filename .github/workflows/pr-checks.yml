@@ -146,6 +146,10 @@ jobs:
         run: bash scripts/rc-safe-run -- vendor/bin/phpunit tests/Feature/Reporting tests/Feature/AgentHeartbeatUpdateTelemetryClearTest.php --testdox
       - name: Check purchased billing and companion access before the full suite
         run: bash scripts/rc-safe-run -- vendor/bin/phpunit tests/Feature/DiApiSubscriptionAccessTest.php tests/Feature/PurchasedCompanionAccessTest.php tests/Feature/SubscriptionPurchaseSnapshotTest.php tests/Feature/VerifiedSubscriptionDocumentsTest.php tests/Feature/SubscriptionFinancialAdjustmentTest.php tests/Feature/PosPaidAddonFlowTest.php tests/Feature/PosRenewalBranchSlotReviewTest.php tests/Feature/PaidRenewalSchemaTest.php --testdox
+      - name: Check DI cycles, packing, proof versions and medicine source ordering
+        run: bash scripts/rc-safe-run -- vendor/bin/phpunit tests/Feature/DiBillingCyclesTest.php tests/Feature/DiSellingPackingTest.php tests/Feature/DiIntegrityCoverageTest.php tests/Feature/MedicineSourceOrderingTest.php tests/Feature/MedicineCatalogueTest.php --testdox
+      - name: Check DI billing compatibility and historical invoice rendering
+        run: bash scripts/rc-safe-run -- vendor/bin/phpunit tests/Feature/AdminPlanCycleRatesTest.php tests/Feature/AdminPlanStorePostTest.php tests/Feature/AdminPagesSmokeTest.php tests/Feature/PaymentProofInstantAccessTest.php tests/Feature/InvoicePdfDecimalQuantityTest.php tests/Feature/FbrLogTenantIsolationTest.php tests/Feature/RequestedPackageSignupTest.php tests/Feature/InvoiceBulkSubmitTest.php
       - name: Run full suite in clean loopback-only environment
         run: bash scripts/rc-safe-run -- vendor/bin/phpunit
       - name: Sanitize CI evidence
@@ -189,6 +193,8 @@ jobs:
           set-safe-directory: false
       - name: Install isolated MariaDB-container build prerequisites
         run: bash scripts/ci-mariadb-provision.sh install
+      - name: Preinstall signed PHP8.4 for the isolated container
+        run: bash scripts/ci-php84-runtime.sh
       - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.4'
@@ -250,6 +256,8 @@ jobs:
           set-safe-directory: false
       - name: Install isolated MariaDB-container build prerequisites
         run: bash scripts/ci-mariadb-provision.sh install
+      - name: Preinstall signed PHP8.4 for the isolated container
+        run: bash scripts/ci-php84-runtime.sh
       - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.4'
@@ -273,13 +281,20 @@ jobs:
         env:
           RC_BROWSER_STATE_ROOT: /tmp/taxnest-rc-browser-${{ github.run_id }}-${{ github.job }}
         run: bash scripts/rc-safe-run -- env PLAYWRIGHT_BROWSERS_PATH="$RC_BROWSER_STATE_ROOT/playwright-cache" node --test scripts/tests/sale-online-recovery-browser.test.mjs
-      - name: Verify Tax Integrations at desktop and 390px mobile
+      - name: Verify DI billing periods and Smart Packing at desktop and 390px
         env:
           RC_MARIADB_PORT: '33117'
           RC_BROWSER_PORT: '5911'
           RC_BROWSER_STATE_ROOT: /tmp/taxnest-rc-browser-${{ github.run_id }}-${{ github.job }}
         run: |
           bash scripts/rc-browser-fixture.sh setup
+          RC_BROWSER_ONLY=fbr-di-bulk bash scripts/rc-browser-fixture.sh run
+      - name: Verify Tax Integrations at desktop and 390px mobile
+        env:
+          RC_MARIADB_PORT: '33117'
+          RC_BROWSER_PORT: '5911'
+          RC_BROWSER_STATE_ROOT: /tmp/taxnest-rc-browser-${{ github.run_id }}-${{ github.job }}
+        run: |
           RC_BROWSER_ONLY=kot-note-visibility bash scripts/rc-browser-fixture.sh run
           RC_BROWSER_ONLY=tax-integrations bash scripts/rc-browser-fixture.sh run
       - name: Verify staff discount owner approval at desktop and 390px
@@ -390,8 +405,9 @@ jobs:
       - name: Install patched Electron runtime for real BrowserWindow acceptance
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends xvfb xauth libgtk-3-0 libnss3 libgbm1 libasound2 libatk-bridge2.0-0
-          node pra-agent/node_modules/electron/install.js
+          sudo apt-get install -y --no-install-recommends xvfb xauth libgtk-3-0 libnss3 libgbm1 libasound2 libatk-bridge2.0-0 unzip
+          bash scripts/tests/ci-electron-runtime-check.sh
+          bash scripts/ci-electron-runtime.sh
       - name: Exercise thermal receipt paper and Agent settings in real Electron
         timeout-minutes: 3
         run: |
@@ -414,6 +430,8 @@ jobs:
       - uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3
         with:
           packages: platform-tools
+      - name: Pre-provision verified Gradle 8.11.1
+        run: bash scripts/ci-gradle-runtime.sh
       - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4
         with:
           gradle-version: '8.11.1'

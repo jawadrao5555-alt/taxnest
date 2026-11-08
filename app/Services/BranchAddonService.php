@@ -249,7 +249,7 @@ class BranchAddonService
         $base = 0.0;
         $addon = 0.0;
 
-        if ($plan) {
+        if ($plan && self::supportsPlan($plan)) {
             // Wahi hisaab jo renewal par charge hota hai — dobara nahi banaya jata.
             $priced = SubscriptionAssignmentService::computePrice($plan, $cycle, $applies ? $company : null);
             $cycle = $priced['cycle'];

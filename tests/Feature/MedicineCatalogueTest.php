@@ -214,6 +214,7 @@ class MedicineCatalogueTest extends TestCase
         $changed = $rows;
         $oldMrp = (float) $changed[0]['mrp'];
         $changed[0]['mrp'] = $oldMrp + 10;
+        $changed[0]['effective_date'] = \Carbon\Carbon::parse($changed[0]['effective_date'] ?? now())->addDay()->toDateString();
         $third = $svc->ingestPage($changed);
         $this->assertSame(1, $third['price_changes']);
         $this->assertSame($baselineHistory + 1, DB::table('medicine_catalogue_prices')->count());
@@ -345,8 +346,8 @@ class MedicineCatalogueTest extends TestCase
         Product::create(['company_id' => self::OTHER_COMPANY, 'name' => 'Loose copy', 'default_price' => 1]);
 
         $changed = collect($rows)->map(function ($r) use ($e1, $e2) {
-            if ($r['drap_reg_no'] === $e1->drap_reg_no && $r['pack_size'] === $e1->pack_size) $r['mrp'] = (float) $r['mrp'] + 20;
-            if ($r['drap_reg_no'] === $e2->drap_reg_no && $r['pack_size'] === $e2->pack_size) $r['mrp'] = (float) $r['mrp'] + 30;
+            if ($r['drap_reg_no'] === $e1->drap_reg_no && $r['pack_size'] === $e1->pack_size) { $r['mrp'] = (float) $r['mrp'] + 20; $r['effective_date'] = \Carbon\Carbon::parse($r['effective_date'] ?? now())->addDay()->toDateString(); }
+            if ($r['drap_reg_no'] === $e2->drap_reg_no && $r['pack_size'] === $e2->pack_size) { $r['mrp'] = (float) $r['mrp'] + 30; $r['effective_date'] = \Carbon\Carbon::parse($r['effective_date'] ?? now())->addDay()->toDateString(); }
             return $r;
         })->all();
         $stats = $svc->ingestPage($changed);
@@ -385,7 +386,7 @@ class MedicineCatalogueTest extends TestCase
 
         // A later change on p1 while an older notice is pending supersedes it (one live notice per product).
         $again = collect($changed)->map(function ($r) use ($e1) {
-            if ($r['drap_reg_no'] === $e1->drap_reg_no && $r['pack_size'] === $e1->pack_size) $r['mrp'] = (float) $r['mrp'] + 5;
+            if ($r['drap_reg_no'] === $e1->drap_reg_no && $r['pack_size'] === $e1->pack_size) { $r['mrp'] = (float) $r['mrp'] + 5; $r['effective_date'] = \Carbon\Carbon::parse($r['effective_date'] ?? now())->addDay()->toDateString(); }
             return $r;
         })->all();
         $svc->ingestPage($again);
@@ -397,6 +398,8 @@ class MedicineCatalogueTest extends TestCase
         $this->assertEquals((float) $e1->mrp + 20, (float) $p1->fresh()->mrp, 'dismiss leaves the product alone');
 
         // Manager cannot apply.
+        foreach ($changed as &$row) $row['effective_date'] = \Carbon\Carbon::parse($row['effective_date'] ?? now())->addDays(2)->toDateString();
+        unset($row);
         $svc->ingestPage($changed); // e1 back to +20 → new pending notice for p1
         $n = MedicinePriceNotice::where('product_id', $p1->id)->where('status', 'pending')->first();
         $this->assertNotNull($n);
@@ -601,7 +604,7 @@ class MedicineCatalogueTest extends TestCase
         $this->controller()->add($this->jsonPost('/fbr-pos/pharmacy/catalogue/add', ['ids' => [$e1->id]]));
         $p1 = Product::where('medicine_catalogue_id', $e1->id)->firstOrFail();
         $svc->ingestPage(collect($rows)->map(function ($r) use ($e1) {
-            if ($r['drap_reg_no'] === $e1->drap_reg_no && $r['pack_size'] === $e1->pack_size) $r['mrp'] = (float) $r['mrp'] + 20;
+            if ($r['drap_reg_no'] === $e1->drap_reg_no && $r['pack_size'] === $e1->pack_size) { $r['mrp'] = (float) $r['mrp'] + 20; $r['effective_date'] = \Carbon\Carbon::parse($r['effective_date'] ?? now())->addDay()->toDateString(); }
             return $r;
         })->all());
         $notice = MedicinePriceNotice::where('product_id', $p1->id)->where('status', 'pending')->firstOrFail();
@@ -624,7 +627,7 @@ class MedicineCatalogueTest extends TestCase
 
         // Mirror image: a dismiss that wins first makes a later apply a no-op on the product.
         $svc->ingestPage(collect($rows)->map(function ($r) use ($e1) {
-            if ($r['drap_reg_no'] === $e1->drap_reg_no && $r['pack_size'] === $e1->pack_size) $r['mrp'] = (float) $r['mrp'] + 25;
+            if ($r['drap_reg_no'] === $e1->drap_reg_no && $r['pack_size'] === $e1->pack_size) { $r['mrp'] = (float) $r['mrp'] + 25; $r['effective_date'] = \Carbon\Carbon::parse($r['effective_date'] ?? now())->addDays(2)->toDateString(); }
             return $r;
         })->all());
         $n2 = MedicinePriceNotice::where('product_id', $p1->id)->where('status', 'pending')->firstOrFail();

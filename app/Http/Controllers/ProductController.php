@@ -70,7 +70,12 @@ class ProductController extends Controller
             $validationRules['mrp'] = 'required|numeric|min:0.01';
         }
 
-        $request->validate($validationRules);
+        $request->validate($validationRules + ['selling_packings' => 'sometimes|array|max:30']);
+        if (($request->has('selling_packings_present') || $request->has('selling_packings')) && !Schema::hasColumn('products', 'selling_packings')) {
+            throw \Illuminate\Validation\ValidationException::withMessages(['selling_packings' => 'Packing support is not installed yet.']);
+        }
+        $packings = $request->has('selling_packings_present') || $request->has('selling_packings')
+            ? \App\Services\DiSellingPacking::definitions($request->input('selling_packings', []), $request->uom, isset($product) ? ($product->selling_packings ?? []) : []) : null;
 
         $companyId = app('currentCompanyId');
 
@@ -97,6 +102,7 @@ class ProductController extends Controller
             'mrp' => $request->mrp,
             'default_price' => $request->default_price,
         ]);
+        if ($packings !== null) $product->update(['selling_packings' => $packings]);
         $this->syncAliases($product, (string) $request->input('aliases_text', ''));
 
         return redirect('/products')->with('success', 'Product created successfully.');
@@ -148,7 +154,12 @@ class ProductController extends Controller
             $validationRules['mrp'] = 'required|numeric|min:0.01';
         }
 
-        $request->validate($validationRules);
+        $request->validate($validationRules + ['selling_packings' => 'sometimes|array|max:30']);
+        if (($request->has('selling_packings_present') || $request->has('selling_packings')) && !Schema::hasColumn('products', 'selling_packings')) {
+            throw \Illuminate\Validation\ValidationException::withMessages(['selling_packings' => 'Packing support is not installed yet.']);
+        }
+        $packings = $request->has('selling_packings_present') || $request->has('selling_packings')
+            ? \App\Services\DiSellingPacking::definitions($request->input('selling_packings', []), $request->uom, isset($product) ? ($product->selling_packings ?? []) : []) : null;
 
         $taxType = $request->tax_type ?? 'taxable';
         if ($scheduleType === 'exempt' || $scheduleType === 'zero_rated') {
@@ -157,10 +168,14 @@ class ProductController extends Controller
             $taxType = 'custom';
         }
 
+        if ($product->selling_packings && $request->uom !== $product->uom) {
+            throw \Illuminate\Validation\ValidationException::withMessages(['uom' => 'Clear and save existing packings before changing the base UOM.']);
+        }
         $product->update(array_merge($request->only([
             'name', 'barcode', 'sku', 'hs_code', 'pct_code', 'default_tax_rate',
             'uom', 'schedule_type', 'sro_reference', 'serial_number', 'mrp', 'default_price'
         ]), ['tax_type' => $taxType]));
+        if ($packings !== null) $product->update(['selling_packings' => $packings]);
         $this->syncAliases($product, (string) $request->input('aliases_text', ''));
 
         return redirect('/products')->with('success', 'Product updated successfully.');
@@ -195,12 +210,23 @@ class ProductController extends Controller
                 $like = \App\Helpers\DbCompat::like();
                 $q->where('name', $like, "%{$query}%")
                   ->orWhere('hs_code', $like, "%{$query}%");
+                if (Schema::hasColumn('products', 'selling_packings')) {
+                    $packingColumn = \App\Helpers\DbCompat::isPgSQL()
+                        ? \Illuminate\Support\Facades\DB::raw('CAST(selling_packings AS TEXT)') : 'selling_packings';
+                    $q->orWhere($packingColumn, $like, "%{$query}%");
+                }
             })
             ->take(20)
             ->get(['id', 'name', 'hs_code', 'pct_code', 'default_tax_rate', 'tax_type', 'uom', 'default_price', 'schedule_type', 'sro_reference', 'serial_number', 'mrp']);
 
-        $products->transform(function ($product) {
+        if (Schema::hasColumn('products', 'selling_packings')) {
+            $packingRows = Product::where('company_id', $companyId)->whereIn('id', $products->pluck('id'))->pluck('selling_packings', 'id');
+            foreach ($products as $product) $product->selling_packings = $packingRows[$product->id] ?? [];
+        }
+        $products->transform(function ($product) use ($query) {
             $rules = \App\Services\ScheduleEngine::resolveValidationRules($product->schedule_type ?? 'standard', (float)($product->default_tax_rate ?? 18));
+            $matches = collect($product->selling_packings ?? [])->filter(fn ($pack) => (string) ($pack['barcode'] ?? '') !== '' && (string) $pack['barcode'] === trim($query));
+            $product->matched_packing_id = $matches->count() === 1 ? $matches->first()['id'] : null;
             $product->requires_sro = $rules['requires_sro'];
             $product->requires_serial = $rules['requires_serial'];
             $product->requires_mrp = $rules['requires_mrp'];

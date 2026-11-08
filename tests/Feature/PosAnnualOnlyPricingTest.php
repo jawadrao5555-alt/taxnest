@@ -12,8 +12,9 @@ use Tests\TestCase;
 /**
  * Annual-only pricing contract (23 Aug 2026).
  *
- * Historical short-cycle columns may remain populated, but POS, FBR POS and
- * DI purchases must always charge annual and create a twelve-month term.
+ * Historical short-cycle columns may remain populated, but POS and FBR POS
+ * purchases remain annual. DI annual prices retain their original calculation;
+ * explicitly configured DI short periods have separate coverage.
  */
 class PosAnnualOnlyPricingTest extends TestCase
 {
@@ -215,7 +216,7 @@ class PosAnnualOnlyPricingTest extends TestCase
         }
     }
 
-    public function test_di_annual_formula_is_unchanged_for_quarterly_request(): void
+    public function test_di_annual_formula_is_unchanged(): void
     {
         $plan = PricingPlan::create([
             'name' => 'DI Plan',
@@ -225,7 +226,7 @@ class PosAnnualOnlyPricingTest extends TestCase
             'invoice_limit' => -1,
         ]);
 
-        $priced = SubscriptionAssignmentService::computePrice($plan, 'quarterly');
+        $priced = SubscriptionAssignmentService::computePrice($plan, 'annual');
         $expected = Subscription::calculateFinalPrice(1000.0, 'annual');
 
         $this->assertSame('annual', $priced['cycle']);

@@ -195,6 +195,38 @@ class InvoiceController extends Controller
         return view('invoice.index', compact('invoices', 'tab', 'draftCount', 'failedCount', 'completedCount', 'completedStats', 'aiReaderAllowed', 'zipExportId'));
     }
 
+    /** Read original packing evidence for an explicit credit-note entry. */
+    public function returnItems(Request $request)
+    {
+        $request->validate(['reference' => 'required|string|max:255']);
+        $companyId = (int) app('currentCompanyId');
+        $reference = $request->input('reference');
+        $matches = Invoice::withoutGlobalScopes()->where('company_id', $companyId)->where('document_type', 'Sale Invoice')
+            ->where(fn ($q) => $q->where('invoice_number', $reference)->orWhere('internal_invoice_number', $reference)
+                ->orWhere('fbr_invoice_number', $reference))->limit(2)->get();
+        abort_unless($matches->count() === 1 && $matches->first()->isLocked(), 422, 'Choose one completed original invoice.');
+        $source = $matches->first();
+        $items = [];
+        foreach ($source->items as $item) {
+            $snapshot = $item->selling_snapshot;
+            if (!$snapshot) continue;
+            $used = InvoiceItem::where('selling_snapshot->source_invoice_item_id', (int) $item->id)
+                ->whereHas('invoice', fn ($q) => $q->where('company_id', $companyId)->where('document_type', 'Credit Note'))->sum('quantity');
+            $remaining = max(0, (float) $item->quantity - (float) $used);
+            if ($remaining <= 0) continue;
+            $qty = \Brick\Math\BigDecimal::of((string) $remaining)->dividedBy($snapshot['factor'], 4, \Brick\Math\RoundingMode::DOWN);
+            $items[] = ['product_id' => $snapshot['product_id'], 'source_invoice_item_id' => $item->id,
+                'selling_packing_id' => $snapshot['packing_id'], 'price_includes_tax' => $snapshot['price_includes_tax'] ?? false,
+                'packings' => [['id' => $snapshot['packing_id'], 'label' => $snapshot['label'], 'factor' => $snapshot['factor']]],
+                'hs_code' => $item->hs_code, 'pct_code' => $item->pct_code, 'description' => $item->description,
+                'default_uom' => $item->default_uom, 'quantity' => (string) $qty, 'price' => $snapshot['selling_price'],
+                'mrp' => $snapshot['selling_mrp'] ?? '', 'mrpManual' => true, 'tax_rate' => $item->tax_rate,
+                'schedule_type' => $item->schedule_type, 'sro_schedule_no' => $item->sro_schedule_no ?? '',
+                'serial_no' => $item->serial_no ?? '', 'tax' => 0];
+        }
+        return response()->json(['items' => $items]);
+    }
+
     public function uniqueBuyers(Request $request)
     {
         $companyId = app('currentCompanyId');
@@ -290,7 +322,7 @@ class InvoiceController extends Controller
             'items' => 'required|array|min:1',
             'items.*.hs_code' => 'required|string|max:50',
             'items.*.description' => 'required|string|max:255',
-            'items.*.quantity' => 'required|numeric|min:0.01',
+            'items.*.quantity' => 'required|numeric|min:0.0001',
             'items.*.price' => 'required|numeric|min:0.01',
             'items.*.tax' => 'required|numeric|min:0',
             'items.*.schedule_type' => 'nullable|string|in:standard,reduced,3rd_schedule,exempt,zero_rated,fed_services,services',
@@ -312,6 +344,7 @@ class InvoiceController extends Controller
             'items.*.price.min' => 'Item prices must be greater than Rs 0. FBR rejects free/bonus lines (error 0300). Note the free item in the description of a paid line or omit it.',
         ]);
 
+        $request->merge(['items' => \App\Services\DiSellingPacking::normalizeRequest($request, (int) $companyId)]);
         $itemsWithTaxRate = collect($request->items)->map(function ($item) {
             $item['tax_rate'] = isset($item['tax_rate']) && is_numeric($item['tax_rate']) ? floatval($item['tax_rate']) : null;
             return $item;
@@ -341,6 +374,7 @@ class InvoiceController extends Controller
 
         DB::beginTransaction();
         try {
+            \App\Services\DiSellingPacking::validateReturns($request->items, (int) $companyId, isset($invoice) ? (int) $invoice->id : null);
             $totals = \App\Services\DiInvoiceMath::totals($request->items);
             $totalValueExcludingST = $totals['value'];
             $totalSalesTax = $totals['tax'];
@@ -395,6 +429,7 @@ class InvoiceController extends Controller
 
                 InvoiceItem::create([
                     'invoice_id' => $invoice->id,
+                    ...(!empty($item['selling_snapshot']) ? ['selling_snapshot' => $item['selling_snapshot']] : []),
                     'hs_code' => $item['hs_code'],
                     'schedule_type' => $scheduleType,
                     'pct_code' => $item['pct_code'] ?? ($hsResolved['pct_code'] ?? null),
@@ -463,6 +498,7 @@ class InvoiceController extends Controller
             return redirect('/invoices')->with('success', 'Invoice created successfully.');
         } catch (\Exception $e) {
             DB::rollBack();
+            if ($e instanceof \Illuminate\Validation\ValidationException) return back()->withErrors($e->errors())->withInput();
             return back()->with('error', 'Failed to create invoice: ' . $e->getMessage())->withInput();
         }
     }
@@ -575,7 +611,7 @@ class InvoiceController extends Controller
             'items' => 'required|array|min:1',
             'items.*.hs_code' => 'required|string|max:50',
             'items.*.description' => 'required|string|max:255',
-            'items.*.quantity' => 'required|numeric|min:0.01',
+            'items.*.quantity' => 'required|numeric|min:0.0001',
             'items.*.price' => 'required|numeric|min:0.01',
             'items.*.tax' => 'required|numeric|min:0',
             'items.*.schedule_type' => 'nullable|string|in:standard,reduced,3rd_schedule,exempt,zero_rated,fed_services,services',
@@ -597,6 +633,7 @@ class InvoiceController extends Controller
             'items.*.price.min' => 'Item prices must be greater than Rs 0. FBR rejects free/bonus lines (error 0300). Note the free item in the description of a paid line or omit it.',
         ]);
 
+        $request->merge(['items' => \App\Services\DiSellingPacking::normalizeRequest($request, (int) $companyId, $invoice)]);
         $itemsWithTaxRate = collect($request->items)->map(function ($item) {
             $item['tax_rate'] = isset($item['tax_rate']) && is_numeric($item['tax_rate']) ? floatval($item['tax_rate']) : null;
             return $item;
@@ -639,6 +676,7 @@ class InvoiceController extends Controller
             }
             $invoice = $lockedInvoice;
 
+            \App\Services\DiSellingPacking::validateReturns($request->items, (int) $companyId, isset($invoice) ? (int) $invoice->id : null);
             $totals = \App\Services\DiInvoiceMath::totals($request->items);
             $totalValueExcludingST = $totals['value'];
             $totalSalesTax = $totals['tax'];
@@ -700,6 +738,7 @@ class InvoiceController extends Controller
 
                 InvoiceItem::create([
                     'invoice_id' => $invoice->id,
+                    ...(!empty($item['selling_snapshot']) ? ['selling_snapshot' => $item['selling_snapshot']] : []),
                     'hs_code' => $item['hs_code'],
                     'schedule_type' => $scheduleType,
                     'pct_code' => $item['pct_code'] ?? ($hsResolved['pct_code'] ?? null),
@@ -759,6 +798,7 @@ class InvoiceController extends Controller
             return redirect('/invoice/' . $invoice->id)->with('success', 'Invoice updated successfully.');
         } catch (\Exception $e) {
             DB::rollBack();
+            if ($e instanceof \Illuminate\Validation\ValidationException) return back()->withErrors($e->errors())->withInput();
             return back()->with('error', 'Failed to update invoice.')->withInput();
         }
     }
@@ -910,6 +950,11 @@ class InvoiceController extends Controller
             ?: \App\Models\InvoiceBulkSubmission::unseenFinishedFor($companyId);
 
         if (!$batch) {
+            if ($key <= 0) {
+                // An empty discovery probe is normal on a company's first invoice.
+                // Explicit missing/foreign batch identifiers still return 404.
+                return response()->json(['status' => 'ok', 'batch_key' => null, 'batch' => null]);
+            }
             return response()->json(['status' => 'not_found'], 404);
         }
 
@@ -1740,13 +1785,11 @@ class InvoiceController extends Controller
         }
 
         $invoice->load('items');
-        $isValid = IntegrityHashService::verify($invoice);
-
-        if ($isValid) {
-            return back()->with('success', 'Integrity check passed. Invoice data has not been tampered with.');
-        }
-
-        return back()->with('error', 'Integrity check FAILED. Invoice data may have been altered after FBR submission.');
+        $status = IntegrityHashService::verificationStatus($invoice);
+        if ($status === 'verified_current') return back()->with('success', 'Current invoice proof verified, including original selling-unit evidence.');
+        if (str_starts_with($status, 'verified_legacy_')) return back()->with('success', 'Original legacy invoice proof verified. Coverage follows the original proof version; newer fields were not covered.');
+        if ($status === 'missing') return back()->with('error', 'No original integrity proof is available. An editing lock is not verification evidence.');
+        return back()->with('error', 'Integrity check FAILED. Stored invoice data differs from its original proof. No evidence was rewritten.');
     }
 
     private function buildPdfData(Invoice $invoice): array
@@ -2362,6 +2405,7 @@ class InvoiceController extends Controller
 
         DB::beginTransaction();
         try {
+            \App\Services\DiSellingPacking::validateReturns($invoice->items->map(fn ($item) => $item->toArray())->all(), (int) $companyId);
             $newInvoiceNumber = InvoiceNumberingService::generateNextNumber($companyId);
 
             $newInvoice = Invoice::create([
@@ -2403,6 +2447,7 @@ class InvoiceController extends Controller
             foreach ($invoice->items as $item) {
                 InvoiceItem::create([
                     'invoice_id' => $newInvoice->id,
+                    ...($item->selling_snapshot ? ['selling_snapshot' => $item->selling_snapshot] : []),
                     'hs_code' => $item->hs_code,
                     'description' => $item->description,
                     'quantity' => $item->quantity,
@@ -2439,6 +2484,7 @@ class InvoiceController extends Controller
             return redirect('/invoice/' . $newInvoice->id)->with('success', 'Invoice duplicated successfully.');
         } catch (\Exception $e) {
             DB::rollBack();
+            if ($e instanceof \Illuminate\Validation\ValidationException) return back()->withErrors($e->errors());
             return back()->with('error', 'Failed to duplicate invoice: ' . $e->getMessage());
         }
     }

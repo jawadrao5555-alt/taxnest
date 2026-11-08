@@ -27,11 +27,10 @@ class BillingController extends Controller
             ->orderBy('price')
             ->get();
 
-        // Annual-only since 23 Aug 2026 (owner): one price per package, still
-        // read from the plan row so the card and the checkout can never differ.
+        // Only configured DI periods are quoted; cards and checkout share the server rates.
         $planPricing = [];
         foreach ($plans as $plan) {
-            foreach (\App\Services\SubscriptionAssignmentService::SELLABLE_CYCLES as $cycle) {
+            foreach (\App\Services\SubscriptionAssignmentService::cyclesForPlan($plan) as $cycle) {
                 $planPricing[$plan->id][$cycle] = Subscription::priceForPlanCycle($plan, $cycle);
             }
         }
@@ -132,9 +131,12 @@ class BillingController extends Controller
             }
         }
 
-        // One cycle left (annual). The saving badge still comes from the SAME
-        // numbers the cards quote, so a reprice can never leave a stale "-6%".
+        // DI periods use their configured prices; other products remain annual.
+        // Savings and totals share the same server quote.
         $billingCycles = [
+            'monthly' => ['label' => 'Monthly', 'discount' => 0],
+            'quarterly' => ['label' => 'Quarterly', 'discount' => 0],
+            'semi_annual' => ['label' => 'Semi-Annual', 'discount' => 0],
             'annual' => ['label' => 'Annual', 'discount' => 0],
         ];
         foreach (array_keys($billingCycles) as $cycle) {
@@ -167,14 +169,14 @@ class BillingController extends Controller
         abort_unless(in_array((string) auth('web')->user()?->role, ['company_admin', 'super_admin'], true), 403);
         $request->validate([
             'plan_id' => 'required|exists:pricing_plans,id',
-            // Annual-only since 23 Aug 2026 (owner). 'yearly' = legacy spelling.
-            'billing_cycle' => 'nullable|in:annual,yearly',
+            // DI's configured periods; 'yearly' remains a legacy annual alias.
+            'billing_cycle' => 'nullable|in:monthly,quarterly,semi_annual,annual,yearly',
         ]);
 
         $plan = PricingPlan::findOrFail($request->plan_id);
         $companyId = app('currentCompanyId');
-        // Whatever a stale form posts, the shop is charged by the year.
-        $cycle = \App\Services\SubscriptionAssignmentService::purchaseCycle($request->billing_cycle, $plan->product_type ?? null);
+        // Never silently charge annual when a configured DI short period was selected.
+        $cycle = \App\Services\SubscriptionAssignmentService::cycleForPlan($plan, $request->billing_cycle);
 
         if ($plan->is_trial) {
             return back()->with('error', 'Trial plan cannot be subscribed to directly.');
@@ -197,7 +199,7 @@ class BillingController extends Controller
             if ($plan->is_trial || $plan->product_type !== 'di' || !\App\Services\DiPlanComparisonService::isSellablePlan($plan)) {
                 throw \Illuminate\Validation\ValidationException::withMessages(['plan_id' => 'Please choose a current Digital Invoice package.']);
             }
-            $quote = \App\Services\PendingSubscriptionSelection::quote($company, $plan)
+            $quote = \App\Services\PendingSubscriptionSelection::quote($company, $plan, $cycle)
                 ?? \App\Services\DistributorDiscountService::quote($company, $plan, $cycle, true);
             \App\Services\PendingSubscriptionSelection::remember($company, $quote);
             return $quote;
@@ -245,6 +247,7 @@ class BillingController extends Controller
 
     public function calculatePrice(Request $request)
     {
+        $request->validate(['plan_id' => 'required|integer', 'billing_cycle' => 'nullable|in:monthly,quarterly,semi_annual,annual,yearly']);
         $plan = PricingPlan::find($request->plan_id);
         // Quoting a retired package would hand back a price for something the
         // subscribe path refuses — same allowlist here.
@@ -252,7 +255,7 @@ class BillingController extends Controller
             return response()->json(['error' => 'Plan not found'], 404);
         }
 
-        $cycle = \App\Services\SubscriptionAssignmentService::purchaseCycle($request->billing_cycle, $plan->product_type ?? null);
+        $cycle = \App\Services\SubscriptionAssignmentService::cycleForPlan($plan, $request->billing_cycle);
         $pricing = Subscription::priceForPlanCycle($plan, $cycle);
         $companyId = app()->bound('currentCompanyId') ? app('currentCompanyId') : null;
         $pricing = $this->applyDistributorFirstPurchaseDiscount($pricing, $companyId ? \App\Models\Company::find($companyId) : null, $cycle);

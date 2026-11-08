@@ -2,26 +2,15 @@
 
 namespace App\Services;
 
-use App\Models\{Company, PricingPlan};
+use App\Models\Company;
+use App\Models\PricingPlan;
 
 /** Evidence of the catalogue at assignment, not an alternative access gate. */
 final class SubscriptionPurchaseSnapshot
 {
-    public static function capture(Company $company, PricingPlan $plan, array $priced, string $start, string $end, bool $paidRenewal): array
+    public static function capture(Company $company, PricingPlan $plan, array $priced, string $start, string $end, bool $paidRenewal, ?array $quotedPlan = null): array
     {
-        $terms = [];
-        $fields = ['id', 'name', 'product_type', 'erps_vertical', 'is_trial', 'features', 'health_modules',
-            'price', 'price_monthly', 'price_quarterly', 'price_semi_annual', 'price_yearly', 'compare_at_price',
-            'invoice_limit', 'user_limit', 'branch_limit', 'max_terminals', 'max_users', 'max_products',
-            'ai_page_limit', 'fair_use_limit', 'health_department_limit'];
-        foreach ($plan->getAttributes() as $key => $value) {
-            if (str_ends_with($key, '_enabled')) {
-                $terms[$key] = $value === null ? null : (bool) $value;
-            } elseif (in_array($key, $fields, true)) {
-                $terms[$key] = $plan->getAttribute($key);
-            }
-        }
-        ksort($terms);
+        $terms = $quotedPlan ?? self::planTerms($plan);
 
         return [
             'version' => 1,
@@ -39,5 +28,24 @@ final class SubscriptionPurchaseSnapshot
             ],
             'period' => ['start' => $start, 'end' => $end],
         ];
+    }
+
+    public static function planTerms(PricingPlan $plan): array
+    {
+        $terms = [];
+        $fields = ['id', 'name', 'product_type', 'erps_vertical', 'is_trial', 'features', 'health_modules',
+            'price', 'price_monthly', 'price_quarterly', 'price_semi_annual', 'price_yearly', 'compare_at_price',
+            'invoice_limit', 'user_limit', 'branch_limit', 'max_terminals', 'max_users', 'max_products',
+            'ai_page_limit', 'fair_use_limit', 'health_department_limit'];
+        foreach ($plan->getAttributes() as $key => $value) {
+            if (str_ends_with($key, '_enabled')) {
+                $terms[$key] = $value === null ? null : (bool) $value;
+            } elseif (in_array($key, $fields, true)) {
+                $terms[$key] = $plan->getAttribute($key);
+            }
+        }
+        ksort($terms);
+
+        return $terms;
     }
 }

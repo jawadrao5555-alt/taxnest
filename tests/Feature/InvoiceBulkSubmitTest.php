@@ -828,6 +828,18 @@ class InvoiceBulkSubmitTest extends TestCase
         $this->assertSame('dispatching', $batch->fresh()->state);
     }
 
+    public function test_empty_batch_discovery_is_successful_but_explicit_missing_batch_is_not_found(): void
+    {
+        \Illuminate\Support\Facades\Http::preventStrayRequests();
+        Queue::fake();
+        $this->actingAs($this->user)->getJson('/invoices/bulk-submit-status')->assertOk()
+            ->assertExactJson(['status' => 'ok', 'batch_key' => null, 'batch' => null]);
+        $this->getJson('/invoices/bulk-submit-status?batch_key=999999')->assertNotFound();
+        $this->assertSame(0, InvoiceBulkSubmission::count());
+        Queue::assertNothingPushed();
+        \Illuminate\Support\Facades\Http::assertNothingSent();
+    }
+
     /**
      * The whole point of the rewrite: the shop starts a run, closes the page,
      * and the server finishes it. On return, the status endpoint — asked with
@@ -852,7 +864,7 @@ class InvoiceBulkSubmitTest extends TestCase
         $this->actingAs($this->user)->postJson('/invoices/bulk-submit-ack')->assertOk();
 
         // Once acknowledged it stops greeting them.
-        $this->actingAs($this->user)->getJson('/invoices/bulk-submit-status')->assertStatus(404);
+        $this->actingAs($this->user)->getJson('/invoices/bulk-submit-status')->assertOk()->assertJsonPath('batch', null);
     }
 
     /** Stopping leaves already-submitted invoices alone and drains the rest. */

@@ -144,6 +144,8 @@ jobs:
         run: bash scripts/rc-safe-run -- vendor/bin/phpunit tests/Feature/PosCallerRingUuidTest.php tests/Feature/PosCallerRingCollapseTest.php tests/Feature/PosCallerEventsEtagTest.php tests/Feature/PosCallerIdPlanGateTest.php tests/Feature/PosCallerIdToggleAndEventsTest.php tests/Feature/AgentCallerReplayTest.php
       - name: Check combined PRA cash, print and offline diagnostics
         run: bash scripts/rc-safe-run -- vendor/bin/phpunit tests/Feature/Reporting tests/Feature/AgentHeartbeatUpdateTelemetryClearTest.php --testdox
+      - name: Check purchased billing and companion access before the full suite
+        run: bash scripts/rc-safe-run -- vendor/bin/phpunit tests/Feature/DiApiSubscriptionAccessTest.php tests/Feature/PurchasedCompanionAccessTest.php tests/Feature/SubscriptionPurchaseSnapshotTest.php tests/Feature/VerifiedSubscriptionDocumentsTest.php tests/Feature/SubscriptionFinancialAdjustmentTest.php tests/Feature/PosPaidAddonFlowTest.php tests/Feature/PosRenewalBranchSlotReviewTest.php tests/Feature/PaidRenewalSchemaTest.php --testdox
       - name: Run full suite in clean loopback-only environment
         run: bash scripts/rc-safe-run -- vendor/bin/phpunit
       - name: Sanitize CI evidence

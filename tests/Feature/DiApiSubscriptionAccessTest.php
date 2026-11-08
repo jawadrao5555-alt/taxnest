@@ -175,15 +175,25 @@ class DiApiSubscriptionAccessTest extends TestCase
         // the same purchased access decision as the browser/backend readers.
         $this->plan->update(['name' => 'Changed paid catalogue', 'is_trial' => false, 'invoice_limit' => 100]);
 
-        $this->api()->postJson('/api/di/v1/invoices', $this->payload('snapshot-first'))
+        $first = $this->api()->postJson('/api/di/v1/invoices', $this->payload('snapshot-first'))
             ->assertStatus(201)
             ->assertJsonPath('status', 'ok');
+        // Drafts do not consume DI quota. A catalogue edit must neither turn
+        // them into billable invoices nor replace the purchased trial cap.
+        $this->api()->postJson('/api/di/v1/invoices', $this->payload('snapshot-second-draft'))
+            ->assertStatus(201);
+        $this->assertSame(0, \App\Services\PlanLimitService::countedInvoices($this->company->id));
+        // Synthetic retained submission evidence only; no fiscal request is
+        // sent. The same production status is counted by the panel and API.
+        Invoice::withoutGlobalScopes()->findOrFail($first->json('invoice.id'))
+            ->update(['fbr_status' => 'production', 'submitted_at' => now()]);
+        $this->assertSame(1, \App\Services\PlanLimitService::countedInvoices($this->company->id));
         $this->api()->postJson('/api/di/v1/invoices', $this->payload('snapshot-over-limit'))
             ->assertStatus(402)
             ->assertJsonPath('error', DiApiSubscriptionAccess::ERROR_CODE)
             ->assertJsonPath('message', __('pos.tl_reason_trial_limit', ['used' => 1, 'limit' => 1]));
 
-        $this->assertSame(1, Invoice::withoutGlobalScopes()->where('company_id', $this->company->id)->count());
+        $this->assertSame(2, Invoice::withoutGlobalScopes()->where('company_id', $this->company->id)->count());
         $this->assertSame(1, $subscription->fresh()->entitlementPlan()->invoice_limit);
         $this->assertSame(100, $this->plan->fresh()->invoice_limit);
     }

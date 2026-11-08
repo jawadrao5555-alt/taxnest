@@ -63,16 +63,26 @@ Source trackers: #337 / #316. Delivery order: first active batch.
 - PosAddonService already quotes remaining package months, narrows submitted quote snapshots and resolves existing entitlements. Do not replace it with a second entitlement service or assume all quoting is missing.
 - BillingController already stores distributor quote snapshots; add-on snapshots exist. Complete immutable purchase coverage requires reconciliation across all purchase paths.
 
-## Implementation acceptance
+## Release acceptance map
 
-- [ ] Inventory every signup, payment-proof, manual assignment, renewal, upgrade and add-on path; identify invoice/receipt/allocation authority and legacy behavior.
-- [ ] Freeze agreed price, product, plan limits and purchased features at purchase/approval with an explicit snapshot version; catalogue edits must not rewrite historical purchases.
-- [ ] Link unique subscription invoice, verified payment, receipt, allocation and activation atomically; retries and concurrent approval create one result.
-- [ ] Complete itemized company/admin billing history and authorized invoice/receipt downloads.
-- [ ] Reconcile upgrade/add-on prorating against existing rules. Preserve existing agreed terms; proposed annual prices are not approved.
-- [ ] Verify shared backend/browser/mobile/Agent feature enforcement against purchased access, including legacy records with no snapshot.
-- [ ] Handle partial payment, credit and refund/reversal through explicit audited transitions; never delete accounting history or automatically issue real refunds.
-- [ ] Exercise DI/PRA/FBR POS, trial/expired/granted/paid states, a second tenant, concurrent reviewers, duplicate callbacks, catalogue changes and reversals.
+The implementation delivered by #363 is the existing-policy billing workstream;
+#316 remains the broader planning tracker. No new package-price, differential
+upgrade-credit, automatic-refund or commission-clawback policy is authorized
+by this release.
+
+| Required behavior | Runtime authority / behavioral acceptance |
+|---|---|
+| Signup, trial and unpaid selection | `TrialSubscriptionService`, transactional DI/PRA/FBR registration and DI proof-selection flow; `TrialPurchaseEvidenceTest`, `SignupTrialSubscriptionTest`, isolated desktop/mobile signup and receipt journeys |
+| Reviewed assignment and renewal | `SubscriptionAssignmentService`, `AdminPaymentProofController`, `SubscriptionPurchaseSnapshot`; `SubscriptionPurchaseSnapshotTest`, `PaidRenewalSchemaTest` and native two-worker approval/trial probes |
+| Immutable purchased access | `Subscription::entitlementPlan` shared by backend, billing views, consultant and DI API; snapshot catalogue-edit/legacy/tenant cases |
+| Desktop/mobile companion parity | Actual PRA/FBR pairing preview/confirm routes with frozen entitlement, later opposite catalogue gate and retained legacy key; `PurchasedCompanionAccessTest`. Android shells reuse authenticated server pages; no installer credential or new mobile protocol |
+| Itemized history/documents | `VerifiedSubscriptionDocuments`, `SubscriptionBillingHistory`, scoped company/admin PDFs; `VerifiedSubscriptionDocumentsTest`, `SubscriptionDocumentAccessTest` |
+| Existing package-change policy | Reviewed change buys the existing full annual term at the canonical quote. Original term/snapshot is retained inactive; second tenant unchanged; retries issue one new term/invoice/receipt. Actual-controller matrix in `SubscriptionPurchaseSnapshotTest` |
+| Existing add-on proration | Remaining calendar months (partial month rounds up), quoted price retained at approval, real changed-subscription/expiry refused; `PosPaidAddonFlowTest`, `PosExtraBranchPurchaseFlowTest`, `PosRenewalBranchSlotReviewTest` |
+| Partial/excess and explicit adjustments | Invoice balance/excess evidence does not forgive debt or move bank money; `SubscriptionFinancialAdjustmentTest`, `VerifiedSubscriptionDocumentsTest`, native concurrent refund-evidence probe |
+
+Release readiness additionally requires all eight hosted exact-head checks.
+A green earlier head is never reused as proof for a new change.
 
 ## Verification and preservation
 
@@ -448,3 +458,25 @@ snapshot fallback remain unchanged. No API key, price, term, proration, credit
 or refund policy changed. Hosted PHP8.4/full-suite acceptance is required for
 the exact published HEAD. Mobile/Agent companion acceptance and existing-policy
 upgrade/proration behavior remain open.
+
+## Release-candidate closure — 8 November 2026
+
+Hosted baseline `b7266d7a44e933105ac907842cdf895b361d30c3` ran
+6,000 tests and failed only the new DI API quota fixture: it expected a draft
+invoice to exhaust a one-invoice trial. Existing policy counts only submitted
+DI invoices. The corrected real-HTTP regression first proves two drafts remain
+free, then marks one retained synthetic submission and requires the next API
+request to be refused at the frozen one-invoice cap. No fiscal request, quota
+policy or assertion was removed.
+
+Added real PRA/FBR desktop/mobile pairing acceptance with both purchased and
+excluded offline access, opposite catalogue edits, retained legacy agents,
+unchanged saved printer and second-tenant records. Added actual reviewed
+package-change acceptance for DI/PRA/FBR at the existing annual quote with
+one result under retry, original historical terms retained and second-tenant
+isolation. Existing calendar-month add-on proration acceptance remains required.
+
+The mandatory hosted PHP lane now runs these billing/companion regressions
+before the full suite, without removing any existing gate. The release notice
+now describes this billing release rather than repeating the inherited KOT
+note announcement. Final exact-head CI results are recorded in the PR.

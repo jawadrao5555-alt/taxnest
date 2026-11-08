@@ -18,6 +18,56 @@ class SubscriptionPurchaseSnapshotTest extends TestCase
     }
 
     #[DataProvider('products')]
+    public function test_reviewed_package_change_keeps_original_terms_and_issues_one_new_purchase(string $product): void
+    {
+        Mail::fake();
+        Http::preventStrayRequests();
+        $this->travelTo(\Carbon\Carbon::parse('2026-11-08 10:00:00'));
+        $admin = AdminUser::create(['name' => 'Synthetic package reviewer', 'email' => 'change-reviewer@example.test',
+            'password' => bcrypt('SyntheticOnly123!'), 'role' => 'super_admin']);
+        $company = Company::create(['name' => 'Synthetic package change', 'ntn' => 'RCCHANGE1',
+            'product_type' => $product, 'status' => 'approved', 'company_status' => 'active']);
+        $oldPlan = PricingPlan::create(['name' => 'Starter', 'product_type' => $product, 'price' => 1000,
+            'is_trial' => false, 'invoice_limit' => 100]);
+        $old = \App\Services\SubscriptionAssignmentService::assign($company->id, $oldPlan->id, 'annual');
+        $old->update(['end_date' => now()->addMonths(6)]);
+        $oldTerms = $old->fresh()->getAttributes();
+        $other = Company::create(['name' => 'Synthetic unchanged buyer', 'ntn' => 'RCCHANGE2', 'product_type' => $product]);
+        $foreign = \App\Services\SubscriptionAssignmentService::assign($other->id, $oldPlan->id, 'annual');
+        $foreignTerms = $foreign->fresh()->getAttributes();
+        $newPlan = PricingPlan::create(['name' => 'Business', 'product_type' => $product, 'price' => 2000,
+            'is_trial' => false, 'invoice_limit' => 500]);
+        $quote = \App\Services\SubscriptionAssignmentService::computePrice($newPlan, 'annual', $company);
+        $proof = PaymentProof::create(['company_id' => $company->id, 'pricing_plan_id' => $newPlan->id,
+            'billing_cycle' => 'annual', 'amount' => $quote['final_price'],
+            'proof_path' => 'synthetic-package-change', 'status' => 'pending']);
+        $input = ['pricing_plan_id' => $newPlan->id, 'billing_cycle' => 'annual',
+            'verified_received_amount' => $quote['final_price']];
+        $this->actingAs($admin, 'admin')->post(route('saas.admin.payment-proofs.approve', $proof->id), $input)
+            ->assertSessionHas('success');
+        $new = Subscription::findOrFail($proof->fresh()->subscription_id);
+        $this->assertFalse((bool) $old->fresh()->active);
+        $this->assertSame(array_diff_key($oldTerms, array_flip(['active', 'updated_at'])),
+            array_diff_key($old->fresh()->getAttributes(), array_flip(['active', 'updated_at'])));
+        $this->assertSame($foreignTerms, $foreign->fresh()->getAttributes());
+        $this->assertSame($newPlan->id, $new->pricing_plan_id);
+        $this->assertEquals($quote['final_price'], $new->final_price);
+        // Existing package-change policy buys a full annual term. It does not
+        // silently invent a credit/refund or transfer old remaining months.
+        $this->assertSame(now()->addYear()->toDateString(), $new->end_date->toDateString());
+        $this->assertSame(500, $new->entitlementPlan()->invoice_limit);
+        $invoice = \App\Models\SubscriptionInvoice::where('payment_proof_id', $proof->id)->sole();
+        $this->assertEquals($quote['final_price'], $invoice->amount);
+        $this->assertSame(1, $invoice->payments()->count());
+        $this->post(route('saas.admin.payment-proofs.approve', $proof->id), $input)->assertRedirect();
+        $this->assertSame(1, Subscription::where('company_id', $company->id)->where('active', true)->count());
+        $this->assertSame(2, Subscription::where('company_id', $company->id)->count());
+        $this->assertSame(1, \App\Models\SubscriptionInvoice::where('payment_proof_id', $proof->id)->count());
+        $this->assertSame(1, $invoice->payments()->count());
+        Http::assertNothingSent();
+    }
+
+    #[DataProvider('products')]
     public function test_real_payment_approval_retains_purchased_plan_after_catalogue_changes(string $product): void
     {
         Mail::fake();

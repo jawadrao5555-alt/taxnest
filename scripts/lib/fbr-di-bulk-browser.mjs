@@ -44,7 +44,7 @@ export async function fbrDiBulkWorkflow(page,t,v,{baseUrl,saveEvidenceScreenshot
   await invoice.locator('[name="items[0][quantity]"]').fill('2');
   await invoice.getByText(/^Reporting quantity: 50 (Kilograms|KG)$/).waitFor();
   await saveEvidenceScreenshot(page,'rc-di-packing-entry-'+v.width);
-  await Promise.all([page.waitForURL(u=>u.pathname==='/invoices'),invoice.locator('button[type="submit"]').filter({hasText:'Save'}).first().click()]);
+  await Promise.all([page.waitForURL(u=>u.pathname==='/invoices'),invoice.getByRole('button',{name:'Create Invoice',exact:true}).click()]);
   await page.getByText('Invoice created successfully.',{exact:true}).first().waitFor();
   const link=page.locator('a[href*="/invoice/"]').filter({hasText:/View/i}).first();
   if(await link.count())await link.click();

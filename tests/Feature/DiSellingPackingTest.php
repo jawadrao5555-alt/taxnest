@@ -147,6 +147,13 @@ class DiSellingPackingTest extends TestCase
         $api->postJson('/api/di/v1/invoices', $input)->assertStatus(422);
         $this->assertSame(2, Invoice::withoutGlobalScopes()->where('company_id', $this->company->id)->count());
         $this->assertSame($original->selling_snapshot, $invoice->items()->sole()->selling_snapshot);
+        $owner = \App\Models\User::create(['name' => 'Synthetic return owner', 'email' => 'packing-return@test.invalid',
+            'password' => 'unused', 'role' => 'company_admin', 'is_active' => true, 'company_id' => $this->company->id]);
+        $this->actingAs($owner)->post('/invoice/'.$return->id.'/duplicate')->assertSessionHasNoErrors()->assertRedirect();
+        $this->assertSame(2, Invoice::withoutGlobalScopes()->where('company_id', $this->company->id)->where('document_type', 'Credit Note')->count());
+        $this->post('/invoice/'.$return->id.'/duplicate')->assertSessionHasErrors('items');
+        $this->assertSame(2, Invoice::withoutGlobalScopes()->where('company_id', $this->company->id)->where('document_type', 'Credit Note')->count());
+
     }
 
     public function test_current_proof_covers_packing_snapshot_and_legacy_hashes_are_preserved(): void

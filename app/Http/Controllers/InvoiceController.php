@@ -2400,6 +2400,7 @@ class InvoiceController extends Controller
 
         DB::beginTransaction();
         try {
+            \App\Services\DiSellingPacking::validateReturns($invoice->items->map(fn ($item) => $item->toArray())->all(), (int) $companyId);
             $newInvoiceNumber = InvoiceNumberingService::generateNextNumber($companyId);
 
             $newInvoice = Invoice::create([
@@ -2478,6 +2479,7 @@ class InvoiceController extends Controller
             return redirect('/invoice/' . $newInvoice->id)->with('success', 'Invoice duplicated successfully.');
         } catch (\Exception $e) {
             DB::rollBack();
+            if ($e instanceof \Illuminate\Validation\ValidationException) return back()->withErrors($e->errors());
             return back()->with('error', 'Failed to duplicate invoice: ' . $e->getMessage());
         }
     }

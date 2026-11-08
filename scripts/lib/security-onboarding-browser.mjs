@@ -140,7 +140,9 @@ export async function securityOnboardingWorkflow(page,t,v,{baseUrl,login,saveEvi
     page.waitForNavigation(),
     page.locator('form[action$="/profile"]').getByRole('button',{name:'Submit Request',exact:true}).click(),
   ]);
-  await page.getByText('Company deletion request recorded and password-verified.',{exact:false}).waitFor();
+  await page.locator('main .bg-green-50')
+    .filter({hasText:'Company deletion request recorded and password-verified.'})
+    .first().waitFor();
   await page.getByText(/Request #\d+ is already recorded \(pending review\)\./).waitFor();
   await page.goto(baseUrl+'/onboarding',{waitUntil:'domcontentloaded'});
   if(new URL(page.url()).pathname==='/login')throw Error('Company deletion request removed the owner login or company immediately');

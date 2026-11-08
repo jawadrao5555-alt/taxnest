@@ -828,3 +828,13 @@ downgraded administrators receive 403 with the complete customer-user table
 unchanged; an existing administrator still creates a fictional company-bound
 viewer through the actual route. The same 1366/390 journey sends the denied
 POST. Focused billing/capability coverage passes **5 tests / 150 assertions**.
+
+Run **42454135064** passed full PHP8.4, native MariaDB, Node, build, safety and
+manifest lanes but its security browser step stopped after the real deletion
+request succeeded: the same success message is intentionally rendered in the
+layout flash, profile confirmation and toast, so Playwright's unscoped strict
+text locator matched three elements at both viewports. The journey now scopes
+that assertion to the visible layout success banner and separately retains the
+unique durable request-number/status assertion. No application response,
+deletion rule or acceptance outcome was weakened; fresh exact-HEAD desktop and
+mobile hosted evidence is required.

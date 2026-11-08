@@ -159,6 +159,15 @@ class AdminBillingCapabilityTest extends TestCase
             ->assertDontSee('+ Add User')
             ->assertDontSee('id="addUserModal"', false)
             ->assertDontSee('action="/admin/all-users"', false);
+        $this->get('/admin/sales')->assertOk()
+            ->assertSee('Sale history is read-only for this account.')
+            ->assertDontSee('action="'.route('saas.admin.sales.store').'"', false);
+        $this->get('/admin/consultants')->assertOk()
+            ->assertSee('Consultant, link and payout history is read-only for this account.')
+            ->assertDontSee('action="'.route('saas.admin.consultants.min-payout').'"', false);
+        $this->get('/admin/groups')->assertOk()
+            ->assertSee('Business-group membership and notes are read-only for this account.')
+            ->assertDontSee('action="'.route('saas.admin.groups.resync').'"', false);
         $this->get('/admin/company/'.$sub->company_id)->assertOk()
             ->assertSee('Legacy company history is read-only for this account.')
             ->assertSee('Fictional capability company')
@@ -191,6 +200,12 @@ class AdminBillingCapabilityTest extends TestCase
                 ->assertDontSee('POS feature configuration is read-only for this account.')
                 ->assertSee('/admin/company/'.$sub->company_id.'/pos-features', false)
                 ->assertSee('Save Override');
+            $this->get('/admin/sales')->assertOk()
+                ->assertDontSee('Sale history is read-only for this account.')
+                ->assertSee('action="'.route('saas.admin.sales.store').'"', false);
+            $this->get('/admin/consultants')->assertOk()
+                ->assertDontSee('Consultant, link and payout history is read-only for this account.')
+                ->assertSee('action="'.route('saas.admin.consultants.min-payout').'"', false);
         }
     }
 

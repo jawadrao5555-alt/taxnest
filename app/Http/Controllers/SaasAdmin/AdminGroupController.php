@@ -37,9 +37,12 @@ class AdminGroupController extends Controller
 
     public function index(Request $request)
     {
+        $currentAdmin = auth('admin')->user()?->fresh();
+        $canManageCompanyLifecycle = (bool) $currentAdmin?->canManageCompanyLifecycle();
         if (!CompanyGroupService::enabled()) {
             return view('saas-admin.groups.index', [
                 'groups' => collect(), 'cards' => [], 'q' => '', 'disabled' => true, 'stats' => [],
+                'canManageCompanyLifecycle' => $canManageCompanyLifecycle,
             ]);
         }
 
@@ -93,12 +96,15 @@ class AdminGroupController extends Controller
             'q'        => $q,
             'disabled' => false,
             'stats'    => $this->stats(),
+            'canManageCompanyLifecycle' => $canManageCompanyLifecycle,
         ]);
     }
 
     public function show($id)
     {
         abort_unless(CompanyGroupService::enabled(), 404);
+        $currentAdmin = auth('admin')->user()?->fresh();
+        $canManageCompanyLifecycle = (bool) $currentAdmin?->canManageCompanyLifecycle();
 
         $group = CompanyGroup::with(['members.company'])->findOrFail($id);
         $cards = $this->summarise(collect([$group]));
@@ -114,6 +120,7 @@ class AdminGroupController extends Controller
             'group'             => $group,
             'card'              => $cards[$group->id] ?? null,
             'excludedCompanies' => $excludedCompanies,
+            'canManageCompanyLifecycle' => $canManageCompanyLifecycle,
         ]);
     }
 

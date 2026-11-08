@@ -14,12 +14,14 @@ class AdminSaleController extends Controller
 {
     public function index()
     {
+        $currentAdmin = auth('admin')->user()?->fresh();
+        $canManageRelease = (bool) $currentAdmin?->canManageRelease();
         $campaigns = collect();
         if (Schema::hasTable('sale_campaigns')) {
             $campaigns = SaleCampaign::orderByDesc('is_active')->orderByDesc('id')->get();
         }
 
-        return view('saas-admin.sales', compact('campaigns'));
+        return view('saas-admin.sales', compact('campaigns', 'canManageRelease'));
     }
 
     public function store(Request $request)

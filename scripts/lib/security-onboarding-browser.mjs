@@ -199,6 +199,15 @@ export async function securityOnboardingWorkflow(page,t,v,{baseUrl,login,saveEvi
   await page.goto(baseUrl+'/admin/plans',{waitUntil:'domcontentloaded'});
   await page.getByRole('heading',{name:'Subscription Plans',exact:true}).waitFor();
   if(await page.locator('form[action*="/admin/plans"]').count())throw Error('Viewer offered package write form');
+  await page.goto(baseUrl+'/admin/sales',{waitUntil:'domcontentloaded'});
+  await page.getByText('Sale history is read-only for this account.',{exact:true}).waitFor();
+  if(await page.locator('form[action*="/admin/sales"]').count())throw Error('Viewer offered sale release controls');
+  await page.goto(baseUrl+'/admin/consultants',{waitUntil:'domcontentloaded'});
+  await page.getByText('Consultant, link and payout history is read-only for this account.',{exact:true}).waitFor();
+  if(await page.locator('form[action*="/admin/consultant"]').count())throw Error('Viewer offered consultant or payout controls');
+  await page.goto(baseUrl+'/admin/groups',{waitUntil:'domcontentloaded'});
+  await page.getByText('Business-group membership and notes are read-only for this account.',{exact:true}).waitFor();
+  if(await page.locator('form[action*="/admin/groups"]').count())throw Error('Viewer offered business-group controls');
   await page.goto(baseUrl+'/admin/app-updates',{waitUntil:'domcontentloaded'});
   await page.getByText('Release history is read-only for this account.',{exact:false}).waitFor();
   if(await page.locator('form[action="/admin/app-updates/feature-toggle"],form[action$="/toggle"],form[action$="/reannounce"],form[action$="/delete"]').count())throw Error('Viewer offered customer-update release controls');

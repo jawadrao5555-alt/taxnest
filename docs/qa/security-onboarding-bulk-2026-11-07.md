@@ -18,6 +18,22 @@ Focused PHP8.3/SQLite deployment-approval coverage passes **8 tests / 60
 assertions**. Fresh supported full-suite and exact-HEAD hosted acceptance remain
 required.
 
+Sales, consultant oversight and business-group reads had the same rendered-UI
+gap: their mutation endpoints reloaded persisted release/billing/lifecycle
+authority, but support/viewer sessions still received launch, toggle, rate,
+payout, revoke, resync, link, detach and notes forms. Each controller now
+computes the matching capability from the fresh administrator row. Read-only
+roles retain campaign history, consultant/link/commission/payout evidence and
+group membership/notes, with explicit read-only notices and no mutation forms.
+Established administrators retain every existing control; no sale, payout,
+commission, link or company membership was changed by this work.
+
+Focused billing, release, consultant-action and grouping coverage passes **28
+tests / 429 assertions**, with Blade compilation and Node/diff checks. The
+required 1366/390 journey now visits the three real history screens and refuses
+any rendered write control. Fresh exact-HEAD hosted PHP8.4/browser acceptance
+remains required.
+
 ## Password-verified company deletion lifecycle continuation
 
 The ordinary profile delete endpoint previously removed only the signed-in user

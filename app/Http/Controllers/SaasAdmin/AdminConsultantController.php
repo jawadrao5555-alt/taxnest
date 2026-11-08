@@ -21,6 +21,8 @@ class AdminConsultantController extends Controller
 {
     public function index(Request $request)
     {
+        $currentAdmin = auth('admin')->user()?->fresh();
+        $canManageBilling = (bool) $currentAdmin?->canManageBilling();
         $profiles = ConsultantProfile::with('user')
             ->orderByDesc('id')
             ->get();
@@ -75,6 +77,7 @@ class AdminConsultantController extends Controller
             'pendingTotals' => $pendingTotals,
             'paidCommissions' => $paidCommissions,
             'links' => $links,
+            'canManageBilling' => $canManageBilling,
         ]);
     }
 

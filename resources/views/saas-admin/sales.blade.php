@@ -5,6 +5,11 @@
         <p class="text-sm text-gray-400 mt-1">Run a limited-time discount across your plans. Sales auto-expire on their end date — no manual switch-off needed. Prices update instantly on every landing &amp; billing page.</p>
     </div>
 
+    @unless($canManageRelease)
+    <div class="mb-6 p-4 rounded-xl bg-amber-900/20 border border-amber-800/60 text-sm text-amber-200">Sale history is read-only for this account.</div>
+    @endunless
+
+    @if($canManageRelease)
     <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-6">
         <h3 class="text-sm font-semibold text-white mb-4">Create a Sale</h3>
         <form method="POST" action="{{ route('saas.admin.sales.store') }}" class="space-y-4">
@@ -40,6 +45,7 @@
             <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition">Launch Sale</button>
         </form>
     </div>
+    @endif
 
     <div class="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
         <div class="px-5 py-3 border-b border-gray-800"><h3 class="text-sm font-semibold text-white">All Sales</h3></div>
@@ -71,6 +77,7 @@
                         · {{ $c->starts_at ? $c->starts_at->format('d M Y') : 'now' }} → {{ $c->ends_at ? $c->ends_at->format('d M Y') : 'no expiry' }}
                     </div>
                 </div>
+                @if($canManageRelease)
                 <div class="flex items-center gap-2">
                     <form method="POST" action="{{ route('saas.admin.sales.toggle', $c->id) }}">
                         @csrf
@@ -82,6 +89,7 @@
                         <button class="text-xs px-3 py-1.5 rounded-lg font-semibold bg-red-600/20 text-red-300 hover:bg-red-600/30 transition">Delete</button>
                     </form>
                 </div>
+                @endif
             </div>
             @endforeach
         </div>

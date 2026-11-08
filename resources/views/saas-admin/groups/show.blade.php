@@ -11,6 +11,10 @@
         @endif
     </div>
 
+    @unless($canManageCompanyLifecycle)
+    <div class="mb-6 p-4 rounded-xl bg-amber-900/20 border border-amber-800/60 text-sm text-amber-200">Business-group membership and notes are read-only for this account.</div>
+    @endunless
+
     {{-- Cross-sell: what this customer does NOT run yet. --}}
     @if($card && $card['missing'])
     <div class="bg-emerald-900/15 border border-emerald-800/50 rounded-xl p-4 mb-4">
@@ -65,11 +69,13 @@
                         joined {{ optional($company->created_at)->format('d M Y') }}
                     </p>
                 </div>
+                @if($canManageCompanyLifecycle)
                 <form method="POST" action="{{ route('saas.admin.groups.detach', [$group->id, $company->id]) }}"
                       onsubmit="return confirm('Detach {{ addslashes($company->name) }} from this group? It will not be re-added automatically.');">
                     @csrf
                     <button type="submit" class="px-3 py-1.5 bg-gray-800 hover:bg-red-900/40 text-gray-400 hover:text-red-300 text-xs rounded-lg transition">Detach</button>
                 </form>
+                @endif
             </div>
             @endforeach
         </div>
@@ -78,12 +84,16 @@
     {{-- Link another account --}}
     <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 mb-6">
         <h2 class="text-sm font-semibold text-gray-300 mb-2">Link another account</h2>
+        @if($canManageCompanyLifecycle)
         <form method="POST" action="{{ route('saas.admin.groups.link', $group->id) }}" class="flex flex-wrap gap-2">
             @csrf
             <input type="text" name="company_ref" required placeholder="Account code (PRA-00026), NTN, or company name"
                    class="flex-1 min-w-[240px] px-3 py-2 bg-gray-950 border border-gray-800 rounded-lg text-sm text-gray-200 placeholder-gray-600 focus:outline-none focus:border-indigo-600">
             <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition">Link</button>
         </form>
+        @else
+        <p class="text-sm text-gray-500">Existing membership is retained for review; linking requires an administrator.</p>
+        @endif
         @if($excludedCompanies->isNotEmpty())
         <p class="text-xs text-gray-500 mt-3">
             Previously detached: {{ $excludedCompanies->pluck('name')->join(', ') }}. Linking one back overrides that decision.
@@ -94,6 +104,7 @@
     {{-- Name + notes --}}
     <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
         <h2 class="text-sm font-semibold text-gray-300 mb-3">Group details</h2>
+        @if($canManageCompanyLifecycle)
         <form method="POST" action="{{ route('saas.admin.groups.update', $group->id) }}" class="space-y-3">
             @csrf
             @method('PUT')
@@ -108,6 +119,9 @@
             </div>
             <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition">Save</button>
         </form>
+        @else
+        <dl class="space-y-3 text-sm"><div><dt class="text-gray-500">Name</dt><dd class="text-gray-200">{{ $group->name ?: $group->displayName() }}</dd></div><div><dt class="text-gray-500">Notes</dt><dd class="text-gray-200 whitespace-pre-wrap">{{ $group->notes ?: '—' }}</dd></div></dl>
+        @endif
     </div>
 </div>
 </x-admin-layout>

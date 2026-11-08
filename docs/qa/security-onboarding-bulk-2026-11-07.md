@@ -1,5 +1,23 @@
 # Security and onboarding bulk — P1
 
+## Fresh owner password for deployment approval
+
+Deployment approval already reloaded the persisted super-admin role, but its
+password confirmation still read the administrator object cached in the guard.
+If the password changed in another session before the cached browser was
+revoked, that browser could confirm an approval with the old password. Both
+new approval requests and pending-request approval now use the freshly loaded
+owner returned by the persisted-role check for password verification and actor
+attribution; signed review links use the same fresh identity.
+
+An actual HTTP regression keeps the old owner object in the guard, rotates only
+the persisted password, requires the old password to create no approval row,
+then confirms the new password binds the fictional exact green PR/HEAD. Mocked
+GitHub and mail are used; no approval dispatch, merge or deployment occurs.
+Focused PHP8.3/SQLite deployment-approval coverage passes **8 tests / 60
+assertions**. Fresh supported full-suite and exact-HEAD hosted acceptance remain
+required.
+
 ## Password-verified company deletion lifecycle continuation
 
 The ordinary profile delete endpoint previously removed only the signed-in user

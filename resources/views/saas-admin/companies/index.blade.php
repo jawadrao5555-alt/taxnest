@@ -101,6 +101,9 @@
                             </span>
                             @endif
                             <p class="tn-directory-owner text-xs text-gray-600 dark:text-gray-400">{{ $company->owner_name ?? '' }}</p>
+                            @if($deletionRequest = ($deletionRequests[$company->id] ?? null))
+                            <span class="inline-flex items-center mt-1 px-1.5 py-0.5 rounded bg-red-900/30 text-red-300 text-xs font-semibold">Deletion request #{{ $deletionRequest->id }} &middot; {{ str_replace('_', ' ', $deletionRequest->status) }}</span>
+                            @endif
                             {{-- Package picked at registration — what approval will activate for 1 year --}}
                             @php $requestedPackage = \App\Services\RequestedPackageService::pendingSummary($company); @endphp
                             @if($requestedPackage)

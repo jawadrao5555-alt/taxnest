@@ -130,6 +130,22 @@ export async function securityOnboardingWorkflow(page,t,v,{baseUrl,login,saveEvi
   await Promise.all([page.waitForNavigation(),page.getByRole('button',{name:'Turn off two-step login',exact:true}).click()]);
   await page.getByRole('button',{name:'Set up two-step login',exact:true}).waitFor();
 
+  // The owner-facing delete control must create a verified company request,
+  // never delete only the owner's login or silently remove business records.
+  await page.goto(baseUrl+'/profile',{waitUntil:'domcontentloaded'});
+  await page.getByRole('button',{name:'Request Company Deletion',exact:true}).click();
+  await page.getByLabel('Reason (optional)',{exact:true}).fill('Synthetic browser lifecycle verification only.');
+  await page.locator('form[action$="/profile"] input[name="password"]').fill(fixture.reset.newPassword);
+  await Promise.all([
+    page.waitForNavigation(),
+    page.locator('form[action$="/profile"]').getByRole('button',{name:'Submit Request',exact:true}).click(),
+  ]);
+  await page.getByText('Company deletion request recorded and password-verified.',{exact:false}).waitFor();
+  await page.getByText(/Request #\d+ is already recorded \(pending review\)\./).waitFor();
+  await page.goto(baseUrl+'/onboarding',{waitUntil:'domcontentloaded'});
+  if(new URL(page.url()).pathname==='/login')throw Error('Company deletion request removed the owner login or company immediately');
+  await saveEvidenceScreenshot(page,'rc-security-deletion-request-'+v.width);
+
   // A password reset performed from the SaaS company page must revoke an
   // already-open Local Bills Viewer browser. Use two genuinely independent
   // contexts so this proves cached-session refusal rather than a logout in
@@ -211,5 +227,5 @@ export async function securityOnboardingWorkflow(page,t,v,{baseUrl,login,saveEvi
   await page.getByText('REOPENED',{exact:true}).waitFor();
   if(await page.getByText('Synthetic recurrence received after explicit resolution.',{exact:true}).count()!==1)throw Error('Support reopen evidence missing from timeline');
   await saveEvidenceScreenshot(page,'rc-security-support-case-'+v.width);
-  pass('SECURITY ONBOARDING PASS: '+v.width+': incomplete setup refused, explicit skip, configured completion, actual password form and independent old-session revocation/fresh login; optional two-step enrollment, fresh authenticator login, single-use recovery and disable; Local Bills Viewer password reset revokes the old browser and permits a fresh login; billing, customer-update, tutorial, announcement and survey release controls stay read-only for viewer; durable support ownership, explicit resolution build and reopen timeline');
+  pass('SECURITY ONBOARDING PASS: '+v.width+': incomplete setup refused, explicit skip, configured completion, actual password form and independent old-session revocation/fresh login; optional two-step enrollment, fresh authenticator login, single-use recovery and disable; password-verified company deletion request retains the owner/company pending review; Local Bills Viewer password reset revokes the old browser and permits a fresh login; billing, customer-update, tutorial, announcement and survey release controls stay read-only for viewer; durable support ownership, explicit resolution build and reopen timeline');
 }

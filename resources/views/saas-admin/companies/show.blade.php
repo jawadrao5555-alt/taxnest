@@ -500,6 +500,13 @@
 
     <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-6">
         <h3 id="company-access-actions" class="text-sm font-semibold text-white mb-3">Quick Actions</h3>
+        @if($companyDeletionRequest)
+        <div class="mb-3 px-3 py-2 rounded-lg bg-red-950/40 border border-red-800/50">
+            <p class="text-xs text-red-200"><span class="font-semibold">Password-verified deletion request #{{ $companyDeletionRequest->id }}</span> &middot; {{ str_replace('_', ' ', $companyDeletionRequest->status) }}</p>
+            <p class="text-[11px] text-red-300/80 mt-1">Requested {{ \Illuminate\Support\Carbon::parse($companyDeletionRequest->requested_at)->format('d M Y, h:i A') }}. Moving to Bin starts the recoverable seven-day hold; this request alone deleted nothing.</p>
+            @if($companyDeletionRequest->reason)<p class="text-[11px] text-gray-400 mt-1">Reason: {{ $companyDeletionRequest->reason }}</p>@endif
+        </div>
+        @endif
         {{-- Package picked before signing up — approval activates exactly this
              plan, on the period that product sells (Task 1484). --}}
         @php $requestedPackage = \App\Services\RequestedPackageService::pendingSummary($company); @endphp

@@ -1,5 +1,44 @@
 # Security and onboarding bulk — P1
 
+## Password-verified company deletion lifecycle continuation
+
+The ordinary profile delete endpoint previously removed only the signed-in user
+row. For a company owner that could orphan the company while invoices, fiscal
+records, subscriptions and staff remained, and it produced no verified company
+deletion request, review state or durable purge evidence.
+
+Company administrators now submit a password-verified company deletion request
+instead of deleting their login. The request is idempotent per company and keeps
+a hashed requester identity, verified timestamp, reason, a canonical hashed
+scope-count manifest and an append-only transition stream. Submission itself
+does not disable the company or delete any record. An authorized persisted SaaS
+administrator must still review it and move the company into the bin; that same
+transaction starts the existing seven-day recoverable hold. The bin shows the
+request reference and state.
+
+Restore closes the active request and rotates only the restored company's
+browser-session generations. A foreign company's browser generation and the
+restored company's Desktop Agent pairing key/enabled state remain byte-for-byte
+unchanged. Permanent deletion records the database purge inside the purge
+transaction, retains the established administrator audit and credential
+ledgers, and records the separate private-file cleanup outcome without claiming
+that a failed cleanup succeeded. Legacy bin entries receive a lifecycle record
+at their first restore/purge, while deploy-before-migrate installations refuse
+owner deletion requests without deleting anything.
+
+Actual HTTP/tables-first coverage passes **27 tests / 185 assertions**, including
+password verification, duplicate-request idempotency, exact hold deadline,
+tenant-isolated browser revocation, Agent-pairing preservation, restore and
+surviving purge evidence. The migration also completed in the focused
+RefreshDatabase profile suite (**5 tests / 21 assertions**). These local runs use
+PHP8.3/SQLite and are supplemental only; fresh exact-HEAD PHP8.4, native MariaDB,
+desktop1366/mobile390 and final-validate acceptance remains required.
+
+This closes the dangerous owner-login-only deletion path and durable
+request/hold/restore/purge evidence slice. Full customer data export, statutory
+retention disposition, production backup verification and tenant-scoped restore
+replay remain open; no production company or business record was touched.
+
 ## Persisted customer-release authority continuation
 
 Actual route reconciliation found that an admin-panel login alone could publish,

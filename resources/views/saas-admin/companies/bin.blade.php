@@ -32,6 +32,9 @@
                         <td class="px-4 py-3">
                             <span class="text-white font-medium">{{ $company->name }}</span>
                             <p class="text-[10px] text-gray-600 dark:text-gray-400">{{ $company->ntn ?? '' }} &middot; {{ $company->owner_name ?? '' }}</p>
+                            @if($requestEvidence = ($deletionRequests[$company->id] ?? null))
+                                <p class="text-[10px] text-amber-400">Verified request #{{ $requestEvidence->id }} &middot; {{ str_replace('_', ' ', $requestEvidence->status) }}</p>
+                            @endif
                         </td>
                         <td class="px-4 py-3 text-center">
                             <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase {{ \App\Support\ProductCatalog::chipClass($company->product_type) }}">{{ \App\Support\ProductCatalog::shortLabel($company->product_type) }}</span>

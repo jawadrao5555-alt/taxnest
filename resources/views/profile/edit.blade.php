@@ -16,6 +16,9 @@
             @if(session('error'))
             <div class="p-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 rounded-lg text-red-700 dark:text-red-300 font-medium">{{ session('error') }}</div>
             @endif
+            @if(session('success'))
+            <div class="p-4 bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-700 rounded-lg text-emerald-700 dark:text-emerald-300 font-medium">{{ session('success') }}</div>
+            @endif
 
             <div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6">
                 <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Account Information</h3>
@@ -180,6 +183,10 @@
             <div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6">
                 <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Change Password</h3>
                 @include('profile.partials.update-password-form')
+            </div>
+
+            <div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6">
+                @include('profile.partials.delete-user-form', ['companyDeletionRequest' => $companyDeletionRequest ?? null])
             </div>
         </div>
     </div>

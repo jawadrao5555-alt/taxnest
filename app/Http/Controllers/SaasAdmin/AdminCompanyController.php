@@ -333,6 +333,12 @@ class AdminCompanyController extends Controller
         }
 
         $companies = $query->orderBy('created_at', 'desc')->paginate(20)->appends($request->all());
+        $deletionRequests = [];
+        if (\Illuminate\Support\Facades\Schema::hasTable('company_deletion_requests')) {
+            $deletionRequests = DB::table('company_deletion_requests')
+                ->whereIn('company_id', $companies->pluck('id'))
+                ->whereNotNull('active_key')->orderByDesc('id')->get()->keyBy('company_id')->all();
+        }
 
         // Agent Health (Task 629): shops that RELY on the Desktop Agent for silent
         // printing but whose agent has been offline for hours — cashiers there are
@@ -359,7 +365,7 @@ class AdminCompanyController extends Controller
             $latestAgentVersion = "{$m[1]}.{$m[2]}.{$m[3]}";
         }
 
-        return view('saas-admin.companies.index', compact('companies', 'offlineAgents', 'latestAgentVersion'));
+        return view('saas-admin.companies.index', compact('companies', 'offlineAgents', 'latestAgentVersion', 'deletionRequests'));
     }
 
     public function show($id)
@@ -368,6 +374,7 @@ class AdminCompanyController extends Controller
         $usageStats = CompanyUsageStat::refreshForCompany($id);
         $accountOverview = \App\Services\CompanyAccountOverview::for($company);
         $company->setRelation('activeSubscription', $accountOverview['current']);
+        $companyDeletionRequest = app(\App\Services\CompanyDeletionLifecycle::class)->active((int) $company->id);
 
         $extraStats = [];
         if ($company->product_type === 'di') {
@@ -466,7 +473,7 @@ class AdminCompanyController extends Controller
             ->filter(fn ($p) => !\App\Services\PlanSellabilityService::isRetired($p))
             ->values();
 
-        return view('saas-admin.companies.show', compact('company', 'usageStats', 'extraStats', 'archiveViewers', 'localViewers', 'companyAdmin', 'teamUsers', 'exemptInternalBills', 'grantPlans', 'groupMember', 'groupSiblings', 'accountOverview'));
+        return view('saas-admin.companies.show', compact('company', 'usageStats', 'extraStats', 'archiveViewers', 'localViewers', 'companyAdmin', 'teamUsers', 'exemptInternalBills', 'grantPlans', 'groupMember', 'groupSiblings', 'accountOverview', 'companyDeletionRequest'));
     }
 
     /**
@@ -1165,9 +1172,14 @@ class AdminCompanyController extends Controller
     {
         $actor = \App\Models\AdminUser::requireCompanyLifecycleAdministrator();
         $company = Company::findOrFail($id);
-        $company->update(['deleted_reason' => $request->input('reason', 'Moved to bin by admin')]);
-        $company->delete();
-        AdminAuditLog::log($actor->id, 'Company moved to bin', 'Company', $id, ['name' => $company->name, 'reason' => $request->input('reason')]);
+        $reason = $request->input('reason', 'Moved to bin by admin');
+        DB::transaction(function () use ($company, $actor, $reason) {
+            $company = Company::query()->whereKey($company->id)->lockForUpdate()->firstOrFail();
+            app(\App\Services\CompanyDeletionLifecycle::class)->beginHold($company, $actor, $reason);
+            $company->update(['deleted_reason' => $reason]);
+            $company->delete();
+        });
+        AdminAuditLog::log($actor->id, 'Company moved to bin', 'Company', $id, ['name' => $company->name, 'reason' => $reason]);
         return redirect()->route('saas.admin.companies')->with('success', "Company '{$company->name}' moved to bin.");
     }
 
@@ -1198,15 +1210,26 @@ class AdminCompanyController extends Controller
         $isSuperAdmin = (bool) $currentAdmin?->isSuperAdmin();
         $canManageCompanyLifecycle = (bool) $currentAdmin?->canManageCompanyLifecycle();
 
-        return view('saas-admin.companies.bin', compact('companies', 'siblingNames', 'isSuperAdmin', 'canManageCompanyLifecycle'));
+        $deletionRequests = [];
+        if (\Illuminate\Support\Facades\Schema::hasTable('company_deletion_requests')) {
+            $deletionRequests = DB::table('company_deletion_requests')
+                ->whereIn('company_id', $companies->pluck('id'))
+                ->whereNotNull('active_key')->orderByDesc('id')->get()->keyBy('company_id')->all();
+        }
+
+        return view('saas-admin.companies.bin', compact('companies', 'siblingNames', 'isSuperAdmin', 'canManageCompanyLifecycle', 'deletionRequests'));
     }
 
     public function restore($id)
     {
         $actor = \App\Models\AdminUser::requireCompanyLifecycleAdministrator();
         $company = Company::onlyTrashed()->findOrFail($id);
-        $company->restore();
-        $company->update(['deleted_reason' => null]);
+        DB::transaction(function () use ($company, $actor) {
+            $company = Company::onlyTrashed()->whereKey($company->id)->lockForUpdate()->firstOrFail();
+            $company->restore();
+            $company->update(['deleted_reason' => null]);
+            app(\App\Services\CompanyDeletionLifecycle::class)->restored($company, $actor);
+        });
         AdminAuditLog::log($actor->id, 'Company restored from bin', 'Company', $id, ['name' => $company->name]);
         return back()->with('success', "Company '{$company->name}' has been restored.");
     }
@@ -1322,7 +1345,8 @@ class AdminCompanyController extends Controller
             'health_audit_notes', 'health_audit_findings', 'health_audit_runs',
             'health_audit_events', 'health_audit_chain_anchors',
         ];
-        DB::transaction(function () use ($orphanTables, $id, $company) {
+        $deletionRequestId = null;
+        DB::transaction(function () use ($orphanTables, $id, $company, $actor, &$deletionRequestId) {
             // pos_deal_items hangs off pos_deals (deal_id, no company_id) — purge
             // by parent deal ids BEFORE the deals themselves are removed.
             if (\Illuminate\Support\Facades\Schema::hasTable('pos_deals')
@@ -1357,12 +1381,16 @@ class AdminCompanyController extends Controller
                 }
             }
 
+            $deletionRequestId = app(\App\Services\CompanyDeletionLifecycle::class)->purged($company, $actor);
             $company->forceDelete();
         });
+        $fileCleanup = [];
         // Remove generated Audit Pack ZIPs for this company from disk.
         try {
             \Illuminate\Support\Facades\Storage::disk('local')->deleteDirectory('audit-packs/company_' . $id);
+            $fileCleanup['audit_packs'] = 'completed';
         } catch (\Throwable $e) {
+            $fileCleanup['audit_packs'] = 'failed';
             \Illuminate\Support\Facades\Log::warning('Audit pack directory cleanup failed on company purge', ['company_id' => $id, 'error' => $e->getMessage()]);
         }
         // The healthcare audit packs are a second archive on the same disk, and
@@ -1370,7 +1398,9 @@ class AdminCompanyController extends Controller
         // the tables above without this leaves the evidence packs behind.
         try {
             \Illuminate\Support\Facades\Storage::disk('local')->deleteDirectory('health-audit-packs/' . $id);
+            $fileCleanup['health_audit_packs'] = 'completed';
         } catch (\Throwable $e) {
+            $fileCleanup['health_audit_packs'] = 'failed';
             \Illuminate\Support\Facades\Log::warning('Healthcare audit pack cleanup failed on company purge', ['company_id' => $id, 'error' => $e->getMessage()]);
         }
         // Healthcare uploads live on the private disk, NOT in the database:
@@ -1379,9 +1409,14 @@ class AdminCompanyController extends Controller
         // must take the medical documents with it.
         try {
             \App\Services\HealthPlatformService::purgeFiles((int) $id);
+            $fileCleanup['health_uploads'] = 'completed';
         } catch (\Throwable $e) {
+            $fileCleanup['health_uploads'] = 'failed';
             \Illuminate\Support\Facades\Log::warning('Healthcare file purge failed on company purge', ['company_id' => $id, 'error' => $e->getMessage()]);
         }
+        app(\App\Services\CompanyDeletionLifecycle::class)->recordFileCleanup(
+            $deletionRequestId, (int) $id, $actor, $fileCleanup
+        );
         AdminAuditLog::log($actor->id, 'Company permanently deleted', 'Company', $id, ['name' => $companyName]);
         return redirect()->route('saas.admin.companies.bin')->with('success', "Company '{$companyName}' has been permanently deleted.");
     }

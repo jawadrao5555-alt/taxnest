@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\ProfileUpdateRequest;
 use App\Models\Company;
+use App\Services\CompanyDeletionLifecycle;
 use App\Services\SecurityLogService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -16,12 +17,17 @@ class ProfileController extends Controller
     public function edit(Request $request): View
     {
         $company = null;
+        $companyDeletionRequest = null;
         if ($request->user()->company_id) {
             $company = Company::find($request->user()->company_id);
+            if ($company && in_array($request->user()->role, ['company_admin', 'super_admin'], true)) {
+                $companyDeletionRequest = app(CompanyDeletionLifecycle::class)->active((int) $company->id);
+            }
         }
         return view('profile.edit', [
             'user' => $request->user(),
             'company' => $company,
+            'companyDeletionRequest' => $companyDeletionRequest,
         ]);
     }
 
@@ -105,16 +111,35 @@ class ProfileController extends Controller
         }
     }
 
-    /**
-     * Delete the user's account.
-     */
     public function destroy(Request $request): RedirectResponse
     {
         $request->validateWithBag('userDeletion', [
             'password' => ['required', 'current_password'],
+            'reason' => ['nullable', 'string', 'max:1000'],
         ]);
 
         $user = $request->user();
+
+        // A business owner cannot safely "delete account" by removing only
+        // their login while the company, invoices and fiscal records remain.
+        // Password verification above establishes the requester; the actual
+        // company purge remains an administrator-reviewed, recoverable hold.
+        if ($user->company_id && in_array($user->role, ['company_admin', 'super_admin'], true)) {
+            $company = Company::findOrFail($user->company_id);
+            $deletion = app(CompanyDeletionLifecycle::class)->requestByOwner(
+                $company,
+                $user,
+                trim((string) $request->input('reason')) ?: null
+            );
+
+            if (!$deletion) {
+                return Redirect::route('profile.edit')->with('error',
+                    'Deletion requests are temporarily unavailable while the security update is being installed. No account or data was deleted.');
+            }
+
+            return Redirect::route('profile.edit')->with('success',
+                'Company deletion request recorded and password-verified. Nothing has been deleted yet; an administrator must review it and the recoverable bin hold still applies.');
+        }
 
         Auth::logout();
 

@@ -921,7 +921,8 @@ foreach ([1366,390] as $securityWidth) {
             DB::table('password_reset_otps')->insert(['email'=>$setupUser->email,'otp'=>'123456','token'=>$setupToken,
                 'product_type'=>'di','used'=>false,'expires_at'=>now()->addHours(4),'created_at'=>now(),'updated_at'=>now()]);
             $securityCases[$securityWidth]['reset']=['email'=>$setupUser->email,'token'=>$setupToken,
-                'newPassword'=>'SyntheticNew!'.bin2hex(random_bytes(12))];
+                'newPassword'=>'SyntheticNew!'.bin2hex(random_bytes(12)),
+                'companyId'=>$setupCompany->id,'userId'=>$setupUser->id];
             $expiredExport=\App\Models\AuditPack::create(['company_id'=>$setupCompany->id,'user_id'=>$setupUser->id,
                 'date_from'=>'2026-01-01','date_to'=>'2026-01-31','status'=>'ready','progress'=>100]);
             $expiredExport->forceFill(['created_at'=>now()->subDays(8),

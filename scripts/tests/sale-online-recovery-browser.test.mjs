@@ -127,6 +127,13 @@ test('actual POS service worker opens online PRA/FBR despite failed offline pref
         await page.waitForFunction(() => document.querySelector('[data-ready]')?.textContent === 'Sale ready');
         await context.setOffline(false);
 
+        // SetOffline(false) can dispatch the page's online recovery reload
+        // after its promise resolves. Finish one explicit healthy navigation
+        // before deleting the sale cache, otherwise that delayed reload can
+        // race the malformed-response assertion below and replace its 503.
+        await page.reload({waitUntil:'load'});
+        await page.waitForFunction(() => document.querySelector('[data-ready]')?.textContent === 'Sale ready');
+
         // Malformed live HTML remains rejected. The actual recovery button
         // reaches a repaired server document without clearing session storage.
         await page.evaluate(async () => {

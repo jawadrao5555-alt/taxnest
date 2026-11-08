@@ -210,7 +210,11 @@ class ProductController extends Controller
                 $like = \App\Helpers\DbCompat::like();
                 $q->where('name', $like, "%{$query}%")
                   ->orWhere('hs_code', $like, "%{$query}%");
-                if (Schema::hasColumn('products', 'selling_packings')) $q->orWhere('selling_packings', $like, "%{$query}%");
+                if (Schema::hasColumn('products', 'selling_packings')) {
+                    $packingColumn = \App\Helpers\DbCompat::isPgSQL()
+                        ? \Illuminate\Support\Facades\DB::raw('CAST(selling_packings AS TEXT)') : 'selling_packings';
+                    $q->orWhere($packingColumn, $like, "%{$query}%");
+                }
             })
             ->take(20)
             ->get(['id', 'name', 'hs_code', 'pct_code', 'default_tax_rate', 'tax_type', 'uom', 'default_price', 'schedule_type', 'sro_reference', 'serial_number', 'mrp']);

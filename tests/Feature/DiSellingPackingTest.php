@@ -186,6 +186,24 @@ class DiSellingPackingTest extends TestCase
         $this->assertSame(0, Invoice::withoutGlobalScopes()->where('company_id', $this->company->id)->count());
     }
 
+    public function test_packing_barcode_search_returns_only_current_company_and_exact_packing(): void
+    {
+        [$product] = $this->product('KG', 'Searchable bag', '25');
+        $packings = DiSellingPacking::definitions([['label' => 'Barcode bag', 'factor' => '25', 'barcode' => 'SYN-BAG-25']], 'KG');
+        $product->update(['selling_packings' => $packings]);
+        $other = Company::create(['name' => 'Synthetic foreign packing company', 'ntn' => 'FOREIGNPACK', 'product_type' => 'di']);
+        Product::withoutGlobalScopes()->create(['company_id' => $other->id, 'name' => 'Foreign barcode product',
+            'hs_code' => '33049900', 'uom' => 'KG', 'is_active' => true, 'selling_packings' => $packings]);
+        app()->instance('currentCompanyId', $this->company->id);
+        $response = app(\App\Http\Controllers\ProductController::class)->search(
+            \Illuminate\Http\Request::create('/products/search', 'GET', ['q' => 'SYN-BAG-25']));
+        $rows = $response->getData(true);
+        $this->assertCount(1, $rows);
+        $this->assertSame($product->id, $rows[0]['id']);
+        $this->assertSame($packings[0]['id'], $rows[0]['matched_packing_id']);
+        $this->assertSame('25', $rows[0]['selling_packings'][0]['factor']);
+    }
+
     private function product(string $uom, string $label, string $factor): array
     {
         $packings = DiSellingPacking::definitions([['label' => $label, 'factor' => $factor]], $uom);

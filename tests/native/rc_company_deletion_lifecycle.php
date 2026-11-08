@@ -97,8 +97,11 @@ try {
         $locked->delete();
     });
     $held = DB::table('company_deletion_requests')->where('company_id', $company->id)->first();
-    $holdSeconds = (int) \Illuminate\Support\Carbon::parse($held->hold_until)
-        ->diffInSeconds(\Illuminate\Support\Carbon::parse($held->binned_at));
+    // Carbon 3 returns a signed interval by default.  Measure from the bin
+    // instant toward the hold deadline so an inverted/past deadline cannot
+    // satisfy the exact seven-day assertion via an absolute conversion.
+    $holdSeconds = (int) \Illuminate\Support\Carbon::parse($held->binned_at)
+        ->diffInSeconds(\Illuminate\Support\Carbon::parse($held->hold_until));
     if ($held->status !== CompanyDeletionLifecycle::ON_HOLD
         || $holdSeconds !== Company::BIN_HOLD_DAYS * 86400) {
         throw new RuntimeException('Native deletion hold did not retain the exact deadline.');

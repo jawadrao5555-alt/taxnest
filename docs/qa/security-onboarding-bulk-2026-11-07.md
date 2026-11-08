@@ -684,12 +684,18 @@ row and no mail. A normal administrator still loads the forms and completes a
 mocked test-email path. The hosted desktop1366/mobile390 journey now checks the
 same page and direct POST refusal.
 
-The first native run of the deletion lifecycle also exposed legacy MariaDB
-implicit `TIMESTAMP` behaviour moving a retained hold boundary. All request,
-hold, restore, purge and audit instants in that new table now use `DATETIME`;
-the existing exact seven-day native assertion remains unchanged. Local
-PHP8.3/SQLite focused evidence is **29 tests / 211 assertions**, plus PHP,
-Blade/Node and shell syntax/diff checks. Fresh supported MariaDB, PHP8.4 and
+The first native run of the deletion lifecycle also exposed a risk from legacy
+MariaDB implicit `TIMESTAMP` behaviour around retained lifecycle boundaries.
+All request, hold, restore, purge and audit instants in that new table now use
+`DATETIME`. A follow-up run showed the native assertion itself measured from
+the future deadline back to the bin instant; Carbon 3 returns that interval as
+negative by default. The assertion now measures forward from bin to deadline,
+so an inverted/past deadline cannot pass and the exact seven-day requirement is
+unchanged. The notification concurrency worker now also authenticates a real
+persisted super-administrator before exercising the newly capability-protected
+reannouncement controller; it no longer relies on ambient CLI guard state.
+The latest relevant PHP8.3/SQLite capability, reannouncement and lifecycle set
+is **41 tests / 336 assertions**, plus PHP and diff checks. Fresh supported MariaDB, PHP8.4 and
 real-Chromium acceptance is required for the published exact HEAD. This does
 not claim that the combined page has been split into independent billing,
 release, AI and messaging screens, and the broader capability/consent/import/

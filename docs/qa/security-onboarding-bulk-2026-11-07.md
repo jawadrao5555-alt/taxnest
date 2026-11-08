@@ -733,3 +733,14 @@ concurrency proof; fresh exact-HEAD hosted PHP8.4/full-suite/browser/final
 validate evidence is required. No deployment was approved or requested, no
 remediation was executed and no production/customer state was touched. The
 broader route/job/export capability matrix remains open.
+
+The platform-wide emergency switch page had the same session-only boundary on
+its toggle endpoint. Health and worker diagnostics remain readable, but the
+page now calculates current persisted capability, hides every toggle form and
+states read-only status for support/viewer/unmapped roles. The POST reloads the
+actor and retains the established `admin`/`super_admin` sensitive-configuration
+authority. A cached downgrade receives 403 before key lookup, leaving the exact
+control and audit rows unchanged; a persisted ordinary admin still toggles and
+audits successfully. Focused coverage passes **7 tests / 50 assertions**. The
+required 1366/390 journey now checks the real page, absence of forms and direct
+POST refusal without changing any control.

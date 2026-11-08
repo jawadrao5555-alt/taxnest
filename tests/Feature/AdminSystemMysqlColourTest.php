@@ -61,7 +61,7 @@ class AdminSystemMysqlColourTest extends TestCase
             $t->string('key')->unique();
             $t->string('value')->default('enabled');
             $t->string('description')->nullable();
-            $t->unsignedBigInteger('last_changed_by')->nullable();
+            $t->unsignedBigInteger('updated_by')->nullable();
             $t->timestamps();
         });
 
@@ -70,6 +70,16 @@ class AdminSystemMysqlColourTest extends TestCase
             $t->string('key')->unique();
             $t->text('value');
             $t->string('description')->nullable();
+            $t->timestamps();
+        });
+
+        Schema::create('admin_audit_logs', function (Blueprint $t) {
+            $t->id();
+            $t->unsignedBigInteger('admin_id');
+            $t->string('action');
+            $t->string('target_type')->nullable();
+            $t->unsignedBigInteger('target_id')->nullable();
+            $t->text('metadata')->nullable();
             $t->timestamps();
         });
 
@@ -120,6 +130,49 @@ class AdminSystemMysqlColourTest extends TestCase
     private function dotWith(string $class): string
     {
         return $class . '" data-testid="mysql-dot"';
+    }
+
+    public function test_cached_role_downgrade_keeps_health_readable_but_refuses_emergency_toggle(): void
+    {
+        DB::table('system_controls')->insert([
+            'key' => 'synthetic_emergency_switch',
+            'value' => 'enabled',
+            'description' => 'Fictional capability boundary only',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $admin = AdminUser::firstOrFail();
+        $this->actingAs($admin, 'admin');
+        AdminUser::whereKey($admin->id)->update(['role' => 'support']);
+
+        $this->get('/admin/system-control')
+            ->assertOk()
+            ->assertSee('System health is visible, but emergency controls are read-only for this account.')
+            ->assertDontSee('action="'.route('saas.admin.system.toggle', 'synthetic_emergency_switch').'"', false);
+        $this->post(route('saas.admin.system.toggle', 'synthetic_emergency_switch'))->assertForbidden();
+
+        $this->assertSame('enabled', DB::table('system_controls')->where('key', 'synthetic_emergency_switch')->value('value'));
+        $this->assertSame(0, DB::table('admin_audit_logs')->count());
+    }
+
+    public function test_persisted_admin_retains_emergency_toggle_authority(): void
+    {
+        DB::table('system_controls')->insert([
+            'key' => 'synthetic_admin_switch',
+            'value' => 'enabled',
+            'description' => 'Fictional established admin authority',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $admin = AdminUser::firstOrFail();
+        $admin->update(['role' => 'admin']);
+
+        $this->actingAs($admin, 'admin')
+            ->post(route('saas.admin.system.toggle', 'synthetic_admin_switch'))
+            ->assertRedirect();
+
+        $this->assertSame('disabled', DB::table('system_controls')->where('key', 'synthetic_admin_switch')->value('value'));
+        $this->assertSame(1, DB::table('admin_audit_logs')->count());
     }
 
     // ──────────────────────────────── tests ──────────────────────────────────

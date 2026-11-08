@@ -218,6 +218,12 @@ export async function securityOnboardingWorkflow(page,t,v,{baseUrl,login,saveEvi
   const settingsForbidden=await page.request.post(baseUrl+'/admin/settings/test-email',{form:{_token:billingCsrf},maxRedirects:0});
   if(settingsForbidden.status()!==403)throw Error('Viewer sensitive configuration POST not refused');
   await saveEvidenceScreenshot(page,'rc-security-sensitive-settings-viewer-'+v.width);
+  await page.goto(baseUrl+'/admin/system-control',{waitUntil:'domcontentloaded'});
+  await page.getByText('System health is visible, but emergency controls are read-only for this account.',{exact:true}).waitFor();
+  if(await page.locator('form[action*="/admin/system-control/"]').count())throw Error('Viewer received emergency system-control form');
+  const systemForbidden=await page.request.post(baseUrl+'/admin/system-control/synthetic-browser-refusal/toggle',{form:{_token:billingCsrf},maxRedirects:0});
+  if(systemForbidden.status()!==403)throw Error('Viewer emergency system-control POST not refused');
+  await saveEvidenceScreenshot(page,'rc-security-system-controls-viewer-'+v.width);
   for(const path of ['/admin/live-ops','/admin/agent-claims','/admin/reporting/oauth/authorize','/admin/deployment-approval']) {
     const superAdminOnly=await page.request.get(baseUrl+path,{maxRedirects:0});
     if(superAdminOnly.status()!==403)throw Error('Viewer reached super-admin-only operation: '+path);
@@ -237,5 +243,5 @@ export async function securityOnboardingWorkflow(page,t,v,{baseUrl,login,saveEvi
   await page.getByText('REOPENED',{exact:true}).waitFor();
   if(await page.getByText('Synthetic recurrence received after explicit resolution.',{exact:true}).count()!==1)throw Error('Support reopen evidence missing from timeline');
   await saveEvidenceScreenshot(page,'rc-security-support-case-'+v.width);
-  pass('SECURITY ONBOARDING PASS: '+v.width+': incomplete setup refused, explicit skip, configured completion, actual password form and independent old-session revocation/fresh login; optional two-step enrollment, fresh authenticator login, single-use recovery and disable; password-verified company deletion request retains the owner/company pending review; Local Bills Viewer password reset revokes the old browser and permits a fresh login; billing, customer-update, tutorial, announcement, survey and sensitive configuration controls stay read-only for viewer; Live Ops, agent claims, reporting consent and deployment approval stay super-admin-only; durable support ownership, explicit resolution build and reopen timeline');
+  pass('SECURITY ONBOARDING PASS: '+v.width+': incomplete setup refused, explicit skip, configured completion, actual password form and independent old-session revocation/fresh login; optional two-step enrollment, fresh authenticator login, single-use recovery and disable; password-verified company deletion request retains the owner/company pending review; Local Bills Viewer password reset revokes the old browser and permits a fresh login; billing, customer-update, tutorial, announcement, survey, sensitive configuration and emergency system controls stay read-only for viewer; Live Ops, agent claims, reporting consent and deployment approval stay super-admin-only; durable support ownership, explicit resolution build and reopen timeline');
 }

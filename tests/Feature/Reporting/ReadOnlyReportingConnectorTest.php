@@ -410,6 +410,35 @@ class ReadOnlyReportingConnectorTest extends TestCase
         $this->get('/admin/reporting/oauth/authorize?'.http_build_query($p))->assertForbidden();
     }
 
+    public function test_cached_super_admin_cannot_issue_reporting_consent_after_persisted_downgrade(): void
+    {
+        $registered = $this->postJson('/api/reporting/oauth/register', [
+            'client_name' => 'Downgrade reporting client',
+            'redirect_uris' => ['https://chatgpt.com/connector_platform_oauth_redirect'],
+            'token_endpoint_auth_method' => 'none',
+        ])->assertCreated()->json();
+        $params = [
+            'client_id' => $registered['client_id'],
+            'redirect_uri' => $registered['redirect_uris'][0],
+            'response_type' => 'code',
+            'code_challenge' => str_repeat('a', 43),
+            'code_challenge_method' => 'S256',
+            'resource' => 'http://localhost/api/reporting/mcp',
+            'scope' => 'taxnest.reports.read',
+            'state' => 'downgrade-state',
+        ];
+
+        $this->actingAs($this->owner, 'admin');
+        AdminUser::whereKey($this->owner->id)->update(['role' => 'support']);
+
+        $this->get('/admin/reporting/oauth/authorize?'.http_build_query($params))->assertForbidden();
+        $this->post('/admin/reporting/oauth/authorize', $params + [
+            'decision' => 'approve',
+            'company_scope' => 'all',
+        ])->assertForbidden();
+        $this->assertSame(0, DB::table('reporting_oauth_codes')->count());
+    }
+
     public function test_branch_counter_payment_filters_and_safe_operational_sources(): void
     {
         Schema::table('pos_transactions', function (Blueprint $t) {

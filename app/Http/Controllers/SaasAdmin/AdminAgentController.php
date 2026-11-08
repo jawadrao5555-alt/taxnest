@@ -4,6 +4,7 @@ namespace App\Http\Controllers\SaasAdmin;
 
 use App\Http\Controllers\Controller;
 use App\Models\AdminAuditLog;
+use App\Models\AdminUser;
 use App\Models\Agent;
 use App\Models\AgentCommission;
 use App\Models\Company;
@@ -26,10 +27,7 @@ class AdminAgentController extends Controller
     /** Super-admin gate — the whole section is invisible to normal admins. */
     private function assertSuperAdmin(): void
     {
-        $admin = auth('admin')->user();
-        if (!$admin || !$admin->isSuperAdmin()) {
-            abort(403, 'Super admin only.');
-        }
+        AdminUser::requireSuperAdministrator();
     }
 
     public function index()

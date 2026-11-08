@@ -292,6 +292,6 @@ class OwnerDeploymentApprovalController extends Controller
 
     private function authorizeOwner(): void
     {
-        abort_unless(auth('admin')->user()?->isSuperAdmin(), 403);
+        \App\Models\AdminUser::requireSuperAdministrator();
     }
 }

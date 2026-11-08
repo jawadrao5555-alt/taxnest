@@ -26,6 +26,10 @@ class OptionalLocalBillArchiveTest extends TestCase
         config(['app.key' => 'base64:'.base64_encode(str_repeat('t', 32))]);
         $this->keyRoot = sys_get_temp_dir().'/taxnest-optional-copy-test-'.bin2hex(random_bytes(8));
         config(['local_bill_archive.key_root' => $this->keyRoot]);
+        Schema::create('admin_users', function (Blueprint $t) {
+            $t->id(); $t->string('name'); $t->string('email'); $t->string('password');
+            $t->string('role'); $t->rememberToken(); $t->timestamps();
+        });
         Schema::create('companies', function (Blueprint $t) {
             $t->id(); $t->string('name'); $t->string('product_type');
             $t->boolean('pra_reporting_enabled')->default(false); $t->boolean('fbr_reporting_enabled')->default(false);
@@ -66,6 +70,21 @@ class OptionalLocalBillArchiveTest extends TestCase
     private function owner(int $company = 1): User
     {
         return (new User)->forceFill(['id' => 100 + $company, 'company_id' => $company, 'role' => 'company_admin', 'name' => 'Fictional owner', 'is_active' => true]);
+    }
+
+    private function admin(int $id, string $role): AdminUser
+    {
+        DB::table('admin_users')->insert([
+            'id' => $id,
+            'name' => 'Fictional '.$role,
+            'email' => $role.'-'.$id.'@example.test',
+            'password' => 'not-used',
+            'role' => $role,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return AdminUser::findOrFail($id);
     }
 
     private function bill(array $attrs = [], string $product = 'pos')
@@ -149,13 +168,13 @@ class OptionalLocalBillArchiveTest extends TestCase
         $archive = app(\App\Services\SaasLocalBillRecord::class);
         auth('pos')->setUser($this->owner());
         foreach (['company', 'support'] as $role) {
-            if ($role === 'support') auth('admin')->setUser((new AdminUser)->forceFill(['id' => 901, 'role' => 'support']));
+            if ($role === 'support') auth('admin')->setUser($this->admin(901, 'support'));
             try { $controller->download(1, $mine, $archive); $this->fail('Non-super-admin read allowed'); }
             catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) { $this->assertSame(403, $e->getStatusCode()); }
             try { $controller->destroy(1, $mine); $this->fail('Non-super-admin delete allowed'); }
             catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) { $this->assertSame(403, $e->getStatusCode()); }
         }
-        auth('admin')->setUser((new AdminUser)->forceFill(['id' => 900, 'role' => 'super_admin']));
+        auth('admin')->setUser($this->admin(900, 'super_admin'));
         try { $controller->download(1, $other, $archive); $this->fail('Cross-company copy read'); }
         catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) { $this->assertSame(404, $e->getStatusCode()); }
         try { $controller->destroy(1, $other); $this->fail('Cross-company copy deleted'); }
@@ -347,7 +366,7 @@ class OptionalLocalBillArchiveTest extends TestCase
             try { $this->archive->grant(1, $user, 30, now()->addDays(7)); $this->fail('Only the real tenant owner may consent'); }
             catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) { $this->assertSame(403, $e->getStatusCode()); }
         }
-        $this->actingAs((new AdminUser)->forceFill(['id' => 900, 'role' => 'super_admin']), 'admin');
+        $this->actingAs($this->admin(900, 'super_admin'), 'admin');
         try { $this->grant(); $this->fail('Admin impersonation cannot grant consent'); }
         catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) { $this->assertSame(403, $e->getStatusCode()); }
         $this->assertSame(0, DB::table('support_bill_archive_consents')->count());
@@ -403,7 +422,7 @@ class OptionalLocalBillArchiveTest extends TestCase
             try { $controller->download($request, $denied, $this->archive); $this->fail('Wrong scope exported'); }
             catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) { $this->assertSame(404, $e->getStatusCode()); }
         }
-        auth('admin')->setUser((new AdminUser)->forceFill(['id' => 900, 'role' => 'super_admin']));
+        auth('admin')->setUser($this->admin(900, 'super_admin'));
         $response = $controller->adminDownload(2, $otherId, $this->archive);
         $this->assertSame(200, $response->getStatusCode());
         $this->assertSame(2, json_decode($response->getContent(), true, 512, JSON_THROW_ON_ERROR)['company_id']);
@@ -411,7 +430,7 @@ class OptionalLocalBillArchiveTest extends TestCase
         catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) { $this->assertSame(404, $e->getStatusCode()); }
         $this->assertSame(1, DB::table('support_bill_archive_access')->where('actor_guard', 'admin')->where('action', 'export')->where('company_id', 2)->count());
         $this->assertSame($before, DB::table('pos_transactions')->get()->map(fn ($row) => (array) $row)->all());
-        auth('admin')->setUser((new AdminUser)->forceFill(['id' => 901, 'role' => 'support']));
+        auth('admin')->setUser($this->admin(901, 'support'));
         try { $controller->adminDownload(1, $id, $this->archive); $this->fail('Non-superadmin read allowed'); }
         catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) { $this->assertSame(403, $e->getStatusCode()); }
     }

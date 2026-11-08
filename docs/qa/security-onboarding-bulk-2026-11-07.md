@@ -700,3 +700,36 @@ real-Chromium acceptance is required for the published exact HEAD. This does
 not claim that the combined page has been split into independent billing,
 release, AI and messaging screens, and the broader capability/consent/import/
 restore/UI checklist remains open.
+
+## Persisted super-admin authority for cross-tenant operations
+
+Several older super-admin-only paths rechecked `isSuperAdmin()` on the
+administrator object cached in the browser guard. A role downgrade written by
+another administrator could therefore leave that already-open browser able to
+reach Live Ops diagnostics/remediation, distributor and claim controls,
+franchise financial actions, SaaS local-record/support-copy administration,
+read-only reporting consent, archive-viewer administration or the owner
+deployment-approval screen until its session was rebuilt.
+
+Those paths now use one shared check which reloads the administrator row before
+authorizing the request and requires the persisted role still to be
+`super_admin`. This preserves every established super-admin-only policy and
+does not grant support/viewer roles a new read or write. Actual HTTP regressions
+retain a super-admin model in the guard, downgrade only its database row, then
+require immediate 403 responses for Live Ops reads/diagnosis/proposals,
+distributor claim approval, reporting consent and deployment-approval request
+creation. The fictional remediation, company attribution, claim, OAuth code
+and deployment-request rows remain unchanged.
+
+The focused PHP8.3/SQLite set covering those paths and their existing positive
+behaviour passes **73 tests / 578 assertions**, plus PHP syntax and diff checks.
+The affected optional-copy, franchise, company-form/bin and legacy admin-action
+compatibility sets also pass **91 tests / 567 assertions**. Their old direct
+controller fixtures were corrected to authenticate persisted fictional
+administrators, matching the production boundary instead of relying on an
+unsaved model; no authorization assertion was removed.
+PHP8.3 remains below the supported PHP8.4 contract and SQLite is not native
+concurrency proof; fresh exact-HEAD hosted PHP8.4/full-suite/browser/final
+validate evidence is required. No deployment was approved or requested, no
+remediation was executed and no production/customer state was touched. The
+broader route/job/export capability matrix remains open.

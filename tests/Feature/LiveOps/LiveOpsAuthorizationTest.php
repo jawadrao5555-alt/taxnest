@@ -175,6 +175,28 @@ class LiveOpsAuthorizationTest extends LiveOpsTestCase
         ])->assertStatus(403);
     }
 
+    public function test_cached_super_admin_is_revoked_immediately_after_persisted_downgrade(): void
+    {
+        $companyId = $this->makeCompany('Downgrade Operations Shop');
+        $admin = $this->makeAdmin('downgraded-live-ops@taxnest.test', 'super_admin');
+
+        $this->actingAs($admin, 'admin');
+        AdminUser::whereKey($admin->id)->update(['role' => 'support']);
+
+        $before = DB::table('live_ops_remediation_requests')->count();
+        $this->get('/admin/live-ops')->assertForbidden();
+        $this->post('/admin/live-ops/diagnose', [
+            'operation' => 'COMPANY_DIAGNOSTIC',
+            'company_id' => $companyId,
+        ])->assertForbidden();
+        $this->post('/admin/live-ops/propose', [
+            'action' => 'REFRESH_OPERATIONAL_STATE',
+            'company_id' => $companyId,
+        ])->assertForbidden();
+
+        $this->assertSame($before, DB::table('live_ops_remediation_requests')->count());
+    }
+
     /** F) Cross-company data leakage prevention in diagnostics + search. */
     public function test_f_cross_company_leakage_prevention(): void
     {

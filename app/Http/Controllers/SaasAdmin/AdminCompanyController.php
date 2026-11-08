@@ -719,10 +719,7 @@ class AdminCompanyController extends Controller
     /** Super-admin gate — shared by every archive-viewer admin action. */
     private function assertSuperAdmin(): void
     {
-        $admin = auth('admin')->user();
-        if (!$admin || !$admin->isSuperAdmin()) {
-            abort(403, 'Super admin only.');
-        }
+        \App\Models\AdminUser::requireSuperAdministrator();
     }
 
     public function storeArchiveViewer(Request $request, $id)

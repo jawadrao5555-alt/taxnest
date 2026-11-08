@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Reporting;
 
 use App\Http\Controllers\Controller;
+use App\Models\AdminUser;
 use App\Services\Reporting\ReportingOAuth;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -13,10 +14,7 @@ final class OAuthController extends Controller
 
     private function owner(): object
     {
-        $owner = auth('admin')->user();
-        abort_unless($owner?->isSuperAdmin(), 403);
-
-        return $owner;
+        return AdminUser::requireSuperAdministrator();
     }
 
     public function resource()

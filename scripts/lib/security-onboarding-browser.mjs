@@ -218,6 +218,10 @@ export async function securityOnboardingWorkflow(page,t,v,{baseUrl,login,saveEvi
   const settingsForbidden=await page.request.post(baseUrl+'/admin/settings/test-email',{form:{_token:billingCsrf},maxRedirects:0});
   if(settingsForbidden.status()!==403)throw Error('Viewer sensitive configuration POST not refused');
   await saveEvidenceScreenshot(page,'rc-security-sensitive-settings-viewer-'+v.width);
+  for(const path of ['/admin/live-ops','/admin/agent-claims','/admin/reporting/oauth/authorize','/admin/deployment-approval']) {
+    const superAdminOnly=await page.request.get(baseUrl+path,{maxRedirects:0});
+    if(superAdminOnly.status()!==403)throw Error('Viewer reached super-admin-only operation: '+path);
+  }
   await page.context().clearCookies();
   await login(page,{...t,loginPath:'/admin/login',login:fixture.supportAdmin,password:t.password});
   await page.goto(baseUrl+'/admin/support-cases/'+fixture.supportCaseId,{waitUntil:'domcontentloaded'});
@@ -233,5 +237,5 @@ export async function securityOnboardingWorkflow(page,t,v,{baseUrl,login,saveEvi
   await page.getByText('REOPENED',{exact:true}).waitFor();
   if(await page.getByText('Synthetic recurrence received after explicit resolution.',{exact:true}).count()!==1)throw Error('Support reopen evidence missing from timeline');
   await saveEvidenceScreenshot(page,'rc-security-support-case-'+v.width);
-  pass('SECURITY ONBOARDING PASS: '+v.width+': incomplete setup refused, explicit skip, configured completion, actual password form and independent old-session revocation/fresh login; optional two-step enrollment, fresh authenticator login, single-use recovery and disable; password-verified company deletion request retains the owner/company pending review; Local Bills Viewer password reset revokes the old browser and permits a fresh login; billing, customer-update, tutorial, announcement, survey and sensitive configuration controls stay read-only for viewer; durable support ownership, explicit resolution build and reopen timeline');
+  pass('SECURITY ONBOARDING PASS: '+v.width+': incomplete setup refused, explicit skip, configured completion, actual password form and independent old-session revocation/fresh login; optional two-step enrollment, fresh authenticator login, single-use recovery and disable; password-verified company deletion request retains the owner/company pending review; Local Bills Viewer password reset revokes the old browser and permits a fresh login; billing, customer-update, tutorial, announcement, survey and sensitive configuration controls stay read-only for viewer; Live Ops, agent claims, reporting consent and deployment approval stay super-admin-only; durable support ownership, explicit resolution build and reopen timeline');
 }

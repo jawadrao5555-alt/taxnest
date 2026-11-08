@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\SaasAdmin;
 
 use App\Http\Controllers\Controller;
-use App\Models\{AdminAuditLog, Company};
+use App\Models\{AdminAuditLog, AdminUser, Company};
 use App\Services\SaasLocalBillRecord;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\{DB, Schema};
@@ -12,7 +12,7 @@ class AdminLocalBillRecordController extends Controller
 {
     private function company(int $companyId): Company
     {
-        abort_unless(auth('admin')->user()?->isSuperAdmin(), 403);
+        AdminUser::requireSuperAdministrator();
         abort_unless(Schema::hasTable('saas_local_bill_records'), 503);
         return Company::where('product_type', 'pos')->findOrFail($companyId);
     }

@@ -87,4 +87,13 @@ class AdminUser extends Authenticatable
 
         return $current;
     }
+
+    public static function requireSuperAdministrator(): self
+    {
+        $actor = auth('admin')->user();
+        $current = $actor instanceof self ? $actor->fresh() : null;
+        abort_unless($current && $current->isSuperAdmin(), 403, 'Super admin only.');
+
+        return $current;
+    }
 }

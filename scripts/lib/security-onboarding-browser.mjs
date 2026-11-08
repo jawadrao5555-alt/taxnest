@@ -233,6 +233,16 @@ export async function securityOnboardingWorkflow(page,t,v,{baseUrl,login,saveEvi
   if(await page.getByText('Admin panel (encrypted)',{exact:true}).count())throw Error('Viewer received Madadgar key source');
   await saveEvidenceScreenshot(page,'rc-security-madadgar-settings-viewer-'+v.width);
   const legacyCompany=fixture.viewer.companyId;
+  await page.goto(baseUrl+'/admin/company/'+legacyCompany,{waitUntil:'domcontentloaded'});
+  await page.getByText('Legacy company history is read-only for this account.',{exact:false}).waitFor();
+  if(await page.locator('form[action^="/admin/company/'+legacyCompany+'/"],form[action^="'+baseUrl+'/admin/company/'+legacyCompany+'/"]').count())throw Error('Viewer received legacy company write controls');
+  await saveEvidenceScreenshot(page,'rc-security-legacy-company-history-viewer-'+v.width);
+  await page.goto(baseUrl+'/admin/company/'+legacyCompany+'/pos-features',{waitUntil:'domcontentloaded'});
+  await page.getByText('POS feature configuration is read-only for this account.',{exact:false}).waitFor();
+  if(await page.locator('form[action*="/admin/company/'+legacyCompany+'/pos-features"]').count())throw Error('Viewer received legacy POS feature write controls');
+  await saveEvidenceScreenshot(page,'rc-security-legacy-pos-features-viewer-'+v.width);
+  const legacyCreateRefused=await page.request.get(baseUrl+'/admin/di-companies/create',{maxRedirects:0});
+  if(legacyCreateRefused.status()!==403)throw Error('Viewer received legacy company create form');
   await page.goto(baseUrl+'/admin/companies/'+legacyCompany,{waitUntil:'domcontentloaded'});
   await page.getByText('Read-only company access.',{exact:false}).waitFor();
   if(await page.locator([

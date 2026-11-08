@@ -903,3 +903,22 @@ now visits both real read screens, requires the read-only notices and absence
 of forms/key-source disclosure, and retains the existing direct POST refusal.
 This local PHP8.3/SQLite evidence is supplemental; fresh exact-HEAD hosted
 PHP8.4 and real-Chromium acceptance remains required.
+
+The older company account and POS-feature screens still emitted lifecycle,
+billing, internal-account, inventory, FBR POS and module-override forms to a
+read-only administrator. Their mutation endpoints were protected, but hidden
+HTML controls could still misrepresent authority and expose a stale-session
+workflow. Both reads now reload the persisted administrator row. Company,
+plan, compliance, activity, current limits, category and granted-extra history
+remain visible, while support/viewer/unmapped roles receive explicit read-only
+notices and no mutation forms. The legacy company-create GET now requires the
+same billing authority as its POST. POS category changes use the same fresh
+actor snapshot rather than the guard-cached role.
+
+Existing administrators retain both complete screens and their established
+write controls. Focused billing, account, company-form, product-type and
+tables-first compatibility coverage passes **70 tests / 1605 assertions**,
+with Blade compilation, Node syntax and diff checks. The required 1366/390
+journey now exercises both retained read-only screens and directly refuses the
+legacy create form; fresh exact-HEAD hosted PHP8.4/browser evidence remains
+required.

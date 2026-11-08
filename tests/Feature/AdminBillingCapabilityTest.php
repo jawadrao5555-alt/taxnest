@@ -145,6 +145,7 @@ class AdminBillingCapabilityTest extends TestCase
         $this->actingAs($this->admin('viewer'), 'admin');
         $this->get('/admin/companies/create')->assertForbidden();
         $this->get('/admin/companies/'.$sub->company_id.'/edit')->assertForbidden();
+        $this->get('/admin/di-companies/create')->assertForbidden();
         $this->get('/admin/subscriptions')->assertOk()->assertSee('Fictional capability company')
             ->assertDontSee('action="'.route('saas.admin.subscriptions.assign').'"', false)
             ->assertDontSee('action="'.route('saas.admin.subscriptions.toggle', $sub->id).'"', false);
@@ -158,6 +159,22 @@ class AdminBillingCapabilityTest extends TestCase
             ->assertDontSee('+ Add User')
             ->assertDontSee('id="addUserModal"', false)
             ->assertDontSee('action="/admin/all-users"', false);
+        $this->get('/admin/company/'.$sub->company_id)->assertOk()
+            ->assertSee('Legacy company history is read-only for this account.')
+            ->assertSee('Fictional capability company')
+            ->assertDontSee('action="/admin/company/'.$sub->company_id.'/approve"', false)
+            ->assertDontSee('action="/admin/company/'.$sub->company_id.'/suspend"', false)
+            ->assertDontSee('action="/admin/company/'.$sub->company_id.'/change-plan"', false)
+            ->assertDontSee('action="/admin/company/'.$sub->company_id.'/update-limits"', false)
+            ->assertDontSee('action="/admin/company/'.$sub->company_id.'/toggle-internal"', false)
+            ->assertDontSee('action="/admin/company/'.$sub->company_id.'/toggle-inventory"', false)
+            ->assertDontSee('action="/admin/company/'.$sub->company_id.'/toggle-fbr-pos"', false);
+        $this->get('/admin/company/'.$sub->company_id.'/pos-features')->assertOk()
+            ->assertSee('POS feature configuration is read-only for this account.')
+            ->assertSee('Current module state')
+            ->assertDontSee('action="/admin/company/'.$sub->company_id.'/pos-features"', false)
+            ->assertDontSee('/pos-features/extras', false)
+            ->assertDontSee('Save Override');
     }
 
     public function test_existing_admin_and_owner_billing_authority_is_preserved(): void
@@ -167,6 +184,13 @@ class AdminBillingCapabilityTest extends TestCase
             $this->actingAs($this->admin($role), 'admin');
             $this->post('/admin/subscriptions/'.$sub->id.'/toggle')->assertRedirect();
             $this->assertFalse((bool) $sub->fresh()->active);
+            $this->get('/admin/company/'.$sub->company_id)->assertOk()
+                ->assertDontSee('Legacy company history is read-only for this account.')
+                ->assertSee('/admin/company/'.$sub->company_id.'/change-plan', false);
+            $this->get('/admin/company/'.$sub->company_id.'/pos-features')->assertOk()
+                ->assertDontSee('POS feature configuration is read-only for this account.')
+                ->assertSee('/admin/company/'.$sub->company_id.'/pos-features', false)
+                ->assertSee('Save Override');
         }
     }
 

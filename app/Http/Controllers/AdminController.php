@@ -185,6 +185,8 @@ class AdminController extends Controller
 
     public function createCompany()
     {
+        \App\Models\AdminUser::requireBillingAdministrator();
+
         return view('admin.company-create');
     }
 
@@ -855,6 +857,10 @@ class AdminController extends Controller
 
     public function companyShow(Company $company)
     {
+        $currentAdmin = auth('admin')->user()?->fresh();
+        $canManageCompanyLifecycle = (bool) $currentAdmin?->canManageCompanyLifecycle();
+        $canManageBilling = (bool) $currentAdmin?->canManageBilling();
+
         $invoiceIds = Invoice::where('company_id', $company->id)->pluck('id');
 
         $stats = [
@@ -943,7 +949,7 @@ class AdminController extends Controller
 
         $plans = PricingPlan::all();
 
-        return view('admin.company-show', compact('company', 'stats', 'activePlan', 'users', 'financial', 'compliance', 'activityLogs', 'plans'));
+        return view('admin.company-show', compact('company', 'stats', 'activePlan', 'users', 'financial', 'compliance', 'activityLogs', 'plans', 'canManageCompanyLifecycle', 'canManageBilling'));
     }
 
     public function toggleInternalAccount(Request $request, Company $company)
@@ -990,6 +996,9 @@ class AdminController extends Controller
      */
     public function posFeatures(Company $company)
     {
+        $currentAdmin = auth('admin')->user()?->fresh();
+        $canManageBilling = (bool) $currentAdmin?->canManageBilling();
+        $isSuperAdmin = (bool) $currentAdmin?->isSuperAdmin();
         $features = \App\Services\PosFeatureService::forCompany($company);
         $categoryModules = \App\Services\PosFeatureService::categoryModules($company);
         $extraModules = \App\Services\PosFeatureService::extraModules($company);
@@ -1004,7 +1013,9 @@ class AdminController extends Controller
             'features',
             'categoryModules',
             'extraModules',
-            'grantableModules'
+            'grantableModules',
+            'canManageBilling',
+            'isSuperAdmin'
         ));
     }
 

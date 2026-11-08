@@ -224,7 +224,7 @@ export async function securityOnboardingWorkflow(page,t,v,{baseUrl,login,saveEvi
   const systemForbidden=await page.request.post(baseUrl+'/admin/system-control/synthetic-browser-refusal/toggle',{form:{_token:billingCsrf},maxRedirects:0});
   if(systemForbidden.status()!==403)throw Error('Viewer emergency system-control POST not refused');
   await saveEvidenceScreenshot(page,'rc-security-system-controls-viewer-'+v.width);
-  for(const path of ['/admin/live-ops','/admin/agent-claims','/admin/reporting/oauth/authorize','/admin/deployment-approval']) {
+  for(const path of ['/admin/live-ops','/admin/live-activity','/admin/agent-claims','/admin/reporting/oauth/authorize','/admin/deployment-approval']) {
     const superAdminOnly=await page.request.get(baseUrl+path,{maxRedirects:0});
     if(superAdminOnly.status()!==403)throw Error('Viewer reached super-admin-only operation: '+path);
   }

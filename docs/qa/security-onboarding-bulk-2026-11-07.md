@@ -744,3 +744,11 @@ control and audit rows unchanged; a persisted ordinary admin still toggles and
 audits successfully. Focused coverage passes **7 tests / 50 assertions**. The
 required 1366/390 journey now checks the real page, absence of forms and direct
 POST refusal without changing any control.
+
+The cross-tenant Live Activity dashboard also used the administrator role
+cached in the guard. It now shares the persisted super-admin boundary, so a
+browser is refused immediately after its administrator row is downgraded. The
+existing ordinary-admin denial and super-admin aggregation behaviour are
+unchanged. The required 1366/390 journey now includes the real dashboard in its
+super-admin-only refusal set; it does not create sales, heartbeats or fiscal
+events.

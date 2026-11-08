@@ -221,6 +221,16 @@ class AdminLiveActivityTest extends TestCase
             ->assertStatus(403);
     }
 
+    /** A browser with a cached former super-admin cannot read cross-tenant activity. */
+    public function test_cached_super_admin_is_refused_after_persisted_downgrade(): void
+    {
+        $admin = AdminUser::firstOrFail();
+        $this->actingAs($admin, 'admin');
+        AdminUser::whereKey($admin->id)->update(['role' => 'support']);
+
+        $this->get('/admin/live-activity')->assertForbidden();
+    }
+
     /** Unauthenticated guests are redirected to admin login. */
     public function test_unauthenticated_redirected_to_login(): void
     {

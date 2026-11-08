@@ -258,6 +258,8 @@ class FeatureSuggestionController extends Controller
 
     public function adminIndex(Request $request)
     {
+        $currentAdmin = auth('admin')->user()?->fresh();
+        $canManageRelease = (bool) $currentAdmin?->canManageRelease();
         $status = $request->query('status');
         $query = FeatureSuggestion::with(['user', 'company'])->orderByDesc('created_at');
         if (in_array($status, FeatureSuggestion::STATUSES, true)) {
@@ -269,7 +271,7 @@ class FeatureSuggestionController extends Controller
         $hotGroups = $this->computeHotGroups();
         $praElaanTally = $this->computePraElaanTally();
 
-        return view('admin.feature-suggestions', compact('suggestions', 'counts', 'status', 'hotGroups', 'praElaanTally'));
+        return view('admin.feature-suggestions', compact('suggestions', 'counts', 'status', 'hotGroups', 'praElaanTally', 'canManageRelease'));
     }
 
     /**

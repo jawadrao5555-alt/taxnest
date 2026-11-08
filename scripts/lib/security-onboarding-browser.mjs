@@ -257,6 +257,16 @@ export async function securityOnboardingWorkflow(page,t,v,{baseUrl,login,saveEvi
   await page.getByText('HS mapping configuration and change history are read-only for this account.',{exact:true}).waitFor();
   if(await page.locator('form[method="POST"],form[method="post"]').count())throw Error('Viewer received HS mapping mutation form');
   await saveEvidenceScreenshot(page,'rc-security-hs-configuration-viewer-'+v.width);
+  await page.goto(baseUrl+'/admin/invoice-override',{waitUntil:'domcontentloaded'});
+  await page.getByText('Invoice state and FBR-status history are read-only for this account.',{exact:true}).waitFor();
+  if(await page.locator('script').filter({hasText:'overrideAction'}).count())throw Error('Viewer received invoice-override mutation script');
+  await page.goto(baseUrl+'/admin/fbr/failed-invoices',{waitUntil:'domcontentloaded'});
+  await page.getByText('Failed-invoice evidence is read-only for this account; no retry can be queued.',{exact:true}).waitFor();
+  if(await page.locator('form[action*="/admin/fbr/retry/"]').count())throw Error('Viewer received failed-invoice retry form');
+  await page.goto(baseUrl+'/admin/feature-suggestions',{waitUntil:'domcontentloaded'});
+  await page.getByText('Feature-suggestion demand, responses and decision history are read-only for this account.',{exact:true}).waitFor();
+  if(await page.locator('form[action*="/admin/feature-suggestions/"]').count())throw Error('Viewer received feature-suggestion decision form');
+  await saveEvidenceScreenshot(page,'rc-security-operational-history-viewer-'+v.width);
   const legacyCompany=fixture.viewer.companyId;
   await page.goto(baseUrl+'/admin/company/'+legacyCompany,{waitUntil:'domcontentloaded'});
   await page.getByText('Legacy company history is read-only for this account.',{exact:false}).waitFor();

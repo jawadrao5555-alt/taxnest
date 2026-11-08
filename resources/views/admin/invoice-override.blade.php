@@ -6,6 +6,10 @@
     <div class="py-8">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
+            @unless($canManageSensitiveConfiguration)
+                <div class="mb-6 p-4 rounded-xl bg-amber-100 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/60 text-sm text-amber-800 dark:text-amber-200">Invoice state and FBR-status history are read-only for this account.</div>
+            @endunless
+
             <div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6 mb-6">
                 <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Search Invoices</h3>
                 <form method="GET" action="/admin/invoice-override" class="flex gap-4">
@@ -14,7 +18,9 @@
                 </form>
             </div>
 
-            <div id="statusMessage" class="hidden mb-4 px-4 py-3 rounded-lg text-sm font-medium"></div>
+            @if($canManageSensitiveConfiguration)
+                <div id="statusMessage" class="hidden mb-4 px-4 py-3 rounded-lg text-sm font-medium"></div>
+            @endif
 
             @if(request('q'))
             <div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden">
@@ -68,6 +74,7 @@
                                 </td>
                                 <td class="py-3 px-4 text-gray-600 dark:text-gray-400">{{ $invoice->fbr_invoice_number ?? '-' }}</td>
                                 <td class="py-3 px-4 text-center">
+                                    @if($canManageSensitiveConfiguration)
                                     <div class="flex items-center justify-center gap-2 flex-wrap">
                                         <button onclick="overrideAction({{ $invoice->id }}, 'lock')" class="inline-flex items-center px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs font-medium hover:bg-green-700 transition" title="Lock Invoice">
                                             <svg class="w-3.5 h-3.5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
@@ -85,6 +92,9 @@
                                             <option value="pending">Pending</option>
                                         </select>
                                     </div>
+                                    @else
+                                    <span class="text-xs text-gray-400">Read only</span>
+                                    @endif
                                 </td>
                             </tr>
                             @endforeach
@@ -103,6 +113,7 @@
         </div>
     </div>
 
+    @if($canManageSensitiveConfiguration)
     <script>
         const csrfToken = '{{ csrf_token() }}';
 
@@ -191,4 +202,5 @@
             .catch(() => showMessage('An error occurred. Please try again.', true));
         }
     </script>
+    @endif
 </x-admin-layout>

@@ -201,6 +201,13 @@ class AdminReleaseCapabilityTest extends TestCase
             ->assertDontSee('id="editSurveyModal"', false)
             ->assertDontSee(route('admin.surveys.feature-toggle'), false)
             ->assertDontSee(route('admin.surveys.toggle-close', $this->survey->id), false);
+
+        $this->actingAs($this->actor, 'admin')->get('/admin/feature-suggestions')
+            ->assertOk()
+            ->assertSee($this->suggestion->title)
+            ->assertSee('Feature-suggestion demand, responses and decision history are read-only for this account.')
+            ->assertDontSee("/admin/feature-suggestions/{$this->suggestion->id}/status", false)
+            ->assertDontSee("/admin/feature-suggestions/{$this->suggestion->id}/delete", false);
     }
 
     public function test_existing_administrator_role_retains_release_authority(): void
@@ -226,5 +233,11 @@ class AdminReleaseCapabilityTest extends TestCase
             ->post("/admin/surveys/{$this->survey->id}/toggle-close")
             ->assertRedirect();
         $this->assertNotNull($this->survey->fresh()->closed_at);
+
+        $this->actingAs($this->actor, 'admin')->get('/admin/feature-suggestions')
+            ->assertOk()
+            ->assertDontSee('Feature-suggestion demand, responses and decision history are read-only for this account.')
+            ->assertSee("/admin/feature-suggestions/{$this->suggestion->id}/status", false)
+            ->assertSee("/admin/feature-suggestions/{$this->suggestion->id}/delete", false);
     }
 }

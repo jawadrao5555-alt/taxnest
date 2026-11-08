@@ -39,6 +39,21 @@ class AdminSensitiveSettingsCapabilityTest extends TestCase
             'schedule_type' => 'standard',
             'default_tax_rate' => 18,
         ]);
+        $failedCompany = Company::create([
+            'name' => 'Fictional retained failed-invoice company',
+            'ntn' => 'FAILED-INVOICE-HISTORY',
+            'product_type' => 'di',
+        ]);
+        $failedInvoice = Invoice::create([
+            'company_id' => $failedCompany->id,
+            'invoice_number' => 'FICTIONAL-FAILED-INVOICE',
+            'buyer_name' => 'Fictional buyer',
+            'status' => 'draft',
+            'fbr_status' => 'failed',
+            'total_amount' => 1,
+            'retry_count' => 0,
+        ]);
+        config(['features.enable_fbr_retry_system' => true]);
 
         $this->actingAs($actor, 'admin');
         // Preserve the cached super-admin model while another administrator
@@ -47,6 +62,7 @@ class AdminSensitiveSettingsCapabilityTest extends TestCase
         $settingsBefore = DB::table('system_settings')->orderBy('id')->get()
             ->map(fn ($row) => (array) $row)->all();
         $auditBefore = DB::table('admin_audit_logs')->count();
+        $failedInvoiceBefore = $failedInvoice->fresh()->getAttributes();
         $fiscalConfigurationBefore = collect([
             'fbr_hs_rate_links',
             'global_hs_master',
@@ -107,6 +123,15 @@ class AdminSensitiveSettingsCapabilityTest extends TestCase
             ->assertDontSee('method="POST" action="'.route('admin.hs-mapping-engine.store').'"', false)
             ->assertDontSee('method="POST" action="'.route('admin.hs-mapping-engine.import').'"', false);
         $this->get('/admin/hs-master-global/'.$hsMaster->id.'/edit')->assertForbidden();
+        $this->get('/admin/invoice-override?q=FICTIONAL-FAILED-INVOICE')->assertOk()
+            ->assertSee('Invoice state and FBR-status history are read-only for this account.')
+            ->assertSee('FICTIONAL-FAILED-INVOICE')
+            ->assertDontSee('overrideAction(', false)
+            ->assertDontSee('updateFbrStatus(', false);
+        $this->get('/admin/fbr/failed-invoices')->assertOk()
+            ->assertSee('Failed-invoice evidence is read-only for this account; no retry can be queued.')
+            ->assertSee('FICTIONAL-FAILED-INVOICE')
+            ->assertDontSee('action="/admin/fbr/retry/'.$failedInvoice->id.'"', false);
 
         foreach ([
             fn () => $this->post('/admin/settings'),
@@ -138,6 +163,7 @@ class AdminSensitiveSettingsCapabilityTest extends TestCase
             fn () => $this->put('/admin/hs-mapping-engine/999999'),
             fn () => $this->delete('/admin/hs-mapping-engine/999999'),
             fn () => $this->post('/admin/hs-mapping-engine/999999/clone'),
+            fn () => $this->post('/admin/fbr/retry/'.$failedInvoice->id),
         ] as $request) {
             $request()->assertForbidden();
         }
@@ -145,6 +171,7 @@ class AdminSensitiveSettingsCapabilityTest extends TestCase
         $this->assertSame($settingsBefore, DB::table('system_settings')->orderBy('id')->get()
             ->map(fn ($row) => (array) $row)->all());
         $this->assertSame($auditBefore, DB::table('admin_audit_logs')->count());
+        $this->assertSame($failedInvoiceBefore, $failedInvoice->fresh()->getAttributes());
         $this->assertSame($fiscalConfigurationBefore, collect(array_keys($fiscalConfigurationBefore))
             ->mapWithKeys(fn (string $table) => [$table => DB::table($table)->count()])->all());
         $this->assertSame('support', $actor->fresh()->role);
@@ -208,7 +235,7 @@ class AdminSensitiveSettingsCapabilityTest extends TestCase
             'invoice_number' => 'LEGACY-CONFIG-INVOICE',
             'buyer_name' => 'Fictional buyer',
             'status' => 'draft',
-            'fbr_status' => 'pending',
+            'fbr_status' => 'failed',
             'total_amount' => 1,
         ]);
         $hsMaster = HsMasterGlobal::create([
@@ -232,6 +259,14 @@ class AdminSensitiveSettingsCapabilityTest extends TestCase
         $this->get('/admin/hs-mapping-engine')->assertOk()
             ->assertDontSee('HS mapping configuration and change history are read-only for this account.')
             ->assertSee('method="POST" action="'.route('admin.hs-mapping-engine.store').'"', false);
+        config(['features.enable_fbr_retry_system' => true]);
+        $this->get('/admin/invoice-override?q=LEGACY-CONFIG-INVOICE')->assertOk()
+            ->assertDontSee('Invoice state and FBR-status history are read-only for this account.')
+            ->assertSee('overrideAction('.$invoice->id, false)
+            ->assertSee('updateFbrStatus('.$invoice->id, false);
+        $this->get('/admin/fbr/failed-invoices')->assertOk()
+            ->assertDontSee('Failed-invoice evidence is read-only for this account; no retry can be queued.')
+            ->assertSee('action="/admin/fbr/retry/'.$invoice->id.'"', false);
 
         $this->post('/admin/invoice-override/'.$invoice->id, ['action' => 'lock'])
             ->assertOk();

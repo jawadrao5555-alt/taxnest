@@ -12,6 +12,10 @@
                 <div class="mb-4 p-4 bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300 rounded-lg">{{ session('error') }}</div>
             @endif
 
+            @unless($canManageRelease)
+                <div class="mb-4 p-4 rounded-xl bg-amber-100 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/60 text-sm text-amber-800 dark:text-amber-200">Feature-suggestion demand, responses and decision history are read-only for this account.</div>
+            @endunless
+
             {{-- Task 1202: PRA provisional-billing elaan — raay tally (source='pra_elaan') --}}
             @if(!empty($praElaanTally))
                 @php
@@ -165,6 +169,7 @@
                                         <span class="px-2 py-1 rounded-full text-xs font-medium {{ $badgeCls }}">{{ ucfirst($sugg->status) }}</span>
                                     </td>
                                     <td class="px-4 py-3">
+                                        @if($canManageRelease)
                                         <form method="POST" action="/admin/feature-suggestions/{{ $sugg->id }}/status" class="flex items-center gap-2 flex-wrap">
                                             @csrf
                                             <select name="status" class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white text-xs py-1.5">
@@ -181,6 +186,9 @@
                                             @method('DELETE')
                                             <button type="submit" class="px-2.5 py-1 rounded-lg text-xs font-medium bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400 hover:bg-red-100">Delete</button>
                                         </form>
+                                        @else
+                                        <div class="text-xs text-gray-500 dark:text-gray-400">{{ $sugg->admin_note ?: 'No administrator note' }}</div>
+                                        @endif
                                     </td>
                                 </tr>
                             @empty

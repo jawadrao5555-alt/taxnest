@@ -1242,6 +1242,8 @@ class AdminController extends Controller
 
     public function invoiceSearch(Request $request)
     {
+        $currentAdmin = auth('admin')->user()?->fresh();
+        $canManageSensitiveConfiguration = (bool) $currentAdmin?->canManageSensitiveConfiguration();
         $invoices = collect();
 
         if ($request->filled('q')) {
@@ -1264,7 +1266,7 @@ class AdminController extends Controller
                 ->get();
         }
 
-        return view('admin.invoice-override', compact('invoices'));
+        return view('admin.invoice-override', compact('invoices', 'canManageSensitiveConfiguration'));
     }
 
     public function invoiceOverride(Request $request, $id)
@@ -1344,6 +1346,8 @@ class AdminController extends Controller
 
     public function failedFbrInvoices(\Illuminate\Http\Request $request)
     {
+        $currentAdmin = auth('admin')->user()?->fresh();
+        $canManageSensitiveConfiguration = (bool) $currentAdmin?->canManageSensitiveConfiguration();
         $flagEnabled = (bool) config('features.enable_fbr_retry_system', false);
 
         $invoices = Invoice::with('company')
@@ -1392,7 +1396,7 @@ class AdminController extends Controller
                 ->where(function ($q) { $q->whereNull('retry_count')->orWhere('retry_count', 0); })->count(),
         ];
 
-        return view('admin.failed-fbr-invoices', compact('invoices', 'errorByInvoice', 'stats', 'flagEnabled'));
+        return view('admin.failed-fbr-invoices', compact('invoices', 'errorByInvoice', 'stats', 'flagEnabled', 'canManageSensitiveConfiguration'));
     }
 
     public function retryFbrInvoice(Invoice $invoice)

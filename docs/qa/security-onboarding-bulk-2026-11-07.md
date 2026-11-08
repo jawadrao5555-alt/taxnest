@@ -52,6 +52,23 @@ form or edit link is rendered. This is synthetic authorization evidence only,
 not live fiscal, invoice or statutory mapping acceptance; fresh exact-HEAD
 hosted PHP8.4/browser acceptance remains required.
 
+Invoice override, the failed-FBR retry manager and feature-suggestion demand
+history also exposed operational controls after their POST endpoints had become
+persisted-role protected. Their read controllers now calculate sensitive or
+release authority from a fresh administrator row. Viewer/support sessions can
+search and inspect invoice/FBR state, retry counts and last errors, demand
+tallies, source responses, prior status and administrator notes, but receive no
+lock/unlock/status script, retry form, suggestion-status form or delete form.
+Existing administrators retain the same controls. No invoice, retry, suggestion
+or fiscal status was changed by these tests.
+
+Focused sensitive-configuration and release coverage passes **6 tests / 217
+assertions**, with Blade compilation, Node syntax and diff checks. The 1366/390
+journey now visits the three real operational-history pages and refuses the
+rendered mutation surfaces. This does not claim a live FBR retry, submission or
+customer communication; fresh exact-HEAD hosted PHP8.4/browser acceptance
+remains required.
+
 ## Password-verified company deletion lifecycle continuation
 
 The ordinary profile delete endpoint previously removed only the signed-in user

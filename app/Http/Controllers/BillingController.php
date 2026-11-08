@@ -131,8 +131,8 @@ class BillingController extends Controller
             }
         }
 
-        // One cycle left (annual). The saving badge still comes from the SAME
-        // numbers the cards quote, so a reprice can never leave a stale "-6%".
+        // DI periods use their configured prices; other products remain annual.
+        // Savings and totals share the same server quote.
         $billingCycles = [
             'monthly' => ['label' => 'Monthly', 'discount' => 0],
             'quarterly' => ['label' => 'Quarterly', 'discount' => 0],

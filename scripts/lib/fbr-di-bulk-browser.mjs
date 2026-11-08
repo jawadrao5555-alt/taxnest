@@ -4,7 +4,7 @@ export async function fbrDiBulkWorkflow(page,t,v,{baseUrl,saveEvidenceScreenshot
   await page.getByLabel('Billing period',{exact:true}).selectOption('quarterly');
   const quote=page.locator('form[action$="/billing/subscribe"]').filter({has:page.locator('input[name="plan_id"][value="'+fixture.planId+'"]')});
   await Promise.all([page.waitForURL(u=>u.pathname==='/billing/plans'),quote.locator('button[type="submit"]').click()]);
-  await page.locator('form[action$="/payment-proofs"] input[name="billing_cycle"][value="quarterly"]').waitFor({state:'attached'});
+  await page.locator('form[action$="/payment-proof"] input[name="billing_cycle"][value="quarterly"]').waitFor({state:'attached'});
   await saveEvidenceScreenshot(page,'rc-di-quarterly-selection-'+v.width);
 
   const name='Synthetic Packing Bag '+v.width;
@@ -15,7 +15,7 @@ export async function fbrDiBulkWorkflow(page,t,v,{baseUrl,saveEvidenceScreenshot
   await product.locator('[name="schedule_type"]').selectOption('standard');
   await product.locator('[name="default_tax_rate"]').fill('18');
   await product.locator('[name="default_price"]').fill('100');
-  await product.locator('[name="uom"]').selectOption('KG');
+  await product.locator('[name="uom"]').selectOption('Kilograms');
   await product.getByRole('button',{name:'Add packing',exact:true}).click();
   await product.getByLabel('Packing label',{exact:true}).fill('25 KG bag');
   await product.getByLabel('Base quantity per packing',{exact:true}).fill('25');

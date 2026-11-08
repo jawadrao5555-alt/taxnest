@@ -8,7 +8,7 @@
             @if(($pendingSelection ?? null) && ($pendingSelectionPlan ?? null))
             <section class="bg-white dark:bg-gray-900 border border-emerald-300 rounded-xl p-6 mb-6" aria-labelledby="selected-package-payment">
                 <h3 id="selected-package-payment" class="font-semibold text-lg">Selected: {{ $pendingSelectionPlan->name }}</h3>
-                <p class="text-sm mt-2">Annual package total: PKR {{ number_format((float) $pendingSelection['net_quote'], 2) }}. Upload your receipt for review. Selecting a package does not activate or replace your subscription.</p>
+                <p class="text-sm mt-2">{{ \App\Models\Subscription::getCycleLabel($pendingSelection['cycle'] ?? 'annual') }} package total: PKR {{ number_format((float) $pendingSelection['net_quote'], 2) }}. Upload your receipt for review. Selecting a package does not activate or replace your subscription.</p>
                 <form method="POST" action="{{ route('payment-proof.store') }}" enctype="multipart/form-data" class="mt-4 space-y-3">
                     @csrf
                     <input type="hidden" name="pricing_plan_id" value="{{ $pendingSelectionPlan->id }}">
@@ -259,8 +259,7 @@
                 saving(planId) { let r = this.row(planId); return r ? Math.max(0, Math.round(r.total_before_discount - r.final_price)) : 0; },
                 fmt(n) { return Number(n).toLocaleString('en-US'); }
             }">
-                {{-- Annual-only since 23 Aug 2026 (owner): nothing to toggle, so
-                     the row just states how the packages are billed. --}}
+                {{-- Only explicitly configured DI periods appear on each plan. --}}
                 <div class="flex justify-center mb-8">
                     <span class="inline-flex items-center gap-2 bg-gray-100 dark:bg-gray-800 rounded-xl px-4 py-2 border border-gray-200 dark:border-gray-700 text-sm text-gray-700 dark:text-gray-300">
                         <label for="di-billing-cycle" class="font-medium">Billing period</label>

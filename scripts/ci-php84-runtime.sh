@@ -6,7 +6,7 @@ set -Eeuo pipefail
 . /etc/os-release
 [[ "$ID" == ubuntu && "$VERSION_ID" == 22.04 ]] || { echo 'Pinned Ubuntu22.04 CI container required' >&2; exit 2; }
 sudo apt-get update
-sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends software-properties-common
+sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends software-properties-common gnupg
 sudo add-apt-repository -y ppa:ondrej/php
 sudo apt-get update
 sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \

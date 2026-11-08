@@ -547,3 +547,19 @@ rotation/replay revocation, resource binding and read-audit tests remain in
 place. Hosted PHP8.4/full-suite acceptance is required for the exact published
 HEAD. This closes the reporting OAuth cached-authority slice only; broader
 companion revocation and the remaining security/onboarding matrix stay open.
+
+## Shared service-worker browser race correction
+
+The first OAuth-acceptance HEAD passed native MariaDB and the non-browser
+guards, but its browser job failed before the dedicated security journey. The
+shared PRA/FBR service-worker recovery test changed Chromium back online and
+immediately started its malformed-response case. Chromium can dispatch the
+page's online recovery reload after `setOffline(false)` resolves, so that late
+reload raced the next navigation and replaced the expected recovery response.
+
+The test now completes one explicit healthy online reload before deleting the
+sale cache and serving malformed HTML. The malformed document must still return
+the real service worker's 503 recovery screen, its Try again action must still
+load a repaired document, and saved local state must remain intact. No service
+worker, application route or assertion was weakened. Node syntax and diff
+checks pass locally; a fresh hosted real-Chromium run is required.

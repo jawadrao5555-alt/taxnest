@@ -122,9 +122,12 @@ final class DiSellingPacking
             $inclusive = filter_var($item['price_includes_tax'] ?? false, FILTER_VALIDATE_BOOLEAN);
             if ($sourceItem) {
                 $prior = $sourceItem->selling_snapshot;
+                $returnMrp = $item['mrp'] ?? '';
+                $returnMrp = $returnMrp === '' || $returnMrp === null || $returnMrp === 0 || $returnMrp === '0'
+                    ? BigDecimal::zero() : self::decimal($returnMrp, "items.$index.mrp", 6);
                 if ($inclusive !== (bool) ($prior['price_includes_tax'] ?? false)
                     || ! $enteredPrice->isEqualTo((string) $prior['selling_price'])
-                    || ! BigDecimal::of((string) ($item['mrp'] ?? 0))->isEqualTo((string) ($prior['selling_mrp'] ?? 0))
+                    || ! $returnMrp->isEqualTo((string) ($prior['selling_mrp'] ?? 0))
                     || (float) ($item['tax_rate'] ?? 0) !== (float) $sourceItem->tax_rate
                     || (string) ($item['schedule_type'] ?? 'standard') !== (string) $sourceItem->schedule_type) {
                     self::reject("items.$index.price", 'A packing return must retain the original selling rate, tax treatment and basis.');

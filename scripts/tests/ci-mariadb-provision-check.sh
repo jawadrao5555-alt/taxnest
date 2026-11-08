@@ -59,13 +59,18 @@ if RC_MARIADB_VERSION=10.6.23 PATH="$tmp:/usr/bin:/bin" \
     fail 'MariaDB version check accepted a matching --version output with exit 1'
 fi
 
-for lane in workflow-safety dependency-audit-build fullphpunit native-mariadb-di \
-    browserdesktopmobile jsagentrealtime manifest-provenance; do
-    # Consume the full pipe: grep -q can close early and SIGPIPE the producer.
-    grep -A120 "^  ${lane}:" "$workflow" |
-        grep -F 'actions/upload-artifact@v4' >/dev/null ||
-        fail "$lane lacks its always-uploaded evidence artifact"
-done
+# Inspect complete job blocks: a growing mandatory preflight must not hide a
+# later always-uploaded artifact behind an arbitrary grep line-count window.
+python3 - "$workflow" <<'PY_CHECK'
+import pathlib,re,sys
+text=pathlib.Path(sys.argv[1]).read_text()
+lanes=('workflow-safety','dependency-audit-build','fullphpunit','native-mariadb-di',
+       'browserdesktopmobile','jsagentrealtime','manifest-provenance')
+for lane in lanes:
+    block=re.search(r'^  '+re.escape(lane)+r':\n(.*?)(?=^  [A-Za-z0-9_-]+:|\Z)',text,re.M|re.S)
+    if not block or not re.search(r"if: always\(\) && steps\.sanitize_evidence\.outcome == 'success'\n\s+uses: actions/upload-artifact@v4",block[1]):
+        raise SystemExit(f'ci-mariadb-provision-check: {lane} lacks its always-uploaded evidence artifact')
+PY_CHECK
 
 python3 "$(dirname "${BASH_SOURCE[0]}")/rc-mariadb-discovery-check.py"
 python3 "$(dirname "${BASH_SOURCE[0]}")/rc-mariadb-startup-check.py"

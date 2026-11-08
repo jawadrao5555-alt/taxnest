@@ -134,6 +134,7 @@ class DiSellingPackingTest extends TestCase
         $input['document_type'] = 'Credit Note';
         $input['reference_invoice_number'] = $invoice->invoice_number;
         $input['items'][0]['source_invoice_item_id'] = $original->id;
+        $input['items'][0]['mrp'] = '';
         $tampered = $input;
         $tampered['items'][0]['mrp'] = '3000';
         $api->postJson('/api/di/v1/invoices', $tampered)->assertStatus(422);

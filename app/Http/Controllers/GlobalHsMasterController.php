@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\GlobalHsMaster;
+use App\Models\AdminUser;
 use App\Models\HsUnmappedLog;
 use App\Models\HsMasterGlobal;
 use App\Models\HsUnmappedQueue;
@@ -62,6 +63,8 @@ class GlobalHsMasterController extends Controller
 
     public function store(Request $request)
     {
+        AdminUser::requireSensitiveConfigurationAdministrator();
+
         $request->validate([
             'hs_code' => 'required|string|max:20|unique:global_hs_master,hs_code',
             'description' => 'nullable|string|max:500',
@@ -101,6 +104,8 @@ class GlobalHsMasterController extends Controller
 
     public function update(Request $request, $id)
     {
+        AdminUser::requireSensitiveConfigurationAdministrator();
+
         $hs = GlobalHsMaster::findOrFail($id);
 
         $request->validate([
@@ -139,6 +144,8 @@ class GlobalHsMasterController extends Controller
 
     public function seed()
     {
+        AdminUser::requireSensitiveConfigurationAdministrator();
+
         $result = GlobalHsService::seedFromExistingSources();
         return redirect('/admin/hs-master?tab=insights')->with('success',
             "Seeded {$result['seeded']} new HS codes. {$result['skipped']} already existed. Total: {$result['total']}."
@@ -147,6 +154,8 @@ class GlobalHsMasterController extends Controller
 
     public function mapUnmapped(Request $request)
     {
+        AdminUser::requireSensitiveConfigurationAdministrator();
+
         $request->validate([
             'hs_code' => 'required|string|max:20',
             'description' => 'nullable|string|max:500',

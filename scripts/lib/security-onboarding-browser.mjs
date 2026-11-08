@@ -231,6 +231,20 @@ export async function securityOnboardingWorkflow(page,t,v,{baseUrl,login,saveEvi
     '/admin/sales',
     '/admin/consultants/min-payout',
     '/admin/groups/resync',
+    '/admin/hs-rate-links',
+    '/admin/hs-rate-links-import',
+    '/admin/hs-master',
+    '/admin/hs-master/seed',
+    '/admin/hs-master/map-unmapped',
+    '/admin/medicine-catalogue/sync',
+    '/admin/medicine-catalogue/sync-cancel',
+    '/admin/medicine-catalogue/import',
+    '/admin/medicine-catalogue',
+    '/admin/hs-unmapped/999999/map',
+    '/admin/hs-unmapped/999999/reject',
+    '/admin/hs-unmapped/999999/regenerate',
+    '/admin/hs-mapping-engine/import',
+    '/admin/hs-mapping-engine',
   ]) {
     const refused=await page.request.post(baseUrl+path,{form:{_token:billingCsrf},maxRedirects:0});
     if(refused.status()!==403)throw Error('Viewer legacy admin mutation not refused: '+path);
@@ -239,6 +253,17 @@ export async function securityOnboardingWorkflow(page,t,v,{baseUrl,login,saveEvi
   if(featureRefused.status()!==403)throw Error('Viewer legacy POS feature mutation not refused');
   const groupRefused=await page.request.put(baseUrl+'/admin/groups/999999',{form:{_token:billingCsrf},maxRedirects:0});
   if(groupRefused.status()!==403)throw Error('Viewer business-group mutation not refused');
+  for(const path of [
+    '/admin/hs-rate-links/999999',
+    '/admin/hs-master/999999',
+    '/admin/medicine-catalogue/999999',
+    '/admin/hs-mapping-engine/999999',
+  ]) {
+    const refused=await page.request.put(baseUrl+path,{form:{_token:billingCsrf},maxRedirects:0});
+    if(refused.status()!==403)throw Error('Viewer global fiscal configuration mutation not refused: '+path);
+  }
+  const fiscalDeleteRefused=await page.request.delete(baseUrl+'/admin/hs-mapping-engine/999999',{form:{_token:billingCsrf},maxRedirects:0});
+  if(fiscalDeleteRefused.status()!==403)throw Error('Viewer global fiscal configuration delete not refused');
   await saveEvidenceScreenshot(page,'rc-security-sensitive-settings-viewer-'+v.width);
   await page.goto(baseUrl+'/admin/system-control',{waitUntil:'domcontentloaded'});
   await page.getByText('System health is visible, but emergency controls are read-only for this account.',{exact:true}).waitFor();

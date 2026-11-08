@@ -41,6 +41,14 @@ class AdminSensitiveSettingsCapabilityTest extends TestCase
         $settingsBefore = DB::table('system_settings')->orderBy('id')->get()
             ->map(fn ($row) => (array) $row)->all();
         $auditBefore = DB::table('admin_audit_logs')->count();
+        $fiscalConfigurationBefore = collect([
+            'fbr_hs_rate_links',
+            'global_hs_master',
+            'medicine_catalogue',
+            'hs_master_global',
+            'hs_unmapped_queue',
+            'hs_code_mappings',
+        ])->mapWithKeys(fn (string $table) => [$table => DB::table($table)->count()])->all();
 
         $this->get('/admin/settings')
             ->assertOk()
@@ -61,6 +69,29 @@ class AdminSensitiveSettingsCapabilityTest extends TestCase
             fn () => $this->post('/admin/settings/test-email'),
             fn () => $this->post('/admin/risk-settings'),
             fn () => $this->post('/admin/madadgar-settings'),
+            fn () => $this->post('/admin/hs-rate-links'),
+            fn () => $this->put('/admin/hs-rate-links/999999'),
+            fn () => $this->delete('/admin/hs-rate-links/999999'),
+            fn () => $this->post('/admin/hs-rate-links/999999/toggle'),
+            fn () => $this->post('/admin/hs-rate-links-import'),
+            fn () => $this->post('/admin/hs-master'),
+            fn () => $this->put('/admin/hs-master/999999'),
+            fn () => $this->post('/admin/hs-master/seed'),
+            fn () => $this->post('/admin/hs-master/map-unmapped'),
+            fn () => $this->post('/admin/medicine-catalogue/sync'),
+            fn () => $this->post('/admin/medicine-catalogue/sync-cancel'),
+            fn () => $this->post('/admin/medicine-catalogue/import'),
+            fn () => $this->post('/admin/medicine-catalogue'),
+            fn () => $this->put('/admin/medicine-catalogue/999999'),
+            fn () => $this->post('/admin/hs-master-global/999999'),
+            fn () => $this->post('/admin/hs-unmapped/999999/map'),
+            fn () => $this->post('/admin/hs-unmapped/999999/reject'),
+            fn () => $this->post('/admin/hs-unmapped/999999/regenerate'),
+            fn () => $this->post('/admin/hs-mapping-engine/import'),
+            fn () => $this->post('/admin/hs-mapping-engine'),
+            fn () => $this->put('/admin/hs-mapping-engine/999999'),
+            fn () => $this->delete('/admin/hs-mapping-engine/999999'),
+            fn () => $this->post('/admin/hs-mapping-engine/999999/clone'),
         ] as $request) {
             $request()->assertForbidden();
         }
@@ -68,6 +99,8 @@ class AdminSensitiveSettingsCapabilityTest extends TestCase
         $this->assertSame($settingsBefore, DB::table('system_settings')->orderBy('id')->get()
             ->map(fn ($row) => (array) $row)->all());
         $this->assertSame($auditBefore, DB::table('admin_audit_logs')->count());
+        $this->assertSame($fiscalConfigurationBefore, collect(array_keys($fiscalConfigurationBefore))
+            ->mapWithKeys(fn (string $table) => [$table => DB::table($table)->count()])->all());
         $this->assertSame('support', $actor->fresh()->role);
         Mail::assertNothingSent();
     }
@@ -145,5 +178,18 @@ class AdminSensitiveSettingsCapabilityTest extends TestCase
             'mode' => 'local',
         ])->assertRedirect(route('admin.madadgar-chats'));
         $this->assertSame('local', SystemSetting::get(\App\Services\MadadgarService::SETTING_MODE));
+
+        $this->actingAs($actor, 'admin')->post('/admin/hs-rate-links', [
+            'hs_code' => '9999.99.99',
+            'schedule_type' => 'standard',
+            'tax_rate' => 18,
+            'rate_label' => 'Fictional standard rate',
+        ])->assertRedirect();
+        $this->assertDatabaseHas('fbr_hs_rate_links', [
+            'hs_code' => '9999.99.99',
+            'schedule_type' => 'standard',
+            'tax_rate' => 18,
+            'is_active' => 1,
+        ]);
     }
 }

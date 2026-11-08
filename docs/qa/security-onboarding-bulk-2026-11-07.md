@@ -794,3 +794,29 @@ cached downgrade to support keeps the general read-only account page but no
 longer receives those bill identifiers. Focused account/lifecycle coverage
 passes **12 tests / 966 assertions** with the fictional exempt bill hidden and
 all company/subscription state unchanged.
+
+## Global fiscal-catalogue mutation capability
+
+The global HS rate links, both HS master implementations, unmapped-HS review,
+HS mapping engine and medicine catalogue had mutation endpoints which relied
+only on an authenticated admin-panel session. A persisted downgrade to
+support/viewer could therefore leave a cached session able to validate or
+attempt global tax mappings, imports, seed/sync jobs and catalogue changes.
+
+Every write entry point now reloads the persisted administrator and preserves
+the established `admin`/`super_admin` sensitive-configuration authority before
+validation, row lookup, import parsing or sync dispatch. Read-only catalogue
+and export paths are unchanged. Actual HTTP regression coverage holds a cached
+former super-admin session, downgrades only its database row, then requires 403
+from 25 create/update/delete/toggle/import/seed/sync/mapping paths and verifies
+the affected global table counts and existing settings/audit rows remain
+unchanged. A persisted ordinary administrator still creates a fictional HS
+rate link through the real route. The required desktop1366/mobile390 journey
+now sends the corresponding POST/PUT/DELETE requests and requires refusal
+before controller validation or missing-record lookup.
+
+Local PHP8.3/SQLite capability coverage passes **10 tests / 276 assertions**
+across the sensitive, billing and release boundaries; Node syntax and diff
+checks pass. This is supplemental evidence below the supported PHP8.4/native
+and real-Chromium contract. Fresh exact-HEAD hosted acceptance remains required,
+and no live tax mapping, medicine catalogue or customer configuration changed.

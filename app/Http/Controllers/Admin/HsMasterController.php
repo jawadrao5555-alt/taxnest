@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\HsMasterGlobal;
 use App\Models\HsUnmappedQueue;
+use App\Models\AdminUser;
 use App\Services\AuditLogService;
 use App\Services\HsIntelligenceService;
 use Illuminate\Http\Request;
@@ -56,6 +57,8 @@ class HsMasterController extends Controller
 
     public function update(Request $request, $id)
     {
+        AdminUser::requireSensitiveConfigurationAdministrator();
+
         $record = HsMasterGlobal::findOrFail($id);
 
         $validated = $request->validate([
@@ -126,6 +129,8 @@ class HsMasterController extends Controller
 
     public function mapFromQueue(Request $request, $id)
     {
+        AdminUser::requireSensitiveConfigurationAdministrator();
+
         $unmapped = HsUnmappedQueue::findOrFail($id);
 
         $existing = HsMasterGlobal::where('hs_code', $unmapped->hs_code)->first();
@@ -185,6 +190,8 @@ class HsMasterController extends Controller
 
     public function rejectSuggestion(Request $request, $id)
     {
+        AdminUser::requireSensitiveConfigurationAdministrator();
+
         $unmapped = HsUnmappedQueue::findOrFail($id);
         $reason = $request->input('rejection_reason', 'Admin rejected suggestion');
 
@@ -198,6 +205,8 @@ class HsMasterController extends Controller
 
     public function regenerateSuggestion($id)
     {
+        AdminUser::requireSensitiveConfigurationAdministrator();
+
         $unmapped = HsUnmappedQueue::findOrFail($id);
 
         HsIntelligenceService::generateSuggestion($unmapped->hs_code);

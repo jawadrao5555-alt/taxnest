@@ -78,9 +78,11 @@ No third-party mirror, version downgrade, unverified binary or skipped test is
 used. Release metadata: [Electron v42.11.16](https://github.com/electron/electron/releases/tag/v42.11.16).
 
 The same release-front-door outage also affected PHP cached builds and Gradle.
-The two MariaDB-container setup-php steps use the action's supported packaged
-PHP mode (`use_builds_cache=false`), retaining PHP8.4 and the existing runtime/
-extension verification. Gradle remains 8.11.1: its official distribution/API
+The two MariaDB-container jobs preinstall supported PHP8.4.1+ packages from
+the same signed Ondrej PPA used by setup-php, then retain the existing action
+and runtime/extension verification. Source inspection established that the
+action's cache-off flag still selects its PHP-builder downloads for 8.4, so
+that flag alone was not a signed-package bypass and is not used. Gradle remains 8.11.1: its official distribution/API
 asset 207876967 is pinned to the official checksum
 `f397b287023acdba1e9f6fc5ea72d22dd63669d59ed4a289a29b1a76eee151c6`.
 The existing pinned setup-gradle action discovers that verified executable on

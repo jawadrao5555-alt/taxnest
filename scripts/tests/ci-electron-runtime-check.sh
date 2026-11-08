@@ -30,5 +30,9 @@ with tempfile.TemporaryDirectory(prefix='taxnest-electron-bootstrap-test-') as d
     result=subprocess.run(['bash',str(root/'scripts/ci-gradle-runtime.sh')],env=env,capture_output=True,text=True,timeout=15)
     if result.returncode==0 or (root/'github-path').exists() or list(root.glob('taxnest-gradle-runtime-*/gradle-8.11.1')):
         raise SystemExit('FAIL: counterfeit Gradle distribution was accepted or added to PATH')
-print('PASS: Electron fallback rejects counterfeit bytes before extraction and refuses an unreviewed package version; Gradle rejects counterfeit bytes without updating PATH; no network used')
+    env['GITHUB_ACTIONS']='false'
+    result=subprocess.run(['bash',str(pathlib.Path(sys.argv[1])/'scripts/ci-php84-runtime.sh')],env=env,capture_output=True,text=True,timeout=15)
+    if result.returncode!=2 or 'GitHub CI container only' not in result.stderr:
+        raise SystemExit('FAIL: PHP preinstallation did not refuse non-CI invocation')
+print('PASS: Electron fallback rejects counterfeit bytes before extraction and refuses an unreviewed package version; Gradle rejects counterfeit bytes without updating PATH; PHP preinstall refuses non-CI; no network used')
 PY

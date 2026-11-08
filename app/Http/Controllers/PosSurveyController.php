@@ -168,6 +168,7 @@ class PosSurveyController extends Controller
 
     public function adminShow($id, Request $request)
     {
+        $canManageRelease = auth('admin')->user()?->fresh()?->canManageRelease() ?? false;
         $survey = Survey::findOrFail($id);
         $request->validate(['company_id' => 'nullable|integer|min:1', 'answered' => 'nullable|in:yes,no']);
         $responses = $survey->responses()->with(['user:id,name', 'company:id,name,restaurant_mode'])
@@ -203,7 +204,7 @@ class PosSurveyController extends Controller
         $pendingCount = max(0, $eligibleCount - $answeredScope->distinct()->count(($survey->response_policy ?? 'user') === 'company' ? 'company_id' : 'user_id'));
 
         return view('admin.survey-results', compact(
-            'eligibleCount', 'pendingCount', 'survey', 'stats', 'comments', 'seenCompanies', 'answeredCompanies', 'responses', 'answered'
+            'eligibleCount', 'pendingCount', 'survey', 'stats', 'comments', 'seenCompanies', 'answeredCompanies', 'responses', 'answered', 'canManageRelease'
         ));
     }
 

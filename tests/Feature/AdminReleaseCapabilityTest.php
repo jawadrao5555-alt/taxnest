@@ -202,6 +202,13 @@ class AdminReleaseCapabilityTest extends TestCase
             ->assertDontSee(route('admin.surveys.feature-toggle'), false)
             ->assertDontSee(route('admin.surveys.toggle-close', $this->survey->id), false);
 
+        $this->actingAs($this->actor, 'admin')->get('/admin/surveys/'.$this->survey->id)
+            ->assertOk()
+            ->assertSee($this->survey->title)
+            ->assertSee('Survey results and response history are read-only for this account.')
+            ->assertSee(route('admin.surveys.export', $this->survey->id), false)
+            ->assertDontSee(route('admin.surveys.toggle-close', $this->survey->id), false);
+
         $this->actingAs($this->actor, 'admin')->get('/admin/feature-suggestions')
             ->assertOk()
             ->assertSee($this->suggestion->title)
@@ -233,6 +240,11 @@ class AdminReleaseCapabilityTest extends TestCase
             ->post("/admin/surveys/{$this->survey->id}/toggle-close")
             ->assertRedirect();
         $this->assertNotNull($this->survey->fresh()->closed_at);
+
+        $this->actingAs($this->actor, 'admin')->get('/admin/surveys/'.$this->survey->id)
+            ->assertOk()
+            ->assertDontSee('Survey results and response history are read-only for this account.')
+            ->assertSee(route('admin.surveys.toggle-close', $this->survey->id), false);
 
         $this->actingAs($this->actor, 'admin')->get('/admin/feature-suggestions')
             ->assertOk()

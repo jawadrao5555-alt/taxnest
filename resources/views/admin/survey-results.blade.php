@@ -8,6 +8,9 @@
             @if(session('success'))
                 <div class="mb-4 p-4 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 rounded-lg">{{ session('success') }}</div>
             @endif
+            @unless($canManageRelease)
+                <div class="mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 text-blue-800 dark:text-blue-200 rounded-lg" role="status">Survey results and response history are read-only for this account.</div>
+            @endunless
 
             <div class="mb-5 flex items-center justify-between gap-3 flex-wrap">
                 <a href="{{ route('admin.surveys') }}" class="text-sm text-emerald-600 dark:text-emerald-400 hover:underline">← All surveys</a>
@@ -19,7 +22,7 @@
                     @else
                         <span class="px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300">Live on POS</span>
                     @endif
-                    @if($survey->is_published)
+                    @if($canManageRelease && $survey->is_published)
                         <form method="POST" action="{{ route('admin.surveys.toggle-close', $survey->id) }}">
                             @csrf
                             <button type="submit" class="px-3 py-1.5 rounded-lg text-xs font-bold {{ $survey->closed_at ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-red-600 text-white hover:bg-red-700' }}">

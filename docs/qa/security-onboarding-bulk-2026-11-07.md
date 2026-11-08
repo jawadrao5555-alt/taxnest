@@ -86,6 +86,15 @@ pricing page and refuses any apply form. This remains synthetic authorization
 evidence, not approval of a new pricing formula or commercial policy; fresh
 exact-HEAD hosted PHP8.4/browser acceptance remains required.
 
+Survey-list release controls were already capability-gated, but the linked
+results page still rendered its close/reopen form to read-only roles. The
+results controller now derives release authority from the freshly persisted
+administrator row; support/viewer/unmapped accounts keep survey questions,
+response evidence, reach counts, comments, filters and CSV export, while the
+close/reopen form is absent. Existing administrator release authority is
+unchanged. The real 1366/390 journey follows the survey-results link and
+refuses the form there as well as on the list page.
+
 ## Password-verified company deletion lifecycle continuation
 
 The ordinary profile delete endpoint previously removed only the signed-in user

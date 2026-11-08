@@ -226,6 +226,11 @@ export async function securityOnboardingWorkflow(page,t,v,{baseUrl,login,saveEvi
   await page.getByText('Survey release history and results are read-only.',{exact:false}).waitFor();
   if(await page.locator('form[action*="/admin/surveys"]').count())throw Error('Viewer offered survey release controls');
   if(await page.locator('#createSurveyModal,#editSurveyModal').count())throw Error('Viewer received hidden survey write modals');
+  const surveyResultsHref=await page.locator('a[href^="/admin/surveys/"]').first().getAttribute('href');
+  if(!surveyResultsHref)throw Error('Viewer survey history did not expose results link');
+  await page.goto(baseUrl+surveyResultsHref,{waitUntil:'domcontentloaded'});
+  await page.getByText('Survey results and response history are read-only for this account.',{exact:true}).waitFor();
+  if(await page.locator('form[action$="/toggle-close"]').count())throw Error('Viewer offered survey close or reopen control on results page');
   await saveEvidenceScreenshot(page,'rc-security-survey-history-viewer-'+v.width);
   await page.goto(baseUrl+'/admin/settings',{waitUntil:'domcontentloaded'});
   await page.getByText('Sensitive configuration is read-only for this account.',{exact:true}).waitFor();

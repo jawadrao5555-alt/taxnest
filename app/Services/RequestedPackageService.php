@@ -54,7 +54,7 @@ class RequestedPackageService
         return $plan;
     }
 
-    /** Every product line sells the YEAR and nothing else (owner, 23 Aug 2026). */
+    /** POS product lines remain annual-only. */
     public const POS_CYCLES = SubscriptionAssignmentService::SELLABLE_CYCLES;
 
     /** Resolve the chosen DI configuration; all other product lines stay annual. */
@@ -119,7 +119,17 @@ class RequestedPackageService
             return null;
         }
 
-        $cycle = self::cycleForPlan($plan, $company->requested_billing_cycle ?? null);
+        try {
+            $cycle = self::cycleForPlan($plan, $company->requested_billing_cycle ?? null);
+        } catch (\Illuminate\Validation\ValidationException $exception) {
+            // A legacy request or later catalogue removal must not break admin lists
+            // or become an annual sale without the customer's explicit selection.
+            return ['name' => $plan->name, 'cycle' => $company->requested_billing_cycle,
+                'cycle_label' => 'Unavailable period', 'price' => null, 'price_label' => 'Review required',
+                'badge' => $plan->name . ' — requested period unavailable',
+                'note' => 'Configure the requested period or explicitly select a new package before assignment.',
+                'available' => false];
+        }
         $priced = SubscriptionAssignmentService::computePrice($plan, $cycle);
         $cycle = $priced['cycle'];
 

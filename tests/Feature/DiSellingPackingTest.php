@@ -204,6 +204,44 @@ class DiSellingPackingTest extends TestCase
         $this->assertSame('25', $rows[0]['selling_packings'][0]['factor']);
     }
 
+    public function test_draft_header_edit_preserves_original_packing_after_catalogue_changes(): void
+    {
+        [$product, $pack] = $this->product('KG', 'Original bag', '25');
+        $input = $this->payload($product, $pack, '2', '2500');
+        $this->withHeader('Authorization', 'Bearer '.$this->key)->postJson('/api/di/v1/invoices', $input)->assertCreated();
+        $invoice = Invoice::withoutGlobalScopes()->where('client_reference', $input['client_reference'])->sole();
+        $line = $invoice->items()->sole();
+        $original = $line->selling_snapshot;
+        $product->update(['selling_packings' => []]);
+        $owner = \App\Models\User::create(['name' => 'Synthetic packing owner', 'email' => 'packing-owner@test.invalid',
+            'password' => 'unused', 'role' => 'company_admin', 'is_active' => true, 'company_id' => $this->company->id]);
+        $edit = $input;
+        unset($edit['mode'], $edit['client_reference']);
+        $edit['buyer_address'] = 'Corrected synthetic address';
+        $edit['items'] = [array_merge($line->only(['hs_code', 'description', 'default_uom', 'quantity', 'price', 'tax', 'tax_rate', 'schedule_type', 'mrp']),
+            ['invoice_item_id' => $line->id])];
+        $this->actingAs($owner)->put('/invoice/'.$invoice->id, $edit)->assertSessionHasNoErrors()->assertRedirect('/invoice/'.$invoice->id);
+        $this->assertSame($original, $invoice->fresh()->items()->sole()->selling_snapshot);
+        $this->assertEquals(50, $invoice->fresh()->items()->sole()->quantity);
+        $this->assertEquals(5900, $invoice->fresh()->total_amount);
+        $this->assertSame('Corrected synthetic address', $invoice->fresh()->buyer_address);
+        Http::assertNothingSent();
+    }
+
+    public function test_product_packing_form_accepts_optional_blank_id_and_barcode(): void
+    {
+        $owner = \App\Models\User::create(['name' => 'Synthetic product owner', 'email' => 'packing-product@test.invalid',
+            'password' => 'unused', 'role' => 'company_admin', 'is_active' => true, 'company_id' => $this->company->id]);
+        $this->actingAs($owner)->post('/products', ['name' => 'Synthetic browser packing product', 'hs_code' => '99010000',
+            'schedule_type' => 'standard', 'default_tax_rate' => '18', 'default_price' => '100', 'mrp' => '100',
+            'uom' => 'Kilograms', 'selling_packings_present' => '1',
+            'selling_packings' => [['id' => '', 'label' => '25 KG bag', 'factor' => '25', 'price' => '2500', 'barcode' => '']]])
+            ->assertSessionHasNoErrors()->assertRedirect('/products');
+        $product = Product::withoutGlobalScopes()->where('company_id', $this->company->id)->sole();
+        $this->assertSame('25', $product->selling_packings[0]['factor']);
+        $this->assertSame('Kilograms', $product->selling_packings[0]['base_uom']);
+    }
+
     private function product(string $uom, string $label, string $factor): array
     {
         $packings = DiSellingPacking::definitions([['label' => $label, 'factor' => $factor]], $uom);

@@ -284,7 +284,13 @@ class SubscriptionAssignmentService
         // assign() deactivates the 3-day trial row and prices the plan for this
         // cycle → end_date = start + the cycle's months. After that the shop
         // must renew (expiry is enforced by PlanLimitService).
-        $cycle = RequestedPackageService::cycleForPlan($plan, $company->requested_billing_cycle ?? null);
+        try {
+            $cycle = RequestedPackageService::cycleForPlan($plan, $company->requested_billing_cycle ?? null);
+        } catch (\Illuminate\Validation\ValidationException $exception) {
+            // Retain the original request for explicit operator review; never
+            // silently substitute a different paid period during company approval.
+            return null;
+        }
 
         return self::assign($company->id, $plan->id, $cycle);
     }

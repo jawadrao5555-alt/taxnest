@@ -20,7 +20,12 @@ export async function fbrDiBulkWorkflow(page,t,v,{baseUrl,saveEvidenceScreenshot
   await product.getByLabel('Packing label',{exact:true}).fill('25 KG bag');
   await product.getByLabel('Base quantity per packing',{exact:true}).fill('25');
   await product.getByLabel('Packing price (optional)',{exact:true}).fill('2500');
-  await Promise.all([page.waitForURL(u=>u.pathname==='/products'),product.getByRole('button',{name:'Create Product',exact:true}).click()]);
+  try {
+    await Promise.all([page.waitForURL(u=>u.pathname==='/products',{waitUntil:'domcontentloaded'}),product.getByRole('button',{name:'Create Product',exact:true}).click()]);
+  } catch(error) {
+    const errors=await page.locator('#productForm .text-red-700').allTextContents();
+    throw new Error('Product packing save failed at '+new URL(page.url()).pathname+': '+errors.join('; ')+'; '+error.message);
+  }
   await page.getByText('Product created successfully.',{exact:true}).waitFor();
   await page.goto(baseUrl+'/invoice/create',{waitUntil:'domcontentloaded'});
   const invoice=page.locator('form[action="/invoice/store"]');

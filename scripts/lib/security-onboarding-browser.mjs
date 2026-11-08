@@ -192,6 +192,10 @@ export async function securityOnboardingWorkflow(page,t,v,{baseUrl,login,saveEvi
   const forbidden=await page.request.post(baseUrl+'/admin/subscriptions/assign',{form:{_token:billingCsrf},maxRedirects:0});
   if(forbidden.status()!==403)throw Error('Viewer billing POST not refused');
   await saveEvidenceScreenshot(page,'rc-security-billing-viewer-'+v.width);
+  await page.goto(baseUrl+'/admin/all-users',{waitUntil:'domcontentloaded'});
+  await page.getByText('User and company assignments are read-only for this account.',{exact:false}).waitFor();
+  if(await page.locator('#addUserModal,form[action="/admin/all-users"]').count())throw Error('Viewer offered cross-company user provisioning controls');
+  await saveEvidenceScreenshot(page,'rc-security-user-history-viewer-'+v.width);
   await page.goto(baseUrl+'/admin/plans',{waitUntil:'domcontentloaded'});
   await page.getByRole('heading',{name:'Subscription Plans',exact:true}).waitFor();
   if(await page.locator('form[action*="/admin/plans"]').count())throw Error('Viewer offered package write form');

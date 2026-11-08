@@ -844,8 +844,14 @@ session. It now reloads the persisted company-lifecycle authority before
 validation or credential creation. Viewer/support/unmapped and cached
 downgraded administrators receive 403 with the complete customer-user table
 unchanged; an existing administrator still creates a fictional company-bound
-viewer through the actual route. The same 1366/390 journey sends the denied
-POST. Focused billing/capability coverage passes **5 tests / 150 assertions**.
+viewer through the actual route. The legacy page's form and success redirect
+also pointed to an unregistered `/admin/users` path; both now use the real
+`/admin/all-users` endpoint. The page reloads persisted capability, retains the
+user/company history for review, and replaces its hidden create modal with an
+explicit read-only notice for viewer/support/unmapped accounts. The same
+1366/390 journey visits that page, requires the notice and absence of the
+create form, then sends the denied POST. Focused billing/capability coverage
+passes **5 tests / 156 assertions**.
 
 Run **42454135064** passed full PHP8.4, native MariaDB, Node, build, safety and
 manifest lanes but its security browser step stopped after the real deletion

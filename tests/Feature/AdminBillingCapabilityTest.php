@@ -124,6 +124,13 @@ class AdminBillingCapabilityTest extends TestCase
     public function test_read_only_billing_pages_keep_history_but_do_not_offer_write_forms(): void
     {
         $sub = $this->paid();
+        User::create([
+            'company_id' => $sub->company_id,
+            'name' => 'Fictional retained user history',
+            'email' => 'fictional-retained-history@example.test',
+            'password' => 'SyntheticOnly123!',
+            'role' => 'viewer',
+        ]);
         $this->actingAs($this->admin('viewer'), 'admin');
         $this->get('/admin/subscriptions')->assertOk()->assertSee('Fictional capability company')
             ->assertDontSee('action="'.route('saas.admin.subscriptions.assign').'"', false)
@@ -132,6 +139,12 @@ class AdminBillingCapabilityTest extends TestCase
             ->assertDontSee('action="'.route('saas.admin.plans.store').'"', false)
             ->assertDontSee('action="'.route('saas.admin.plans.addons.update').'"', false)
             ->assertDontSee('action="'.route('saas.admin.plans.update', $sub->pricing_plan_id).'"', false);
+        $this->get('/admin/all-users')->assertOk()
+            ->assertSee('Fictional retained user history')
+            ->assertSee('User and company assignments are read-only for this account.')
+            ->assertDontSee('+ Add User')
+            ->assertDontSee('id="addUserModal"', false)
+            ->assertDontSee('action="/admin/all-users"', false);
     }
 
     public function test_existing_admin_and_owner_billing_authority_is_preserved(): void
@@ -154,7 +167,7 @@ class AdminBillingCapabilityTest extends TestCase
                 'password' => 'SyntheticOnly123!',
                 'role' => 'viewer',
                 'company_id' => $sub->company_id,
-            ])->assertRedirect('/admin/users');
+            ])->assertRedirect('/admin/all-users');
 
         $this->assertDatabaseHas('users', [
             'company_id' => $sub->company_id,

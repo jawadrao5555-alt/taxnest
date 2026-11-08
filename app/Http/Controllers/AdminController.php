@@ -432,7 +432,10 @@ class AdminController extends Controller
     {
         $users = User::with('company')->paginate(15);
         $companies = Company::all();
-        return view('admin.users', compact('users', 'companies'));
+        $currentAdmin = auth('admin')->user()?->fresh();
+        $canManageCompanyLifecycle = (bool) $currentAdmin?->canManageCompanyLifecycle();
+
+        return view('admin.users', compact('users', 'companies', 'canManageCompanyLifecycle'));
     }
 
     public function storeUser(Request $request)
@@ -457,7 +460,7 @@ class AdminController extends Controller
 
         SecurityLogService::log('user_created', auth()->id(), ['new_user_id' => $user->id, 'role' => $request->role]);
 
-        return redirect('/admin/users')->with('success', 'User created successfully.');
+        return redirect('/admin/all-users')->with('success', 'User created successfully.');
     }
 
     public function fbrLogs()

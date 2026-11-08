@@ -18,12 +18,38 @@ class MedicineSourceOrderingTest extends TestCase
         $row = ['brand_name' => 'Synthetic source medicine', 'drap_reg_no' => 'SYNMED001',
             'manufacturer' => 'Synthetic maker', 'pack_size' => '10 tablets', 'mrp' => 250, 'effective_date' => '2026-11-01'];
         $entry = $svc->upsertRow($row)['entry'];
-        $before = $entry->getAttributes();
+        $svc->upsertRow(array_replace($row, ['mrp' => null, 'effective_date' => '2026-10-01', 'composition' => 'Synthetic metadata update']));
+        $this->assertSame('2026-11-01', $entry->fresh()->effective_date->toDateString(), 'Metadata cannot backdate the current price evidence.');
+        $svc->upsertRow(array_replace($row, ['mrp' => null, 'effective_date' => '2026-11-20']));
+        $this->assertSame('2026-11-01', $entry->fresh()->effective_date->toDateString(), 'Metadata cannot future-date the current price evidence.');
         $svc->upsertRow(array_replace($row, ['mrp' => 180, 'effective_date' => '2026-10-01']));
         $entry->refresh();
         $this->assertEquals(250, $entry->mrp);
         $this->assertSame('2026-11-01', $entry->effective_date->toDateString());
         $this->assertSame(1, $entry->prices()->count());
+    }
+
+    public function test_metadata_without_a_price_cannot_establish_or_block_price_chronology(): void
+    {
+        \Illuminate\Support\Facades\Http::preventStrayRequests();
+        $svc = app(MedicineCatalogueSyncService::class);
+        foreach (['fresh', 'legacy'] as $kind) {
+            $row = ['brand_name' => 'Synthetic unpriced '.$kind, 'drap_reg_no' => 'SYNUNPRICED'.$kind,
+                'mrp' => null, 'effective_date' => '2026-11-20'];
+            $entry = $svc->upsertRow($row)['entry'];
+            $this->assertNull($entry->mrp);
+            $this->assertNull($entry->effective_date);
+            if ($kind === 'legacy') {
+                $entry->update(['effective_date' => '2026-11-20']);
+            }
+            $svc->upsertRow(array_replace($row, ['mrp' => 100, 'effective_date' => '2026-10-01']));
+            $this->assertEquals(100, $entry->fresh()->mrp);
+            $this->assertSame('2026-10-01', $entry->fresh()->effective_date->toDateString());
+            $history = $entry->prices()->sole();
+            $this->assertNull($history->old_mrp);
+            $this->assertNull($history->old_effective_date);
+        }
+        \Illuminate\Support\Facades\Http::assertNothingSent();
     }
 
     public function test_invalid_price_and_date_do_not_create_catalogue_rows(): void

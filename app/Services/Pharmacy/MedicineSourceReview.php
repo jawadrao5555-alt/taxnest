@@ -38,7 +38,7 @@ final class MedicineSourceReview
         if ($date && $date > now()->timezone('Asia/Karachi')->toDateString()) {
             return 'pending';
         }
-        $current = $entry?->effective_date?->toDateString();
+        $current = $entry?->mrp !== null ? $entry->effective_date?->toDateString() : null;
         if ($current && $date && $date < $current) {
             return 'stale';
         }

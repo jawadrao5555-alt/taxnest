@@ -355,7 +355,7 @@ class MedicineCatalogueSyncService
                 'category' => $category,
                 'pack_size' => $pack !== '' ? mb_substr($pack, 0, 160) : null,
                 'mrp' => $mrp,
-                'effective_date' => $effective,
+                'effective_date' => $mrp !== null ? $effective : null,
                 'source' => $source,
                 'is_active' => true,
                 'dedupe_key' => $key,
@@ -427,9 +427,9 @@ class MedicineCatalogueSyncService
         if ($mrp !== null && $mayWriteMrp && ($oldMrp === null || abs($oldMrp - $mrp) >= 0.005)) {
             $update['mrp'] = $mrp;
             $update['effective_date'] = $effective ?? $entry->effective_date?->format('Y-m-d');
-            $this->recordPriceChange($entry, $oldMrp, $mrp, $entry->effective_date?->format('Y-m-d'), $update['effective_date'], $source, $syncId);
+            $this->recordPriceChange($entry, $oldMrp, $mrp, $oldMrp !== null ? $entry->effective_date?->format('Y-m-d') : null, $update['effective_date'], $source, $syncId);
             $priceChanged = true;
-        } elseif ($effective !== null && $mayWriteMrp && $entry->effective_date?->format('Y-m-d') !== $effective) {
+        } elseif ($mrp !== null && $effective !== null && $mayWriteMrp && $entry->effective_date?->format('Y-m-d') !== $effective) {
             $update['effective_date'] = $effective;
         }
         $update['checksum'] = $checksum;

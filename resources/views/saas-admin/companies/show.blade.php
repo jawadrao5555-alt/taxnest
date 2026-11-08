@@ -419,7 +419,7 @@
                 @endif
                 @if($extraStats['active_subscription'])
                 <div class="pt-2 border-t border-gray-800">
-                    <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">Plan</span><span class="text-indigo-400 font-medium text-right min-w-0 break-words">{{ $extraStats['active_subscription']->pricingPlan->name ?? 'N/A' }}</span></div>
+                    <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">Plan</span><span class="text-indigo-400 font-medium text-right min-w-0 break-words">{{ $extraStats['active_subscription']->entitlementPlan()?->name ?? 'N/A' }}</span></div>
                     <div class="flex justify-between gap-2 min-w-0 mt-1"><span class="text-gray-400 shrink-0">Billing</span><span class="text-white text-right min-w-0">{{ ucfirst(str_replace('_', ' ', $extraStats['active_subscription']->billing_cycle ?? 'N/A')) }}</span></div>
                 </div>
                 @else
@@ -719,10 +719,10 @@
                 <label class="text-xs text-gray-400 block">
                     Package
                     <span class="text-gray-600">— currently
-                        {{ $activeSub?->pricingPlan?->name ?? 'none' }}</span>
+                        {{ $activeSub?->entitlementPlan()?->name ?? 'none' }}</span>
                 </label>
                 <select name="pricing_plan_id" class="w-full bg-gray-900 border border-gray-700 rounded-lg text-white text-sm px-3 py-2">
-                    <option value="">Keep current package{{ $activeSub?->pricingPlan?->name ? ' (' . $activeSub->pricingPlan->name . ')' : ' (none)' }}</option>
+                    <option value="">Keep current package{{ $activeSub?->entitlementPlan()?->name ? ' (' . $activeSub->entitlementPlan()->name . ')' : ' (none)' }}</option>
                     @foreach(($grantPlans ?? collect()) as $gp)
                         {{-- live PDO hands ints back as strings — compare as ints --}}
                         <option value="{{ $gp->id }}" @selected((int) ($activeSub?->pricing_plan_id ?? 0) === (int) $gp->id)>

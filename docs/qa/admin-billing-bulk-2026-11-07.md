@@ -412,3 +412,23 @@ This closes this administrator display slice only. Existing-policy
 upgrade/proration and remaining mobile/Agent/API companion parity remain open,
 and exact hosted full-suite/browser acceptance is required for the published
 HEAD.
+
+## Company-detail purchased-name parity
+
+The legacy company detail and the SaaS company account views still mixed the
+frozen purchased entitlement with the mutable catalogue relationship. A later
+catalogue rename could therefore rewrite the active-plan summary, retained
+subscription history and the context shown beside a manual correction even
+though access enforcement and the subscription list already used the immutable
+purchase snapshot.
+
+Those existing read-only labels now use `entitlementPlan()`. The package picker
+continues to list the live catalogue for an explicitly reviewed change; no
+assignment, price, term, access, upgrade or proration behavior changed. A
+focused authenticated company-detail regression freezes the purchased label,
+renames the catalogue entry and requires the purchased label across current,
+history and correction context while preserving both records.
+
+This closes another administrator companion-display slice only. Existing-policy
+upgrade/proration and remaining mobile/Agent/API companion parity remain open;
+fresh exact-HEAD hosted PHP8.4/full-suite/browser acceptance is required.

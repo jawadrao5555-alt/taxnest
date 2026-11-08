@@ -29,6 +29,29 @@ class AdminCompanyAccountOverviewTest extends TestCase
         $this->assertSame($before,$sub->fresh()->getAttributes());
     }
 
+    public function test_manage_company_uses_frozen_purchased_name_for_current_history_and_correction_context(): void
+    {
+        [$admin,$company,$sub] = $this->fixture();
+        $plan = $sub->pricingPlan;
+        $sub->update(['purchase_snapshot' => [
+            'version' => 1,
+            'company_id' => $company->id,
+            'plan' => [
+                'id' => $plan->id,
+                'name' => 'Purchased B01 Package',
+                'product_type' => 'pos',
+            ],
+        ]]);
+        $plan->update(['name' => 'Later Catalogue Label']);
+
+        $before = $sub->fresh()->getAttributes();
+        $response = $this->actingAs($admin,'admin')->get('/admin/companies/'.$company->id)->assertOk();
+
+        $this->assertGreaterThanOrEqual(4, substr_count($response->getContent(), 'Purchased B01 Package'));
+        $this->assertSame($before,$sub->fresh()->getAttributes());
+        $this->assertSame('Later Catalogue Label',$plan->fresh()->name);
+    }
+
     public function test_suspension_records_reason_and_restore_condition_atomically_with_company_state(): void
     {
         [$admin,$company,$sub] = $this->fixture();

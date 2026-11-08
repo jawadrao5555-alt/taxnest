@@ -25,7 +25,7 @@
         @endif
         @if($sub)
         <dl data-current-subscription="{{ $sub->id }}" class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-5 text-sm">
-            <div><dt class="font-semibold">Linked package</dt><dd class="break-words">{{ $sub->pricingPlan?->name ?? 'Plan record unavailable' }} (subscription #{{ $sub->id }})</dd></div>
+            <div><dt class="font-semibold">Linked package</dt><dd class="break-words">{{ $sub->entitlementPlan()?->name ?? 'Plan record unavailable' }} (subscription #{{ $sub->id }})</dd></div>
             <div><dt class="font-semibold">Record status / billing cycle</dt><dd>{{ $sub->active ? 'Active row' : 'Inactive row' }} / {{ $sub->billing_cycle ? ucfirst(str_replace('_', ' ', $sub->billing_cycle)) : 'Not recorded' }}</dd></div>
             <div><dt class="font-semibold">Stored period start</dt><dd data-account-start>{{ $date($sub->start_date) }}</dd></div>
             <div><dt class="font-semibold">Stored period end / renewal review</dt><dd data-account-end>{{ $date($sub->end_date) }}</dd></div>
@@ -57,7 +57,7 @@
         <div class="overflow-x-auto mt-3" role="region" tabindex="0" aria-label="Company subscription history">
             <table class="w-full text-sm"><thead><tr class="text-left"><th class="p-2">Record / package</th><th class="p-2">Flag / cycle</th><th class="p-2">Period</th><th class="p-2">Trial / grant</th><th class="p-2">Stored price</th></tr></thead><tbody>
             @forelse($account['history'] as $row)
-                <tr class="border-t"><td class="p-2">#{{ $row->id }} {{ $row->pricingPlan?->name ?? 'Plan record unavailable' }}</td><td class="p-2">{{ $row->active ? 'Active row' : 'Inactive row' }} / {{ $row->billing_cycle ?: 'Not recorded' }}</td><td class="p-2">{{ $date($row->start_date) }} → {{ $date($row->end_date) }}</td><td class="p-2">Trial: {{ $date($row->trial_ends_at) }}; {{ $row->override_type ?: 'None recorded' }} until {{ $date($row->override_until) }}</td><td class="p-2">{{ $price($row) }}</td></tr>
+                <tr class="border-t"><td class="p-2">#{{ $row->id }} {{ $row->entitlementPlan()?->name ?? 'Plan record unavailable' }}</td><td class="p-2">{{ $row->active ? 'Active row' : 'Inactive row' }} / {{ $row->billing_cycle ?: 'Not recorded' }}</td><td class="p-2">{{ $date($row->start_date) }} → {{ $date($row->end_date) }}</td><td class="p-2">Trial: {{ $date($row->trial_ends_at) }}; {{ $row->override_type ?: 'None recorded' }} until {{ $date($row->override_until) }}</td><td class="p-2">{{ $price($row) }}</td></tr>
             @empty<tr><td colspan="5" class="p-3">{{ $account['subscriptions_available'] ? 'No subscription records.' : 'Subscription records unavailable.' }}</td></tr>@endforelse
             </tbody></table>
         </div>

@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Models\{AdminUser, AppUpdate, SystemSetting, TutorialVideo};
+use App\Models\{AdminAnnouncement, AdminUser, AppUpdate, Survey, SystemSetting, TutorialVideo};
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
@@ -14,6 +14,8 @@ class AdminReleaseCapabilityTest extends TestCase
     private AdminUser $actor;
     private AppUpdate $update;
     private TutorialVideo $video;
+    private AdminAnnouncement $announcement;
+    private Survey $survey;
 
     protected function setUp(): void
     {
@@ -46,7 +48,28 @@ class AdminReleaseCapabilityTest extends TestCase
             'controls_applied' => true,
             'audience_family' => 'all',
         ]);
+        $announcementCreator = \App\Models\User::factory()->create();
+        $this->announcement = AdminAnnouncement::create([
+            'title' => 'Fictional retained announcement',
+            'message' => 'Synthetic release history only',
+            'type' => 'info',
+            'target' => 'all',
+            'audience_panel' => 'all',
+            'is_active' => true,
+            'created_by' => $announcementCreator->id,
+        ]);
+        $this->survey = Survey::create([
+            'title' => 'Fictional retained survey',
+            'questions' => [[
+                'key' => 'q1', 'text' => 'Synthetic question?', 'options' => [
+                    ['key' => 'yes', 'label' => 'Yes'], ['key' => 'no', 'label' => 'No'],
+                ],
+            ]],
+            'audience' => 'pos_all',
+            'is_published' => true,
+        ]);
         SystemSetting::set('pos_whats_new_enabled', '1', 'Synthetic release capability baseline');
+        SystemSetting::set('pos_surveys_enabled', '1', 'Synthetic survey capability baseline');
     }
 
     public function test_cached_role_downgrade_cannot_change_customer_updates_or_tutorial_release_state(): void
@@ -58,7 +81,10 @@ class AdminReleaseCapabilityTest extends TestCase
 
         $updateBefore = $this->update->fresh()->getAttributes();
         $videoBefore = $this->video->fresh()->getAttributes();
+        $announcementBefore = $this->announcement->fresh()->getAttributes();
+        $surveyBefore = $this->survey->fresh()->getAttributes();
         $settingBefore = SystemSetting::get('pos_whats_new_enabled');
+        $surveySettingBefore = SystemSetting::get('pos_surveys_enabled');
 
         $requests = [
             fn () => $this->post('/admin/app-updates/feature-toggle'),
@@ -81,6 +107,23 @@ class AdminReleaseCapabilityTest extends TestCase
             fn () => $this->post("/admin/tutorial-videos/{$this->video->id}/role", [
                 'min_role' => 'admin', 'audience_family' => 'services',
             ]),
+            fn () => $this->post('/admin/announcements', [
+                'title' => 'Unauthorized announcement', 'message' => 'Must not persist',
+                'type' => 'info', 'target' => 'all', 'audience_panel' => 'all', 'audience_scope' => 'all',
+            ]),
+            fn () => $this->post("/admin/announcements/{$this->announcement->id}/toggle"),
+            fn () => $this->delete("/admin/announcements/{$this->announcement->id}/delete"),
+            fn () => $this->post('/admin/surveys/feature-toggle'),
+            fn () => $this->post('/admin/surveys', [
+                'title' => 'Unauthorized survey', 'questions_json' => '[]',
+                'audience' => 'pos_all',
+            ]),
+            fn () => $this->post("/admin/surveys/{$this->survey->id}/update", [
+                'title' => 'Unauthorized survey edit', 'questions_json' => '[]',
+                'audience' => 'pos_all',
+            ]),
+            fn () => $this->post("/admin/surveys/{$this->survey->id}/toggle-close"),
+            fn () => $this->delete("/admin/surveys/{$this->survey->id}"),
         ];
 
         foreach ($requests as $request) {
@@ -89,8 +132,13 @@ class AdminReleaseCapabilityTest extends TestCase
 
         $this->assertSame($updateBefore, $this->update->fresh()->getAttributes());
         $this->assertSame($videoBefore, $this->video->fresh()->getAttributes());
+        $this->assertSame($announcementBefore, $this->announcement->fresh()->getAttributes());
+        $this->assertSame($surveyBefore, $this->survey->fresh()->getAttributes());
         $this->assertSame($settingBefore, SystemSetting::get('pos_whats_new_enabled'));
+        $this->assertSame($surveySettingBefore, SystemSetting::get('pos_surveys_enabled'));
         $this->assertDatabaseMissing('app_updates', ['title' => 'Unauthorized publication']);
+        $this->assertDatabaseMissing('admin_announcements', ['title' => 'Unauthorized announcement']);
+        $this->assertDatabaseMissing('surveys', ['title' => 'Unauthorized survey']);
         $this->assertSame('support', $this->actor->fresh()->role);
     }
 
@@ -112,6 +160,24 @@ class AdminReleaseCapabilityTest extends TestCase
             ->assertSee('Tutorial release controls are read-only')
             ->assertDontSee("/admin/tutorial-videos/{$this->video->id}/toggle-published", false)
             ->assertDontSee("/admin/tutorial-videos/{$this->video->id}/gate", false);
+
+        $this->actingAs($this->actor, 'admin')->get('/admin/announcements')
+            ->assertOk()
+            ->assertSee($this->announcement->title)
+            ->assertSee('Announcement history is read-only')
+            ->assertDontSee('id="addAnnouncementModal"', false)
+            ->assertDontSee("/admin/announcements/{$this->announcement->id}/toggle", false)
+            ->assertDontSee("/admin/announcements/{$this->announcement->id}/delete", false);
+
+        $this->actingAs($this->actor, 'admin')->get('/admin/surveys')
+            ->assertOk()
+            ->assertSee($this->survey->title)
+            ->assertSee('Survey release history and results are read-only')
+            ->assertSee(route('admin.surveys.show', $this->survey->id), false)
+            ->assertDontSee('id="createSurveyModal"', false)
+            ->assertDontSee('id="editSurveyModal"', false)
+            ->assertDontSee(route('admin.surveys.feature-toggle'), false)
+            ->assertDontSee(route('admin.surveys.toggle-close', $this->survey->id), false);
     }
 
     public function test_existing_administrator_role_retains_release_authority(): void
@@ -127,5 +193,15 @@ class AdminReleaseCapabilityTest extends TestCase
             ->post("/admin/tutorial-videos/{$this->video->id}/toggle-public")
             ->assertRedirect('/admin/tutorial-videos');
         $this->assertTrue((bool) $this->video->fresh()->show_public);
+
+        $this->actingAs($this->actor, 'admin')
+            ->post("/admin/announcements/{$this->announcement->id}/toggle")
+            ->assertRedirect('/admin/announcements');
+        $this->assertFalse((bool) $this->announcement->fresh()->is_active);
+
+        $this->actingAs($this->actor, 'admin')
+            ->post("/admin/surveys/{$this->survey->id}/toggle-close")
+            ->assertRedirect();
+        $this->assertNotNull($this->survey->fresh()->closed_at);
     }
 }

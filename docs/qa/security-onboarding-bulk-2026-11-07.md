@@ -4,23 +4,29 @@
 
 Actual route reconciliation found that an admin-panel login alone could publish,
 edit, reannounce or archive customer updates, change the What's New master switch,
-and alter tutorial publication, public visibility, feature audience or role gates.
+alter tutorial publication, public visibility, feature audience or role gates,
+publish/toggle/delete announcements, and publish/edit/close/delete surveys or
+change their master switch.
 Those operations change the customer-facing release and must not be available to
 support, viewer or unmapped roles—or to a formerly privileged browser after its
 persisted actor is downgraded.
 
 Every release mutation now re-reads the persisted administrator and requires the
-existing `admin` or `super_admin` role. Customer-update and tutorial histories stay
-readable to support/viewer accounts, but the write forms and hidden edit modals are
-not rendered and the screen states that it is read-only. Existing administrators
-retain the same release controls; audience preview remains a read-only calculation.
+existing `admin` or `super_admin` role. Customer-update, tutorial, announcement and
+survey histories/results stay readable to support/viewer accounts, but write forms
+and hidden edit modals are not rendered and the screens state that they are
+read-only. Existing administrators retain the same release controls; update and
+announcement audience previews and survey result/export reads remain available.
 
 Focused actual-HTTP coverage keeps a super-admin model cached, downgrades only its
-persisted row, requires every customer-update and tutorial mutation to return 403,
-and proves the update, tutorial, feature setting and audit-facing history stay
+persisted row, requires every customer-update, tutorial, announcement and survey
+mutation to return 403, and proves all four records and both feature settings stay
 unchanged. The required security browser journey now checks the real read-only
-screens at desktop1366 and mobile390 and requires all release forms to be absent.
-It does not publish a notice, toggle a tutorial or contact a customer. Fresh
+screens at desktop1366 and mobile390 and requires all release forms/modals to be
+absent while survey Results remains reachable. It does not publish a notice,
+toggle a tutorial/survey or contact a customer. Supplemental PHP8.3/SQLite focused
+capability coverage passes **3 tests / 64 assertions**; PHP8.3 remains below the
+supported contract and SQLite is not native proof. Fresh
 exact-HEAD PHP8.4/full-suite/browser/final-validate acceptance remains required.
 
 ## Versioned Healthcare consent and withdrawal evidence continuation

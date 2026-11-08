@@ -2,10 +2,12 @@
     <x-slot name="header">
         <div class="flex items-center justify-between flex-wrap gap-3">
             <h2 class="font-bold text-xl text-gray-800 dark:text-gray-100 leading-tight">Announcements</h2>
+            @if($canManageRelease)
             <button onclick="document.getElementById('addAnnouncementModal').classList.remove('hidden')" class="inline-flex items-center px-3 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition">
                 <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                 New Announcement
             </button>
+            @endif
         </div>
     </x-slot>
 
@@ -14,6 +16,9 @@
             @if(session('success'))
                 <div class="mb-4 p-4 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 rounded-lg">{{ session('success') }}</div>
             @endif
+            @unless($canManageRelease)
+                <div class="mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 text-blue-800 dark:text-blue-200 rounded-lg" role="status">Announcement history is read-only. Publishing and release controls require an administrator.</div>
+            @endunless
 
             <div class="mb-4 flex gap-2">
                 <a href="/admin/announcements" class="px-3 py-1.5 rounded-lg text-sm font-medium {{ !request('status') ? 'bg-emerald-600 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300' }}">All</a>
@@ -75,6 +80,7 @@
                                     <td class="px-4 py-3 text-xs text-gray-500 dark:text-gray-400">{{ $ann->expires_at ? $ann->expires_at->format('d M Y H:i') : 'Never' }}</td>
                                     <td class="px-4 py-3 text-xs text-gray-500 dark:text-gray-400">{{ $ann->created_at->format('d M Y') }}<br>by {{ $ann->creator->name ?? '-' }}</td>
                                     <td class="px-4 py-3">
+                                        @if($canManageRelease)
                                         <div class="flex items-center gap-1.5">
                                             <form method="POST" action="/admin/announcements/{{ $ann->id }}/toggle" class="inline">
                                                 @csrf
@@ -89,6 +95,9 @@
                                                 </button>
                                             </form>
                                         </div>
+                                        @else
+                                            <span class="text-xs text-gray-400">Read-only</span>
+                                        @endif
                                     </td>
                                 </tr>
                             @empty
@@ -104,6 +113,7 @@
         </div>
     </div>
 
+    @if($canManageRelease)
     <div id="addAnnouncementModal" class="hidden fixed inset-0 z-50 overflow-y-auto">
         <div class="flex items-center justify-center min-h-screen px-4">
             <div class="fixed inset-0 bg-black/50" onclick="document.getElementById('addAnnouncementModal').classList.add('hidden')"></div>
@@ -234,4 +244,5 @@
             });
         })();
     </script>
+    @endif
 </x-admin-layout>

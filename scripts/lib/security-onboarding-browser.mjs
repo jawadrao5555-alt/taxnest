@@ -186,6 +186,16 @@ export async function securityOnboardingWorkflow(page,t,v,{baseUrl,login,saveEvi
   await page.getByText('Tutorial release controls are read-only for this account.',{exact:false}).waitFor();
   if(await page.locator('form[action*="/admin/tutorial-videos/"]').count())throw Error('Viewer offered tutorial publication or audience controls');
   await saveEvidenceScreenshot(page,'rc-security-tutorial-history-viewer-'+v.width);
+  await page.goto(baseUrl+'/admin/announcements',{waitUntil:'domcontentloaded'});
+  await page.getByText('Announcement history is read-only.',{exact:false}).waitFor();
+  if(await page.locator('form[action^="/admin/announcements/"]').count())throw Error('Viewer offered announcement release controls');
+  if(await page.locator('#addAnnouncementModal').count())throw Error('Viewer received hidden announcement write modal');
+  await saveEvidenceScreenshot(page,'rc-security-announcement-history-viewer-'+v.width);
+  await page.goto(baseUrl+'/admin/surveys',{waitUntil:'domcontentloaded'});
+  await page.getByText('Survey release history and results are read-only.',{exact:false}).waitFor();
+  if(await page.locator('form[action*="/admin/surveys"]').count())throw Error('Viewer offered survey release controls');
+  if(await page.locator('#createSurveyModal,#editSurveyModal').count())throw Error('Viewer received hidden survey write modals');
+  await saveEvidenceScreenshot(page,'rc-security-survey-history-viewer-'+v.width);
   await page.context().clearCookies();
   await login(page,{...t,loginPath:'/admin/login',login:fixture.supportAdmin,password:t.password});
   await page.goto(baseUrl+'/admin/support-cases/'+fixture.supportCaseId,{waitUntil:'domcontentloaded'});
@@ -201,5 +211,5 @@ export async function securityOnboardingWorkflow(page,t,v,{baseUrl,login,saveEvi
   await page.getByText('REOPENED',{exact:true}).waitFor();
   if(await page.getByText('Synthetic recurrence received after explicit resolution.',{exact:true}).count()!==1)throw Error('Support reopen evidence missing from timeline');
   await saveEvidenceScreenshot(page,'rc-security-support-case-'+v.width);
-  pass('SECURITY ONBOARDING PASS: '+v.width+': incomplete setup refused, explicit skip, configured completion, actual password form and independent old-session revocation/fresh login; optional two-step enrollment, fresh authenticator login, single-use recovery and disable; Local Bills Viewer password reset revokes the old browser and permits a fresh login; billing, customer-update and tutorial release controls stay read-only for viewer; durable support ownership, explicit resolution build and reopen timeline');
+  pass('SECURITY ONBOARDING PASS: '+v.width+': incomplete setup refused, explicit skip, configured completion, actual password form and independent old-session revocation/fresh login; optional two-step enrollment, fresh authenticator login, single-use recovery and disable; Local Bills Viewer password reset revokes the old browser and permits a fresh login; billing, customer-update, tutorial, announcement and survey release controls stay read-only for viewer; durable support ownership, explicit resolution build and reopen timeline');
 }

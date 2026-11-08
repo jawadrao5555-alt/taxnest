@@ -275,3 +275,22 @@ silently attached. Backup evidence still has no company-scoped retained source
 in the current schema. Required exact-HEAD PHP8.4/full-suite, native, browser,
 build and validate checks remain pending. Full field completeness and bounded
 export acceptance remain open.
+
+## Explicit backup-evidence gap (registry v8)
+
+The registry now exposes a product-specific backup-evidence source for PRA POS,
+DI, FBR POS and Healthcare, but deliberately returns `UNAVAILABLE` with
+`NO_TENANT_BOUND_RETAINED_SOURCE`. The current schema has no retained
+company-bound backup proof, so global infrastructure or release state is never
+attached to a tenant and an absent row is never described as healthy, complete
+or a successful restore.
+
+The daily bounded collector retains the unavailable observation with the same
+company/product/run identity as other sources. Focused SQLite and mandatory
+native MariaDB checks require the explicit reason, empty redacted rows, false
+complete/seven-day flags and no health claim. No backup, restore or business
+record is read, created, changed or deleted.
+
+This closes only truthful registration of the backup gap. Actual tenant-bound
+backup/restore evidence, remaining field completeness and bounded export
+acceptance remain open; fresh exact-HEAD hosted checks are required.

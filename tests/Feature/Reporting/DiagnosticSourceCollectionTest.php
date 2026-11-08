@@ -82,6 +82,26 @@ class DiagnosticSourceCollectionTest extends TestCase
         $collector->capture(3, 'pra.fiscal', '2026-11-06', (string) Str::uuid());
     }
 
+    public function test_backup_gap_is_explicitly_unavailable_and_never_inferred_from_global_state(): void
+    {
+        $collector = app(DiagnosticSourceCollection::class);
+        $this->assertSame('UNAVAILABLE', $collector->capture(1, 'pos.backup_evidence', '2026-11-06', (string) Str::uuid()));
+
+        $report = app(DiagnosticSourceEvidence::class)->read([
+            'company_name' => 'Synthetic observed PRA',
+            'source' => 'pos.backup_evidence',
+            'date_from' => '2026-11-06',
+        ], [1]);
+
+        $this->assertSame('UNAVAILABLE', $report['status']);
+        $this->assertSame('NO_TENANT_BOUND_RETAINED_SOURCE', $report['availability_reason']);
+        $this->assertSame('UNAVAILABLE', $report['collection_observation']['status']);
+        $this->assertFalse($report['coverage']['complete']);
+        $this->assertFalse($report['coverage']['seven_day_complete']);
+        $this->assertSame([], $report['rows']);
+        $this->assertStringNotContainsString('healthy', strtolower(json_encode($report)));
+    }
+
     public function test_scheduled_collection_retires_only_derived_old_observations(): void
     {
         $collector = app(DiagnosticSourceCollection::class);
@@ -90,12 +110,14 @@ class DiagnosticSourceCollectionTest extends TestCase
         DB::table('pra_logs')->insert(['id' => 1, 'company_id' => 1, 'created_at' => '2026-10-01 01:00:00', 'payload' => 'RETAIN-SOURCE']);
         $this->artisan('diagnostics:observe-sources')->assertSuccessful();
         $this->assertSame(0, DB::table('diagnostic_source_observations')->where('collected_at', '<', '2026-10-31 12:00:00')->count());
-        // Fourteen PRA sources per company and twelve legacy-Healthcare sources.
-        $this->assertSame(40, DB::table('diagnostic_source_observations')->count());
+        // Fifteen PRA sources per company and thirteen legacy-Healthcare sources,
+        // including one explicit unavailable backup-evidence gap per product.
+        $this->assertSame(43, DB::table('diagnostic_source_observations')->count());
         $this->assertDatabaseHas('diagnostic_source_observations', ['company_id' => 1, 'source' => 'pos.offline_samples', 'status' => 'UNAVAILABLE']);
         $this->assertDatabaseHas('diagnostic_source_observations', ['company_id' => 3, 'source' => 'health.federal', 'status' => 'UNAVAILABLE']);
         $this->assertDatabaseHas('diagnostic_source_observations', ['company_id' => 1, 'source' => 'pos.support_cases', 'status' => 'UNAVAILABLE']);
         $this->assertDatabaseHas('diagnostic_source_observations', ['company_id' => 1, 'source' => 'pos.live_ops', 'status' => 'UNAVAILABLE']);
+        $this->assertDatabaseHas('diagnostic_source_observations', ['company_id' => 1, 'source' => 'pos.backup_evidence', 'status' => 'UNAVAILABLE']);
         $this->assertSame('RETAIN-SOURCE', DB::table('pra_logs')->sole()->payload);
         $this->expectException(\InvalidArgumentException::class);
         $collector->capture(1, 'pra.fiscal', '2026-10-01', (string) Str::uuid());

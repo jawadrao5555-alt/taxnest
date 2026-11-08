@@ -10,7 +10,7 @@ use Illuminate\Validation\ValidationException;
 /** Registered, SELECT-only source metadata. Never returns stored payloads. */
 final class DiagnosticSourceEvidence
 {
-    public const REGISTRY_VERSION = 7;
+    public const REGISTRY_VERSION = 8;
 
     public const SOURCES = [
         'pra.fiscal' => ['pos', 'pra_logs', 'created_at'],
@@ -53,6 +53,13 @@ final class DiagnosticSourceEvidence
         'health.branches' => ['erps', 'branches', 'created_at'],
         'health.support_cases' => ['erps', 'support_cases', 'updated_at'],
         'health.live_ops' => ['erps', 'live_ops_autonomous_requests', 'updated_at'],
+        // No current table retains tenant-bound backup evidence. Register the
+        // gap explicitly so callers receive UNAVAILABLE instead of a false
+        // healthy/empty result or globally attributed infrastructure state.
+        'pos.backup_evidence' => ['pos', null, null, [], 'NO_TENANT_BOUND_RETAINED_SOURCE'],
+        'di.backup_evidence' => ['di', null, null, [], 'NO_TENANT_BOUND_RETAINED_SOURCE'],
+        'fbrpos.backup_evidence' => ['fbrpos', null, null, [], 'NO_TENANT_BOUND_RETAINED_SOURCE'],
+        'health.backup_evidence' => ['erps', null, null, [], 'NO_TENANT_BOUND_RETAINED_SOURCE'],
         'di.import_batches' => ['di', 'invoice_import_batches', 'created_at'],
         'di.audit_exports' => ['di', 'audit_packs', 'created_at'],
         'health.prescriptions' => ['erps', 'health_prescriptions', 'created_at'],
@@ -102,6 +109,7 @@ final class DiagnosticSourceEvidence
         }
         [$product, $table, $stamp] = self::SOURCES[$v['source']];
         $fixed = self::SOURCES[$v['source']][3] ?? [];
+        $unavailableReason = self::SOURCES[$v['source']][4] ?? null;
         if (\App\Support\NestErps::canonicalProductType($company->product_type) !== $product) {
             throw ValidationException::withMessages(['source' => 'This source does not apply to the selected product.']);
         }
@@ -123,6 +131,10 @@ final class DiagnosticSourceEvidence
         if ($v['source'] === 'pos.offline_samples') {
             $meta['related_operation'] = ['name' => 'get_pra_operations_evidence', 'stream' => 'agent_collection',
                 'purpose' => 'Retained device sequence gaps, source/receipt clock-or-upload difference, stale streams, pending/dropped/reset counts and storage status.'];
+        }
+        if ($unavailableReason !== null) {
+            return $meta + ['status' => 'UNAVAILABLE', 'availability_reason' => $unavailableReason,
+                'observed' => null, 'rows' => [], 'pagination' => ['has_more' => false, 'next_after_id' => null]];
         }
         try {
             foreach (array_merge(['id', $stamp, $v['source'] === 'di.fiscal' ? 'invoice_id' : 'company_id'], array_keys($fixed)) as $column) {

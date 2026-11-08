@@ -29,6 +29,7 @@ final class DiagnosticSourceCollection
         $company = $company->first(['id', 'product_type']);
         [$product, $table, $stamp] = DiagnosticSourceEvidence::SOURCES[$source];
         $fixed = DiagnosticSourceEvidence::SOURCES[$source][3] ?? [];
+        $unavailableReason = DiagnosticSourceEvidence::SOURCES[$source][4] ?? null;
         if (! $company || NestErps::canonicalProductType($company->product_type) !== $product) {
             throw new \InvalidArgumentException('Source does not apply to company.');
         }
@@ -36,6 +37,11 @@ final class DiagnosticSourceCollection
         $result = ['registry_version' => DiagnosticSourceEvidence::REGISTRY_VERSION, 'collected_at' => Carbon::now(config('app.timezone'))->format('Y-m-d H:i:s'), 'status' => 'UNAVAILABLE',
             'retained_rows' => null, 'first_source_at' => null, 'last_source_at' => null];
         try {
+            if ($unavailableReason !== null) {
+                DB::table('diagnostic_source_observations')->insertOrIgnore($identity + $result);
+
+                return $result['status'];
+            }
             $required = array_merge(['id', $stamp, $source === 'di.fiscal' ? 'invoice_id' : 'company_id'], array_keys($fixed));
             $available = Schema::hasTable($table);
             foreach ($required as $field) {

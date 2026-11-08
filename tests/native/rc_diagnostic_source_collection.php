@@ -156,6 +156,19 @@ try {
     }
     echo "PASS: native company-linked Live Ops source excludes global and foreign rows without exposing job or deployment payloads\n";
 
+    $collection->capture($company->id, 'pos.backup_evidence', $day, (string) Str::uuid());
+    $backupGap = app(\App\Services\Reporting\DiagnosticSourceEvidence::class)->read([
+        'company_name' => $company->name, 'source' => 'pos.backup_evidence', 'date_from' => $day,
+    ], [$company->id]);
+    if ($backupGap['status'] !== 'UNAVAILABLE'
+        || $backupGap['availability_reason'] !== 'NO_TENANT_BOUND_RETAINED_SOURCE'
+        || $backupGap['collection_observation']['status'] !== 'UNAVAILABLE'
+        || $backupGap['coverage']['complete'] !== false || $backupGap['coverage']['seven_day_complete'] !== false
+        || $backupGap['rows'] !== [] || str_contains(strtolower(json_encode($backupGap)), 'healthy')) {
+        throw new RuntimeException('Native backup evidence gap was not retained as explicit unavailable evidence');
+    }
+    echo "PASS: native tenant backup evidence remains explicitly unavailable without global attribution or health claim\n";
+
     $branchIds = [
         'selected' => DB::table('branches')->insertGetId(['company_id' => $company->id, 'name' => 'Synthetic selected '.$suffix,
             'created_at' => $stamp, 'updated_at' => $stamp]),

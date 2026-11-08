@@ -28,6 +28,7 @@ class AdminCompanyController extends Controller
 {
     public function create()
     {
+        \App\Models\AdminUser::requireCompanyLifecycleAdministrator();
         $franchises = Franchise::where('status', 'active')->get();
         $agents = $this->activeAgents();
         return view('saas-admin.companies.create', compact('franchises', 'agents'));
@@ -208,6 +209,7 @@ class AdminCompanyController extends Controller
 
     public function edit($id)
     {
+        \App\Models\AdminUser::requireCompanyLifecycleAdministrator();
         $company = Company::findOrFail($id);
         $franchises = Franchise::where('status', 'active')->get();
         $companyAdmin = User::where('company_id', $id)->where('role', 'company_admin')->first();
@@ -217,6 +219,7 @@ class AdminCompanyController extends Controller
 
     public function update(Request $request, $id)
     {
+        \App\Models\AdminUser::requireCompanyLifecycleAdministrator();
         $company = Company::findOrFail($id);
         $request->validate([
             'name' => 'required|string|max:255',
@@ -371,6 +374,9 @@ class AdminCompanyController extends Controller
     public function show($id)
     {
         $currentAdmin = auth('admin')->user()?->fresh();
+        $canManageCompanyLifecycle = (bool) $currentAdmin?->canManageCompanyLifecycle();
+        $canManageBilling = (bool) $currentAdmin?->canManageBilling();
+        $isSuperAdmin = (bool) $currentAdmin?->isSuperAdmin();
         $company = Company::withTrashed()->with(['franchise', 'activeSubscription', 'requestedPlan'])->findOrFail($id);
         $usageStats = CompanyUsageStat::refreshForCompany($id);
         $accountOverview = \App\Services\CompanyAccountOverview::for($company);
@@ -474,7 +480,7 @@ class AdminCompanyController extends Controller
             ->filter(fn ($p) => !\App\Services\PlanSellabilityService::isRetired($p))
             ->values();
 
-        return view('saas-admin.companies.show', compact('company', 'usageStats', 'extraStats', 'archiveViewers', 'localViewers', 'companyAdmin', 'teamUsers', 'exemptInternalBills', 'grantPlans', 'groupMember', 'groupSiblings', 'accountOverview', 'companyDeletionRequest'));
+        return view('saas-admin.companies.show', compact('company', 'usageStats', 'extraStats', 'archiveViewers', 'localViewers', 'companyAdmin', 'teamUsers', 'exemptInternalBills', 'grantPlans', 'groupMember', 'groupSiblings', 'accountOverview', 'companyDeletionRequest', 'canManageCompanyLifecycle', 'canManageBilling', 'isSuperAdmin'));
     }
 
     /**
@@ -528,6 +534,7 @@ class AdminCompanyController extends Controller
      */
     public function revealFbrAccessCode($id)
     {
+        $this->assertSuperAdmin();
         $company = Company::withTrashed()->findOrFail($id);
 
         if (empty($company->fbr_access_code)) {
@@ -1132,6 +1139,7 @@ class AdminCompanyController extends Controller
      */
     public function grantAiPages(Request $request, $id)
     {
+        \App\Models\AdminUser::requireBillingAdministrator();
         $company = Company::findOrFail($id);
 
         $data = $request->validate([
@@ -1421,6 +1429,7 @@ class AdminCompanyController extends Controller
 
     public function changeProductType(Request $request, $id)
     {
+        \App\Models\AdminUser::requireCompanyLifecycleAdministrator();
         $company = Company::findOrFail($id);
         $request->validate(['product_type' => 'required|' . \App\Support\ProductCatalog::validationRule()]);
         $old = $company->product_type;
@@ -1458,6 +1467,7 @@ class AdminCompanyController extends Controller
      */
     public function cloneToProduct(Request $request, $id)
     {
+        \App\Models\AdminUser::requireCompanyLifecycleAdministrator();
         $source = Company::findOrFail($id);
 
         $request->validate([

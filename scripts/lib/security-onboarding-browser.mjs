@@ -224,6 +224,18 @@ export async function securityOnboardingWorkflow(page,t,v,{baseUrl,login,saveEvi
   const settingsForbidden=await page.request.post(baseUrl+'/admin/settings/test-email',{form:{_token:billingCsrf},maxRedirects:0});
   if(settingsForbidden.status()!==403)throw Error('Viewer sensitive configuration POST not refused');
   const legacyCompany=fixture.viewer.companyId;
+  await page.goto(baseUrl+'/admin/companies/'+legacyCompany,{waitUntil:'domcontentloaded'});
+  await page.getByText('Read-only company access.',{exact:false}).waitFor();
+  if(await page.locator([
+    'form[action$="/limits"]','form[action$="/ai-pages"]','form[action$="/change-type"]',
+    'form[action$="/clone-product"]','form[action*="/override/"]','form[action$="/reset-password"]',
+    'form[action$="/impersonate"]',
+  ].join(',')).count())throw Error('Viewer received company profile write controls');
+  await saveEvidenceScreenshot(page,'rc-security-company-history-viewer-'+v.width);
+  for(const path of ['/admin/companies/create','/admin/companies/'+legacyCompany+'/edit']) {
+    const refused=await page.request.get(baseUrl+path,{maxRedirects:0});
+    if(refused.status()!==403)throw Error('Viewer received company lifecycle form: '+path);
+  }
   for(const path of [
     '/admin/company/'+legacyCompany+'/suspend',
     '/admin/company/'+legacyCompany+'/reject',
@@ -238,6 +250,12 @@ export async function securityOnboardingWorkflow(page,t,v,{baseUrl,login,saveEvi
     '/admin/consultants/min-payout',
     '/admin/groups/resync',
     '/admin/all-users',
+    '/admin/companies/'+legacyCompany+'/ai-pages',
+    '/admin/companies/'+legacyCompany+'/change-type',
+    '/admin/companies/'+legacyCompany+'/clone-product',
+    '/admin/companies/'+legacyCompany+'/reveal-access-code',
+    '/admin/companies/'+legacyCompany+'/reset-password',
+    '/admin/companies/'+legacyCompany+'/impersonate',
     '/admin/hs-rate-links',
     '/admin/hs-rate-links-import',
     '/admin/hs-master',
@@ -258,6 +276,8 @@ export async function securityOnboardingWorkflow(page,t,v,{baseUrl,login,saveEvi
   }
   const featureRefused=await page.request.put(baseUrl+'/admin/company/'+legacyCompany+'/pos-features',{form:{_token:billingCsrf},maxRedirects:0});
   if(featureRefused.status()!==403)throw Error('Viewer legacy POS feature mutation not refused');
+  const companyUpdateRefused=await page.request.put(baseUrl+'/admin/companies/'+legacyCompany,{form:{_token:billingCsrf},maxRedirects:0});
+  if(companyUpdateRefused.status()!==403)throw Error('Viewer company profile mutation not refused');
   const groupRefused=await page.request.put(baseUrl+'/admin/groups/999999',{form:{_token:billingCsrf},maxRedirects:0});
   if(groupRefused.status()!==403)throw Error('Viewer business-group mutation not refused');
   for(const path of [

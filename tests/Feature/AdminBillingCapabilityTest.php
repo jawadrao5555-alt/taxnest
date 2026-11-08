@@ -56,6 +56,8 @@ class AdminBillingCapabilityTest extends TestCase
         $invoiceBefore = $invoice->fresh()->getAttributes();
         $plans = DB::table('pricing_plans')->orderBy('id')->get()->toJson();
         $usersBefore = User::count();
+        $companiesBefore = Company::count();
+        $aiLedgerBefore = DB::table('ai_page_ledgers')->count();
         foreach (['viewer', 'support', 'unknown_role'] as $role) {
             $this->actingAs($this->admin($role), 'admin');
             foreach ([
@@ -63,10 +65,17 @@ class AdminBillingCapabilityTest extends TestCase
                 ['POST', '/admin/subscriptions/assign', ['company_id' => $sub->company_id, 'pricing_plan_id' => $sub->pricing_plan_id, 'billing_cycle' => 'annual']],
                 ['POST', '/admin/payment-proofs/999999/approve', []], ['POST', '/admin/payment-proofs/999999/reject', []],
                 ['POST', '/admin/companies', []],
+                ['PUT', '/admin/companies/'.$sub->company_id, []],
                 ['POST', '/admin/di-companies/store', []],
                 ['POST', '/admin/all-users', []],
                 ['POST', '/admin/companies/'.$sub->company_id.'/approve', []],
                 ['POST', '/admin/companies/'.$sub->company_id.'/limits', ['extra_branch_slots' => 10]],
+                ['POST', '/admin/companies/'.$sub->company_id.'/ai-pages', ['pages' => 100]],
+                ['POST', '/admin/companies/'.$sub->company_id.'/change-type', ['product_type' => 'pos']],
+                ['POST', '/admin/companies/'.$sub->company_id.'/clone-product', ['products' => ['pos']]],
+                ['POST', '/admin/companies/'.$sub->company_id.'/reveal-access-code', []],
+                ['POST', '/admin/companies/'.$sub->company_id.'/reset-password', ['new_password' => 'SyntheticNew123!']],
+                ['POST', '/admin/companies/'.$sub->company_id.'/impersonate', ['mode' => 'full']],
                 ['POST', '/admin/companies/'.$sub->company_id.'/override/lifetime', []],
                 ['POST', '/admin/companies/'.$sub->company_id.'/override/temporary', []],
                 ['DELETE', '/admin/companies/'.$sub->company_id.'/override', []],
@@ -107,6 +116,8 @@ class AdminBillingCapabilityTest extends TestCase
         $this->assertSame($invoiceBefore, $invoice->fresh()->getAttributes());
         $this->assertSame($plans, DB::table('pricing_plans')->orderBy('id')->get()->toJson());
         $this->assertSame($usersBefore, User::count());
+        $this->assertSame($companiesBefore, Company::count());
+        $this->assertSame($aiLedgerBefore, DB::table('ai_page_ledgers')->count());
         $this->assertSame(1, Subscription::where('company_id', $sub->company_id)->count());
         Mail::assertNothingSent();
     }
@@ -132,6 +143,8 @@ class AdminBillingCapabilityTest extends TestCase
             'role' => 'viewer',
         ]);
         $this->actingAs($this->admin('viewer'), 'admin');
+        $this->get('/admin/companies/create')->assertForbidden();
+        $this->get('/admin/companies/'.$sub->company_id.'/edit')->assertForbidden();
         $this->get('/admin/subscriptions')->assertOk()->assertSee('Fictional capability company')
             ->assertDontSee('action="'.route('saas.admin.subscriptions.assign').'"', false)
             ->assertDontSee('action="'.route('saas.admin.subscriptions.toggle', $sub->id).'"', false);
@@ -155,6 +168,33 @@ class AdminBillingCapabilityTest extends TestCase
             $this->post('/admin/subscriptions/'.$sub->id.'/toggle')->assertRedirect();
             $this->assertFalse((bool) $sub->fresh()->active);
         }
+    }
+
+    public function test_read_only_company_detail_redacts_machine_keys_and_all_write_controls(): void
+    {
+        $sub = $this->paid();
+        $company = Company::findOrFail($sub->company_id);
+        $machineKey = 'tnk_synthetic_secret_machine_key';
+        $company->forceFill([
+            'product_type' => 'fbrpos',
+            'agent_api_key' => $machineKey,
+            'agent_enabled' => true,
+            'fbr_access_code' => \Illuminate\Support\Facades\Crypt::encryptString('SYNTHETIC-ACCESS-CODE'),
+        ])->saveQuietly();
+
+        $this->actingAs($this->admin('viewer'), 'admin')
+            ->get('/admin/companies/'.$company->id)->assertOk()
+            ->assertSee('Restricted to super administrator')
+            ->assertDontSee($machineKey)
+            ->assertDontSee('>Reveal<', false)
+            ->assertDontSee('action="'.route('saas.admin.companies.impersonate', $company->id).'"', false)
+            ->assertDontSee('action="'.route('saas.admin.companies.aiPages', $company->id).'"', false)
+            ->assertDontSee('action="'.route('saas.admin.companies.cloneProduct', $company->id).'"', false)
+            ->assertDontSee('action="'.route('saas.admin.companies.resetPassword', $company->id).'"', false);
+
+        $this->actingAs($this->admin('super_admin'), 'admin')
+            ->postJson('/admin/companies/'.$company->id.'/reveal-access-code')
+            ->assertOk()->assertJson(['code' => 'SYNTHETIC-ACCESS-CODE']);
     }
 
     public function test_existing_administrator_can_create_a_fictional_company_user(): void

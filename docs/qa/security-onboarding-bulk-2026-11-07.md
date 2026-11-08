@@ -853,6 +853,29 @@ explicit read-only notice for viewer/support/unmapped accounts. The same
 create form, then sends the denied POST. Focused billing/capability coverage
 passes **5 tests / 156 assertions**.
 
+The company detail surface still exposed several controls after those earlier
+lifecycle fixes. Direct PUT/POST requests could reach profile and fiscal-field
+updates, product-type changes, sibling-account cloning and AI page grants with
+only an authenticated admin-panel session; the encrypted FBR access-code route
+also omitted its documented super-admin check. Those entry points now reload
+the persisted company-lifecycle, billing or super-admin authority before row
+lookup or validation. Company create/edit form GETs use the same persisted
+lifecycle boundary.
+
+Support/viewer/unmapped accounts retain the company, subscription, sibling and
+override history, but the page renders no edit/manage-as, limits, AI grant,
+product change/clone, credential reset or subscription-override controls. The
+Desktop Agent machine key is no longer present in their HTML and the FBR
+access-code reveal control is super-admin-only. Cached super-admin downgrade is
+therefore reflected by both the rendered page and every direct request. Actual
+HTTP coverage requires 403 across the new route matrix and exact preservation
+of company, user, subscription and AI ledger rows. The affected capability,
+account-overview, company-form, product-type and tables-first compatibility set
+passes **83 tests / 1624 assertions**; Blade compilation, PHP/Node syntax and
+diff checks pass. The required 1366/390 journey now visits the real retained
+company history, requires absence of all write forms, and probes every guarded
+endpoint without creating a company, credential, grant or impersonation.
+
 Run **42454135064** passed full PHP8.4, native MariaDB, Node, build, safety and
 manifest lanes but its security browser step stopped after the real deletion
 request succeeded: the same success message is intentionally rendered in the

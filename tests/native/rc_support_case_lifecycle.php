@@ -92,6 +92,21 @@ $case = $make($company, random_int(100000, 999999));
 $foreign = $make($other, random_int(1000000, 1999999));
 $foreignBefore = $foreign->fresh()->getAttributes();
 $foreignEventsBefore = $foreign->events()->get()->map->getAttributes()->all();
+$session = app('session')->driver();
+$slaRequest = Request::create('/admin/support-inbox/cases/'.$case->id.'/assign', 'POST', [
+    'assigned_admin_id' => $admin->id,
+    'priority' => SupportCase::PRIORITY_NORMAL,
+    'sla_due_at' => '2030-01-01T12:00',
+]);
+$slaRequest->setLaravelSession($session);
+app()->instance('request', $slaRequest);
+auth('admin')->login($admin);
+app(SupportInboxController::class)->assignCase($slaRequest, $case);
+$case->refresh();
+if ($case->sla_due_at?->format('Y-m-d H:i:s') !== '2030-01-01 12:00:00'
+    || $case->events()->where('event_type', 'sla_changed')->count() !== 1) {
+    throw new RuntimeException('Support SLA deadline or timeline evidence was not retained');
+}
 $barrier = dirname($socket).'/support-case-'.$suffix;
 $processes = [];
 try {
@@ -136,11 +151,13 @@ try {
     app(SupportInboxController::class)->reopenCase($request, $case);
     $case->refresh();
     if ($case->status !== SupportCase::STATUS_REOPENED || $case->resolution_build !== 'native-support-1'
+        || $case->sla_due_at?->format('Y-m-d H:i:s') !== '2030-01-01 12:00:00'
+        || $case->events()->where('event_type', 'sla_changed')->count() !== 1
         || $case->events()->where('event_type', 'reopened')->count() !== 1
-        || $case->events()->count() !== 3) {
+        || $case->events()->count() !== 4) {
         throw new RuntimeException('Support reopen did not retain resolution timeline');
     }
-    echo "PASS: native concurrent support resolution records one exact build; reopen retains history and other company unchanged\n";
+    echo "PASS: native support SLA and concurrent resolution retain one exact build; reopen keeps history and other company unchanged\n";
 } finally {
     foreach ($processes as $process) {
         if ($process->isRunning()) {

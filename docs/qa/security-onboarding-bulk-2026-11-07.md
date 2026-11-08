@@ -114,7 +114,11 @@ the deadline. The 1366/390 journey uses the actual datetime form and verifies
 the exact retained timeline value. Current combined focused coverage is 20
 tests / 100 assertions. Customer acknowledgement and additional
 evidence/duplicate message links remain separate unimplemented B08-R05/T40
-work; no outbound message is sent by this increment.
+work; no outbound message is sent by this increment. The mandatory native
+support probe now uses the actual assignment controller to retain the explicit
+SLA, then requires it to survive two-worker concurrent resolution and reopen
+while a second company remains byte-for-byte unchanged. Fresh exact-HEAD hosted
+MariaDB execution is still required.
 
 ## Password-verified company deletion lifecycle continuation
 

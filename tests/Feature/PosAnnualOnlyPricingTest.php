@@ -12,8 +12,9 @@ use Tests\TestCase;
 /**
  * Annual-only pricing contract (23 Aug 2026).
  *
- * Historical short-cycle columns may remain populated, but POS, FBR POS and
- * DI purchases must always charge annual and create a twelve-month term.
+ * Historical short-cycle columns may remain populated, but POS and FBR POS
+ * purchases remain annual. DI annual prices retain their original calculation;
+ * explicitly configured DI short periods have separate coverage.
  */
 class PosAnnualOnlyPricingTest extends TestCase
 {

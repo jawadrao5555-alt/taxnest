@@ -1635,7 +1635,7 @@ async function workflow(page,t,v,diagnostics) {
   }
   if(t.b02Deal)return b02DealWorkflow(page,t,v,{baseUrl,waitForOperationalSurface,dismiss,saveEvidenceScreenshot,pass});
   if(t.staffDiscount)return staffDiscountWorkflow(page,t,v,{baseUrl,login,dismiss,waitForOperationalSurface,saveEvidenceScreenshot,pass,loopback});
-  if(t.fbrDiBulk)return fbrDiBulkWorkflow(page,t,v,{baseUrl,saveEvidenceScreenshot,pass});
+  if(t.fbrDiBulk)return fbrDiBulkWorkflow(page,t,v,{baseUrl,saveEvidenceScreenshot,pass,diagnostics});
   if(t.billingSelection)return billingSelectionWorkflow(page,t,v,{baseUrl,saveEvidenceScreenshot,pass});
   if(t.smartImport)return smartImportWorkflow(page,t,v);
   if(t.ingredientUnitAudit)return ingredientUnitAudit(page,t,v);

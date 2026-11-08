@@ -173,6 +173,9 @@ final class DiSellingPacking
             if (isset($item['mrp']) && (string) $item['mrp'] !== '' && (float) $item['mrp'] > 0) {
                 $mrp = self::decimal($item['mrp'], "items.$index.mrp", 6);
                 $baseMrp = $mrp->dividedBy($factor, 6, RoundingMode::HALF_UP);
+                if (! BigDecimal::of(number_format((float) (string) $baseMrp, 6, '.', ''))->isEqualTo($baseMrp)) {
+                    self::reject("items.$index.mrp", 'Converted MRP exceeds supported fiscal precision.');
+                }
                 if (! $mrp->multipliedBy($quantity)->toScale(2, RoundingMode::HALF_UP)
                     ->isEqualTo($baseMrp->multipliedBy($baseQuantity)->toScale(2, RoundingMode::HALF_UP))) {
                     self::reject("items.$index.mrp", 'MRP conversion exceeds fiscal precision. Use the base unit.');

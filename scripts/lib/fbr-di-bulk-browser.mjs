@@ -1,4 +1,4 @@
-export async function fbrDiBulkWorkflow(page,t,v,{baseUrl,saveEvidenceScreenshot,pass}) {
+export async function fbrDiBulkWorkflow(page,t,v,{baseUrl,saveEvidenceScreenshot,pass,diagnostics}) {
   const fixture=t.fbrDiBulk[v.width];
   await page.goto(baseUrl+'/billing/plans',{waitUntil:'domcontentloaded'});
   await page.getByLabel('Billing period',{exact:true}).selectOption('quarterly');
@@ -20,11 +20,14 @@ export async function fbrDiBulkWorkflow(page,t,v,{baseUrl,saveEvidenceScreenshot
   await product.getByLabel('Packing label',{exact:true}).fill('25 KG bag');
   await product.getByLabel('Base quantity per packing',{exact:true}).fill('25');
   await product.getByLabel('Packing price (optional)',{exact:true}).fill('2500');
+  const invalid=await product.evaluate(form=>Array.from(form.elements).filter(e=>e.willValidate&&!e.validity.valid).map(e=>({name:e.name,value:e.value,message:e.validationMessage})));
+  if(invalid.length)throw new Error('Product packing form invalid: '+JSON.stringify(invalid));
   try {
     await Promise.all([page.waitForURL(u=>u.pathname==='/products',{waitUntil:'domcontentloaded'}),product.getByRole('button',{name:'Create Product',exact:true}).click()]);
   } catch(error) {
     const errors=await page.locator('#productForm .text-red-700').allTextContents();
-    throw new Error('Product packing save failed at '+new URL(page.url()).pathname+': '+errors.join('; ')+'; '+error.message);
+    const fields=await product.evaluate(form=>Array.from(new FormData(form).entries()).filter(([name])=>name!=='_token'));
+    throw new Error('Product packing save failed at '+new URL(page.url()).pathname+': '+errors.join('; ')+'; fields='+JSON.stringify(fields)+'; pageErrors='+JSON.stringify(diagnostics?.pageErrors||[])+'; '+error.message);
   }
   await page.getByText('Product created successfully.',{exact:true}).waitFor();
   await page.goto(baseUrl+'/invoice/create',{waitUntil:'domcontentloaded'});

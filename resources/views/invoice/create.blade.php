@@ -1383,7 +1383,7 @@
                         tax_rate: item.tax_rate || 0,
                         sro_schedule_no: item.sro_schedule_no || '',
                         serial_no: item.serial_no || '',
-                        buyer_type: (document.querySelector('input[name="buyer_ntn"]')?.value || '').length > 5 ? 'registered' : 'unregistered'
+                        buyer_type: this.buyerRegType === 'Registered' ? 'registered' : 'unregistered'
                     };
                     this.recordMappingResponse(mappingId, hsCode, 'custom', customVals);
                     item.showMappingPanel = false;

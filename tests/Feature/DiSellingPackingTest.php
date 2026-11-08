@@ -183,6 +183,9 @@ class DiSellingPackingTest extends TestCase
         [$product, $pack] = $this->product('KG', 'Large packing', '1');
         $input = $this->payload($product, $pack, '100', '999999999999.99');
         $api->postJson('/api/di/v1/invoices', $input)->assertStatus(422);
+        $input = $this->payload($product, $pack, '1', '100');
+        $input['items'][0]['mrp'] = '999999999999.999999';
+        $api->postJson('/api/di/v1/invoices', $input)->assertStatus(422);
         $this->assertSame(0, Invoice::withoutGlobalScopes()->where('company_id', $this->company->id)->count());
     }
 

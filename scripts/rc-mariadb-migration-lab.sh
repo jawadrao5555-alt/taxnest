@@ -103,6 +103,7 @@ concurrency(){
     grep -Fqx "PASS: native shared source excludes global and foreign rows; exhausted cursor retains window evidence and original rows" "$EVIDENCE_DIR/diagnostic-source-observations.log" || fail diagnostic-shared-source-attribution-missing-success-proof
     grep -Fqx "PASS: native company-linked Live Ops source retains safe job/release identifiers without exposing payloads or claiming deployment" "$EVIDENCE_DIR/diagnostic-source-observations.log" || fail diagnostic-live-ops-source-attribution-missing-success-proof
     grep -Fqx "PASS: native exact branch source scope excludes sibling and foreign rows; company-wide collection is not branch proof" "$EVIDENCE_DIR/diagnostic-source-observations.log" || fail diagnostic-branch-source-attribution-missing-success-proof
+    grep -Fqx "PASS: native bounded source export reuses exact branch scope, redaction and unchanged retained rows" "$EVIDENCE_DIR/diagnostic-source-observations.log" || fail diagnostic-bounded-source-export-missing-success-proof
     grep -Fqx "PASS: native healthcare bill follows exact tenant-scoped clinical, pharmacy and stock source IDs without changing rows" "$EVIDENCE_DIR/diagnostic-source-observations.log" || fail diagnostic-health-source-attribution-missing-success-proof
     grep -Fqx "PASS: native concurrent source observation is idempotent, scoped and preserves source rows" "$EVIDENCE_DIR/diagnostic-source-observations.log" || fail diagnostic-source-observations-missing-success-proof
     clean_php php "$ROOT/tests/native/rc_elaan_scope.php"

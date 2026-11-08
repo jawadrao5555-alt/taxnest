@@ -213,6 +213,10 @@ try {
         'company_name' => $company->name, 'source' => 'pra.fiscal', 'date_from' => $day,
         'branch_id' => $branchIds['selected'],
     ], [$company->id]);
+    $branchExport = app(\App\Services\Reporting\DiagnosticSourceExport::class)->read([
+        'company_name' => $company->name, 'source' => 'pos.sales', 'date_from' => $day,
+        'branch_id' => $branchIds['selected'], 'max_rows' => 1,
+    ], [$company->id]);
     try {
         app(\App\Services\Reporting\DiagnosticSourceEvidence::class)->read([
             'company_name' => $company->name, 'source' => 'pos.sales', 'date_from' => $day,
@@ -226,12 +230,17 @@ try {
         || $branchScoped['collection_observation']['status'] !== 'UNAVAILABLE_FOR_BRANCH_SCOPE'
         || array_column($branchRow['rows'], 'id') !== [(int) $branchIds['sibling']]
         || $unsupportedBranch['status'] !== 'BRANCH_SCOPE_UNAVAILABLE' || $unsupportedBranch['rows'] !== []
-        || str_contains(json_encode([$branchScoped, $branchRow, $unsupportedBranch]), 'Synthetic selected')
+        || array_column($branchExport['rows'], 'id') !== [(int) $branchSaleIds['selected']]
+        || $branchExport['export']['row_limit'] !== 1 || $branchExport['export']['truncated'] !== false
+        || $branchExport['export']['retained_window_rows_exhausted'] !== true
+        || $branchExport['export']['source_collection_complete'] !== false
+        || str_contains(json_encode([$branchScoped, $branchRow, $unsupportedBranch, $branchExport]), 'Synthetic selected')
         || $branchBefore['branches'] !== DB::table('branches')->whereIn('id', array_values($branchIds))->orderBy('id')->get()->toJson()
         || $branchBefore['sales'] !== DB::table('pos_transactions')->whereIn('id', array_values($branchSaleIds))->orderBy('id')->get()->toJson()) {
         throw new RuntimeException('Native exact branch source scope or row preservation failed');
     }
     echo "PASS: native exact branch source scope excludes sibling and foreign rows; company-wide collection is not branch proof\n";
+    echo "PASS: native bounded source export reuses exact branch scope, redaction and unchanged retained rows\n";
 
     $health = Company::create(['name' => 'Synthetic health diagnostic '.$suffix, 'ntn' => 'h'.$suffix, 'product_type' => 'erps']);
     $otherHealth = Company::create(['name' => 'Other health diagnostic '.$suffix, 'ntn' => 'y'.$suffix, 'product_type' => 'erps']);

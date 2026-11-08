@@ -1,5 +1,30 @@
 # Whole-SaaS diagnostics bulk — P1
 
+## Bounded source-evidence export continuation
+
+The registered source report now has a separate read-only JSON export tool. It
+reuses the same OAuth grant, exact company/product, optional exact branch,
+maximum seven-date window and allow-listed source registry; it cannot accept a
+table name or widen an unsupported branch source. The export reads at most five
+pages of 50 rows (250 rows total) and returns an explicit truncation flag and
+immutable-ID continuation cursor.
+
+Exhausting the retained matching rows is reported separately from source
+collection completeness, which remains false. The export therefore does not
+claim seven-day field collection, physical paper, regulator acceptance,
+successful backup/restore or product health. It returns the same redacted IDs,
+timestamps and source-specific safe operational identifiers as the paginated
+report; no payload, patient/customer detail, amount, credential or raw failure
+text is included. Every OAuth call remains read-audited and revocation stays
+authoritative.
+
+Focused regression requires a 120-row hard stop, exact continuation, resumed
+completion, sibling-branch and foreign-tenant exclusion, payload redaction,
+unchanged source bytes and refusal of row 251 or arbitrary table filters. The
+actual MCP regression requires the bounded tool schema, OAuth scope and audit.
+Fresh exact-HEAD PHP8.4/full-suite/native/browser/Node/final validate remains
+required; retained export acceptance is not field completeness.
+
 ## Expanded retained evidence and explicit bill links (7 November continuation)
 
 Registry v3 adds retained PRA order, IMS/DI submission, print-receipt and

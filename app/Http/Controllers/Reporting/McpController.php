@@ -90,6 +90,7 @@ final class McpController extends Controller
                 'get_pra_operations_evidence' => app(\App\Services\Reporting\PraOperationsEvidence::class)->read($args, $allowed),
                 'get_diagnostic_coverage' => app(DiagnosticCoverage::class)->catalog($args),
                 'get_diagnostic_source_evidence' => app(\App\Services\Reporting\DiagnosticSourceEvidence::class)->read($args, $allowed),
+                'export_diagnostic_source_evidence' => app(\App\Services\Reporting\DiagnosticSourceExport::class)->read($args, $allowed),
                 'get_diagnostic_bill_evidence' => app(\App\Services\Reporting\DiagnosticBillEvidence::class)->read($args, $allowed),
                 default => null,
             };
@@ -130,6 +131,13 @@ final class McpController extends Controller
             'stream' => ['type' => 'string', 'enum' => ['reports', 'openings', 'counter_closes']],
             'branch_id' => ['type' => 'integer', 'minimum' => 0], 'terminal_id' => ['type' => 'integer', 'minimum' => 0]];
         $defs = [
+            ['export_diagnostic_source_evidence', 'Bounded redacted JSON export of registered source evidence. Reuses exact OAuth company/product/branch/date scope, returns at most 250 rows and an explicit continuation cursor; retained rows never prove collection completeness or health.',
+                array_intersect_key($operationsPeriod, array_flip(['company_name', 'company_id', 'date_from', 'date_to'])) + [
+                    'branch_id' => ['type' => 'integer', 'minimum' => 1, 'description' => 'Optional exact company branch. Unsupported branch sources remain unavailable.'],
+                    'source' => ['type' => 'string', 'enum' => array_keys(\App\Services\Reporting\DiagnosticSourceEvidence::SOURCES)],
+                    'after_id' => ['type' => 'integer', 'minimum' => 0],
+                    'max_rows' => ['type' => 'integer', 'minimum' => 1, 'maximum' => \App\Services\Reporting\DiagnosticSourceExport::MAX_ROWS]],
+                ['company_name', 'date_from', 'source']],
             ['get_diagnostic_bill_evidence', 'Bounded explicit bill-to-source record associations for PRA, DI, FBR POS or Healthcare. IDs only; missing links and unsupported streams stay unknown. No replay or fiscal acceptance inference.',
                 array_intersect_key($operationsPeriod, array_flip(['company_name', 'company_id'])) + $cursor + [
                     'bill_id' => ['type' => 'integer', 'minimum' => 1]], ['company_name', 'bill_id']],

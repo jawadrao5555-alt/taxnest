@@ -950,6 +950,11 @@ class InvoiceController extends Controller
             ?: \App\Models\InvoiceBulkSubmission::unseenFinishedFor($companyId);
 
         if (!$batch) {
+            if ($key <= 0) {
+                // An empty discovery probe is normal on a company's first invoice.
+                // Explicit missing/foreign batch identifiers still return 404.
+                return response()->json(['status' => 'ok', 'batch_key' => null, 'batch' => null]);
+            }
             return response()->json(['status' => 'not_found'], 404);
         }
 

@@ -149,7 +149,7 @@ jobs:
       - name: Check DI cycles, packing, proof versions and medicine source ordering
         run: bash scripts/rc-safe-run -- vendor/bin/phpunit tests/Feature/DiBillingCyclesTest.php tests/Feature/DiSellingPackingTest.php tests/Feature/DiIntegrityCoverageTest.php tests/Feature/MedicineSourceOrderingTest.php tests/Feature/MedicineCatalogueTest.php --testdox
       - name: Check DI billing compatibility and historical invoice rendering
-        run: bash scripts/rc-safe-run -- vendor/bin/phpunit tests/Feature/AdminPlanCycleRatesTest.php tests/Feature/AdminPlanStorePostTest.php tests/Feature/AdminPagesSmokeTest.php tests/Feature/PaymentProofInstantAccessTest.php tests/Feature/InvoicePdfDecimalQuantityTest.php tests/Feature/FbrLogTenantIsolationTest.php tests/Feature/RequestedPackageSignupTest.php
+        run: bash scripts/rc-safe-run -- vendor/bin/phpunit tests/Feature/AdminPlanCycleRatesTest.php tests/Feature/AdminPlanStorePostTest.php tests/Feature/AdminPagesSmokeTest.php tests/Feature/PaymentProofInstantAccessTest.php tests/Feature/InvoicePdfDecimalQuantityTest.php tests/Feature/FbrLogTenantIsolationTest.php tests/Feature/RequestedPackageSignupTest.php tests/Feature/InvoiceBulkSubmitTest.php
       - name: Run full suite in clean loopback-only environment
         run: bash scripts/rc-safe-run -- vendor/bin/phpunit
       - name: Sanitize CI evidence

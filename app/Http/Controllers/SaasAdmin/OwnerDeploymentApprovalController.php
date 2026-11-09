@@ -25,9 +25,18 @@ class OwnerDeploymentApprovalController extends Controller
         $showHistory = $request->boolean('history');
         $releases = null;
         $historyWarning = null;
+        $historyFilters = [];
         if ($showHistory) {
+            $historyFilters = $request->validate([
+                'q' => ['nullable', 'string', 'max:120'],
+                'state' => ['nullable', 'in:'.implode(',', array_keys(DeploymentReleaseHistory::STATES))],
+                'module' => ['nullable', 'in:'.implode(',', array_keys(DeploymentReleaseHistory::MODULES))],
+                'deployment' => ['nullable', 'in:'.implode(',', array_keys(DeploymentReleaseHistory::DEPLOYMENTS))],
+                'from' => ['nullable', 'date_format:Y-m-d'],
+                'to' => ['nullable', 'date_format:Y-m-d'],
+            ]);
             try {
-                $releases = $history->recent();
+                $releases = $history->paginate($historyFilters);
             } catch (DeploymentGitHubUnavailable $exception) {
                 $historyWarning = $exception->getMessage();
             }
@@ -46,6 +55,7 @@ class OwnerDeploymentApprovalController extends Controller
             'showHistory' => $showHistory,
             'releases' => $releases,
             'historyWarning' => $historyWarning,
+            'historyFilters' => $historyFilters,
             'eligiblePullRequests' => $eligiblePullRequests,
             'eligibilityWarning' => $github->availabilityWarning(),
             'immediateDispatch' => OwnerApprovalImmediateDispatch::status(),

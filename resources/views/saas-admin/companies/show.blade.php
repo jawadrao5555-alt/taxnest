@@ -27,14 +27,35 @@
                     View as Company
                 </button>
             </form>
-            <form method="POST" action="{{ route('saas.admin.companies.impersonate', $company->id) }}" onsubmit="return confirm('FULL ACCESS: you will act AS this company and any change you make (invoices, settings, and live FBR/PRA submissions) is REAL. Continue?');">
-                @csrf
-                <input type="hidden" name="mode" value="full">
-                <button type="submit" class="flex items-center gap-1.5 px-3 py-1.5 bg-red-100 hover:bg-red-200 text-red-900 text-xs font-semibold rounded-lg transition border border-red-500">
-                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
-                    Manage as Company
-                </button>
-            </form>
+            <button type="button" onclick="document.getElementById('manage-company-confirmation').showModal()"
+                    class="flex items-center gap-1.5 px-3 py-1.5 bg-red-100 hover:bg-red-200 text-red-900 text-xs font-semibold rounded-lg transition border border-red-500">
+                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+                Manage as Company
+            </button>
+            <dialog id="manage-company-confirmation" aria-labelledby="manage-company-title"
+                    aria-describedby="manage-company-warning"
+                    class="m-auto w-11/12 max-w-md rounded-xl border border-gray-200 bg-white p-5 text-gray-900 shadow-xl backdrop:bg-black/60 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100">
+                <h2 id="manage-company-title" class="text-lg font-semibold">Confirm Full Access</h2>
+                <p class="mt-2 break-words text-sm">Company <strong>{{ $company->name }}</strong></p>
+                <p id="manage-company-warning" class="mt-2 text-sm">
+                    You will act as this company. Changes to invoices and settings, and live FBR or PRA submissions, are real.
+                </p>
+                <div class="mt-5 flex flex-wrap justify-end gap-2">
+                    <form method="dialog">
+                        <button type="submit" autofocus
+                                class="rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium dark:border-gray-600">
+                            Cancel
+                        </button>
+                    </form>
+                    <form method="POST" action="{{ route('saas.admin.companies.impersonate', $company->id) }}">
+                        @csrf
+                        <input type="hidden" name="mode" value="full">
+                        <button type="submit" class="rounded-lg bg-red-700 px-3 py-2 text-sm font-semibold text-white hover:bg-red-800">
+                            Confirm Full Access
+                        </button>
+                    </form>
+                </div>
+            </dialog>
             @endif
             <a href="{{ route('saas.admin.companies.edit', $company->id) }}" class="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-100 hover:bg-indigo-200 text-indigo-900 text-xs font-semibold rounded-lg transition border border-indigo-500">
                 <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>

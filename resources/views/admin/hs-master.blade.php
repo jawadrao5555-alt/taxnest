@@ -3,6 +3,7 @@
         <div class="flex items-center justify-between">
             <h2 class="font-bold text-xl text-gray-800 dark:text-gray-100 leading-tight">Global HS Intelligence Control</h2>
             <div class="flex items-center space-x-3">
+                @if($canManageSensitiveConfiguration)
                 <form method="POST" action="/admin/hs-master/seed" class="inline">
                     @csrf
                     <button type="submit" class="inline-flex items-center px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition">
@@ -10,6 +11,7 @@
                         Sync From Sources
                     </button>
                 </form>
+                @endif
                 <a href="/admin/hs-master-export" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition">
                     <svg class="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
                     Export
@@ -26,6 +28,10 @@
             @if(session('error'))
                 <div class="mb-4 p-4 bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300 rounded-lg">{{ session('error') }}</div>
             @endif
+
+            @unless($canManageSensitiveConfiguration)
+                <div class="mb-4 p-4 rounded-xl bg-amber-100 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/60 text-sm text-amber-800 dark:text-amber-200">Global HS intelligence and unmapped evidence are read-only for this account.</div>
+            @endunless
 
             <div class="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-6">
                 <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-4 text-center">
@@ -87,6 +93,7 @@
                             <button type="submit" class="bg-emerald-600 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-emerald-700">Search</button>
                         </form>
 
+                        @if($canManageSensitiveConfiguration)
                         <div x-data="{ showAdd: false }" class="mb-4">
                             <button @click="showAdd = !showAdd" class="text-sm text-emerald-600 dark:text-emerald-400 hover:underline font-medium">+ Add New HS Code</button>
                             <div x-show="showAdd" x-cloak class="mt-4 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
@@ -115,6 +122,7 @@
                                 </form>
                             </div>
                         </div>
+                        @endif
 
                         <div class="overflow-x-auto">
                             <table class="w-full text-sm table-cards">
@@ -165,9 +173,14 @@
                                                 @endif
                                             </td>
                                             <td class="py-3">
+                                                @if($canManageSensitiveConfiguration)
                                                 <button @click="editing = !editing" class="text-xs text-blue-600 dark:text-blue-400 hover:underline">Edit</button>
+                                                @else
+                                                <span class="text-xs text-gray-400">Read only</span>
+                                                @endif
                                             </td>
                                         </tr>
+                                        @if($canManageSensitiveConfiguration)
                                         <tr x-show="editing" x-cloak>
                                             <td colspan="9" class="py-3">
                                                 <form method="POST" action="/admin/hs-master/{{ $hs->id }}" class="grid grid-cols-1 sm:grid-cols-5 gap-2 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
@@ -195,6 +208,7 @@
                                                 </form>
                                             </td>
                                         </tr>
+                                        @endif
                                     @empty
                                         <tr>
                                             <td colspan="9" class="py-8 text-center text-gray-400 dark:text-gray-500">No HS codes found. Click "Sync From Sources" to populate.</td>
@@ -239,9 +253,14 @@
                                             <td class="py-3 pr-4 text-xs">{{ $um->earliest_seen ? \Carbon\Carbon::parse($um->earliest_seen)->format('M d, Y') : '-' }}</td>
                                             <td class="py-3 pr-4 text-xs">{{ $um->latest_seen ? \Carbon\Carbon::parse($um->latest_seen)->format('M d, Y') : '-' }}</td>
                                             <td class="py-3">
+                                                @if($canManageSensitiveConfiguration)
                                                 <button @click="mapping = !mapping" class="text-xs text-emerald-600 dark:text-emerald-400 hover:underline font-medium">Map Now</button>
+                                                @else
+                                                <span class="text-xs text-gray-400">Read only</span>
+                                                @endif
                                             </td>
                                         </tr>
+                                        @if($canManageSensitiveConfiguration)
                                         <tr x-show="mapping" x-cloak>
                                             <td colspan="6" class="py-3">
                                                 <form method="POST" action="/admin/hs-master/map-unmapped" class="grid grid-cols-1 sm:grid-cols-5 gap-2 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
@@ -259,6 +278,7 @@
                                                 </form>
                                             </td>
                                         </tr>
+                                        @endif
                                     @empty
                                         <tr>
                                             <td colspan="6" class="py-8 text-center text-gray-400 dark:text-gray-500">No unmapped HS codes detected. All HS codes are mapped.</td>

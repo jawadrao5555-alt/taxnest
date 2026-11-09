@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\AdminAnnouncement;
+use App\Models\AdminUser;
 use App\Models\AnnouncementDismissal;
 use App\Models\Company;
 use App\Services\PosFeatureService;
@@ -29,12 +30,14 @@ class AnnouncementController extends Controller
             'pra' => PosFeatureService::categoryGroups('pra'),
             'fbr' => PosFeatureService::categoryGroups('fbr'),
         ];
+        $canManageRelease = auth('admin')->user()?->fresh()?->canManageRelease() ?? false;
 
-        return view('admin.announcements', compact('announcements', 'companies', 'categoryGroups'));
+        return view('admin.announcements', compact('announcements', 'companies', 'categoryGroups', 'canManageRelease'));
     }
 
     public function store(Request $request)
     {
+        AdminUser::requireReleaseAdministrator();
         $this->validateAudience($request);
         $request->validate([
             'title' => 'required|string|max:255',
@@ -118,6 +121,7 @@ class AnnouncementController extends Controller
 
     public function toggle($id)
     {
+        AdminUser::requireReleaseAdministrator();
         $announcement = AdminAnnouncement::findOrFail($id);
         $announcement->update(['is_active' => !$announcement->is_active]);
         return redirect('/admin/announcements')->with('success', 'Announcement ' . ($announcement->is_active ? 'activated' : 'deactivated') . '.');
@@ -125,6 +129,7 @@ class AnnouncementController extends Controller
 
     public function destroy($id)
     {
+        AdminUser::requireReleaseAdministrator();
         AdminAnnouncement::findOrFail($id)->delete();
         return redirect('/admin/announcements')->with('success', 'Announcement deleted.');
     }

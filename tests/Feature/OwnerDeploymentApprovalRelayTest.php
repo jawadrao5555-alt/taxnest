@@ -87,6 +87,20 @@ class OwnerDeploymentApprovalRelayTest extends TestCase
             ->get('/admin/deployment-approval')->assertForbidden();
     }
 
+    public function test_cached_super_admin_is_revoked_before_a_deployment_approval_request(): void
+    {
+        $admin = $this->admin();
+        $this->actingAs($admin, 'admin');
+        AdminUser::whereKey($admin->id)->update(['role' => 'support']);
+
+        $this->get('/admin/deployment-approval')->assertForbidden();
+        $this->post('/admin/deployment-approval', [
+            'pull_request_number' => 17,
+            'password' => 'correct-password',
+        ])->assertForbidden();
+        $this->assertDatabaseCount('owner_deployment_approval_requests', 0);
+    }
+
     public function test_immediate_dispatch_seam_is_credential_free_and_fail_closed(): void
     {
         config(['deployment_approval.immediate_dispatch.driver' => 'github_app']);

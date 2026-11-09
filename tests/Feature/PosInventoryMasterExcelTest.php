@@ -829,9 +829,19 @@ class PosInventoryMasterExcelTest extends TestCase
             if ($impersonation === null) {
                 auth('admin')->logout();
             } else {
-                $admin = new AdminUser(['name' => 'Test Admin', 'email' => 'admin@example.test', 'role' => 'super_admin']);
-                $admin->id = 1;
+                // Impersonation authorization deliberately re-reads both current
+                // identities. Keep this isolated inventory fixture database-free
+                // for auth tables, while modelling the persisted identities that
+                // the real controller establishes before opening the company panel.
+                $admin = \Mockery::mock(AdminUser::class)->makePartial();
+                $admin->forceFill(['id' => 1, 'name' => 'Test Admin', 'email' => 'admin@example.test', 'role' => 'super_admin']);
+                $admin->shouldReceive('fresh')->andReturnSelf();
                 auth('admin')->setUser($admin);
+
+                $panel = \Mockery::mock(\App\Models\User::class)->makePartial();
+                $panel->forceFill(['id' => 2, 'company_id' => $this->companyId, 'is_active' => true]);
+                $panel->shouldReceive('fresh')->andReturnSelf();
+                auth('pos')->setUser($panel);
             }
             $request = Request::create('/pos/inventory-master/export', 'GET');
             $request->setLaravelSession(app('session.store'));

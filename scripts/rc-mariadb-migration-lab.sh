@@ -102,6 +102,23 @@ concurrency(){
     clean_php php "$ROOT/tests/native/rc_subscription_financial_adjustments.php" | tee "$EVIDENCE_DIR/subscription-financial-adjustments.log"
     grep -Fqx "PASS: native concurrent trial creation returns one frozen zero-price term; paid company and documents unchanged" "$EVIDENCE_DIR/trial-signup.log" || fail trial-signup-missing-success-proof
     grep -Fqx "PASS: native concurrent paid renewal preserves remaining term once; retry and other company preserved" "$EVIDENCE_DIR/paid-renewal.log" || fail paid-renewal-missing-success-proof
+    clean_php php "$ROOT/tests/native/rc_password_reset_grant.php" | tee "$EVIDENCE_DIR/password-reset-grant.log"
+    clean_php php "$ROOT/tests/native/rc_two_step_login.php" | tee "$EVIDENCE_DIR/two-step-login.log"
+    clean_php php "$ROOT/tests/native/rc_audit_export_retention.php" | tee "$EVIDENCE_DIR/audit-export-retention.log"
+    grep -Fqx "PASS: native concurrent audit export expiry retains history and invoices; foreign paths and current exports preserved" "$EVIDENCE_DIR/audit-export-retention.log" || fail audit-export-retention-missing-success-proof
+    clean_php php "$ROOT/tests/native/rc_company_deletion_lifecycle.php" | tee "$EVIDENCE_DIR/company-deletion-lifecycle.log"
+    grep -Fqx "PASS: native concurrent verified company deletion request creates one exact hold; restore revokes only browser sessions and preserves foreign tenant and Agent pairing" "$EVIDENCE_DIR/company-deletion-lifecycle.log" || fail company-deletion-lifecycle-missing-success-proof
+    clean_php php "$ROOT/tests/native/rc_restore_security_quarantine.php" | tee "$EVIDENCE_DIR/restore-security-quarantine.log"
+    grep -Fqx "PASS: native post-restore quarantine revokes browser, reset, reporting and consultant access; company rows and Agent pairing remain exact" "$EVIDENCE_DIR/restore-security-quarantine.log" || fail restore-security-quarantine-missing-success-proof
+    grep -Fqx "PASS: native restore epoch refuses stale administrator sessions and remember cookies; fresh login succeeds" "$EVIDENCE_DIR/restore-security-quarantine.log" || fail restore-session-epoch-missing-proof
+    clean_php php "$ROOT/tests/native/rc_support_case_lifecycle.php" | tee "$EVIDENCE_DIR/support-case-lifecycle.log"
+    grep -Fqx "PASS: native reviewed company purge retains support identity and immutable history without cross-tenant loss" "$EVIDENCE_DIR/support-case-lifecycle.log" || fail support-purge-retention-missing-proof
+    grep -Fqx "PASS: native support duplicate links remain idempotent and preserve both case states and other tenant" "$EVIDENCE_DIR/support-case-lifecycle.log" || fail support-links-missing-proof
+    grep -Fqx "PASS: native support SLA and concurrent resolution retain one exact build; reopen keeps history and other company unchanged" "$EVIDENCE_DIR/support-case-lifecycle.log" || fail support-case-lifecycle-missing-success-proof
+    grep -Fqx "PASS: native concurrent two-step controller permits one TOTP and one recovery use; other account unchanged" "$EVIDENCE_DIR/two-step-login.log" || fail two-step-single-use-missing-success-proof
+    grep -Fqx "PASS: native password reset grant permits one concurrent completion and preserves other account" "$EVIDENCE_DIR/password-reset-grant.log" || fail password-reset-grant-missing-success-proof
+    grep -Fqx "PASS: native reset rotates the company browser session generation atomically" "$EVIDENCE_DIR/password-reset-grant.log" || fail password-reset-session-generation-missing-success-proof
+    grep -Fqx "PASS: native reset link claim preserves its original TIMESTAMP deadline" "$EVIDENCE_DIR/password-reset-grant.log" || fail password-reset-link-deadline-missing-success-proof
     clean_php php "$ROOT/tests/native/rc_diagnostic_source_collection.php" | tee "$EVIDENCE_DIR/diagnostic-source-observations.log"
     grep -Fqx "PASS: native IMS links and print source read/collection retain exact tenant/product attribution and unchanged bill" "$EVIDENCE_DIR/diagnostic-source-observations.log" || fail diagnostic-ims-print-attribution-missing-success-proof
     grep -Fqx "PASS: native shared source excludes global and foreign rows; exhausted cursor retains window evidence and original rows" "$EVIDENCE_DIR/diagnostic-source-observations.log" || fail diagnostic-shared-source-attribution-missing-success-proof

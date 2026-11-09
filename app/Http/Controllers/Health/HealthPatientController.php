@@ -355,15 +355,44 @@ class HealthPatientController extends HealthPanelController
         }
 
         $anyGiven = $attributes['consent_treatment'] || $attributes['consent_share_reports'] || $attributes['consent_contact'];
+        $hadAnyGiven = $existing !== null && (
+            (bool) $existing->consent_treatment
+            || (bool) $existing->consent_share_reports
+            || (bool) $existing->consent_contact
+        );
+
+        // Deploy-before-migrate compatibility: older application nodes retain
+        // the existing current-consent fields until the additive evidence
+        // columns are present. Never make patient registration depend on the
+        // migration having reached every node first.
+        $hasVersionedEvidence = Schema::hasColumn('health_patients', 'consent_policy_version')
+            && Schema::hasColumn('health_patients', 'consent_withdrawn_at')
+            && Schema::hasColumn('health_patients', 'consent_withdrawn_by');
+
+        if ($changed && $hasVersionedEvidence) {
+            $attributes['consent_policy_version'] = HealthPatient::CONSENT_POLICY_VERSION;
+        }
 
         if ($changed && $anyGiven) {
             $attributes['consent_recorded_at'] = now();
             $attributes['consent_recorded_by'] = $this->user()?->id;
+            if ($hasVersionedEvidence) {
+                $attributes['consent_withdrawn_at'] = null;
+                $attributes['consent_withdrawn_by'] = null;
+            }
         } elseif ($changed && !$anyGiven) {
             // Consent fully withdrawn — the old stamp no longer describes
             // anything and must not linger as if it did.
             $attributes['consent_recorded_at'] = null;
             $attributes['consent_recorded_by'] = null;
+            if ($hasVersionedEvidence && $hadAnyGiven) {
+                // A declined initial registration is not a withdrawal. Once a
+                // granted permission is removed, however, preserve when and by
+                // whom it was withdrawn instead of making it indistinguishable
+                // from a record that never carried consent.
+                $attributes['consent_withdrawn_at'] = now();
+                $attributes['consent_withdrawn_by'] = $this->user()?->id;
+            }
         }
 
         return $attributes;

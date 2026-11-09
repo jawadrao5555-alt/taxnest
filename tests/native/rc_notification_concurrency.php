@@ -36,6 +36,12 @@ if (($argv[1] ?? '') === 'worker') {
     if ($argv[2] === 'publish') {
         \App\Models\AppUpdate::firstOrCreate(['manual_publish_key' => $key], $attrs);
     } elseif ($argv[2] === 'reannounce') {
+        if (!ctype_digit($argv[6] ?? '')) {
+            throw new RuntimeException('Missing persisted release administrator identity');
+        }
+        \Illuminate\Support\Facades\Auth::guard('admin')->setUser(
+            \App\Models\AdminUser::findOrFail((int) $argv[6])
+        );
         (new \App\Http\Controllers\AppUpdateController())->reannounce((int) $argv[5]);
     } else {
         throw new RuntimeException('Unknown worker mode');
@@ -44,12 +50,13 @@ if (($argv[1] ?? '') === 'worker') {
     exit(0);
 }
 
-function race(string $mode, int $sourceId = 0): void {
+function race(string $mode, int $sourceId = 0, int $adminId = 0): void {
     $barrier = dirname(getenv('DB_SOCKET')).'/notification-'.bin2hex(random_bytes(8));
     $workers = [];
     try {
         for ($i = 0; $i < 2; $i++) {
-            $process = proc_open([PHP_BINARY, __FILE__, 'worker', $mode, $barrier, (string) $i, (string) $sourceId],
+            $process = proc_open([PHP_BINARY, __FILE__, 'worker', $mode, $barrier, (string) $i,
+                (string) $sourceId, (string) $adminId],
                 [0 => ['file', '/dev/null', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
             if (!is_resource($process)) throw new RuntimeException('Worker launch failed');
             foreach ($pipes as $pipe) stream_set_blocking($pipe, false);
@@ -94,7 +101,13 @@ $source = $matches->first();
 $oldTimestamp = now()->subDays(8)->startOfSecond();
 \Illuminate\Support\Facades\DB::table('app_updates')->where('id', $source->id)
     ->update(['created_at' => $oldTimestamp, 'updated_at' => $oldTimestamp]);
-race('reannounce', $source->id);
+$admin = \App\Models\AdminUser::create([
+    'name' => 'Synthetic release concurrency admin',
+    'email' => bin2hex(random_bytes(8)).'@release-concurrency.invalid',
+    'password' => \Illuminate\Support\Facades\Hash::make('SyntheticRelease123!'),
+    'role' => 'super_admin',
+]);
+race('reannounce', $source->id, $admin->id);
 $revisions = \App\Models\AppUpdate::where('announcement_parent_id', $source->id)->get();
 if ($revisions->count() !== 1 || !$revisions->first()->announcement_revision
     || $revisions->first()->notification_key === $source->notification_key

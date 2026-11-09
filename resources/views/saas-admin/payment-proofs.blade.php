@@ -1,4 +1,7 @@
 <x-admin-layout>
+@php
+    $canManageBilling = auth('admin')->user() instanceof \App\Models\AdminUser && auth('admin')->user()->canManageBilling();
+@endphp
 <div class="p-4 sm:p-6 max-w-7xl mx-auto">
     <div class="flex items-center justify-between mb-6">
         <h1 class="text-2xl font-bold text-white">Payment Proofs</h1>
@@ -164,7 +167,7 @@
                                 @endif
                             </td>
                             <td class="px-4 py-3 text-center whitespace-nowrap">
-                                @if($proof->status === 'pending')
+                                @if($proof->status === 'pending' && $canManageBilling)
                                     <button @click="panel = (panel === 'approve' ? null : 'approve')" class="text-xs text-emerald-400 hover:text-emerald-300 mr-2">Approve</button>
                                     <button @click="panel = (panel === 'reject' ? null : 'reject')" class="text-xs text-red-400 hover:text-red-300">Reject</button>
 

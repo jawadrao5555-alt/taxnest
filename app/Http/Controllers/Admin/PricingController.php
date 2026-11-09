@@ -18,6 +18,8 @@ class PricingController extends Controller
 
     public function index(Request $request)
     {
+        $currentAdmin = auth('admin')->user()?->fresh();
+        $canManageBilling = (bool) $currentAdmin?->canManageBilling();
         $companyId = $request->input('company_id');
         $verdictFilter = $request->input('verdict'); // fast_selling | slow_selling | typical | insufficient_data
 
@@ -50,11 +52,12 @@ class PricingController extends Controller
             'insufficient_data' => $suggestions->where('verdict', 'insufficient_data')->count(),
         ];
 
-        return view('admin.pricing.suggestions', compact('suggestions', 'summary', 'companyId', 'verdictFilter'));
+        return view('admin.pricing.suggestions', compact('suggestions', 'summary', 'companyId', 'verdictFilter', 'canManageBilling'));
     }
 
     public function applySuggestion(Request $request, Product $product)
     {
+        \App\Models\AdminUser::requireBillingAdministrator();
         $s = $this->pricing->suggestPrice($product->id);
 
         if ($s['suggested_price'] === null || $s['verdict'] === 'insufficient_data') {

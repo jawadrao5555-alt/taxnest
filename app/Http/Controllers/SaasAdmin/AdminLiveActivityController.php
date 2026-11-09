@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\SaasAdmin;
 
 use App\Http\Controllers\Controller;
+use App\Models\AdminUser;
 use App\Models\Company;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -28,9 +29,7 @@ class AdminLiveActivityController extends Controller
 {
     public function index()
     {
-        if ((auth('admin')->user()->role ?? null) !== 'super_admin') {
-            abort(403);
-        }
+        AdminUser::requireSuperAdministrator();
 
         $now = now(); // app tz = Asia/Karachi
         // Reference trading day under the default 06:00 cutoff (header only —

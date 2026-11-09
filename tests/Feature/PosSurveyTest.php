@@ -36,6 +36,7 @@ use Tests\TestCase;
  */
 class PosSurveyTest extends TestCase
 {
+    use \Tests\Concerns\CreatesImpersonationActor;
     private const TITLE = 'SVMARK-CALLERID-91xa1';
 
     private int $companyId;
@@ -266,10 +267,10 @@ class PosSurveyTest extends TestCase
     {
         // A real impersonation always has the admin's own login alive in the same
         // session — without it the flag is orphaned and gets cleared on sight.
-        auth('admin')->setUser((new \App\Models\AdminUser())->forceFill(['id' => 1]));
+        $this->loginImpersonatingAdmin();
 
         $resp = $this->actingAs(User::find($this->adminId), 'pos')
-            ->withSession(['impersonation' => ['readonly' => true, 'admin_id' => 1]])
+            ->withSession(['impersonation' => ['readonly' => true, 'admin_id' => 1, 'company_id' => $this->companyId, 'guard' => 'pos']])
             ->get('/pos/my-profile');
         $resp->assertStatus(200);
         $resp->assertDontSee(self::TITLE);

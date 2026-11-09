@@ -3,6 +3,10 @@
     <h1 class="text-2xl font-bold text-white mb-1">Consultants</h1>
     <p class="text-sm text-gray-400 mb-6">Affiliate program oversight — consultants, client links, commissions and payouts.</p>
 
+    @unless($canManageBilling)
+    <div class="mb-6 p-4 rounded-xl bg-amber-900/20 border border-amber-800/60 text-sm text-amber-200">Consultant, link and payout history is read-only for this account.</div>
+    @endunless
+
     {{-- Consultants --}}
     <div class="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden mb-6">
         <div class="px-5 py-4 border-b border-gray-800"><h3 class="text-sm font-semibold text-white">Registered consultants</h3></div>
@@ -34,14 +38,19 @@
                         <td class="px-4 py-3 text-right text-amber-400">{{ number_format((float) optional($pSums->firstWhere('status', 'pending'))->total) }}</td>
                         <td class="px-4 py-3 text-right text-emerald-400">{{ number_format((float) optional($pSums->firstWhere('status', 'paid'))->total) }}</td>
                         <td class="px-4 py-3 text-center">
+                            @if($canManageBilling)
                             <form method="POST" action="{{ route('saas.admin.consultants.rate', $p->id) }}" class="inline-flex items-center gap-1">
                                 @csrf
                                 <input type="number" name="commission_rate" value="{{ (float) $p->commission_rate }}" step="0.5" min="0" max="100"
                                        class="w-16 bg-gray-800 border border-gray-700 rounded text-white text-xs px-2 py-1 text-center">
                                 <button class="text-xs text-indigo-400 hover:underline">Save</button>
                             </form>
+                            @else
+                            <span class="text-gray-300">{{ (float) $p->commission_rate }}</span>
+                            @endif
                         </td>
                         <td class="px-4 py-3 text-center">
+                            @if($canManageBilling)
                             <form method="POST" action="{{ route('saas.admin.consultants.toggle', $p->id) }}" class="inline">
                                 @csrf
                                 <button class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {{ $p->status === 'active' ? 'bg-emerald-900/30 text-emerald-400 hover:bg-red-900/30 hover:text-red-400' : 'bg-red-900/30 text-red-400 hover:bg-emerald-900/30 hover:text-emerald-400' }}"
@@ -49,6 +58,9 @@
                                     {{ ucfirst($p->status) }}
                                 </button>
                             </form>
+                            @else
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {{ $p->status === 'active' ? 'bg-emerald-900/30 text-emerald-400' : 'bg-red-900/30 text-red-400' }}">{{ ucfirst($p->status) }}</span>
+                            @endif
                         </td>
                     </tr>
                     @empty
@@ -64,6 +76,7 @@
         <div class="px-5 py-4 border-b border-gray-800 flex flex-wrap items-center justify-between gap-3">
             <h3 class="text-sm font-semibold text-white">Pending commissions</h3>
             <div class="flex items-center gap-4">
+                @if($canManageBilling)
                 <form method="POST" action="{{ route('saas.admin.consultants.min-payout') }}" class="inline-flex items-center gap-1" title="Pending balance below this carries over; 0 = no minimum">
                     @csrf
                     <label class="text-xs text-gray-500">Min payout Rs</label>
@@ -71,6 +84,9 @@
                            class="w-24 bg-gray-800 border border-gray-700 rounded text-white text-xs px-2 py-1 text-right">
                     <button class="text-xs text-indigo-400 hover:underline">Save</button>
                 </form>
+                @else
+                <span class="text-xs text-gray-500">Min payout Rs {{ number_format((float) ($minPayout ?? 0)) }}</span>
+                @endif
                 <span class="text-xs text-gray-500">Rs {{ number_format((float) $pendingCommissions->sum('amount')) }} total</span>
             </div>
         </div>
@@ -120,12 +136,16 @@
                         </td>
                         <td class="px-4 py-3 text-right text-amber-400 font-semibold">{{ number_format((float) $c->amount) }}</td>
                         <td class="px-4 py-3 text-right">
+                            @if($canManageBilling)
                             <form method="POST" action="{{ route('saas.admin.consultants.mark-paid', $c->id) }}" class="inline-flex items-center gap-1 justify-end">
                                 @csrf
                                 <input type="text" name="payout_reference" placeholder="Ref (optional)" maxlength="255"
                                        class="w-28 bg-gray-800 border border-gray-700 rounded text-white text-xs px-2 py-1">
                                 <button class="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded transition">Paid</button>
                             </form>
+                            @else
+                            <span class="text-xs text-gray-500">Pending</span>
+                            @endif
                         </td>
                     </tr>
                     @empty
@@ -159,14 +179,16 @@
                                 <span class="inline-flex px-2 py-0.5 rounded text-xs font-medium {{ $l->status === 'active' ? 'bg-emerald-900/30 text-emerald-400' : ($l->status === 'pending' ? 'bg-amber-900/30 text-amber-400' : 'bg-gray-800 text-gray-500') }}">{{ ucfirst($l->status) }}</span>
                             </td>
                             <td class="px-4 py-3 text-right">
-                                @if($l->status !== 'revoked')
+                                @if($l->status !== 'revoked' && $canManageBilling)
                                 <form method="POST" action="{{ route('saas.admin.consultants.revoke-link', $l->id) }}" class="inline"
                                       onsubmit="return confirm('Revoke this link?');">
                                     @csrf
                                     <button class="text-xs text-red-400 hover:text-red-300">Revoke</button>
                                 </form>
-                                @else
+                                @elseif($l->status === 'revoked')
                                 <span class="text-xs text-gray-600">{{ $l->revoked_by }}</span>
+                                @else
+                                <span class="text-xs text-gray-600">Active</span>
                                 @endif
                             </td>
                         </tr>

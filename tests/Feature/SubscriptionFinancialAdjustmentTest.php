@@ -191,7 +191,7 @@ class SubscriptionFinancialAdjustmentTest extends TestCase
     public function test_non_billing_role_and_company_user_cannot_record_or_view_admin_evidence(): void
     {
         $f = $this->fixture('support');
-        $this->postAdjustment($f)->assertSessionHasErrors('adjustment');
+        $this->postAdjustment($f)->assertForbidden();
         auth('admin')->logout();
         $companyUser = \App\Models\User::create([
             'name' => 'Synthetic tenant user',

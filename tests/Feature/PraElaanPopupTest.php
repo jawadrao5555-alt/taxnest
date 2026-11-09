@@ -45,6 +45,7 @@ use Tests\TestCase;
  */
 class PraElaanPopupTest extends TestCase
 {
+    use \Tests\Concerns\CreatesImpersonationActor;
     use ControlsSharedServiceNotice;
 
     /** Unique marker so grep-assertions never match other content. */
@@ -315,10 +316,10 @@ class PraElaanPopupTest extends TestCase
         // A real impersonation always has the admin's own login alive in the same
         // session — without it the flag is orphaned and gets cleared on sight.
         // (Same idiom as PosSurveyTest / WhatsNewAudienceTargetingTest.)
-        auth('admin')->setUser((new AdminUser())->forceFill(['id' => 1]));
+        $this->loginImpersonatingAdmin();
 
         $resp = $this->actingAs(User::find($this->adminId), 'pos')
-            ->withSession(['impersonation' => ['readonly' => true, 'admin_id' => 1]])
+            ->withSession(['impersonation' => ['readonly' => true, 'admin_id' => 1, 'company_id' => $this->companyId, 'guard' => 'pos']])
             ->get('/pos/my-profile');
         $resp->assertStatus(200);
         $resp->assertDontSee(self::MARKER, false);

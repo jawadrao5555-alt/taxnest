@@ -208,7 +208,9 @@
                                 <td class="py-3 pr-4 font-semibold text-gray-800 dark:text-gray-200 whitespace-nowrap">{{ $pack->date_from->format('d M Y') }} – {{ $pack->date_to->format('d M Y') }}</td>
                                 <td class="py-3 pr-4 text-gray-600 dark:text-gray-300">{{ $pack->total_invoices ? number_format($pack->total_invoices) : '—' }}</td>
                                 <td class="py-3 pr-4">
-                                    @if($pack->status === 'ready')
+                                    @if($pack->status === 'expired' || ($pack->expiresAt() && $pack->expiresAt()->lte(now())))
+                                        <span class="text-xs text-gray-500">Expired export — history retained</span>
+                                    @elseif($pack->status === 'ready')
                                         <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">Ready</span>
                                     @elseif($pack->status === 'failed')
                                         <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" title="{{ Str::limit($pack->error_message, 120) }}">Failed</span>
@@ -226,7 +228,7 @@
                                 <td class="py-3 pr-4 text-gray-500 dark:text-gray-400 whitespace-nowrap">{{ $pack->created_at->format('d M Y H:i') }}</td>
                                 <td class="py-3 pr-4 text-gray-500 dark:text-gray-400 whitespace-nowrap">{{ optional($pack->expiresAt())->format('d M Y') ?? '—' }}</td>
                                 <td class="py-3 text-right whitespace-nowrap">
-                                    @if($pack->status === 'ready')
+                                    @if($pack->status === 'ready' && $pack->expiresAt() && $pack->expiresAt()->gt(now()))
                                     <a href="{{ route('compliance.packs.download', $pack) }}" class="inline-flex items-center px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 rounded-lg font-bold text-xs text-white transition">
                                         <svg class="w-3.5 h-3.5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
                                         Download ZIP
@@ -283,24 +285,39 @@
                 processed: initialProcessed || 0,
                 total: initialTotal || 0,
                 timer: null,
+                polling: false,
                 init() {
                     this.timer = setInterval(() => this.poll(), 4000);
                     this.poll();
                 },
                 poll() {
+                    if (this.polling) return;
+                    this.polling = true;
                     fetch(statusUrl, { headers: { 'Accept': 'application/json' }, credentials: 'same-origin' })
                         .then(r => r.ok ? r.json() : null)
+                        .then(async data => {
+                            if (data?.advance_url) {
+                                const token = document.querySelector('meta[name="csrf-token"]')?.content;
+                                if (token) {
+                                    const response = await fetch(data.advance_url, { method:'POST', credentials:'same-origin',
+                                        headers:{'Accept':'application/json','X-CSRF-TOKEN':token} });
+                                    if (response.ok) return response.json();
+                                }
+                            }
+                            return data;
+                        })
                         .then(data => {
                             if (!data) return;
                             this.status = data.status;
                             this.progress = data.progress || 0;
                             this.processed = data.processed || 0;
                             this.total = data.total || 0;
-                            if (data.status === 'ready' || data.status === 'failed') {
+                            if (data.status === 'ready' || data.status === 'failed' || data.status === 'expired') {
                                 clearInterval(this.timer);
                                 window.location.reload();
                             }
                         })
+                        .finally(() => { this.polling = false; })
                         .catch(() => {});
                 }
             };

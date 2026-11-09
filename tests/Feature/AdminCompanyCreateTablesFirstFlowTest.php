@@ -33,6 +33,20 @@ class AdminCompanyCreateTablesFirstFlowTest extends TestCase
 
         Schema::dropAllTables();
 
+        // Controller authorization re-reads the persisted administrator.
+        Schema::create('admin_users', function (Blueprint $table) {
+            $table->id();
+            $table->string('name');
+            $table->string('email')->unique();
+            $table->string('password');
+            $table->string('role');
+            $table->timestamps();
+        });
+        $this->actingAs(\App\Models\AdminUser::create([
+            'name' => 'Synthetic administrator', 'email' => 'admin@tables-flow.invalid',
+            'password' => 'Synthetic123!', 'role' => 'admin',
+        ]), 'admin');
+
         // companies — all columns written by AdminCompanyController::store(),
         // plus tables_first_flow with its mandatory DEFAULT 1.
         Schema::create('companies', function (Blueprint $table) {

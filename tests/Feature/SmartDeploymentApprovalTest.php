@@ -179,6 +179,42 @@ class SmartDeploymentApprovalTest extends TestCase
         $this->assertDatabaseCount('owner_deployment_approval_requests', 0);
     }
 
+    public function test_password_rotation_revokes_cached_owner_approval_password_immediately(): void
+    {
+        Mail::fake();
+        Http::fake([
+            'https://api.github.com/repos/jawadrao5555-alt/taxnest/pulls/55' => Http::response($this->eligiblePr(), 200),
+            'https://api.github.com/repos/jawadrao5555-alt/taxnest/commits/'.self::SHA.'/check-runs*' => Http::response([
+                'check_runs' => [['name' => 'validate', 'status' => 'completed', 'conclusion' => 'success']],
+            ], 200),
+        ]);
+        $owner = AdminUser::query()->create([
+            'name' => 'Cached owner',
+            'email' => 'cached-owner@example.test',
+            'password' => 'old-secret-password',
+            'role' => 'super_admin',
+        ]);
+        $this->actingAs($owner, 'admin');
+        AdminUser::query()->whereKey($owner->id)->update(['password' => bcrypt('new-secret-password')]);
+
+        $this->post('/admin/deployment-approval', [
+            'pull_request_number' => 55,
+            'password' => 'old-secret-password',
+        ])->assertSessionHasErrors('password');
+        $this->assertDatabaseCount('owner_deployment_approval_requests', 0);
+
+        $this->post('/admin/deployment-approval', [
+            'pull_request_number' => 55,
+            'password' => 'new-secret-password',
+        ])->assertRedirect()->assertSessionHas('success');
+        $this->assertDatabaseHas('owner_deployment_approval_requests', [
+            'pull_request_number' => 55,
+            'status' => 'approved',
+            'approved_admin_id' => $owner->id,
+        ]);
+        Mail::assertNothingSent();
+    }
+
     public function test_release_history_shows_direct_merge_and_requires_password_to_approve_its_exact_commit(): void
     {
         Mail::fake();

@@ -62,6 +62,8 @@ class AdminCompanyTypeViewerBinPostsSmokeTest extends TestCase
             $table->string('status')->default('approved');
             $table->string('company_status')->default('active');
             $table->string('deleted_reason')->nullable();
+            $table->string('agent_api_key')->nullable();
+            $table->boolean('agent_enabled')->default(false);
             $table->softDeletes();
             $table->timestamps();
         });
@@ -75,6 +77,7 @@ class AdminCompanyTypeViewerBinPostsSmokeTest extends TestCase
             $table->string('role')->nullable();
             $table->string('pos_role')->nullable();
             $table->boolean('is_active')->default(true);
+            $table->uuid('session_generation')->nullable();
             $table->rememberToken();
             $table->timestamps();
         });
@@ -107,6 +110,39 @@ class AdminCompanyTypeViewerBinPostsSmokeTest extends TestCase
             $table->string('credential_value', 191);
             $table->unsignedBigInteger('company_id')->nullable();
             $table->timestamp('created_at')->nullable();
+        });
+
+        Schema::create('company_deletion_requests', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('company_id')->index();
+            $table->string('active_key', 80)->nullable()->unique();
+            $table->string('company_name_snapshot');
+            $table->string('product_type_snapshot', 80)->nullable();
+            $table->string('requester_guard', 20);
+            $table->unsignedBigInteger('requested_by_user_id')->nullable();
+            $table->unsignedBigInteger('requested_by_admin_id')->nullable();
+            $table->string('requester_email_hash', 64)->nullable();
+            $table->timestamp('requester_verified_at');
+            $table->text('reason')->nullable();
+            $table->string('status', 30)->index();
+            $table->json('scope_manifest')->nullable();
+            $table->string('scope_manifest_sha256', 64)->nullable();
+            $table->timestamp('requested_at');
+            $table->timestamp('binned_at')->nullable();
+            $table->timestamp('hold_until')->nullable();
+            $table->timestamp('restored_at')->nullable();
+            $table->timestamp('purged_at')->nullable();
+            $table->timestamps();
+        });
+        Schema::create('company_deletion_request_events', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('request_id')->index();
+            $table->unsignedBigInteger('company_id')->index();
+            $table->string('event', 50)->index();
+            $table->string('actor_guard', 20);
+            $table->unsignedBigInteger('actor_id')->nullable();
+            $table->json('metadata')->nullable();
+            $table->timestamp('created_at');
         });
 
         DB::table('admin_users')->insert([
@@ -269,6 +305,7 @@ class AdminCompanyTypeViewerBinPostsSmokeTest extends TestCase
         $this->assertSame('new-archive@taxnest.test', $user->email);
         $this->assertTrue(Hash::check('NewPass@123', $user->password));
         $this->assertSame('archive_viewer', $user->pos_role, 'pos_role must never change on update');
+        $this->assertNotNull($user->session_generation, 'password reset must revoke an already-open viewer browser session');
     }
 
     public function test_archive_viewer_update_without_password_keeps_old_password(): void
@@ -285,6 +322,7 @@ class AdminCompanyTypeViewerBinPostsSmokeTest extends TestCase
             ->assertSessionMissing('errors');
 
         $this->assertTrue(Hash::check('OldPass@123', DB::table('users')->where('id', $userId)->value('password')));
+        $this->assertNull(DB::table('users')->where('id', $userId)->value('session_generation'), 'profile-only edits must not revoke viewer sessions');
     }
 
     public function test_archive_viewer_update_invalid_data_bounces_and_leaves_user_unchanged(): void
@@ -411,6 +449,7 @@ class AdminCompanyTypeViewerBinPostsSmokeTest extends TestCase
         $this->assertSame('new-local@taxnest.test', $user->email);
         $this->assertTrue(Hash::check('NewPass@123', $user->password));
         $this->assertSame('local_viewer', $user->pos_role);
+        $this->assertNotNull($user->session_generation, 'password reset must revoke an already-open viewer browser session');
     }
 
     public function test_local_viewer_update_invalid_data_bounces_and_leaves_user_unchanged(): void
@@ -453,6 +492,112 @@ class AdminCompanyTypeViewerBinPostsSmokeTest extends TestCase
     }
 
     // ── Bin: restore / force delete ──────────────────────────────────────
+
+    public function test_deletion_verifies_current_persisted_password_after_cached_identity_rotation(): void
+    {
+        $id = $this->makeCompany(['name'=>'Synthetic current-password owner']);
+        $ownerId = $this->makeViewer($id, 'admin', ['email'=>'fresh-delete@taxnest.test','role'=>'company_admin']);
+        $owner = \App\Models\User::findOrFail($ownerId);
+        $this->actingAs($owner);
+        DB::table('users')->where('id',$ownerId)->update(['password'=>\Illuminate\Support\Facades\Hash::make('CurrentOwner123!')]);
+        $this->from('/profile')->delete('/profile',['password'=>'OldPass@123'])
+            ->assertSessionHasErrorsIn('userDeletion','password');
+        $this->assertSame(0, DB::table('company_deletion_requests')->count());
+        $this->from('/profile')->delete('/profile',['password'=>'CurrentOwner123!'])
+            ->assertSessionHas('success');
+        $this->assertSame(1, DB::table('company_deletion_requests')->count());
+        $this->assertSame(1, DB::table('companies')->where('id',$id)->count());
+    }
+
+    public function test_company_owner_password_verified_delete_endpoint_records_request_without_deleting_data(): void
+    {
+        $id = $this->makeCompany(['name' => 'Owner Request Co']);
+        $ownerId = $this->makeViewer($id, 'admin', [
+            'name' => 'Actual Owner',
+            'email' => 'actual-owner@taxnest.test',
+            'role' => 'company_admin',
+        ]);
+        $owner = \App\Models\User::findOrFail($ownerId);
+
+        $this->actingAs($owner)->from('/profile')->delete('/profile', [
+            'password' => 'OldPass@123',
+            'reason' => 'Owner requested closure',
+        ])->assertRedirect('/profile')->assertSessionHas('success');
+
+        $this->assertSame(1, DB::table('companies')->where('id', $id)->count());
+        $this->assertSame(1, DB::table('users')->where('id', $ownerId)->count());
+        $request = DB::table('company_deletion_requests')->where('company_id', $id)->first();
+        $this->assertNotNull($request);
+        $this->assertSame('pending_review', $request->status);
+        $this->assertSame('web', $request->requester_guard);
+        $this->assertSame($ownerId, (int) $request->requested_by_user_id);
+        $this->assertNotNull($request->requester_verified_at);
+        $this->assertSame(hash('sha256', 'actual-owner@taxnest.test'), $request->requester_email_hash);
+        $this->assertSame(hash('sha256', (string) $request->scope_manifest), $request->scope_manifest_sha256);
+        $this->assertDatabaseHas('company_deletion_request_events', [
+            'request_id' => $request->id,
+            'event' => 'deletion_requested',
+            'actor_guard' => 'web',
+        ]);
+
+        // A retry is idempotent: one active request, no duplicate lifecycle.
+        $this->actingAs($owner)->delete('/profile', ['password' => 'OldPass@123']);
+        $this->assertSame(1, DB::table('company_deletion_requests')->where('company_id', $id)->count());
+    }
+
+    public function test_verified_request_moves_to_exact_hold_then_restore_revokes_browser_sessions_only(): void
+    {
+        $this->travelTo(now()->startOfSecond());
+        $id = $this->makeCompany([
+            'name' => 'Recoverable Co',
+            'agent_api_key' => 'paired-agent-secret',
+            'agent_enabled' => true,
+        ]);
+        $otherId = $this->makeCompany(['name' => 'Other Tenant']);
+        $ownerId = $this->makeViewer($id, 'admin', [
+            'email' => 'recoverable-owner@taxnest.test',
+            'role' => 'company_admin',
+        ]);
+        $otherUserId = $this->makeViewer($otherId, 'admin', [
+            'email' => 'other-owner@taxnest.test',
+            'role' => 'company_admin',
+            'session_generation' => '22222222-2222-4222-8222-222222222222',
+        ]);
+        $owner = \App\Models\User::findOrFail($ownerId);
+        $this->actingAs($owner)->delete('/profile', [
+            'password' => 'OldPass@123',
+            'reason' => 'Verified closure',
+        ])->assertSessionHas('success');
+        DB::table('users')->where('id', $ownerId)->update([
+            'session_generation' => '11111111-1111-4111-8111-111111111111',
+        ]);
+
+        $this->actingAsAdmin()->post("/admin/companies/{$id}/delete", ['reason' => 'Reviewed request'])
+            ->assertSessionHas('success');
+        $request = DB::table('company_deletion_requests')->where('company_id', $id)->first();
+        $this->assertSame('on_hold', $request->status);
+        $this->assertSame(now()->addDays(\App\Models\Company::BIN_HOLD_DAYS)->toDateTimeString(),
+            \Illuminate\Support\Carbon::parse($request->hold_until)->toDateTimeString());
+        $this->assertNotNull(DB::table('companies')->where('id', $id)->value('deleted_at'));
+
+        $this->actingAsAdmin()->from('/admin/bin')->post("/admin/bin/{$id}/restore")
+            ->assertSessionHas('success');
+        $request = DB::table('company_deletion_requests')->where('company_id', $id)->first();
+        $this->assertSame('restored', $request->status);
+        $this->assertNull($request->active_key);
+        $this->assertNotSame('11111111-1111-4111-8111-111111111111',
+            DB::table('users')->where('id', $ownerId)->value('session_generation'));
+        $this->assertSame('22222222-2222-4222-8222-222222222222',
+            DB::table('users')->where('id', $otherUserId)->value('session_generation'));
+        $company = DB::table('companies')->where('id', $id)->first();
+        $this->assertSame('paired-agent-secret', $company->agent_api_key,
+            'browser-session revocation must not rotate or break Agent pairing');
+        $this->assertEquals(1, $company->agent_enabled);
+        $this->assertDatabaseHas('company_deletion_request_events', [
+            'request_id' => $request->id,
+            'event' => 'company_restored',
+        ]);
+    }
 
     public function test_restore_clears_deleted_at_and_deleted_reason(): void
     {
@@ -517,6 +662,18 @@ class AdminCompanyTypeViewerBinPostsSmokeTest extends TestCase
         $this->assertSame(1, DB::table('pos_deals')->where('company_id', $otherId)->count());
         $this->assertSame(1, DB::table('pos_deal_items')->where('deal_id', $otherDeal)->count());
         $this->assertSame(1, DB::table('registered_credentials')->where('company_id', $id)->count());
+        $request = DB::table('company_deletion_requests')->where('company_id', $id)->first();
+        $this->assertSame('purged', $request->status);
+        $this->assertNull($request->active_key);
+        $this->assertNotNull($request->purged_at);
+        $this->assertDatabaseHas('company_deletion_request_events', [
+            'request_id' => $request->id,
+            'event' => 'database_purge_committed',
+        ]);
+        $this->assertDatabaseHas('company_deletion_request_events', [
+            'request_id' => $request->id,
+            'event' => 'private_file_cleanup_attempted',
+        ]);
     }
 
     public function test_force_delete_of_company_not_in_bin_flashes_error_not_silently(): void
@@ -586,6 +743,29 @@ class AdminCompanyTypeViewerBinPostsSmokeTest extends TestCase
             ->assertSessionHas('error');
 
         $this->assertSame(1, DB::table('companies')->where('id', $id)->count());
+    }
+
+    public function test_support_role_cannot_bin_restore_or_permanently_delete_a_company(): void
+    {
+        $activeId = $this->makeCompany(['name' => 'Active Protected Co']);
+        $binnedId = $this->makeCompany([
+            'name' => 'Binned Protected Co',
+            'deleted_at' => now()->subDays(\App\Models\Company::BIN_HOLD_DAYS + 1),
+        ]);
+        $support = AdminUser::create([
+            'name' => 'Read-only Support', 'email' => 'readonly.lifecycle@taxnest.test',
+            'password' => Hash::make('Secret@12345'), 'role' => 'support',
+        ]);
+
+        $this->actingAs($support, 'admin')
+            ->post("/admin/companies/{$activeId}/delete", ['reason' => 'Must not land'])
+            ->assertForbidden();
+        $this->post("/admin/bin/{$binnedId}/restore")->assertForbidden();
+        $this->delete("/admin/bin/{$binnedId}/destroy")->assertForbidden();
+
+        $this->assertNull(DB::table('companies')->where('id', $activeId)->value('deleted_at'));
+        $this->assertNotNull(DB::table('companies')->where('id', $binnedId)->value('deleted_at'));
+        $this->assertSame(0, DB::table('admin_audit_logs')->count());
     }
 
     // ── Guests never reach these POSTs ───────────────────────────────────

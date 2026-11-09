@@ -2,7 +2,8 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\{SubscriptionInvoice, SubscriptionPayment};
+use App\Models\SubscriptionInvoice;
+use App\Models\SubscriptionPayment;
 use App\Services\HealthAccessService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
@@ -15,7 +16,9 @@ final class SubscriptionDocumentController extends Controller
         $this->authorizeCompanyUser($request);
         $record = SubscriptionInvoice::where('company_id', $companyId)
             ->whereNotNull('document_number')->whereNotNull('document_snapshot')->find($invoice);
-        if (!$record) return $this->notFound();
+        if (! $record) {
+            return $this->notFound();
+        }
 
         return $this->download('invoice', $record, null);
     }
@@ -26,27 +29,33 @@ final class SubscriptionDocumentController extends Controller
         $this->authorizeCompanyUser($request);
         $record = SubscriptionPayment::whereNotNull('receipt_number')->whereNotNull('receipt_snapshot')
             ->whereHas('invoice', fn ($query) => $query->where('company_id', $companyId))->find($payment);
-        if (!$record) return $this->notFound();
+        if (! $record) {
+            return $this->notFound();
+        }
 
         return $this->download('receipt', $record->invoice, $record);
     }
 
     public function adminInvoice(int $company, int $invoice)
     {
-        abort_unless(auth('admin')->check(), 403);
+        abort_unless(auth('admin')->user()?->fresh(), 403);
         $record = SubscriptionInvoice::where('company_id', $company)
             ->whereNotNull('document_number')->whereNotNull('document_snapshot')->find($invoice);
-        if (!$record) return $this->notFound();
+        if (! $record) {
+            return $this->notFound();
+        }
 
         return $this->download('invoice', $record, null);
     }
 
     public function adminReceipt(int $company, int $payment)
     {
-        abort_unless(auth('admin')->check(), 403);
+        abort_unless(auth('admin')->user()?->fresh(), 403);
         $record = SubscriptionPayment::whereNotNull('receipt_number')->whereNotNull('receipt_snapshot')
             ->whereHas('invoice', fn ($query) => $query->where('company_id', $company))->find($payment);
-        if (!$record) return $this->notFound();
+        if (! $record) {
+            return $this->notFound();
+        }
 
         return $this->download('receipt', $record->invoice, $record);
     }
@@ -57,7 +66,7 @@ final class SubscriptionDocumentController extends Controller
         $guard = str_starts_with($route, 'health.')
             ? 'health'
             : (str_starts_with($route, 'fbrpos.') ? 'fbrpos' : (str_starts_with($route, 'pos.') ? 'pos' : 'web'));
-        $user = auth($guard)->user();
+        $user = auth($guard)->user()?->fresh();
         abort_unless($user && (int) $user->company_id === (int) app('currentCompanyId'), 403);
         $owner = ($guard === 'health' && HealthAccessService::isOwner($user))
             || in_array((string) ($user->role ?? ''), ['super_admin', 'company_admin'], true)

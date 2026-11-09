@@ -102,6 +102,35 @@ class AgentProgrammeTest extends TestCase
         $this->assertSame('pending', $steal->fresh()->status);
     }
 
+    public function test_cached_super_admin_cannot_review_a_claim_after_persisted_downgrade(): void
+    {
+        $agent = $this->agent('Downgrade Claimant', 'downgrade-claimant@example.com');
+        $company = Company::create(['name' => 'Protected Shop', 'ntn' => 'PROTECTED-NTN']);
+        $claim = AgentSaleClaim::create([
+            'agent_id' => $agent->id,
+            'identifier_type' => 'ntn',
+            'identifier' => 'PROTECTED-NTN',
+            'status' => 'pending',
+        ]);
+        $admin = AdminUser::create([
+            'name' => 'Former Super',
+            'email' => 'former-super-agent@example.com',
+            'password' => 'password123',
+            'role' => 'super_admin',
+        ]);
+
+        $this->actingAs($admin, 'admin');
+        AdminUser::whereKey($admin->id)->update(['role' => 'support']);
+
+        $this->post(route('saas.admin.agent-claims.review', $claim), [
+            'decision' => 'approve',
+        ])->assertForbidden();
+
+        $this->assertNull($company->fresh()->agent_id);
+        $this->assertSame('pending', $claim->fresh()->status);
+        $this->assertNull($claim->fresh()->reviewed_at);
+    }
+
     public function test_distributor_portal_never_exposes_company_or_commission_data(): void
     {
         $agent = $this->agent('Portal Agent', 'portal-agent@example.com');

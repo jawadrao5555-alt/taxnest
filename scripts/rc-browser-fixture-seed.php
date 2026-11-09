@@ -891,6 +891,76 @@ foreach ([1366,390] as $staffWidth) {
     $staffCashier=$user($staffCompany,'Synthetic Staff Cashier','staff-cashier-'.$staffWidth.'@rc-browser.invalid','user','pos_cashier');
     $staffCases[$staffWidth]=['owner'=>$staffOwner->email,'cashier'=>$staffCashier->email,'employee'=>$staffCashier->id];
 }
+$securityCases=[];
+foreach ([1366,390] as $securityWidth) {
+    $billingViewer=AdminUser::create(['name'=>'Synthetic billing viewer '.$securityWidth,
+        'email'=>'billing-viewer-'.$securityWidth.'@rc-browser.invalid','password'=>\Illuminate\Support\Facades\Hash::make($password),'role'=>'viewer']);
+    $securityCases[$securityWidth]['billingViewer']=$billingViewer->email;
+    $viewerCompany=$company('Synthetic viewer revocation '.$securityWidth,
+        'viewer-revocation-'.$securityWidth.'@rc-browser.invalid','RCVIEW'.$securityWidth,'pos',[
+            'pos_setup_completed'=>true,'pos_integration_mode'=>'local']);
+    $viewer=$user($viewerCompany,'Synthetic Local Bills Viewer',
+        'local-viewer-revoke-'.$securityWidth.'@rc-browser.invalid','employee','local_viewer');
+    $securityCases[$securityWidth]['viewer']=[
+        'companyId'=>$viewerCompany->id,'userId'=>$viewer->id,'email'=>$viewer->email,
+        'newPassword'=>'SyntheticViewerNew!'.bin2hex(random_bytes(12)),'admin'=>$admin->email,
+    ];
+    foreach (['incomplete','ready','reset'] as $setupState) {
+        $setupCompany=$company('Synthetic setup '.$setupState.' '.$securityWidth,'setup-'.$setupState.'-'.$securityWidth.'@rc-browser.invalid',
+            'RCSET'.$setupState.$securityWidth,'di',['onboarding_completed'=>false,
+                'fbr_sandbox_token'=>$setupState==='ready'?'FICTIONAL_LOCAL_ONLY_TOKEN':null]);
+        $setupUser=$user($setupCompany,'Synthetic setup owner','setup-owner-'.$setupState.'-'.$securityWidth.'@rc-browser.invalid','company_admin');
+        $securityCases[$securityWidth][$setupState]=$setupUser->email;
+        if ($setupState==='ready') {
+            \App\Models\Branch::create(['company_id'=>$setupCompany->id,'name'=>'Existing fictional branch']);
+            \App\Models\Product::create(['company_id'=>$setupCompany->id,'name'=>'Existing fictional product','hs_code'=>'0000.0000']);
+            \App\Models\Invoice::create(['company_id'=>$setupCompany->id,'buyer_name'=>'Fictional draft buyer']);
+        }
+        if ($setupState==='reset') {
+            $setupToken=bin2hex(random_bytes(32));
+            DB::table('password_reset_otps')->insert(['email'=>$setupUser->email,'otp'=>'123456','token'=>$setupToken,
+                'product_type'=>'di','used'=>false,'expires_at'=>now()->addHours(4),'created_at'=>now(),'updated_at'=>now()]);
+            $securityCases[$securityWidth]['reset']=['email'=>$setupUser->email,'token'=>$setupToken,
+                'newPassword'=>'SyntheticNew!'.bin2hex(random_bytes(12)),
+                'companyId'=>$setupCompany->id,'userId'=>$setupUser->id];
+            $expiredExport=\App\Models\AuditPack::create(['company_id'=>$setupCompany->id,'user_id'=>$setupUser->id,
+                'date_from'=>'2026-01-01','date_to'=>'2026-01-31','status'=>'ready','progress'=>100]);
+            $expiredExport->forceFill(['created_at'=>now()->subDays(8),
+                'file_path'=>'audit-packs/company_'.$setupCompany->id.'/fbr-audit-pack-'.$expiredExport->id.'.zip','file_size'=>18])->save();
+            \Illuminate\Support\Facades\Storage::disk('local')->put($expiredExport->file_path,'SYNTHETIC ZIP DATA');
+            $securityCases[$securityWidth]['reset']['expiredPackId']=$expiredExport->id;
+            DB::table('invoices')->insert(['company_id'=>$setupCompany->id,
+                'invoice_number'=>'RC-EXPORT-'.$securityWidth,'internal_invoice_number'=>'RC-EXPORT-'.$securityWidth,
+                'invoice_date'=>now()->toDateString(),'status'=>'locked','fbr_status'=>'sandbox',
+                'buyer_name'=>'Fictional export buyer','total_amount'=>0,'total_sales_tax'=>0,'total_value_excluding_st'=>0,
+                'created_at'=>now(),'updated_at'=>now()]);
+            $pendingExport=\App\Models\AuditPack::create(['company_id'=>$setupCompany->id,'user_id'=>$setupUser->id,
+                'date_from'=>now()->toDateString(),'date_to'=>now()->toDateString(),'status'=>'pending']);
+            $pendingExport->forceFill(['updated_at'=>now()->subMinute()])->save(['timestamps'=>false]);
+            $securityCases[$securityWidth]['reset']['pendingPackId']=$pendingExport->id;
+            $supportCase=\App\Models\SupportCase::create([
+                'company_id'=>$setupCompany->id,'assigned_admin_id'=>$admin->id,'opened_by_admin_id'=>$admin->id,
+                'source_box'=>'inbox','source_uid'=>900000+$securityWidth,
+                'source_message_id'=>'<synthetic-support-'.$securityWidth.'@rc-browser.invalid>',
+                'subject'=>'Synthetic support lifecycle '.$securityWidth,'status'=>\App\Models\SupportCase::STATUS_OPEN,
+                'opened_at'=>now(),
+            ]);
+            \App\Models\SupportCaseEvent::create([
+                'support_case_id'=>$supportCase->id,'actor_admin_id'=>$admin->id,'event_type'=>'opened',
+                'from_status'=>null,'to_status'=>\App\Models\SupportCase::STATUS_OPEN,
+                'note'=>'Synthetic browser fixture case.','occurred_at'=>now(),
+            ]);
+            $securityCases[$securityWidth]['supportAdmin']=$admin->email;
+            $securityCases[$securityWidth]['supportCaseId']=$supportCase->id;
+            $relatedSupportCase=\App\Models\SupportCase::create([
+                'company_id'=>$setupCompany->id,'assigned_admin_id'=>$admin->id,'opened_by_admin_id'=>$admin->id,
+                'source_box'=>'inbox','source_uid'=>910000+$securityWidth,'subject'=>'Synthetic duplicate message '.$securityWidth,
+                'status'=>'open','opened_at'=>now(),
+            ]);
+            $securityCases[$securityWidth]['relatedSupportCaseId']=$relatedSupportCase->id;
+        }
+    }
+}
 $billingSelectionCases = [];
 foreach ([1366,390] as $width) {
     $billingCompany = $company('Synthetic Billing Selection '.$width, 'billing-selection-'.$width.'@rc-browser.invalid', 'RCBILLSEL'.$width, 'di',
@@ -961,6 +1031,9 @@ $fixture = [
         ['name' => 'service-work-orders-denied', 'login' => $serviceDenied->email, 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/work-orders', '/pos/work-orders/report.csv'], 'denied' => true],
     ], $categoryJourneys, $optionalArchiveJourneys),
     'transactionalJourneys' => [
+        ['name'=>'restore-session-boundary','login'=>$admin->email,'password'=>$password,'loginPath'=>'/admin/login', 'paths'=>[], 'manualOnly'=>true, 'restoreSessionBoundary'=>true],
+        ['name'=>'security-onboarding','login'=>$securityCases[1366]['incomplete'],'password'=>$password,
+            'loginPath'=>'/login','paths'=>[], 'securityOnboarding'=>$securityCases],
         ['name'=>'fbr-di-bulk','login'=>$diBulkCases[1366]['login'],'password'=>$password,'loginPath'=>'/login',
             'paths'=>[], 'manualOnly'=>true, 'fbrDiBulk'=>$diBulkCases],
         ['name'=>'billing-package-selection','login'=>$billingSelectionCases[1366]['login'],'password'=>$password,'loginPath'=>'/login',

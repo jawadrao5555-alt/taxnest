@@ -1,16 +1,21 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="flex items-center justify-between">
+        <div class="min-w-0">
             <h2 class="font-bold text-xl text-gray-800 dark:text-gray-100 leading-tight">Welcome to TaxNest</h2>
-            <form method="POST" action="/onboarding/skip">
-                @csrf
-                <button type="submit" class="text-sm text-gray-500 hover:text-gray-700 dark:text-gray-300 underline">Skip Setup</button>
-            </form>
         </div>
     </x-slot>
 
     <div class="py-8">
         <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-end mb-4">
+                <form method="POST" action="/onboarding/skip">
+                    @csrf
+                    <button type="submit" class="px-4 py-2 min-h-11 text-sm font-medium rounded-lg text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600">Skip Setup</button>
+                </form>
+            </div>
+            @error('setup')
+                <p role="alert" class="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">{{ $message }}</p>
+            @enderror
 
             <div class="text-center mb-8">
                 <h3 class="text-2xl font-bold text-gray-900">Let's set up your account</h3>

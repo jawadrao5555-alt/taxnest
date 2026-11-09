@@ -48,6 +48,9 @@ class LogImpersonatedWrites
         if ($path === 'admin' || str_starts_with($path, 'admin/')) {
             return $response;
         }
+        if ($path === 'security/two-step/admin/verify') {
+            return $response; // Recorded as the admin's two-step security event.
+        }
 
         // Only record changes that actually went through.
         if ($response->getStatusCode() >= 400) {

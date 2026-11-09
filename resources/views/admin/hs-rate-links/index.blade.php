@@ -12,12 +12,14 @@
                 <a href="{{ route('admin.hs-rate-links.export') }}" class="inline-flex items-center px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">
                     ⬇ Export CSV
                 </a>
+                @if($canManageSensitiveConfiguration)
                 <button onclick="document.getElementById('importModal').classList.remove('hidden')" class="inline-flex items-center px-3 py-2 bg-amber-600 text-white rounded-lg text-sm font-medium hover:bg-amber-700">
                     ⬆ Import CSV
                 </button>
                 <button onclick="document.getElementById('addModal').classList.remove('hidden')" class="inline-flex items-center px-3 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700">
                     + Add Mapping
                 </button>
+                @endif
             </div>
         </div>
     </x-slot>
@@ -26,6 +28,10 @@
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             @if(session('success'))<div class="mb-4 p-4 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 rounded-lg">{{ session('success') }}</div>@endif
             @if(session('error'))<div class="mb-4 p-4 bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300 rounded-lg">{{ session('error') }}</div>@endif
+
+            @unless($canManageSensitiveConfiguration)
+                <div class="mb-4 p-4 rounded-xl bg-amber-100 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/60 text-sm text-amber-800 dark:text-amber-200">HS rate-link history is read-only for this account.</div>
+            @endunless
 
             <!-- Stats -->
             <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
@@ -92,17 +98,25 @@
                                 <td class="px-3 py-2 text-center text-xs">{{ $r->uom ?: '—' }}</td>
                                 <td class="px-3 py-2 text-xs text-gray-500 italic max-w-xs truncate" title="{{ $r->notes }}">{{ $r->notes ?: '—' }}</td>
                                 <td class="px-3 py-2 text-center">
+                                    @if($canManageSensitiveConfiguration)
                                     <form method="POST" action="{{ route('admin.hs-rate-links.toggle', $r->id) }}" class="inline">@csrf
                                         <button class="px-2 py-0.5 rounded text-xs font-medium {{ $r->is_active ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-600' }}">
                                             {{ $r->is_active ? '✓ Active' : '✗ Off' }}
                                         </button>
                                     </form>
+                                    @else
+                                    <span class="px-2 py-0.5 rounded text-xs font-medium {{ $r->is_active ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-600' }}">{{ $r->is_active ? '✓ Active' : '✗ Off' }}</span>
+                                    @endif
                                 </td>
                                 <td class="px-3 py-2 text-center whitespace-nowrap">
+                                    @if($canManageSensitiveConfiguration)
                                     <button onclick='editRow(@json($r))' class="text-blue-600 hover:underline text-xs mr-2">Edit</button>
                                     <form method="POST" action="{{ route('admin.hs-rate-links.destroy', $r->id) }}" class="inline" onsubmit="return confirm('Delete this mapping?')">@csrf @method('DELETE')
                                         <button class="text-red-600 hover:underline text-xs">Delete</button>
                                     </form>
+                                    @else
+                                    <span class="text-xs text-gray-400">Read only</span>
+                                    @endif
                                 </td>
                             </tr>
                             @empty
@@ -116,6 +130,7 @@
         </div>
     </div>
 
+    @if($canManageSensitiveConfiguration)
     <!-- ADD / EDIT MODAL -->
     <div id="addModal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
         <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto">
@@ -228,4 +243,5 @@
             document.getElementById('addModal').classList.remove('hidden');
         }
     </script>
+    @endif
 </x-admin-layout>

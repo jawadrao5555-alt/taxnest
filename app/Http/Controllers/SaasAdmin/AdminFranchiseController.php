@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Franchise;
 use App\Models\FranchiseCommission;
 use App\Models\AdminAuditLog;
+use App\Models\AdminUser;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -46,7 +47,7 @@ class AdminFranchiseController extends Controller
 
     public function reconcile(int $id)
     {
-        abort_unless(auth('admin')->user()?->isSuperAdmin(), 403);
+        AdminUser::requireSuperAdministrator();
         Franchise::findOrFail($id);
         $count = \App\Services\FranchiseCommissionService::reconcile($id);
         AdminAuditLog::log(auth('admin')->id(), 'Franchise verified receipts reconciled', 'Franchise', $id,
@@ -56,7 +57,7 @@ class AdminFranchiseController extends Controller
 
     public function markPaid(Request $request, int $id)
     {
-        abort_unless(auth('admin')->user()?->isSuperAdmin(), 403);
+        AdminUser::requireSuperAdministrator();
         $request->validate(['reference' => 'required|string|max:255']);
         $payout = DB::transaction(function () use ($id, $request) {
             Franchise::whereKey($id)->lockForUpdate()->firstOrFail();
@@ -82,7 +83,7 @@ class AdminFranchiseController extends Controller
 
     public function adjust(Request $request, int $id, int $lineId)
     {
-        abort_unless(auth('admin')->user()?->isSuperAdmin(), 403);
+        AdminUser::requireSuperAdministrator();
         $data = $request->validate([
             'amount' => 'required|numeric|min:0.01|max:100000000',
             'reason' => 'required|string|max:255',
@@ -108,7 +109,7 @@ class AdminFranchiseController extends Controller
 
     public function store(Request $request)
     {
-        abort_unless(auth('admin')->user()?->isSuperAdmin(), 403);
+        AdminUser::requireSuperAdministrator();
         $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|email|unique:franchises,email',
@@ -132,7 +133,7 @@ class AdminFranchiseController extends Controller
 
     public function update(Request $request, $id)
     {
-        abort_unless(auth('admin')->user()?->isSuperAdmin(), 403);
+        AdminUser::requireSuperAdministrator();
         $franchise = Franchise::findOrFail($id);
 
         $request->validate([
@@ -154,7 +155,7 @@ class AdminFranchiseController extends Controller
 
     public function toggleStatus($id)
     {
-        abort_unless(auth('admin')->user()?->isSuperAdmin(), 403);
+        AdminUser::requireSuperAdministrator();
         $franchise = Franchise::findOrFail($id);
         $newStatus = $franchise->status === 'active' ? 'suspended' : 'active';
         $franchise->update(['status' => $newStatus]);

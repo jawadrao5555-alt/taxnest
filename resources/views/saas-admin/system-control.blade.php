@@ -198,6 +198,11 @@
 
     <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
         <p class="text-xs text-gray-500 dark:text-gray-400 mb-5">Emergency switches to control platform-wide features. Changes take effect immediately.</p>
+        @unless($canManageSystemControls)
+            <p class="mb-5 rounded-lg border border-amber-800/60 bg-amber-900/15 px-4 py-3 text-sm text-amber-300">
+                System health is visible, but emergency controls are read-only for this account.
+            </p>
+        @endunless
 
         <div class="space-y-4">
             @foreach($controls as $control)
@@ -206,12 +211,16 @@
                     <p class="text-sm font-semibold text-white">{{ ucwords(str_replace('_', ' ', $control->key)) }}</p>
                     <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{{ $control->description }}</p>
                 </div>
-                <form method="POST" action="{{ route('saas.admin.system.toggle', $control->key) }}">
-                    @csrf
-                    <button class="w-full sm:w-auto px-4 py-2 rounded-lg text-sm font-medium transition {{ $control->value === 'enabled' ? 'bg-red-600/20 text-red-400 hover:bg-red-600/40 border border-red-700/50' : 'bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/40 border border-emerald-700/50' }}">
-                        {{ $control->value === 'enabled' ? 'Disable' : 'Enable' }}
-                    </button>
-                </form>
+                @if($canManageSystemControls)
+                    <form method="POST" action="{{ route('saas.admin.system.toggle', $control->key) }}">
+                        @csrf
+                        <button class="w-full sm:w-auto px-4 py-2 rounded-lg text-sm font-medium transition {{ $control->value === 'enabled' ? 'bg-red-600/20 text-red-400 hover:bg-red-600/40 border border-red-700/50' : 'bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/40 border border-emerald-700/50' }}">
+                            {{ $control->value === 'enabled' ? 'Disable' : 'Enable' }}
+                        </button>
+                    </form>
+                @else
+                    <span class="text-xs font-semibold uppercase tracking-wide text-gray-400">Read only</span>
+                @endif
             </div>
             @endforeach
         </div>

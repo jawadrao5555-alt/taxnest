@@ -19,6 +19,9 @@ use Illuminate\Support\Carbon;
  */
 class HealthPatient extends Model
 {
+    /** Disclosure contract shown by the current Healthcare registration form. */
+    public const CONSENT_POLICY_VERSION = 'health-consent-v1';
+
     public const GENDERS = ['male', 'female', 'other'];
 
     public const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
@@ -54,6 +57,9 @@ class HealthPatient extends Model
         'consent_contact',
         'consent_recorded_at',
         'consent_recorded_by',
+        'consent_policy_version',
+        'consent_withdrawn_at',
+        'consent_withdrawn_by',
         'is_confidential',
         'notes',
         'registered_by',
@@ -63,6 +69,7 @@ class HealthPatient extends Model
     protected $casts = [
         'date_of_birth' => 'date',
         'consent_recorded_at' => 'datetime',
+        'consent_withdrawn_at' => 'datetime',
         'consent_treatment' => 'boolean',
         'consent_share_reports' => 'boolean',
         'consent_contact' => 'boolean',

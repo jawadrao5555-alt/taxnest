@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Company;
+use App\Models\AdminUser;
 use App\Services\BranchContextService;
 use App\Services\OptionalLocalBillArchive;
 use Carbon\Carbon;
@@ -33,7 +34,7 @@ class OptionalLocalBillArchiveController extends Controller
 
     private function adminContext(int $companyId): array
     {
-        abort_unless(auth('admin')->user()?->isSuperAdmin(), 403);
+        AdminUser::requireSuperAdministrator();
         $company = Company::whereIn('product_type', ['pos', 'fbrpos'])->findOrFail($companyId);
         $this->ready();
         return [$company, $company->product_type, auth('admin')->user()];

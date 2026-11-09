@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\HsMasterGlobal;
 use App\Models\HsUnmappedQueue;
+use App\Models\AdminUser;
 use App\Services\AuditLogService;
 use App\Services\HsIntelligenceService;
 use Illuminate\Http\Request;
@@ -13,6 +14,8 @@ class HsMasterController extends Controller
 {
     public function index(Request $request)
     {
+        $currentAdmin = auth('admin')->user()?->fresh();
+        $canManageSensitiveConfiguration = (bool) $currentAdmin?->canManageSensitiveConfiguration();
         $query = HsMasterGlobal::query();
 
         if ($search = $request->input('search')) {
@@ -45,17 +48,21 @@ class HsMasterController extends Controller
             'unmapped_queue' => HsUnmappedQueue::count(),
         ];
 
-        return view('admin.hs_master.index', compact('records', 'scheduleTypes', 'taxRates', 'stats'));
+        return view('admin.hs_master.index', compact('records', 'scheduleTypes', 'taxRates', 'stats', 'canManageSensitiveConfiguration'));
     }
 
     public function edit($id)
     {
+        AdminUser::requireSensitiveConfigurationAdministrator();
+
         $record = HsMasterGlobal::findOrFail($id);
         return view('admin.hs_master.edit', compact('record'));
     }
 
     public function update(Request $request, $id)
     {
+        AdminUser::requireSensitiveConfigurationAdministrator();
+
         $record = HsMasterGlobal::findOrFail($id);
 
         $validated = $request->validate([
@@ -101,6 +108,8 @@ class HsMasterController extends Controller
 
     public function unmapped()
     {
+        $currentAdmin = auth('admin')->user()?->fresh();
+        $canManageSensitiveConfiguration = (bool) $currentAdmin?->canManageSensitiveConfiguration();
         $records = HsUnmappedQueue::with('company')
             ->orderByDesc('usage_count')
             ->paginate(25);
@@ -121,11 +130,13 @@ class HsMasterController extends Controller
             $rejections[$r->id] = $rejection;
         }
 
-        return view('admin.hs_master.unmapped', compact('records', 'suggestions', 'rejections'));
+        return view('admin.hs_master.unmapped', compact('records', 'suggestions', 'rejections', 'canManageSensitiveConfiguration'));
     }
 
     public function mapFromQueue(Request $request, $id)
     {
+        AdminUser::requireSensitiveConfigurationAdministrator();
+
         $unmapped = HsUnmappedQueue::findOrFail($id);
 
         $existing = HsMasterGlobal::where('hs_code', $unmapped->hs_code)->first();
@@ -185,6 +196,8 @@ class HsMasterController extends Controller
 
     public function rejectSuggestion(Request $request, $id)
     {
+        AdminUser::requireSensitiveConfigurationAdministrator();
+
         $unmapped = HsUnmappedQueue::findOrFail($id);
         $reason = $request->input('rejection_reason', 'Admin rejected suggestion');
 
@@ -198,6 +211,8 @@ class HsMasterController extends Controller
 
     public function regenerateSuggestion($id)
     {
+        AdminUser::requireSensitiveConfigurationAdministrator();
+
         $unmapped = HsUnmappedQueue::findOrFail($id);
 
         HsIntelligenceService::generateSuggestion($unmapped->hs_code);

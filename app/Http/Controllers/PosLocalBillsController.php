@@ -268,8 +268,16 @@ class PosLocalBillsController extends Controller
         if ($request->filled('password')) {
             $update['password'] = bcrypt($request->password);
             $update = ViewablePasswordService::apply($update, $request->password);
+            // Resetting a viewer password revokes that viewer's existing
+            // browser sessions as part of the same row update. The owner's
+            // own session and unrelated company users remain intact.
+            if (\Illuminate\Support\Facades\Schema::hasColumn('users', 'session_generation')) {
+                $update['session_generation'] = (string) \Illuminate\Support\Str::uuid();
+            }
         }
-        $viewer->update($update);
+        // Internal validated field set. forceFill is required for the hidden,
+        // non-mass-assignable session_generation revocation marker.
+        $viewer->forceFill($update)->save();
 
         AuditLogService::log(
             'pos_local_viewer_updated',

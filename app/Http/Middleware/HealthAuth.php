@@ -68,6 +68,9 @@ class HealthAuth
             return $this->toLogin()->with('error', __('health.auth_no_role'));
         }
 
+        if ($challenge = \App\Services\TwoStepLogin::challenge($request, 'health')) {
+            return $challenge;
+        }
         app()->instance('currentCompanyId', $user->company_id);
         app()->instance('currentBranchGuard', 'health');
 

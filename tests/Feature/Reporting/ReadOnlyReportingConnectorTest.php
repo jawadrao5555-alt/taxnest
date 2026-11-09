@@ -374,17 +374,36 @@ class ReadOnlyReportingConnectorTest extends TestCase
         $this->assertNotNull(DB::table('reporting_oauth_grants')->first()->revoked_at);
     }
 
-    public function test_owner_revocation_and_owner_demotion_block_existing_tokens(): void
+    public function test_owner_revocation_and_owner_demotion_block_existing_and_refresh_tokens(): void
     {
         [$p,$t] = $this->connection();
         $grant = DB::table('reporting_oauth_grants')->first();
         $this->get('/admin/reporting/connections')->assertOk()->assertSee('Synthetic reporting client')->assertDontSee($t['access_token']);
         $this->post('/admin/reporting/connections/'.$grant->id.'/revoke')->assertRedirect();
         $this->toolCall($t['access_token'], 'get_company_billing_summary', $this->period())->assertUnauthorized();
+        $this->postJson('/api/reporting/oauth/token', [
+            'grant_type' => 'refresh_token', 'client_id' => $p['client_id'],
+            'resource' => $p['resource'], 'refresh_token' => $t['refresh_token'],
+        ])->assertStatus(400);
+
         [$p,$t] = $this->connection();
         $this->owner->update(['role' => 'support']);
         $this->toolCall($t['access_token'], 'get_company_billing_summary', $this->period())->assertUnauthorized();
+        $this->postJson('/api/reporting/oauth/token', [
+            'grant_type' => 'refresh_token', 'client_id' => $p['client_id'],
+            'resource' => $p['resource'], 'refresh_token' => $t['refresh_token'],
+        ])->assertStatus(400);
         $this->get('/admin/reporting/connections')->assertForbidden();
+    }
+
+    public function test_owner_demotion_blocks_a_preissued_authorization_code(): void
+    {
+        [, $input] = $this->authorize();
+        $this->owner->update(['role' => 'support']);
+
+        $this->postJson('/api/reporting/oauth/token', $input)->assertStatus(400);
+        $this->assertSame(0, DB::table('reporting_oauth_grants')->count());
+        $this->assertNull(DB::table('reporting_oauth_codes')->first()->used_at);
     }
 
     public function test_metadata_redirect_origin_bearer_and_protocol_guards(): void
@@ -484,6 +503,35 @@ class ReadOnlyReportingConnectorTest extends TestCase
         $this->toolCall($t['access_token'], 'get_company_billing_summary', $this->period())->assertUnauthorized();
         $this->owner->update(['role' => 'support']);
         $this->get('/admin/reporting/oauth/authorize?'.http_build_query($p))->assertForbidden();
+    }
+
+    public function test_cached_super_admin_cannot_issue_reporting_consent_after_persisted_downgrade(): void
+    {
+        $registered = $this->postJson('/api/reporting/oauth/register', [
+            'client_name' => 'Downgrade reporting client',
+            'redirect_uris' => ['https://chatgpt.com/connector_platform_oauth_redirect'],
+            'token_endpoint_auth_method' => 'none',
+        ])->assertCreated()->json();
+        $params = [
+            'client_id' => $registered['client_id'],
+            'redirect_uri' => $registered['redirect_uris'][0],
+            'response_type' => 'code',
+            'code_challenge' => str_repeat('a', 43),
+            'code_challenge_method' => 'S256',
+            'resource' => 'http://localhost/api/reporting/mcp',
+            'scope' => 'taxnest.reports.read',
+            'state' => 'downgrade-state',
+        ];
+
+        $this->actingAs($this->owner, 'admin');
+        AdminUser::whereKey($this->owner->id)->update(['role' => 'support']);
+
+        $this->get('/admin/reporting/oauth/authorize?'.http_build_query($params))->assertForbidden();
+        $this->post('/admin/reporting/oauth/authorize', $params + [
+            'decision' => 'approve',
+            'company_scope' => 'all',
+        ])->assertForbidden();
+        $this->assertSame(0, DB::table('reporting_oauth_codes')->count());
     }
 
     public function test_branch_counter_payment_filters_and_safe_operational_sources(): void

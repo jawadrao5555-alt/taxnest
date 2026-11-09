@@ -2,15 +2,24 @@
     <x-slot name="header">
         <div class="flex items-center justify-between">
             <h2 class="font-bold text-xl text-gray-800 dark:text-gray-100 leading-tight">Users</h2>
+            @if($canManageCompanyLifecycle)
             <button onclick="document.getElementById('addUserModal').classList.toggle('hidden')" class="inline-flex items-center px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition">+ Add User</button>
+            @endif
         </div>
     </x-slot>
 
     <div class="py-8">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
+            @unless($canManageCompanyLifecycle)
+                <div class="mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 text-blue-800 dark:text-blue-200 rounded-lg" role="status">
+                    User and company assignments are read-only for this account. An administrator must create users or change access.
+                </div>
+            @endunless
+
+            @if($canManageCompanyLifecycle)
             <div id="addUserModal" class="hidden mb-6">
-                <form method="POST" action="/admin/users" class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6">
+                <form method="POST" action="/admin/all-users" class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6">
                     @csrf
                     <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Add New User</h3>
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -50,6 +59,7 @@
                     </div>
                 </form>
             </div>
+            @endif
 
             <div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden">
                 <div class="overflow-x-auto">

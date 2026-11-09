@@ -23,7 +23,7 @@
         // so it is a SUPER-ADMIN-only action (Task 1559). Every other admin
         // role sees the current preset read-only and its POST is ignored
         // server-side, exactly the way the shop's own page is treated.
-        $canChangeCategory = (bool) (auth('admin')->user()?->isSuperAdmin());
+        $canChangeCategory = $isSuperAdmin;
         $presets = $canChangeCategory ? \App\Services\PosFeatureService::categoriesForCompany($company) : [];
         $currentPresetMeta = \App\Services\PosFeatureService::presetMeta($currentCategory);
         // The amber "this belongs on the other panel" notice fires only when the
@@ -42,6 +42,12 @@
 
     <div class="py-6">
         <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8" x-data="adminFeatureSettings()">
+
+            @unless($canManageBilling)
+                <div class="mb-5 p-4 rounded-xl bg-amber-50 border border-amber-200 text-sm text-amber-800 dark:bg-amber-900/20 dark:border-amber-800 dark:text-amber-200">
+                    POS feature configuration is read-only for this account. Category, module and extra history remains visible.
+                </div>
+            @endunless
 
             {{-- Hero --}}
             <div class="mb-6 rounded-2xl bg-gradient-to-br from-indigo-700 via-purple-700 to-fuchsia-700 p-6 text-white shadow-xl relative overflow-hidden">
@@ -99,10 +105,12 @@
                                 <td class="text-gray-600 dark:text-gray-300">{{ $extra['by'] ?? '—' }}</td>
                                 <td class="text-gray-600 dark:text-gray-300 whitespace-nowrap">{{ $extra['at'] ?? '—' }}</td>
                                 <td class="text-right">
+                                    @if($canManageBilling)
                                     <form method="POST" action="/admin/company/{{ $company->id }}/pos-features/extras/{{ $module }}/revoke" onsubmit="return confirm('Revoke this category extra?')">
                                         @csrf
                                         <button class="px-2.5 py-1 rounded-lg bg-red-100 text-red-700 text-xs font-semibold">Revoke</button>
                                     </form>
+                                    @endif
                                 </td>
                             </tr>
                         @empty
@@ -111,7 +119,7 @@
                         </tbody>
                     </table>
                 </div>
-                @if($grantableModules)
+                @if($canManageBilling && $grantableModules)
                     <form method="POST" action="/admin/company/{{ $company->id }}/pos-features/extras" class="grid sm:grid-cols-[minmax(0,1fr)_minmax(0,2fr)_auto] gap-2 items-end">
                         @csrf
                         <label class="text-xs font-semibold text-gray-600 dark:text-gray-300">Module
@@ -130,6 +138,7 @@
                 @endif
             </div>
 
+            @if($canManageBilling)
             <form method="POST" action="/admin/company/{{ $company->id }}/pos-features" class="space-y-5">
                 @csrf
                 @method('PUT')
@@ -245,6 +254,20 @@
                     </button>
                 </div>
             </form>
+            @else
+                <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl p-5 shadow-sm">
+                    <h3 class="text-base font-extrabold text-gray-900 dark:text-white mb-3">Current module state</h3>
+                    <div class="grid sm:grid-cols-2 gap-2">
+                        @foreach(\App\Services\PosFeatureService::ALL_FLAGS as $flag)
+                            @php $meta = \App\Services\PosFeatureService::flagMeta($flag); @endphp
+                            <div class="flex items-center justify-between gap-3 p-2.5 rounded-lg border border-gray-200 dark:border-gray-700">
+                                <span class="text-sm font-semibold text-gray-900 dark:text-white">{{ $meta['icon'] }} {{ $meta['label'] }}</span>
+                                <span class="text-xs font-bold {{ $features->{$flag} ? 'text-emerald-600' : 'text-gray-400' }}">{{ $features->{$flag} ? 'ON' : 'OFF' }}</span>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+            @endif
         </div>
     </div>
 

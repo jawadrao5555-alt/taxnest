@@ -2,7 +2,7 @@
 <div class="p-4 sm:p-6 max-w-7xl mx-auto">
     <div class="flex flex-wrap items-center justify-between gap-3 mb-2">
         <h1 class="text-2xl font-bold text-white">Business Groups</h1>
-        @unless($disabled)
+        @if(!$disabled && $canManageCompanyLifecycle)
         <form method="POST" action="{{ route('saas.admin.groups.resync') }}" onsubmit="return confirm('Re-check every account for group matches? Detached pairs stay detached.');">
             @csrf
             <button type="submit" class="flex items-center gap-2 px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white text-xs rounded-lg transition">
@@ -10,12 +10,16 @@
                 Re-sync
             </button>
         </form>
-        @endunless
+        @endif
     </div>
     <p class="text-sm text-gray-500 mb-6 max-w-3xl">
         One person can legitimately hold a PRA POS, an FBR POS and a Digital Invoice account — same NTN, same CNIC, three separate businesses.
         The accounts stay fully separate for them; this section is ours: who is really one customer, what they have not bought yet, and who keeps starting fresh trials.
     </p>
+
+    @unless($canManageCompanyLifecycle)
+    <div class="mb-6 p-4 rounded-xl bg-amber-900/20 border border-amber-800/60 text-sm text-amber-200">Business-group membership and notes are read-only for this account.</div>
+    @endunless
 
     @if($disabled)
     <div class="bg-amber-900/20 border border-amber-800/60 rounded-xl p-4 text-sm text-amber-300">

@@ -6,6 +6,7 @@
         <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">{{ __('pos.my_profile_desc') }}</p>
     </div>
 
+    <p class="mb-4"><a class="text-blue-700 underline" href="{{ route('two-step.settings',['panel'=>'fbrpos']) }}">Two-step login</a></p>
     <form method="POST" action="{{ route('fbrpos.my-profile') }}">
         @csrf
         <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-6 space-y-5">

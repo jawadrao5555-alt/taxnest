@@ -4,6 +4,17 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\Pos\OfflineQueueReportController;
 use Illuminate\Support\Facades\Route;
 
+// Exact-guard authorization lives in the controller so the challenge cannot
+// redirect back into its own protected middleware. All writes retain web CSRF.
+Route::prefix('security/two-step/{panel}')->where(['panel' => 'di|pos|fbrpos|health|admin'])
+    ->controller(\App\Http\Controllers\Auth\TwoStepController::class)->group(function () {
+        Route::get('/', 'settings')->name('two-step.settings');
+        Route::get('/challenge', 'challenge')->name('two-step.challenge');
+        foreach (['begin', 'confirm', 'verify', 'disable', 'logout'] as $action) {
+            Route::post('/'.$action, $action)->middleware('throttle:20,1')->name('two-step.'.$action);
+        }
+    });
+
 // ── Stateless machine endpoints (Task 1090) ─────────────────────────────────
 // Token/webhook-authenticated endpoints hit by machines (Desktop Agent every
 // 5-30s per shop, rider/caller apps, biometric devices, WA webhooks). They
@@ -18,6 +29,7 @@ use Illuminate\Support\Facades\Route;
 // $request->session() unguarded, so they MUST come off together with
 // StartSession or every request would 500.
 $statelessMachine = [
+    \App\Http\Middleware\CompanySessionGeneration::class,
     \Illuminate\Cookie\Middleware\EncryptCookies::class,
     \Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse::class,
     \Illuminate\Session\Middleware\StartSession::class,
@@ -599,6 +611,7 @@ Route::middleware(['auth', 'company', 'rate_limit_company', 'company.approval'])
         Route::get('/compliance', [ComplianceController::class, 'index'])->name('compliance.index');
         Route::post('/compliance/audit-packs', [ComplianceController::class, 'store'])->name('compliance.packs.store');
         Route::get('/compliance/audit-packs/{pack}/status', [ComplianceController::class, 'status'])->name('compliance.packs.status');
+        Route::post('/compliance/audit-packs/{pack}/advance', [ComplianceController::class, 'advance'])->middleware('throttle:30,1')->name('compliance.packs.advance');
         Route::get('/compliance/audit-packs/{pack}/download', [ComplianceController::class, 'download'])->name('compliance.packs.download');
         Route::delete('/compliance/audit-packs/{pack}', [ComplianceController::class, 'destroy'])->name('compliance.packs.destroy');
 
@@ -1870,6 +1883,13 @@ Route::prefix('admin')->middleware(['admin.auth'])->group(function () {
     Route::post('/support-inbox/send', [\App\Http\Controllers\SaasAdmin\SupportInboxController::class, 'send'])->middleware('throttle:20,1')->name('saas.admin.support-inbox.send');
     Route::get('/support-inbox/unread', [\App\Http\Controllers\SaasAdmin\SupportInboxController::class, 'unread'])->name('saas.admin.support-inbox.unread');
     Route::get('/support-inbox/poll', [\App\Http\Controllers\SaasAdmin\SupportInboxController::class, 'poll'])->middleware('throttle:30,1')->name('saas.admin.support-inbox.poll');
+    Route::get('/support-cases', [\App\Http\Controllers\SaasAdmin\SupportInboxController::class, 'caseIndex'])->name('saas.admin.support-cases');
+    Route::get('/support-cases/{supportCase}', [\App\Http\Controllers\SaasAdmin\SupportInboxController::class, 'caseShow'])->whereNumber('supportCase')->name('saas.admin.support-cases.show');
+    Route::post('/support-inbox/{box}/{uid}/case', [\App\Http\Controllers\SaasAdmin\SupportInboxController::class, 'storeCase'])->whereNumber('uid')->name('saas.admin.support-inbox.case.store');
+    Route::post('/support-inbox/cases/{supportCase}/links', [\App\Http\Controllers\SaasAdmin\SupportInboxController::class, 'linkCase'])->whereNumber('supportCase')->name('saas.admin.support-inbox.case.link');
+    Route::post('/support-inbox/cases/{supportCase}/assign', [\App\Http\Controllers\SaasAdmin\SupportInboxController::class, 'assignCase'])->whereNumber('supportCase')->name('saas.admin.support-inbox.case.assign');
+    Route::post('/support-inbox/cases/{supportCase}/resolve', [\App\Http\Controllers\SaasAdmin\SupportInboxController::class, 'resolveCase'])->whereNumber('supportCase')->name('saas.admin.support-inbox.case.resolve');
+    Route::post('/support-inbox/cases/{supportCase}/reopen', [\App\Http\Controllers\SaasAdmin\SupportInboxController::class, 'reopenCase'])->whereNumber('supportCase')->name('saas.admin.support-inbox.case.reopen');
     Route::get('/support-inbox/{box}/{uid}', [\App\Http\Controllers\SaasAdmin\SupportInboxController::class, 'show'])->name('saas.admin.support-inbox.show');
     Route::get('/support-inbox/{box}/{uid}/attachment/{index}', [\App\Http\Controllers\SaasAdmin\SupportInboxController::class, 'attachment'])->name('saas.admin.support-inbox.attachment');
 

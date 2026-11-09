@@ -59,18 +59,44 @@ if RC_MARIADB_VERSION=10.6.23 PATH="$tmp:/usr/bin:/bin" \
     fail 'MariaDB version check accepted a matching --version output with exit 1'
 fi
 
-# Inspect complete job blocks: a growing mandatory preflight must not hide a
-# later always-uploaded artifact behind an arbitrary grep line-count window.
-python3 - "$workflow" <<'PY_CHECK'
-import pathlib,re,sys
-text=pathlib.Path(sys.argv[1]).read_text()
-lanes=('workflow-safety','dependency-audit-build','fullphpunit','native-mariadb-di',
-       'browserdesktopmobile','jsagentrealtime','manifest-provenance')
-for lane in lanes:
-    block=re.search(r'^  '+re.escape(lane)+r':\n(.*?)(?=^  [A-Za-z0-9_-]+:|\Z)',text,re.M|re.S)
-    if not block or not re.search(r"if: always\(\) && steps\.sanitize_evidence\.outcome == 'success'\n\s+uses: actions/upload-artifact@v4",block[1]):
-        raise SystemExit(f'ci-mariadb-provision-check: {lane} lacks its always-uploaded evidence artifact')
-PY_CHECK
+job_block() {
+    # Bound evidence to the actual job, not an arbitrary line budget or the
+    # following job's uploader. New acceptance steps can legitimately make a
+    # lane longer without changing its always-uploaded evidence contract.
+    awk -v job="$1" '
+        $0 == "  " job ":" { inside = 1; next }
+        inside && /^  [A-Za-z0-9_-]+:/ { exit }
+        inside { print }
+    ' "$2"
+}
+
+has_evidence() {
+    python3 -c 'import re,sys; text=sys.stdin.read(); sys.exit(0 if re.search(r"if: always\(\) && steps\.sanitize_evidence\.outcome == \x27success\x27\n\s+uses: actions/upload-artifact@v4",text) else 1)'
+}
+
+for lane in workflow-safety dependency-audit-build fullphpunit native-mariadb-di \
+    browserdesktopmobile jsagentrealtime manifest-provenance; do
+    job_block "$lane" "$workflow" | has_evidence ||
+        fail "$lane lacks its always-uploaded evidence artifact"
+done
+
+# The same real parser accepts long jobs and refuses uploaders from another job
+# or without the required always/sanitization guard.
+{
+    printf '  long-lane:\n'
+    for ((i=0;i<130;i++)); do printf '      # synthetic acceptance line\n'; done
+    printf "      if: always() && steps.sanitize_evidence.outcome == 'success'\n      uses: actions/upload-artifact@v4\n"
+    printf '  missing-lane:\n      steps: []\n  following-lane:\n'
+    printf "      if: always() && steps.sanitize_evidence.outcome == 'success'\n      uses: actions/upload-artifact@v4\n"
+    printf '  unguarded-lane:\n      uses: actions/upload-artifact@v4\n'
+} >"$tmp/evidence-workflow.yml"
+job_block long-lane "$tmp/evidence-workflow.yml" | has_evidence || fail 'long-job evidence extraction regressed'
+for rejected in missing-lane unguarded-lane; do
+    if job_block "$rejected" "$tmp/evidence-workflow.yml" | has_evidence; then
+        fail 'unguarded evidence or evidence from another job was accepted'
+    fi
+done
+printf 'PASS: evidence extraction accepts long jobs and rejects next-job or unguarded uploaders.\n'
 
 python3 "$(dirname "${BASH_SOURCE[0]}")/rc-mariadb-discovery-check.py"
 python3 "$(dirname "${BASH_SOURCE[0]}")/rc-mariadb-startup-check.py"

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\SystemControl;
 use App\Models\SystemSetting;
 use App\Models\AdminAuditLog;
+use App\Models\AdminUser;
 use Illuminate\Http\Request;
 
 class AdminSystemController extends Controller
@@ -22,6 +23,9 @@ class AdminSystemController extends Controller
 
     public function index()
     {
+        $actor = auth('admin')->user();
+        $currentActor = $actor instanceof AdminUser ? $actor->fresh() : null;
+        $canManageSystemControls = (bool) $currentActor?->canManageSensitiveConfiguration();
         $controls = SystemControl::orderBy('key')->get();
 
         $heartbeatRaw = SystemSetting::get('scheduler_last_heartbeat');
@@ -139,7 +143,7 @@ class AdminSystemController extends Controller
             'controls', 'heartbeatAt', 'heartbeatStale',
             'queueHeartbeatAt', 'queueStale', 'stuckJobs', 'oldestStuckAt',
             'logHealthFailure', 'logHealthLastPassAt', 'logHealthStale',
-            'mysqlThreads', 'mysqlMaxConn', 'mysqlPct'
+            'mysqlThreads', 'mysqlMaxConn', 'mysqlPct', 'canManageSystemControls'
         ));
     }
 
@@ -190,8 +194,9 @@ class AdminSystemController extends Controller
 
     public function toggle(Request $request, $key)
     {
-        $control = SystemControl::toggle($key, auth('admin')->id());
-        AdminAuditLog::log(auth('admin')->id(), "System control toggled: {$key}", 'SystemControl', $control->id, [
+        $actor = AdminUser::requireSensitiveConfigurationAdministrator();
+        $control = SystemControl::toggle($key, $actor->id);
+        AdminAuditLog::log($actor->id, "System control toggled: {$key}", 'SystemControl', $control->id, [
             'new_value' => $control->value,
         ]);
         return back()->with('success', "'{$key}' is now {$control->value}.");

@@ -59,6 +59,7 @@ class AdminPlanController extends Controller
 
     public function updateAddonPricing(Request $request)
     {
+        \App\Models\AdminUser::requireBillingAdministrator();
         // One rate per cycle the catalogue sells — adding a cycle to CYCLES
         // must never leave the admin form silently unable to price it.
         $rules = ['addons' => ['required', 'array']];
@@ -151,6 +152,7 @@ class AdminPlanController extends Controller
 
     public function store(Request $request)
     {
+        \App\Models\AdminUser::requireBillingAdministrator();
         $data = $request->validate([
             'name' => 'required|string|max:100',
             'price' => 'required|numeric|min:0',
@@ -222,6 +224,7 @@ class AdminPlanController extends Controller
 
     public function update(Request $request, $id)
     {
+        \App\Models\AdminUser::requireBillingAdministrator();
         $plan = PricingPlan::findOrFail($id);
 
         $data = $request->validate([

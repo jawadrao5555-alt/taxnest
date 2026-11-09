@@ -6,6 +6,8 @@ import { b03DesignsWorkflow, b03DeliveryNavigationWorkflow, b03AutoKotWorkflow }
 import { b02DealWorkflow } from './lib/pra-b02-browser.mjs';
 import { mixedFulfillmentWorkflow } from './lib/mixed-fulfillment-browser.mjs';
 import { staffDiscountWorkflow } from './lib/pra-staff-discount-browser.mjs';
+import { restoreSessionBoundaryWorkflow } from './lib/restore-session-browser.mjs';
+import { securityOnboardingWorkflow } from './lib/security-onboarding-browser.mjs';
 import { billingSelectionWorkflow } from './lib/billing-selection-browser.mjs';
 import { createHash } from 'node:crypto';
 import { lstatSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
@@ -1495,6 +1497,8 @@ async function deliveryContactSearchWorkflow(page,t,v) {
 }
 
 async function workflow(page,t,v,diagnostics) {
+  if(t.restoreSessionBoundary)return restoreSessionBoundaryWorkflow(page,t,v,{baseUrl,login,saveEvidenceScreenshot,pass});
+  if(t.securityOnboarding)return securityOnboardingWorkflow(page,t,v,{baseUrl,login,saveEvidenceScreenshot,pass,loopback});
   if(t.taxIntegrations)return taxIntegrationsWorkflow(page,t,v,{baseUrl,waitForOperationalSurface,dismiss,saveEvidenceScreenshot,pass});
   if(t.b01Account)return b01CompanyAccountWorkflow(page,t,v,{baseUrl,waitForOperationalSurface,dismiss,saveEvidenceScreenshot,pass});
   if(t.kotNoteVisibility)return kotNoteVisibilityWorkflow(page,t,v,{baseUrl,waitForOperationalSurface,dismiss,saveEvidenceScreenshot,pass,openMobileCart,loopback,login,attachDiagnostics});
@@ -2283,6 +2287,26 @@ async function healthIsolation(browser,label,v,iso) {
     const own=`/health/patients/${iso.ownPatient.id}`, ownResponse=await p.goto(baseUrl+own,{waitUntil:'domcontentloaded',timeout:30000});
     if((ownResponse?.status()||0)>=400||new URL(p.url()).pathname!==own||!(await p.locator('body').innerText()).includes(iso.ownPatient.identifier))fail(`HEALTH ISOLATION: ${label}: own branch patient is not accessible`);
     else pass(`HEALTH ISOLATION PASS: ${label}: own branch patient accessible`);
+
+    // Versioned consent is exercised through the real receptionist form at
+    // both widths. End withdrawn so the same disposable patient is safe to
+    // reuse when the second viewport runs.
+    const edit=own+'/edit';
+    let editResponse=await p.goto(baseUrl+edit,{waitUntil:'domcontentloaded',timeout:30000});
+    if((editResponse?.status()||0)>=400||new URL(p.url()).pathname!==edit)throw new Error(`HEALTH CONSENT: ${label}: patient edit form is unavailable`);
+    const consent=p.locator('input[name="consent_treatment"][type="checkbox"]');
+    await consent.check();
+    await Promise.all([p.waitForNavigation({waitUntil:'domcontentloaded'}),p.locator('form[action$="/health/patients/'+iso.ownPatient.id+'"] button[type="submit"]').click()]);
+    editResponse=await p.goto(baseUrl+edit,{waitUntil:'domcontentloaded',timeout:30000});
+    let consentBody=await p.locator('body').innerText();
+    if((editResponse?.status()||0)>=400||!consentBody.includes('health-consent-v1')||!consentBody.includes('Consent recorded'))throw new Error(`HEALTH CONSENT: ${label}: granted consent evidence/version is not visible`);
+    await p.locator('input[name="consent_treatment"][type="checkbox"]').uncheck();
+    await Promise.all([p.waitForNavigation({waitUntil:'domcontentloaded'}),p.locator('form[action$="/health/patients/'+iso.ownPatient.id+'"] button[type="submit"]').click()]);
+    editResponse=await p.goto(baseUrl+edit,{waitUntil:'domcontentloaded',timeout:30000});
+    consentBody=await p.locator('body').innerText();
+    if((editResponse?.status()||0)>=400||!consentBody.includes('health-consent-v1')||!consentBody.includes('Consent withdrawn'))throw new Error(`HEALTH CONSENT: ${label}: withdrawal evidence/version is not visible`);
+    pass(`HEALTH CONSENT PASS: ${label}: grant and withdrawal retain versioned evidence`);
+
     for(const patient of [iso.otherBranchPatient,iso.foreignTenantPatient]) {
       const response=await p.goto(baseUrl+`/health/patients/${patient.id}`,{waitUntil:'domcontentloaded',timeout:30000});
       const body=await p.locator('body').innerText().catch(()=> '');

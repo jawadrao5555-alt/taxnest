@@ -4,6 +4,7 @@ namespace App\Http\Controllers\SaasAdmin;
 
 use App\Http\Controllers\Controller;
 use App\Models\AdminAuditLog;
+use App\Models\AdminUser;
 use App\Models\Company;
 use App\Models\CompanyGroup;
 use App\Models\CompanyGroupMember;
@@ -36,9 +37,12 @@ class AdminGroupController extends Controller
 
     public function index(Request $request)
     {
+        $currentAdmin = auth('admin')->user()?->fresh();
+        $canManageCompanyLifecycle = (bool) $currentAdmin?->canManageCompanyLifecycle();
         if (!CompanyGroupService::enabled()) {
             return view('saas-admin.groups.index', [
                 'groups' => collect(), 'cards' => [], 'q' => '', 'disabled' => true, 'stats' => [],
+                'canManageCompanyLifecycle' => $canManageCompanyLifecycle,
             ]);
         }
 
@@ -92,12 +96,15 @@ class AdminGroupController extends Controller
             'q'        => $q,
             'disabled' => false,
             'stats'    => $this->stats(),
+            'canManageCompanyLifecycle' => $canManageCompanyLifecycle,
         ]);
     }
 
     public function show($id)
     {
         abort_unless(CompanyGroupService::enabled(), 404);
+        $currentAdmin = auth('admin')->user()?->fresh();
+        $canManageCompanyLifecycle = (bool) $currentAdmin?->canManageCompanyLifecycle();
 
         $group = CompanyGroup::with(['members.company'])->findOrFail($id);
         $cards = $this->summarise(collect([$group]));
@@ -113,11 +120,13 @@ class AdminGroupController extends Controller
             'group'             => $group,
             'card'              => $cards[$group->id] ?? null,
             'excludedCompanies' => $excludedCompanies,
+            'canManageCompanyLifecycle' => $canManageCompanyLifecycle,
         ]);
     }
 
     public function update(Request $request, $id)
     {
+        AdminUser::requireCompanyLifecycleAdministrator();
         $group = CompanyGroup::findOrFail($id);
         $request->validate([
             'name'  => 'nullable|string|max:190',
@@ -143,6 +152,7 @@ class AdminGroupController extends Controller
      */
     public function detach(Request $request, $id, $companyId)
     {
+        AdminUser::requireCompanyLifecycleAdministrator();
         $group = CompanyGroup::findOrFail($id);
         $company = Company::withTrashed()->findOrFail($companyId);
 
@@ -166,6 +176,7 @@ class AdminGroupController extends Controller
     /** Link an account an admin knows belongs here (account code / NTN / name). */
     public function link(Request $request, $id)
     {
+        AdminUser::requireCompanyLifecycleAdministrator();
         $group = CompanyGroup::findOrFail($id);
         $request->validate(['company_ref' => 'required|string|max:190']);
 
@@ -195,6 +206,7 @@ class AdminGroupController extends Controller
     /** Re-run the automatic pass (after a data clean-up, or a manual detach spree). */
     public function resync(Request $request)
     {
+        AdminUser::requireCompanyLifecycleAdministrator();
         abort_unless(CompanyGroupService::enabled(), 404);
         @set_time_limit(300);
 

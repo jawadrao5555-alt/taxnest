@@ -5,7 +5,10 @@
             <h1 class="text-2xl font-bold text-white">Support Inbox</h1>
             <p class="text-xs text-gray-500 dark:text-gray-400">support@taxnest.pk — emails yahin parhein aur jawab dein</p>
         </div>
-        <button @click="compose = !compose" class="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium">Compose Email</button>
+        <div class="flex gap-2">
+            <a href="{{ route('saas.admin.support-cases') }}" class="px-4 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-200 text-sm font-medium">Support Cases</a>
+            <button @click="compose = !compose" class="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium">Compose Email</button>
+        </div>
     </div>
 
     @if($error)

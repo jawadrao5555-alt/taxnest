@@ -4,6 +4,7 @@ namespace App\Http\Controllers\SaasAdmin;
 
 use App\Http\Controllers\Controller;
 use App\Models\AdminAuditLog;
+use App\Models\AdminUser;
 use App\Models\AgentSaleClaim;
 use App\Models\Company;
 use App\Models\PaymentProof;
@@ -14,7 +15,7 @@ class AdminAgentClaimController extends Controller
 {
     private function assertSuperAdmin(): void
     {
-        abort_unless(auth('admin')->user()?->isSuperAdmin(), 403, 'Super admin only.');
+        AdminUser::requireSuperAdministrator();
     }
 
     public function index()

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\SaasAdmin;
 use App\Http\Controllers\Controller;
 use App\Exceptions\DeploymentGitHubUnavailable;
 use App\Models\OwnerDeploymentApprovalRequest;
+use App\Models\AdminUser;
 use App\Services\EligibleDeploymentPullRequestService;
 use App\Services\DeploymentReleaseHistory;
 use App\Services\GitHubActionsOidcVerifier;
@@ -61,30 +62,30 @@ class OwnerDeploymentApprovalController extends Controller
         EligibleDeploymentPullRequestService $github,
         OwnerApprovalImmediateDispatch $immediateDispatch
     ) {
-        $this->authorizeOwner();
+        $actor = $this->authorizeOwner();
         $input = $request->validate([
             'pull_request_number' => ['required', 'integer', 'min:1'],
             'password' => ['required', 'string'],
             'merge_sha' => ['nullable', 'regex:/^[a-f0-9]{40}$/i'],
         ]);
 
-        if (!Hash::check((string) $request->input('password'), auth('admin')->user()->password)) {
+        if (!Hash::check((string) $request->input('password'), $actor->password)) {
             return back()->withErrors(['password' => 'Current admin password is incorrect.'])->withInput($request->only('pull_request_number', 'merge_sha'));
         }
 
         try {
             if (!empty($input['merge_sha'])) {
                 $approval = $service->requestMergedRelease(
-                    (int) $input['pull_request_number'], $input['merge_sha'], auth('admin')->id()
+                    (int) $input['pull_request_number'], $input['merge_sha'], $actor->id
                 );
             } else {
                 $candidate = $github->resolve((int) $input['pull_request_number']);
                 $approval = $service->create([
                     'pull_request_number' => $candidate['number'],
                     'head_sha' => $candidate['head_sha'],
-                ], auth('admin')->id());
+                ], $actor->id);
             }
-            $approval = $service->approve($approval, auth('admin')->id());
+            $approval = $service->approve($approval, $actor->id);
             $immediateDispatch->dispatch($approval);
         } catch (\InvalidArgumentException $exception) {
             return back()->withErrors(['pull_request_number' => $exception->getMessage()])->withInput($request->only('pull_request_number', 'merge_sha'));
@@ -95,8 +96,8 @@ class OwnerDeploymentApprovalController extends Controller
 
     public function review(Request $request, string $requestId)
     {
-        $this->authorizeOwner();
-        abort_unless((int) $request->query('approver') === (int) auth('admin')->id(), 403);
+        $actor = $this->authorizeOwner();
+        abort_unless((int) $request->query('approver') === (int) $actor->id, 403);
 
         $approval = OwnerDeploymentApprovalRequest::findOrFail($requestId);
         abort_unless($approval->status === 'pending' && $approval->isUnexpired(), 410);
@@ -111,16 +112,16 @@ class OwnerDeploymentApprovalController extends Controller
         OwnerDeploymentApprovalService $service,
         OwnerApprovalImmediateDispatch $immediateDispatch
     ) {
-        $this->authorizeOwner();
+        $actor = $this->authorizeOwner();
         $request->validate(['password' => ['required', 'string']]);
 
-        if (!Hash::check((string) $request->input('password'), auth('admin')->user()->password)) {
+        if (!Hash::check((string) $request->input('password'), $actor->password)) {
             return back()->withErrors(['password' => 'Current admin password is incorrect.']);
         }
 
         try {
             $approval = OwnerDeploymentApprovalRequest::findOrFail($requestId);
-            $approval = $service->approve($approval, auth('admin')->id());
+            $approval = $service->approve($approval, $actor->id);
             $immediateDispatch->dispatch($approval);
         } catch (\InvalidArgumentException $exception) {
             return back()->withErrors(['password' => $exception->getMessage()]);
@@ -290,8 +291,8 @@ class OwnerDeploymentApprovalController extends Controller
         ]);
     }
 
-    private function authorizeOwner(): void
+    private function authorizeOwner(): AdminUser
     {
-        abort_unless(auth('admin')->user()?->isSuperAdmin(), 403);
+        return AdminUser::requireSuperAdministrator();
     }
 }

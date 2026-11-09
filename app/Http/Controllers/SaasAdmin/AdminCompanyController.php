@@ -28,6 +28,7 @@ class AdminCompanyController extends Controller
 {
     public function create()
     {
+        \App\Models\AdminUser::requireCompanyLifecycleAdministrator();
         $franchises = Franchise::where('status', 'active')->get();
         $agents = $this->activeAgents();
         return view('saas-admin.companies.create', compact('franchises', 'agents'));
@@ -44,6 +45,7 @@ class AdminCompanyController extends Controller
 
     public function store(Request $request)
     {
+        $currentAdmin = \App\Models\AdminUser::requireBillingAdministrator();
         // Which POS panel (if any) this company is being created on. The
         // business type is a POS-only question: Digital Invoice and healthcare
         // companies are created exactly as they always were.
@@ -164,7 +166,7 @@ class AdminCompanyController extends Controller
         // Only super admin sees/sets the agent dropdown (Agents section is
         // super-admin-only); key added conditionally so older schemas without
         // the column never receive it.
-        if (auth('admin')->user()?->isSuperAdmin()
+        if ($currentAdmin->isSuperAdmin()
             && $request->filled('agent_id')
             && \Illuminate\Support\Facades\Schema::hasColumn('companies', 'agent_id')) {
             $companyData['agent_id'] = $request->agent_id;
@@ -207,6 +209,7 @@ class AdminCompanyController extends Controller
 
     public function edit($id)
     {
+        \App\Models\AdminUser::requireCompanyLifecycleAdministrator();
         $company = Company::findOrFail($id);
         $franchises = Franchise::where('status', 'active')->get();
         $companyAdmin = User::where('company_id', $id)->where('role', 'company_admin')->first();
@@ -216,6 +219,7 @@ class AdminCompanyController extends Controller
 
     public function update(Request $request, $id)
     {
+        \App\Models\AdminUser::requireCompanyLifecycleAdministrator();
         $company = Company::findOrFail($id);
         $request->validate([
             'name' => 'required|string|max:255',
@@ -332,6 +336,12 @@ class AdminCompanyController extends Controller
         }
 
         $companies = $query->orderBy('created_at', 'desc')->paginate(20)->appends($request->all());
+        $deletionRequests = [];
+        if (\Illuminate\Support\Facades\Schema::hasTable('company_deletion_requests')) {
+            $deletionRequests = DB::table('company_deletion_requests')
+                ->whereIn('company_id', $companies->pluck('id'))
+                ->whereNotNull('active_key')->orderByDesc('id')->get()->keyBy('company_id')->all();
+        }
 
         // Agent Health (Task 629): shops that RELY on the Desktop Agent for silent
         // printing but whose agent has been offline for hours — cashiers there are
@@ -358,15 +368,20 @@ class AdminCompanyController extends Controller
             $latestAgentVersion = "{$m[1]}.{$m[2]}.{$m[3]}";
         }
 
-        return view('saas-admin.companies.index', compact('companies', 'offlineAgents', 'latestAgentVersion'));
+        return view('saas-admin.companies.index', compact('companies', 'offlineAgents', 'latestAgentVersion', 'deletionRequests'));
     }
 
     public function show($id)
     {
+        $currentAdmin = auth('admin')->user()?->fresh();
+        $canManageCompanyLifecycle = (bool) $currentAdmin?->canManageCompanyLifecycle();
+        $canManageBilling = (bool) $currentAdmin?->canManageBilling();
+        $isSuperAdmin = (bool) $currentAdmin?->isSuperAdmin();
         $company = Company::withTrashed()->with(['franchise', 'activeSubscription', 'requestedPlan'])->findOrFail($id);
         $usageStats = CompanyUsageStat::refreshForCompany($id);
         $accountOverview = \App\Services\CompanyAccountOverview::for($company);
         $company->setRelation('activeSubscription', $accountOverview['current']);
+        $companyDeletionRequest = app(\App\Services\CompanyDeletionLifecycle::class)->active((int) $company->id);
 
         $extraStats = [];
         if ($company->product_type === 'di') {
@@ -448,7 +463,7 @@ class AdminCompanyController extends Controller
         // that were never submitted to PRA (pre-Task-760). Super-admin can re-queue
         // them from the UI instead of needing SSH/artisan access.
         $exemptInternalBills = collect();
-        if ($company->product_type === 'pos' && auth('admin')->user()?->isSuperAdmin()) {
+        if ($company->product_type === 'pos' && $currentAdmin?->isSuperAdmin()) {
             $exemptInternalBills = PosTransaction::where('company_id', $id)
                 ->where('pra_status', 'exempt_internal')
                 ->whereNull('pra_invoice_number')
@@ -465,7 +480,7 @@ class AdminCompanyController extends Controller
             ->filter(fn ($p) => !\App\Services\PlanSellabilityService::isRetired($p))
             ->values();
 
-        return view('saas-admin.companies.show', compact('company', 'usageStats', 'extraStats', 'archiveViewers', 'localViewers', 'companyAdmin', 'teamUsers', 'exemptInternalBills', 'grantPlans', 'groupMember', 'groupSiblings', 'accountOverview'));
+        return view('saas-admin.companies.show', compact('company', 'usageStats', 'extraStats', 'archiveViewers', 'localViewers', 'companyAdmin', 'teamUsers', 'exemptInternalBills', 'grantPlans', 'groupMember', 'groupSiblings', 'accountOverview', 'companyDeletionRequest', 'canManageCompanyLifecycle', 'canManageBilling', 'isSuperAdmin'));
     }
 
     /**
@@ -519,6 +534,7 @@ class AdminCompanyController extends Controller
      */
     public function revealFbrAccessCode($id)
     {
+        $this->assertSuperAdmin();
         $company = Company::withTrashed()->findOrFail($id);
 
         if (empty($company->fbr_access_code)) {
@@ -711,10 +727,7 @@ class AdminCompanyController extends Controller
     /** Super-admin gate — shared by every archive-viewer admin action. */
     private function assertSuperAdmin(): void
     {
-        $admin = auth('admin')->user();
-        if (!$admin || !$admin->isSuperAdmin()) {
-            abort(403, 'Super admin only.');
-        }
+        \App\Models\AdminUser::requireSuperAdministrator();
     }
 
     public function storeArchiveViewer(Request $request, $id)
@@ -770,8 +783,16 @@ class AdminCompanyController extends Controller
         ];
         if ($request->filled('password')) {
             $update['password'] = bcrypt($request->password);
+            // A credential reset is also a revocation event. Rotate the
+            // browser-session generation in the same write so an already
+            // signed-in archive device cannot keep its old-password session.
+            if (\Illuminate\Support\Facades\Schema::hasColumn('users', 'session_generation')) {
+                $update['session_generation'] = (string) \Illuminate\Support\Str::uuid();
+            }
         }
-        $user->update($update);
+        // Internal validated field set. forceFill is required for the hidden,
+        // non-mass-assignable session_generation revocation marker.
+        $user->forceFill($update)->save();
 
         AdminAuditLog::log(auth('admin')->id(), 'Archive Viewer updated', 'User', $user->id, [
             'company_id' => $company->id,
@@ -870,8 +891,15 @@ class AdminCompanyController extends Controller
             $update['password'] = bcrypt($request->password);
             // Keep the owner-viewable copy in step (Task 665) — see storeLocalViewer.
             $update = ViewablePasswordService::apply($update, $request->password);
+            // Revoke this viewer's cached browser sessions without touching
+            // the owner/admin login or stateless Agent/API credentials.
+            if (\Illuminate\Support\Facades\Schema::hasColumn('users', 'session_generation')) {
+                $update['session_generation'] = (string) \Illuminate\Support\Str::uuid();
+            }
         }
-        $user->update($update);
+        // Internal validated field set. forceFill is required for the hidden,
+        // non-mass-assignable session_generation revocation marker.
+        $user->forceFill($update)->save();
 
         AdminAuditLog::log(auth('admin')->id(), 'Local Bills Viewer updated', 'User', $user->id, [
             'company_id' => $company->id,
@@ -912,6 +940,7 @@ class AdminCompanyController extends Controller
 
     public function approve($id)
     {
+        \App\Models\AdminUser::requireBillingAdministrator();
         $company = Company::findOrFail($id);
         // Flip BOTH status columns: `status` drives the CheckCompanyApproval
         // view-only gate + admin UI badges; `company_status` drives login-time
@@ -1023,9 +1052,10 @@ class AdminCompanyController extends Controller
 
     public function reject($id)
     {
+        $actor = \App\Models\AdminUser::requireCompanyLifecycleAdministrator();
         $company = Company::findOrFail($id);
         $company->update(['status' => 'rejected', 'company_status' => 'rejected']);
-        AdminAuditLog::log(auth('admin')->id(), 'Company rejected', 'Company', $id, ['name' => $company->name]);
+        AdminAuditLog::log($actor->id, 'Company rejected', 'Company', $id, ['name' => $company->name]);
         return back()->with('success', "Company '{$company->name}' has been rejected.");
     }
 
@@ -1041,13 +1071,14 @@ class AdminCompanyController extends Controller
 
     private function changeCompanyState(Request $request, int $id, bool $activate)
     {
+        $actor = \App\Models\AdminUser::requireCompanyLifecycleAdministrator();
         $data = $request->validate([
             // Versioned forms require a reason; existing unversioned clients remain compatible.
             'reason' => [$request->filled('state_token') ? 'required' : 'nullable', 'string', 'max:1000'],
             'restoration_condition' => ['nullable', 'string', 'max:1000'],
             'state_token' => ['nullable', 'string', 'regex:/^[a-f0-9]{64}$/D'],
         ]);
-        $result = \App\Services\CompanyAccountStateService::change($id, $activate, (int) auth('admin')->id(), $data);
+        $result = \App\Services\CompanyAccountStateService::change($id, $activate, (int) $actor->id, $data);
         if ($request->wantsJson()) {
             return response()->json(['success' => !$result['conflict']] + $result, $result['conflict'] ? 409 : 200);
         }
@@ -1056,6 +1087,7 @@ class AdminCompanyController extends Controller
 
     public function updateLimits(Request $request, $id)
     {
+        \App\Models\AdminUser::requireBillingAdministrator();
         $company = Company::findOrFail($id);
         $request->validate([
             'invoice_limit_override' => 'nullable|integer|min:0',
@@ -1107,6 +1139,7 @@ class AdminCompanyController extends Controller
      */
     public function grantAiPages(Request $request, $id)
     {
+        \App\Models\AdminUser::requireBillingAdministrator();
         $company = Company::findOrFail($id);
 
         $data = $request->validate([
@@ -1143,10 +1176,16 @@ class AdminCompanyController extends Controller
 
     public function softDelete(Request $request, $id)
     {
+        $actor = \App\Models\AdminUser::requireCompanyLifecycleAdministrator();
         $company = Company::findOrFail($id);
-        $company->update(['deleted_reason' => $request->input('reason', 'Moved to bin by admin')]);
-        $company->delete();
-        AdminAuditLog::log(auth('admin')->id(), 'Company moved to bin', 'Company', $id, ['name' => $company->name, 'reason' => $request->input('reason')]);
+        $reason = $request->input('reason', 'Moved to bin by admin');
+        DB::transaction(function () use ($company, $actor, $reason) {
+            $company = Company::query()->whereKey($company->id)->lockForUpdate()->firstOrFail();
+            app(\App\Services\CompanyDeletionLifecycle::class)->beginHold($company, $actor, $reason);
+            $company->update(['deleted_reason' => $reason]);
+            $company->delete();
+        });
+        AdminAuditLog::log($actor->id, 'Company moved to bin', 'Company', $id, ['name' => $company->name, 'reason' => $reason]);
         return redirect()->route('saas.admin.companies')->with('success', "Company '{$company->name}' moved to bin.");
     }
 
@@ -1173,22 +1212,37 @@ class AdminCompanyController extends Controller
                 ->map(fn ($s) => $s->name . ' (' . \App\Support\ProductCatalog::shortLabel($s->product_type) . ')')
                 ->values()->all();
         }
-        $isSuperAdmin = (bool) auth('admin')->user()?->isSuperAdmin();
+        $currentAdmin = auth('admin')->user()?->fresh();
+        $isSuperAdmin = (bool) $currentAdmin?->isSuperAdmin();
+        $canManageCompanyLifecycle = (bool) $currentAdmin?->canManageCompanyLifecycle();
 
-        return view('saas-admin.companies.bin', compact('companies', 'siblingNames', 'isSuperAdmin'));
+        $deletionRequests = [];
+        if (\Illuminate\Support\Facades\Schema::hasTable('company_deletion_requests')) {
+            $deletionRequests = DB::table('company_deletion_requests')
+                ->whereIn('company_id', $companies->pluck('id'))
+                ->whereNotNull('active_key')->orderByDesc('id')->get()->keyBy('company_id')->all();
+        }
+
+        return view('saas-admin.companies.bin', compact('companies', 'siblingNames', 'isSuperAdmin', 'canManageCompanyLifecycle', 'deletionRequests'));
     }
 
     public function restore($id)
     {
+        $actor = \App\Models\AdminUser::requireCompanyLifecycleAdministrator();
         $company = Company::onlyTrashed()->findOrFail($id);
-        $company->restore();
-        $company->update(['deleted_reason' => null]);
-        AdminAuditLog::log(auth('admin')->id(), 'Company restored from bin', 'Company', $id, ['name' => $company->name]);
+        DB::transaction(function () use ($company, $actor) {
+            $company = Company::onlyTrashed()->whereKey($company->id)->lockForUpdate()->firstOrFail();
+            $company->restore();
+            $company->update(['deleted_reason' => null]);
+            app(\App\Services\CompanyDeletionLifecycle::class)->restored($company, $actor);
+        });
+        AdminAuditLog::log($actor->id, 'Company restored from bin', 'Company', $id, ['name' => $company->name]);
         return back()->with('success', "Company '{$company->name}' has been restored.");
     }
 
     public function forceDelete(Request $request, $id)
     {
+        $actor = \App\Models\AdminUser::requireCompanyLifecycleAdministrator();
         $company = Company::onlyTrashed()->findOrFail($id);
         $companyName = $company->name;
 
@@ -1197,7 +1251,7 @@ class AdminCompanyController extends Controller
         // recoverable. A super-admin may override, but only by typing the
         // company's exact name — both the refusal and the override are audited.
         if ($company->purgeHoldActive()) {
-            $admin = auth('admin')->user();
+            $admin = $actor;
             $typed = trim((string) $request->input('confirm_name', ''));
             $eligible = $company->purgeEligibleAt()->format('d M Y, h:i A');
 
@@ -1297,7 +1351,8 @@ class AdminCompanyController extends Controller
             'health_audit_notes', 'health_audit_findings', 'health_audit_runs',
             'health_audit_events', 'health_audit_chain_anchors',
         ];
-        DB::transaction(function () use ($orphanTables, $id, $company) {
+        $deletionRequestId = null;
+        DB::transaction(function () use ($orphanTables, $id, $company, $actor, &$deletionRequestId) {
             // pos_deal_items hangs off pos_deals (deal_id, no company_id) — purge
             // by parent deal ids BEFORE the deals themselves are removed.
             if (\Illuminate\Support\Facades\Schema::hasTable('pos_deals')
@@ -1332,12 +1387,16 @@ class AdminCompanyController extends Controller
                 }
             }
 
+            $deletionRequestId = app(\App\Services\CompanyDeletionLifecycle::class)->purged($company, $actor);
             $company->forceDelete();
         });
+        $fileCleanup = [];
         // Remove generated Audit Pack ZIPs for this company from disk.
         try {
             \Illuminate\Support\Facades\Storage::disk('local')->deleteDirectory('audit-packs/company_' . $id);
+            $fileCleanup['audit_packs'] = 'completed';
         } catch (\Throwable $e) {
+            $fileCleanup['audit_packs'] = 'failed';
             \Illuminate\Support\Facades\Log::warning('Audit pack directory cleanup failed on company purge', ['company_id' => $id, 'error' => $e->getMessage()]);
         }
         // The healthcare audit packs are a second archive on the same disk, and
@@ -1345,7 +1404,9 @@ class AdminCompanyController extends Controller
         // the tables above without this leaves the evidence packs behind.
         try {
             \Illuminate\Support\Facades\Storage::disk('local')->deleteDirectory('health-audit-packs/' . $id);
+            $fileCleanup['health_audit_packs'] = 'completed';
         } catch (\Throwable $e) {
+            $fileCleanup['health_audit_packs'] = 'failed';
             \Illuminate\Support\Facades\Log::warning('Healthcare audit pack cleanup failed on company purge', ['company_id' => $id, 'error' => $e->getMessage()]);
         }
         // Healthcare uploads live on the private disk, NOT in the database:
@@ -1354,15 +1415,21 @@ class AdminCompanyController extends Controller
         // must take the medical documents with it.
         try {
             \App\Services\HealthPlatformService::purgeFiles((int) $id);
+            $fileCleanup['health_uploads'] = 'completed';
         } catch (\Throwable $e) {
+            $fileCleanup['health_uploads'] = 'failed';
             \Illuminate\Support\Facades\Log::warning('Healthcare file purge failed on company purge', ['company_id' => $id, 'error' => $e->getMessage()]);
         }
-        AdminAuditLog::log(auth('admin')->id(), 'Company permanently deleted', 'Company', $id, ['name' => $companyName]);
+        app(\App\Services\CompanyDeletionLifecycle::class)->recordFileCleanup(
+            $deletionRequestId, (int) $id, $actor, $fileCleanup
+        );
+        AdminAuditLog::log($actor->id, 'Company permanently deleted', 'Company', $id, ['name' => $companyName]);
         return redirect()->route('saas.admin.companies.bin')->with('success', "Company '{$companyName}' has been permanently deleted.");
     }
 
     public function changeProductType(Request $request, $id)
     {
+        \App\Models\AdminUser::requireCompanyLifecycleAdministrator();
         $company = Company::findOrFail($id);
         $request->validate(['product_type' => 'required|' . \App\Support\ProductCatalog::validationRule()]);
         $old = $company->product_type;
@@ -1400,6 +1467,7 @@ class AdminCompanyController extends Controller
      */
     public function cloneToProduct(Request $request, $id)
     {
+        \App\Models\AdminUser::requireCompanyLifecycleAdministrator();
         $source = Company::findOrFail($id);
 
         $request->validate([
@@ -1674,6 +1742,7 @@ class AdminCompanyController extends Controller
 
     public function grantLifetime(Request $request, $id)
     {
+        \App\Models\AdminUser::requireBillingAdministrator();
         $request->validate(['reason' => 'nullable|string|max:255']);
         $company = Company::findOrFail($id);
         $sub = $this->getOrCreateActiveSubscription($company->id);
@@ -1694,6 +1763,7 @@ class AdminCompanyController extends Controller
 
     public function grantTemporary(Request $request, $id)
     {
+        \App\Models\AdminUser::requireBillingAdministrator();
         $request->validate([
             'until' => 'required|date|after:today',
             'pricing_plan_id' => 'nullable|integer|exists:pricing_plans,id',
@@ -1761,6 +1831,7 @@ class AdminCompanyController extends Controller
 
     public function removeOverride($id)
     {
+        \App\Models\AdminUser::requireBillingAdministrator();
         $company = Company::findOrFail($id);
         $sub = Subscription::where('company_id', $company->id)->orderByDesc('id')->first();
         if (!$sub) {

@@ -164,29 +164,51 @@ class HealthSetupImportController extends HealthPanelController
                 ->with('error', __('health.import_err_file_changed'));
         }
 
-        $parsed = Onboarding::parseFile($dataset, Storage::disk('local')->path($path));
-        if (!empty($parsed['error']) || empty($parsed['rows'])) {
-            return redirect()->route('health.setup.import')->with('error', __('health.import_err_unreadable'));
+        /*
+         * A double click, retrying proxy or second browser must not run the
+         * same reviewed workbook concurrently.  Row-level upserts make many
+         * datasets look idempotent after the fact, but staff credentials and
+         * opening journals must never depend on that accident.  Exclusive
+         * creation is atomic on the local disk shared by these upload files;
+         * the claim contains no workbook data or credential.
+         *
+         * We release on an exception so the same reviewed file can be retried.
+         * A successful commit deletes both workbook and review before release,
+         * therefore a later replay follows the ordinary file-gone path.
+         */
+        $claim = $this->claimCommit($token);
+        if ($claim === null) {
+            return redirect()->route('health.setup.import.preview', ['dataset' => $dataset, 'token' => $token])
+                ->with('error', __('health.import_err_processing'));
         }
 
-        $analysis = Onboarding::analyse($dataset, $company, $parsed['rows']);
-        $result = Onboarding::commit($dataset, $company, $analysis['rows'], $this->user());
+        try {
+            $parsed = Onboarding::parseFile($dataset, Storage::disk('local')->path($path));
+            if (!empty($parsed['error']) || empty($parsed['rows'])) {
+                return redirect()->route('health.setup.import')->with('error', __('health.import_err_unreadable'));
+            }
 
-        // The reviewed file has done its job. Leaving it on disk would leave a
-        // sheet of staff CNICs and patient details sitting in storage.
-        Storage::disk('local')->delete($path);
-        Storage::disk('local')->delete($this->reviewPath($token));
+            $analysis = Onboarding::analyse($dataset, $company, $parsed['rows']);
+            $result = Onboarding::commit($dataset, $company, $analysis['rows'], $this->user());
 
-        $message = __('health.import_done', [
-            'created' => (string) $result['created'],
-            'updated' => (string) $result['updated'],
-            'failed' => (string) $result['failed'],
-        ]);
+            // The reviewed file has done its job. Leaving it on disk would leave a
+            // sheet of staff CNICs and patient details sitting in storage.
+            Storage::disk('local')->delete($path);
+            Storage::disk('local')->delete($this->reviewPath($token));
 
-        return redirect()->route('health.setup.import')
-            ->with($result['failed'] > 0 ? 'warning' : 'success', $message)
-            ->with('importMessages', $result['messages'])
-            ->with('importCredentials', $result['credentials']);
+            $message = __('health.import_done', [
+                'created' => (string) $result['created'],
+                'updated' => (string) $result['updated'],
+                'failed' => (string) $result['failed'],
+            ]);
+
+            return redirect()->route('health.setup.import')
+                ->with($result['failed'] > 0 ? 'warning' : 'success', $message)
+                ->with('importMessages', $result['messages'])
+                ->with('importCredentials', $result['credentials']);
+        } finally {
+            $this->releaseCommitClaim($claim);
+        }
     }
 
     /** Throw the stored file away without importing it. */
@@ -248,6 +270,43 @@ class HealthSetupImportController extends HealthPanelController
         $safe = preg_match('/^[a-z0-9]{32}$/', $token) ? $token : 'invalid';
 
         return Onboarding::DISK_DIRECTORY . '/' . $this->company()->id . '/' . $safe . '-review.json';
+    }
+
+    /**
+     * Atomically claim one reviewed workbook for commit.
+     *
+     * @return resource|null Open handle owned by this request, or null when
+     *                       another request already owns the commit.
+     */
+    private function claimCommit(string $token)
+    {
+        $safe = preg_match('/^[a-z0-9]{32}$/', $token) ? $token : 'invalid';
+        $relative = Onboarding::DISK_DIRECTORY . '/' . $this->company()->id . '/' . $safe . '-commit.lock';
+        $absolute = Storage::disk('local')->path($relative);
+
+        $handle = @fopen($absolute, 'x');
+        if ($handle === false) {
+            return null;
+        }
+
+        fwrite($handle, json_encode([
+            'claimed_at' => now()->toIso8601String(),
+            'actor_id' => (int) ($this->user()?->id ?? 0),
+        ]));
+
+        return $handle;
+    }
+
+    /** @param resource $handle */
+    private function releaseCommitClaim($handle): void
+    {
+        $metadata = stream_get_meta_data($handle);
+        $path = $metadata['uri'] ?? null;
+        fclose($handle);
+
+        if (is_string($path) && $path !== '') {
+            @unlink($path);
+        }
     }
 
     /** Record that the preview rendered, and for which file exactly. */

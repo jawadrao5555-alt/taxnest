@@ -146,6 +146,8 @@ jobs:
         run: bash scripts/rc-safe-run -- vendor/bin/phpunit tests/Feature/Reporting tests/Feature/AgentHeartbeatUpdateTelemetryClearTest.php --testdox
       - name: Check purchased billing and companion access before the full suite
         run: bash scripts/rc-safe-run -- vendor/bin/phpunit tests/Feature/DiApiSubscriptionAccessTest.php tests/Feature/PurchasedCompanionAccessTest.php tests/Feature/SubscriptionPurchaseSnapshotTest.php tests/Feature/VerifiedSubscriptionDocumentsTest.php tests/Feature/SubscriptionFinancialAdjustmentTest.php tests/Feature/PosPaidAddonFlowTest.php tests/Feature/PosRenewalBranchSlotReviewTest.php tests/Feature/PaidRenewalSchemaTest.php --testdox
+      - name: Check security, support and restored-session boundaries
+        run: bash scripts/rc-safe-run -- vendor/bin/phpunit tests/Feature/Auth tests/Feature/AdminBillingCapabilityTest.php tests/Feature/AdminPosFeaturesStaleFormGuardTest.php tests/Feature/AdminReleaseCapabilityTest.php tests/Feature/AdminSensitiveSettingsCapabilityTest.php tests/Feature/RestoreSessionBoundaryTest.php tests/Feature/RestoreSecurityQuarantineTest.php tests/Feature/SupportCaseLinksTest.php tests/Feature/SupportCaseLifecycleSchemaTest.php tests/Feature/AdminSupportInboxSmokeTest.php tests/Feature/OnboardingCompletionSafetyTest.php --testdox
       - name: Check DI cycles, packing, proof versions and medicine source ordering
         run: bash scripts/rc-safe-run -- vendor/bin/phpunit tests/Feature/DiBillingCyclesTest.php tests/Feature/DiSellingPackingTest.php tests/Feature/DiIntegrityCoverageTest.php tests/Feature/MedicineSourceOrderingTest.php tests/Feature/MedicineCatalogueTest.php --testdox
       - name: Check DI billing compatibility and historical invoice rendering
@@ -303,6 +305,18 @@ jobs:
           RC_BROWSER_PORT: '5911'
           RC_BROWSER_STATE_ROOT: /tmp/taxnest-rc-browser-${{ github.run_id }}-${{ github.job }}
         run: RC_BROWSER_ONLY=staff-discount-approval bash scripts/rc-browser-fixture.sh run
+      - name: Verify password recovery and onboarding at desktop and 390px
+        env:
+          RC_MARIADB_PORT: '33117'
+          RC_BROWSER_PORT: '5911'
+          RC_BROWSER_STATE_ROOT: /tmp/taxnest-rc-browser-${{ github.run_id }}-${{ github.job }}
+        run: |
+          RC_BROWSER_ONLY=security-onboarding bash scripts/rc-browser-fixture.sh run
+          RC_BROWSER_ONLY=restore-session-boundary bash scripts/rc-browser-fixture.sh run
+          bash scripts/rc-browser-fixture.sh stop
+          # stop removes the entire disposable state, including its pinned browser cache.
+          bash scripts/rc-playwright-install.sh
+          bash scripts/rc-browser-fixture.sh setup
       - name: Seed and verify authenticated Smart DI source import
         id: browser-preflight
         env:

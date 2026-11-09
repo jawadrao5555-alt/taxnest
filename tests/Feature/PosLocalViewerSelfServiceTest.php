@@ -71,6 +71,7 @@ class PosLocalViewerSelfServiceTest extends TestCase
             $table->string('pos_role')->nullable();
             $table->boolean('is_active')->default(true);
             $table->boolean('dark_mode')->default(false);
+            $table->uuid('session_generation')->nullable();
             $table->rememberToken();
             $table->timestamps();
         });
@@ -458,6 +459,73 @@ class PosLocalViewerSelfServiceTest extends TestCase
         // …and the owner can manage it (it is one shared list, not two).
         $this->actingAs($this->ownerA, 'pos')->post("/pos/local-bills/viewers/{$viewer->id}/toggle")->assertRedirect();
         $this->assertFalse((bool) $viewer->fresh()->is_active);
+    }
+
+    public function test_password_reset_revokes_only_the_viewers_existing_browser_session(): void
+    {
+        $viewer = $this->seedViewer($this->companyA, 'revoked-viewer@t.test', 'Viewer@12345');
+        $other = $this->seedViewer($this->companyA, 'other-viewer@t.test', 'Viewer@12345');
+        $viewer->forceFill(['session_generation' => '11111111-1111-4111-8111-111111111111'])->save();
+        $other->forceFill(['session_generation' => '22222222-2222-4222-8222-222222222222'])->save();
+        $oldGeneration = $viewer->session_generation;
+
+        $this->actingAs($viewer, 'pos')->withSession([
+            \App\Http\Middleware\CompanySessionGeneration::key('pos') => [
+                'user_id' => $viewer->id,
+                'generation' => $oldGeneration,
+            ],
+        ])->get('/pos/local-bills')->assertOk();
+
+        $this->actingAs($this->superAdmin, 'admin')
+            ->put("/admin/companies/{$this->companyA}/local-viewer/{$viewer->id}", [
+                'name' => 'Viewer',
+                'email' => 'revoked-viewer@t.test',
+                'password' => 'Reset@98765',
+            ])->assertRedirect();
+
+        $viewer->refresh();
+        $this->assertNotSame($oldGeneration, $viewer->session_generation);
+        $this->assertSame('22222222-2222-4222-8222-222222222222', $other->fresh()->session_generation);
+
+        // Recreate the already-open viewer browser. Middleware must stop the
+        // stale generation before the read-only controller runs.
+        $this->actingAs($viewer, 'pos')->withSession([
+            \App\Http\Middleware\CompanySessionGeneration::key('pos') => [
+                'user_id' => $viewer->id,
+                'generation' => $oldGeneration,
+            ],
+        ])->get('/pos/local-bills')->assertRedirect('/pos/login');
+        $this->assertGuest('pos');
+
+        // A fresh generation works, and the separate viewer stays intact.
+        $this->actingAs($viewer->fresh(), 'pos')->withSession([
+            \App\Http\Middleware\CompanySessionGeneration::key('pos') => [
+                'user_id' => $viewer->id,
+                'generation' => $viewer->session_generation,
+            ],
+        ])->get('/pos/local-bills')->assertOk();
+        $this->assertTrue((bool) $other->fresh()->is_active);
+    }
+
+    public function test_owner_password_reset_rotates_generation_but_profile_only_edit_does_not(): void
+    {
+        $viewer = $this->seedViewer($this->companyA, 'owner-reset-viewer@t.test', 'Viewer@12345');
+        $viewer->forceFill(['session_generation' => '33333333-3333-4333-8333-333333333333'])->save();
+
+        $this->actingAs($this->ownerA, 'pos')
+            ->put("/pos/local-bills/viewers/{$viewer->id}", [
+                'name' => 'Renamed only',
+                'email' => 'owner-reset-viewer@t.test',
+            ])->assertRedirect();
+        $this->assertSame('33333333-3333-4333-8333-333333333333', $viewer->fresh()->session_generation);
+
+        $this->actingAs($this->ownerA, 'pos')
+            ->put("/pos/local-bills/viewers/{$viewer->id}", [
+                'name' => 'Renamed only',
+                'email' => 'owner-reset-viewer@t.test',
+                'password' => 'OwnerReset@98765',
+            ])->assertRedirect();
+        $this->assertNotSame('33333333-3333-4333-8333-333333333333', $viewer->fresh()->session_generation);
     }
 
     public function test_the_owners_section_stays_invisible_to_the_manager(): void

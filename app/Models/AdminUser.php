@@ -18,4 +18,82 @@ class AdminUser extends Authenticatable
     {
         return $this->role === 'super_admin';
     }
+
+    public function canManageBilling(): bool
+    {
+        // Preserve the established default admin role as well as the owner.
+        // Support/viewer and unmapped roles are not financial write grants.
+        return in_array($this->role, ['admin', 'super_admin'], true);
+    }
+
+    public function canManageCompanyLifecycle(): bool
+    {
+        // Company rejection/suspension/bin/purge changes customer access or
+        // destroys operational rows.  Keep the established administrator
+        // roles, but never let support/viewer/unmapped roles inherit that
+        // authority merely because they have an admin-panel session.
+        return in_array($this->role, ['admin', 'super_admin'], true);
+    }
+
+    public function canManageRelease(): bool
+    {
+        // Publishing customer notices and changing tutorial visibility/gates
+        // changes the customer-facing release.  A support/viewer session may
+        // inspect history, but it is not release authority.
+        return in_array($this->role, ['admin', 'super_admin'], true);
+    }
+
+    public function canManageSensitiveConfiguration(): bool
+    {
+        // Global destinations, SMTP/WhatsApp credentials, AI models and app
+        // version switches can disclose infrastructure details or change
+        // customer-facing behaviour.  Support/viewer sessions stay read-only.
+        return in_array($this->role, ['admin', 'super_admin'], true);
+    }
+
+    public static function requireBillingAdministrator(): self
+    {
+        $actor = auth('admin')->user();
+        $current = $actor instanceof self ? $actor->fresh() : null;
+        abort_unless($current && $current->canManageBilling(), 403, 'Billing changes require an administrator.');
+
+        return $current;
+    }
+
+    public static function requireCompanyLifecycleAdministrator(): self
+    {
+        $actor = auth('admin')->user();
+        $current = $actor instanceof self ? $actor->fresh() : null;
+        abort_unless($current && $current->canManageCompanyLifecycle(), 403, 'Company lifecycle changes require an administrator.');
+
+        return $current;
+    }
+
+    public static function requireReleaseAdministrator(): self
+    {
+        $actor = auth('admin')->user();
+        $current = $actor instanceof self ? $actor->fresh() : null;
+        abort_unless($current && $current->canManageRelease(), 403, 'Release changes require an administrator.');
+
+        return $current;
+    }
+
+    public static function requireSensitiveConfigurationAdministrator(): self
+    {
+        $actor = auth('admin')->user();
+        $current = $actor instanceof self ? $actor->fresh() : null;
+        abort_unless($current && $current->canManageSensitiveConfiguration(), 403,
+            'Sensitive configuration changes require an administrator.');
+
+        return $current;
+    }
+
+    public static function requireSuperAdministrator(): self
+    {
+        $actor = auth('admin')->user();
+        $current = $actor instanceof self ? $actor->fresh() : null;
+        abort_unless($current && $current->isSuperAdmin(), 403, 'Super admin only.');
+
+        return $current;
+    }
 }

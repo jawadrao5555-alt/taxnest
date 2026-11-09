@@ -51,7 +51,9 @@ class AppUpdateController extends Controller
         $featureOn = SystemSetting::get('pos_whats_new_enabled', '1') === '1';
         $filtersActive = $q !== '' || in_array($status, ['published', 'hidden'], true) || $request->filled('from') || $request->filled('to');
 
-        return view('admin.app-updates', compact('updates', 'featureOn', 'filtersActive'));
+        $canManageRelease = auth('admin')->user()?->fresh()?->canManageRelease() ?? false;
+
+        return view('admin.app-updates', compact('updates', 'featureOn', 'filtersActive', 'canManageRelease'));
     }
 
     /** Actual current recipient companies for the existing POS category picker. */
@@ -90,6 +92,8 @@ class AppUpdateController extends Controller
 
     public function store(Request $request)
     {
+        \App\Models\AdminUser::requireReleaseAdministrator();
+
         $request->validate([
             'title' => 'required|string|max:150',
             'points_text' => 'required|string|max:3000',
@@ -158,6 +162,8 @@ class AppUpdateController extends Controller
 
     public function update(Request $request, $id)
     {
+        \App\Models\AdminUser::requireReleaseAdministrator();
+
         $appUpdate = AppUpdate::findOrFail($id);
 
         $request->validate([
@@ -221,6 +227,8 @@ class AppUpdateController extends Controller
 
     public function toggle($id)
     {
+        \App\Models\AdminUser::requireReleaseAdministrator();
+
         $appUpdate = AppUpdate::findOrFail($id);
         $publishing = !$appUpdate->is_published;
 
@@ -273,6 +281,8 @@ class AppUpdateController extends Controller
      */
     public function reannounce($id)
     {
+        \App\Models\AdminUser::requireReleaseAdministrator();
+
         $appUpdate = AppUpdate::findOrFail($id);
         $this->restartLiveWindow($appUpdate);
 
@@ -313,6 +323,8 @@ class AppUpdateController extends Controller
 
     public function destroy($id)
     {
+        \App\Models\AdminUser::requireReleaseAdministrator();
+
         $appUpdate = AppUpdate::findOrFail($id);
         if (\Illuminate\Support\Facades\Schema::hasColumn('app_updates', 'archived_at')) {
             $group = AppUpdate::whereKey($appUpdate->id);
@@ -356,6 +368,8 @@ class AppUpdateController extends Controller
 
     public function toggleFeature()
     {
+        \App\Models\AdminUser::requireReleaseAdministrator();
+
         $on = SystemSetting::get('pos_whats_new_enabled', '1') === '1';
         SystemSetting::set('pos_whats_new_enabled', $on ? '0' : '1', 'POS What\'s New notifications (popup + bell) master switch');
 

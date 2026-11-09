@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\HsCodeMapping;
 use App\Models\HsMappingResponse;
+use App\Models\AdminUser;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Response;
@@ -12,6 +13,8 @@ class HsCodeMappingController extends Controller
 {
     public function index(Request $request)
     {
+        $currentAdmin = auth('admin')->user()?->fresh();
+        $canManageSensitiveConfiguration = (bool) $currentAdmin?->canManageSensitiveConfiguration();
         $search = $request->get('search', '');
         $saleTypeFilter = $request->get('sale_type', '');
         $statusFilter = $request->get('status', '');
@@ -67,11 +70,13 @@ class HsCodeMappingController extends Controller
             $historyData = $this->getHistoryData($request);
         }
 
-        return view('admin.hs-mapping-engine', compact('mappings', 'stats', 'search', 'saleTypeFilter', 'statusFilter', 'tab', 'analyticsData', 'historyData'));
+        return view('admin.hs-mapping-engine', compact('mappings', 'stats', 'search', 'saleTypeFilter', 'statusFilter', 'tab', 'analyticsData', 'historyData', 'canManageSensitiveConfiguration'));
     }
 
     public function store(Request $request)
     {
+        AdminUser::requireSensitiveConfigurationAdministrator();
+
         $validated = $request->validate([
             'hs_code' => 'required|string|max:20',
             'label' => 'nullable|string|max:255',
@@ -119,6 +124,8 @@ class HsCodeMappingController extends Controller
 
     public function update(Request $request, $id)
     {
+        AdminUser::requireSensitiveConfigurationAdministrator();
+
         $mapping = HsCodeMapping::findOrFail($id);
         $oldValues = $mapping->toArray();
 
@@ -164,6 +171,8 @@ class HsCodeMappingController extends Controller
 
     public function destroy($id)
     {
+        AdminUser::requireSensitiveConfigurationAdministrator();
+
         $mapping = HsCodeMapping::findOrFail($id);
         $this->logAudit($mapping->id, 'deleted', null, null, null, $mapping->toArray());
         $mapping->delete();
@@ -173,6 +182,8 @@ class HsCodeMappingController extends Controller
 
     public function duplicate($id)
     {
+        AdminUser::requireSensitiveConfigurationAdministrator();
+
         $original = HsCodeMapping::findOrFail($id);
         $clone = $original->replicate();
         $clone->label = ($clone->label ? $clone->label . ' (Copy)' : 'Copy');
@@ -218,6 +229,8 @@ class HsCodeMappingController extends Controller
 
     public function importCsv(Request $request)
     {
+        AdminUser::requireSensitiveConfigurationAdministrator();
+
         $request->validate([
             'csv_file' => 'required|file|mimes:csv,txt|max:5120',
         ]);

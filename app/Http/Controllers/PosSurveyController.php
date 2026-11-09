@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AdminUser;
 use App\Models\Survey;
 use App\Models\SurveyResponse;
 use App\Models\SystemSetting;
@@ -160,12 +161,14 @@ class PosSurveyController extends Controller
         ])->orderByDesc('created_at')->paginate(15);
 
         $featureOn = SystemSetting::get('pos_surveys_enabled', '1') === '1';
+        $canManageRelease = auth('admin')->user()?->fresh()?->canManageRelease() ?? false;
 
-        return view('admin.surveys', compact('surveys', 'featureOn'));
+        return view('admin.surveys', compact('surveys', 'featureOn', 'canManageRelease'));
     }
 
     public function adminShow($id, Request $request)
     {
+        $canManageRelease = auth('admin')->user()?->fresh()?->canManageRelease() ?? false;
         $survey = Survey::findOrFail($id);
         $request->validate(['company_id' => 'nullable|integer|min:1', 'answered' => 'nullable|in:yes,no']);
         $responses = $survey->responses()->with(['user:id,name', 'company:id,name,restaurant_mode'])
@@ -201,7 +204,7 @@ class PosSurveyController extends Controller
         $pendingCount = max(0, $eligibleCount - $answeredScope->distinct()->count(($survey->response_policy ?? 'user') === 'company' ? 'company_id' : 'user_id'));
 
         return view('admin.survey-results', compact(
-            'eligibleCount', 'pendingCount', 'survey', 'stats', 'comments', 'seenCompanies', 'answeredCompanies', 'responses', 'answered'
+            'eligibleCount', 'pendingCount', 'survey', 'stats', 'comments', 'seenCompanies', 'answeredCompanies', 'responses', 'answered', 'canManageRelease'
         ));
     }
 
@@ -228,6 +231,7 @@ class PosSurveyController extends Controller
     /** Create a new survey (draft or immediately published). */
     public function adminStore(\Illuminate\Http\Request $request)
     {
+        AdminUser::requireReleaseAdministrator();
         $validated = $request->validate([
             'title' => 'required|string|max:200',
             'intro' => 'nullable|string|max:1000',
@@ -262,6 +266,8 @@ class PosSurveyController extends Controller
     /** Update an existing survey. Blocked once published AND responses exist. */
     public function adminUpdate(\Illuminate\Http\Request $request, $id)
     {
+        AdminUser::requireReleaseAdministrator();
+
         return \Illuminate\Support\Facades\DB::transaction(function () use ($request, $id) {
             $survey = Survey::whereKey($id)->lockForUpdate()->firstOrFail();
             $hasResponses = $survey->responses()->exists();
@@ -305,6 +311,8 @@ class PosSurveyController extends Controller
     /** Delete a survey — only allowed if no responses exist. */
     public function adminDestroy($id)
     {
+        AdminUser::requireReleaseAdministrator();
+
         return \Illuminate\Support\Facades\DB::transaction(function () use ($id) {
             $survey = Survey::whereKey($id)->lockForUpdate()->firstOrFail();
             if ($survey->responses()->exists()) {
@@ -400,6 +408,7 @@ class PosSurveyController extends Controller
     /** Close (stop showing on POS, keep results) or reopen. */
     public function toggleClose($id)
     {
+        AdminUser::requireReleaseAdministrator();
         $survey = Survey::findOrFail($id);
         $survey->update(['closed_at' => $survey->closed_at ? null : now()]);
 
@@ -409,6 +418,7 @@ class PosSurveyController extends Controller
     /** Master kill switch for ALL survey popups/pills (same convention as What's New). */
     public function toggleFeature()
     {
+        AdminUser::requireReleaseAdministrator();
         $on = SystemSetting::get('pos_surveys_enabled', '1') === '1';
         SystemSetting::set('pos_surveys_enabled', $on ? '0' : '1', 'POS survey popups master switch');
 

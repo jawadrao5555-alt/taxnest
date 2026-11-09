@@ -215,6 +215,10 @@ class MadadgarController extends Controller
 
     public function adminChats(Request $request)
     {
+        $actor = auth('admin')->user();
+        $currentActor = $actor instanceof \App\Models\AdminUser ? $actor->fresh() : null;
+        $canManageSensitiveConfiguration = (bool) $currentActor?->canManageSensitiveConfiguration();
+
         $sessions = MadadgarMessage::selectRaw('session_id, company_id, user_id, COUNT(*) as msg_count, MAX(created_at) as last_at, MAX(escalation_id) as any_escalation')
             ->groupBy('session_id', 'company_id', 'user_id')
             ->orderByDesc('last_at')
@@ -238,11 +242,14 @@ class MadadgarController extends Controller
             }
         }
 
-        $keySource = 'none';
-        if (\App\Models\SystemSetting::get(MadadgarService::SETTING_KEY_ENC)) {
-            $keySource = 'admin';
-        } elseif (trim((string) config('services.openai.key')) !== '') {
-            $keySource = 'env';
+        $keySource = 'restricted';
+        if ($canManageSensitiveConfiguration) {
+            $keySource = 'none';
+            if (\App\Models\SystemSetting::get(MadadgarService::SETTING_KEY_ENC)) {
+                $keySource = 'admin';
+            } elseif (trim((string) config('services.openai.key')) !== '') {
+                $keySource = 'env';
+            }
         }
 
         // Answer-source totals (owner: "kharcha bachy" — show the saving).
@@ -275,11 +282,13 @@ class MadadgarController extends Controller
             'botLive' => MadadgarService::enabled(),
             'botMode' => MadadgarService::mode(),
             'sourceStats' => $sourceStats,
+            'canManageSensitiveConfiguration' => $canManageSensitiveConfiguration,
         ]);
     }
 
     public function adminSettings(Request $request)
     {
+        \App\Models\AdminUser::requireSensitiveConfigurationAdministrator();
         $request->validate([
             'enabled' => 'required|in:0,1',
             'mode' => 'required|in:hybrid,local,openai',

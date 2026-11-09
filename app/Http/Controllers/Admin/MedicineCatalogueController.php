@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\AdminUser;
 use App\Models\AdminAuditLog;
 use App\Models\MedicineCatalogueEntry;
 use App\Models\MedicineCataloguePrice;
@@ -129,6 +130,8 @@ class MedicineCatalogueController extends Controller
     /** "Sync from DRAP" — idempotent: a second press returns the same run. */
     public function startSync(Request $request)
     {
+        AdminUser::requireSensitiveConfigurationAdministrator();
+
         if (!MedicineCatalogueSyncService::tablesReady()) {
             return back()->with('error', 'Catalogue tables are missing — run migrations first.');
         }
@@ -143,6 +146,8 @@ class MedicineCatalogueController extends Controller
 
     public function cancelSync()
     {
+        AdminUser::requireSensitiveConfigurationAdministrator();
+
         $run = MedicineCatalogueSync::active();
         if (!$run) {
             return back()->with('error', 'No active sync to cancel.');
@@ -156,6 +161,8 @@ class MedicineCatalogueController extends Controller
     /** Inline edit of one row's parsed/descriptive fields (+ optional explicit MRP change). */
     public function update(Request $request, int $id)
     {
+        AdminUser::requireSensitiveConfigurationAdministrator();
+
         $entry = MedicineCatalogueEntry::findOrFail($id);
         $data = $request->validate([
             'brand_name' => 'required|string|max:250',
@@ -201,6 +208,8 @@ class MedicineCatalogueController extends Controller
     /** Add one supplementary row by hand (source = manual). */
     public function store(Request $request)
     {
+        AdminUser::requireSensitiveConfigurationAdministrator();
+
         $data = $request->validate([
             'brand_name' => 'required|string|max:250',
             'composition' => 'nullable|string|max:2000',
@@ -224,6 +233,8 @@ class MedicineCatalogueController extends Controller
      */
     public function import(Request $request)
     {
+        AdminUser::requireSensitiveConfigurationAdministrator();
+
         $request->validate([
             'file' => 'required|file|mimes:xlsx,xls,csv,txt|max:10240',
             'overwrite_drap_mrp' => 'nullable|boolean',

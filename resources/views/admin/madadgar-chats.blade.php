@@ -33,13 +33,20 @@
                                 @endif
                             </span>
                             — Key source:
-                            @if($keySource === 'admin') Admin panel (encrypted)
+                            @if(!$canManageSensitiveConfiguration) restricted
+                            @elseif($keySource === 'admin') Admin panel (encrypted)
                             @elseif($keySource === 'env') Server .env
                             @else <span class="{{ $botMode === 'openai' ? 'text-red-600' : '' }}">none @if($botMode !== 'openai')(local mode ko zaroorat nahi)@endif</span>
                             @endif
                         </p>
                     </div>
                 </div>
+                @unless($canManageSensitiveConfiguration)
+                    <div class="px-5 py-4 text-sm text-amber-800 bg-amber-50 dark:bg-amber-900/20 dark:text-amber-200">
+                        Madadgar configuration is read-only for this account. API key location and write controls are restricted.
+                    </div>
+                @endunless
+                @if($canManageSensitiveConfiguration)
                 <form method="POST" action="{{ route('admin.madadgar-settings') }}" class="px-5 py-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 items-end">
                     @csrf
                     <div>
@@ -69,6 +76,7 @@
                         <button type="submit" class="px-5 py-2.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-sm font-bold transition cursor-pointer">Save Settings</button>
                     </div>
                 </form>
+                @endif
             </div>
 
             {{-- Answer-source totals (kharcha bachat) --}}

@@ -14,6 +14,12 @@
             <span class="font-semibold">Feature gate</span> = inside company logins, only subscriptions that include this feature see the video ("Everyone" = core feature, all companies).
         </div>
 
+        @unless($canManageRelease)
+            <div class="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl px-4 py-3 text-sm text-amber-900 dark:text-amber-200" role="status">
+                Tutorial release controls are read-only for this account. An administrator must change publication, audience, feature or role gates.
+            </div>
+        @endunless
+
         <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-x-auto">
             <table class="w-full text-sm">
                 <thead>
@@ -45,6 +51,7 @@
                         </td>
                         <td class="px-4 py-3 text-gray-600 dark:text-gray-300 whitespace-nowrap">{{ \App\Models\TutorialVideo::CATEGORIES[$v->category] ?? ucfirst((string) $v->category) }}</td>
                         <td class="px-4 py-3">
+                            @if($canManageRelease)
                             <form method="POST" action="/admin/tutorial-videos/{{ $v->id }}/gate" class="flex items-center gap-1.5">
                                 @csrf
                                 <select name="required_feature" class="text-xs rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 py-1.5 pr-7">
@@ -60,10 +67,14 @@
                                 </select>
                                 <button type="submit" class="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200">Set</button>
                             </form>
+                            @else
+                                <span class="text-xs text-gray-600 dark:text-gray-300">{{ $gateOptions[$v->required_feature] ?? 'Everyone (core)' }} · {{ $audienceOptions[$v->audience_family] ?? $audienceOptions['all'] }}</span>
+                            @endif
                         </td>
                         <td class="px-4 py-3">
                             {{-- ZFC (5 Aug 2026): staff role tier — waiter/kitchen/rider ko
                                  sirf 'Everyone' videos dikhti hain (PRA/settings unse chhupi). --}}
+                            @if($canManageRelease)
                             <form method="POST" action="/admin/tutorial-videos/{{ $v->id }}/role" class="flex items-center gap-1.5">
                                 @csrf
                                 <select name="min_role" class="text-xs rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 py-1.5 pr-7">
@@ -78,22 +89,33 @@
                                 </select>
                                 <button type="submit" class="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200">Set</button>
                             </form>
+                            @else
+                                <span class="text-xs text-gray-600 dark:text-gray-300">{{ $roleOptions[$v->min_role ?? 'any'] ?? $roleOptions['any'] }} · {{ $audienceOptions[$v->audience_family] ?? $audienceOptions['all'] }}</span>
+                            @endif
                         </td>
                         <td class="px-4 py-3">
+                            @if($canManageRelease)
                             <form method="POST" action="/admin/tutorial-videos/{{ $v->id }}/toggle-public" class="inline">
                                 @csrf
                                 <button type="submit" class="px-2.5 py-1.5 rounded-lg text-xs font-medium {{ $v->show_public ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300 hover:bg-green-200' : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200' }}">
                                     {{ $v->show_public ? 'Visible' : 'Hidden' }}
                                 </button>
                             </form>
+                            @else
+                                <span class="text-xs {{ $v->show_public ? 'text-green-700 dark:text-green-300' : 'text-gray-500 dark:text-gray-400' }}">{{ $v->show_public ? 'Visible' : 'Hidden' }}</span>
+                            @endif
                         </td>
                         <td class="px-4 py-3">
+                            @if($canManageRelease)
                             <form method="POST" action="/admin/tutorial-videos/{{ $v->id }}/toggle-published" class="inline">
                                 @csrf
                                 <button type="submit" class="px-2.5 py-1.5 rounded-lg text-xs font-medium {{ $v->is_published ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300 hover:bg-green-200' : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 hover:bg-amber-200' }}">
                                     {{ $v->is_published ? 'Published' : 'Unpublished' }}
                                 </button>
                             </form>
+                            @else
+                                <span class="text-xs {{ $v->is_published ? 'text-green-700 dark:text-green-300' : 'text-amber-700 dark:text-amber-300' }}">{{ $v->is_published ? 'Published' : 'Unpublished' }}</span>
+                            @endif
                         </td>
                     </tr>
                     @empty

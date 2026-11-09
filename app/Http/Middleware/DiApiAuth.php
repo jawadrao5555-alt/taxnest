@@ -57,7 +57,7 @@ class DiApiAuth
                 'message' => 'This company account is suspended. Contact TaxNest support.',
             ], 403);
         }
-        if ($company->status === 'rejected') {
+        if ($company->status === 'rejected' || $company->company_status === 'rejected') {
             return response()->json([
                 'status' => 'error',
                 'error' => 'company_rejected',
@@ -69,6 +69,13 @@ class DiApiAuth
                 'status' => 'error',
                 'error' => 'company_pending_approval',
                 'message' => 'This company is pending admin approval. API access is enabled after approval.',
+            ], 403);
+        }
+        if ($company->status === 'inactive' || $company->company_status === 'inactive') {
+            return response()->json([
+                'status' => 'error',
+                'error' => 'company_inactive',
+                'message' => 'This company account is inactive. Contact TaxNest support.',
             ], 403);
         }
 

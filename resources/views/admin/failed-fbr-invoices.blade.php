@@ -9,6 +9,10 @@
     <div class="py-8">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
 
+            @unless($canManageSensitiveConfiguration)
+                <div class="bg-amber-50 border border-amber-300 text-amber-900 rounded-lg p-4">Failed-invoice evidence is read-only for this account; no retry can be queued.</div>
+            @endunless
+
             @if(!$flagEnabled)
                 <div class="bg-amber-50 border border-amber-300 text-amber-900 rounded-lg p-4">
                     <strong>Feature flag OFF.</strong> Set <code>FEATURE_FBR_RETRY_SYSTEM=true</code> in your environment to enable retry actions. Currently view-only.
@@ -73,11 +77,13 @@
                                     {{ \Illuminate\Support\Str::limit($errorByInvoice[$inv->id] ?? '—', 80) }}
                                 </td>
                                 <td class="px-3 py-2 text-sm">
-                                    @if($flagEnabled && ($inv->retry_count ?? 0) < 3)
+                                    @if($canManageSensitiveConfiguration && $flagEnabled && ($inv->retry_count ?? 0) < 3)
                                         <form method="POST" action="/admin/fbr/retry/{{ $inv->id }}" class="inline">
                                             @csrf
                                             <button type="submit" class="px-3 py-1 bg-emerald-600 text-white text-xs rounded hover:bg-emerald-700">Retry</button>
                                         </form>
+                                    @elseif(!$canManageSensitiveConfiguration)
+                                        <span class="text-xs text-gray-400">read only</span>
                                     @elseif(!$flagEnabled)
                                         <span class="text-xs text-gray-400">disabled</span>
                                     @else

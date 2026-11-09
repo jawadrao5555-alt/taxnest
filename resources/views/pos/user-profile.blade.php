@@ -7,6 +7,7 @@
     <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-2">{{ __('pos.my_profile') }}</h1>
     <p class="text-sm text-gray-500 dark:text-gray-400 mb-6">{{ __('pos.my_profile_sub') }}</p>
 
+    <p class="mb-4"><a class="text-purple-700 underline" href="{{ route('two-step.settings',['panel'=>'pos']) }}">Two-step login</a></p>
     @if(session('success'))
     <div class="mb-4 p-3 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 text-sm border border-emerald-200 dark:border-emerald-800">{{ session('success') }}</div>
     @endif

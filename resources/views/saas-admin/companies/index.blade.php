@@ -1,4 +1,5 @@
 <x-admin-layout>
+@php $canManageCompanyLifecycle = (bool) auth('admin')->user()?->fresh()?->canManageCompanyLifecycle(); @endphp
 <div class="p-4 sm:p-6 max-w-7xl mx-auto tn-company-directory" data-company-directory>
     <div class="flex items-center justify-between mb-6">
         <h1 class="text-2xl font-bold text-white">Companies</h1>
@@ -100,6 +101,9 @@
                             </span>
                             @endif
                             <p class="tn-directory-owner text-xs text-gray-600 dark:text-gray-400">{{ $company->owner_name ?? '' }}</p>
+                            @if($deletionRequest = ($deletionRequests[$company->id] ?? null))
+                            <span class="inline-flex items-center mt-1 px-1.5 py-0.5 rounded bg-red-900/30 text-red-300 text-xs font-semibold">Deletion request #{{ $deletionRequest->id }} &middot; {{ str_replace('_', ' ', $deletionRequest->status) }}</span>
+                            @endif
                             {{-- Package picked at registration — what approval will activate for 1 year --}}
                             @php $requestedPackage = \App\Services\RequestedPackageService::pendingSummary($company); @endphp
                             @if($requestedPackage)
@@ -116,6 +120,7 @@
                         <td class="px-4 py-3 text-gray-500 dark:text-gray-400 text-xs hidden sm:table-cell">{{ $company->created_at->format('d M Y') }}</td>
                         <td class="px-4 py-3 text-center">
                             <div class="tn-directory-actions flex items-center justify-center gap-1">
+                                @if($canManageCompanyLifecycle)
                                 @if($company->status === 'pending')
                                 <form method="POST" action="{{ route('saas.admin.companies.approve', $company->id) }}" class="inline">@csrf<button class="px-2 py-1 bg-emerald-600/20 text-emerald-400 text-xs rounded hover:bg-emerald-600/40 transition">Approve</button></form>
                                 <form method="POST" action="{{ route('saas.admin.companies.reject', $company->id) }}" class="inline">@csrf<button class="px-2 py-1 bg-red-600/20 text-red-400 text-xs rounded hover:bg-red-600/40 transition">Reject</button></form>
@@ -123,6 +128,7 @@
                                 <a href="{{ route('saas.admin.companies.show', $company->id) }}#company-access-actions" class="px-2 py-1 bg-amber-600/20 text-amber-400 text-xs rounded hover:bg-amber-600/40 transition">Suspend</a>
                                 @elseif($company->status === 'suspended' || $company->status === 'rejected')
                                 <a href="{{ route('saas.admin.companies.show', $company->id) }}#company-access-actions" class="px-2 py-1 bg-emerald-600/20 text-emerald-400 text-xs rounded hover:bg-emerald-600/40 transition">Activate</a>
+                                @endif
                                 @endif
                                 <a href="{{ route('saas.admin.companies.show', $company->id) }}" class="px-2 py-1 bg-indigo-600/20 text-indigo-400 text-xs rounded hover:bg-indigo-600/40 transition">View</a>
                             </div>

@@ -534,6 +534,36 @@ class ConsultantConsoleTest extends TestCase
         $this->assertFalse(session()->has(ConsultantService::SESSION_KEY));
     }
 
+    public function test_disabled_consultant_account_ends_switched_session_on_next_request(): void
+    {
+        [$consultant] = $this->makeConsultant();
+        $client = $this->makeCompany();
+        $clientAdmin = $this->makeAdmin($client);
+
+        ConsultantClientLink::create([
+            'consultant_user_id' => $consultant->id,
+            'company_id' => $client->id,
+            'status' => 'active',
+        ]);
+
+        $this->actingAs($consultant)->post("/consultant/switch/{$client->id}")->assertRedirect('/dashboard');
+        $this->assertAuthenticatedAs($clientAdmin->fresh());
+
+        // An administrator disables the ORIGINAL consultant account while the
+        // browser is authenticated as the client's user. The retained active
+        // link/profile must not keep this delegated session alive.
+        $consultant->update(['is_active' => false]);
+
+        $this->get('/dashboard')->assertRedirect('/login');
+        $this->assertGuest('web');
+        $this->assertFalse(session()->has(ConsultantService::SESSION_KEY));
+        $this->assertDatabaseHas('audit_logs', [
+            'action' => 'consultant_switch_out',
+            'company_id' => $client->id,
+            'user_id' => $consultant->id,
+        ]);
+    }
+
     // ── 4. Invite codes: single-use, expiring, client-generated ─────────
 
     public function test_invite_code_redeem_links_and_is_single_use(): void

@@ -13,6 +13,10 @@ class AdminAuth
             return redirect()->guest('/admin/login');
         }
 
-        return $next($request);
+        // Exiting a delegated session must remain reachable even without its factor.
+        if ($request->routeIs('saas.admin.impersonation.stop')) {
+            return $next($request);
+        }
+        return \App\Services\TwoStepLogin::challenge($request, 'admin') ?? $next($request);
     }
 }

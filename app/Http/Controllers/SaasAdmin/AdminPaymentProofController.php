@@ -53,6 +53,7 @@ class AdminPaymentProofController extends Controller
 
     public function approve(Request $request, $id)
     {
+        \App\Models\AdminUser::requireBillingAdministrator();
         $proof = PaymentProof::with('pricingPlan')->findOrFail($id);
 
         // Extra-branch add-on request: apna raasta — SIRF slots barhte hain.
@@ -663,6 +664,7 @@ class AdminPaymentProofController extends Controller
 
     public function reject(Request $request, $id)
     {
+        \App\Models\AdminUser::requireBillingAdministrator();
         $request->validate([
             'reject_reason' => 'nullable|string|max:255',
         ]);

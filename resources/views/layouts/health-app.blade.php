@@ -204,6 +204,7 @@
                         <div class="sm:hidden px-3 py-2 border-b border-gray-200 dark:border-gray-700">
                             <x-branch-switcher color="emerald" :showManage="false" :allowAll="true" />
                         </div>
+                        <a class="block px-4 py-2.5 text-sm font-bold" href="{{ route('two-step.settings',['panel'=>'health']) }}">Two-step login</a>
                         <form method="POST" action="{{ route('health.logout') }}">
                             @csrf
                             <button type="submit" class="w-full text-start px-4 py-2.5 text-sm font-bold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20">

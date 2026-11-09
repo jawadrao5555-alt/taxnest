@@ -4,6 +4,7 @@ namespace App\Http\Controllers\SaasAdmin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Company;
+use App\Models\AdminUser;
 use App\Models\LiveOpsAgentCommand;
 use App\Models\LiveOpsAuditEvent;
 use App\Models\LiveOpsDiagnosticReport;
@@ -29,10 +30,7 @@ class AdminLiveOpsController extends Controller
 {
     private function gate(): void
     {
-        $admin = auth('admin')->user();
-        if (!$admin || !$admin->isSuperAdmin()) {
-            abort(403, 'Super admin only.');
-        }
+        AdminUser::requireSuperAdministrator();
     }
 
     public function index(Request $request)

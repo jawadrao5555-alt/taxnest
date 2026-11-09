@@ -815,6 +815,35 @@ class HealthOnboardingImportTest extends TestCase
         $this->assertSame(1, HealthDepartment::withoutGlobalScopes()->where('company_id', $this->company->id)->count());
     }
 
+    public function test_a_concurrent_commit_claim_refuses_a_second_writer_without_consuming_the_review(): void
+    {
+        [$token] = $this->uploadAndAnalyse('departments', [[
+            'name' => 'Outpatient', 'code' => 'OPD', 'type' => 'opd', 'branch' => '', 'description' => '',
+        ]]);
+
+        $claim = Onboarding::DISK_DIRECTORY . '/' . $this->company->id . '/' . $token . '-commit.lock';
+        Storage::disk('local')->put($claim, json_encode(['claimed_at' => now()->toIso8601String()]));
+
+        $this->actingAs($this->owner, HealthPanel::GUARD)
+            ->post('/health/setup/import/departments/commit/' . $token)
+            ->assertRedirect(route('health.setup.import.preview', ['dataset' => 'departments', 'token' => $token]))
+            ->assertSessionHas('error', __('health.import_err_processing'));
+
+        $this->assertSame(
+            0,
+            HealthDepartment::withoutGlobalScopes()->where('company_id', $this->company->id)->count(),
+            'A second request must not write any part of a workbook owned by the first committer.'
+        );
+
+        Storage::disk('local')->delete($claim);
+
+        $this->actingAs($this->owner, HealthPanel::GUARD)
+            ->post('/health/setup/import/departments/commit/' . $token)
+            ->assertRedirect(route('health.setup.import'));
+
+        $this->assertSame(1, HealthDepartment::withoutGlobalScopes()->where('company_id', $this->company->id)->count());
+    }
+
     /* ─────────────────────────── Cell handling ────────────────────────────── */
 
     public function test_dates_are_read_day_first_and_excel_serials_are_understood(): void

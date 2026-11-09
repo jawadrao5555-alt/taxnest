@@ -188,6 +188,77 @@ class HealthOpdCoreTest extends TestCase
         $this->assertSame(1, HealthPatient::count(), 'A duplicate CNIC must be a hard refusal, not a warning.');
     }
 
+    public function test_consent_version_and_withdrawal_evidence_survive_unrelated_edits_and_regrant(): void
+    {
+        $this->actingAs($this->receptionist, HealthPanel::GUARD);
+
+        $this->post('/health/patients', [
+            'name' => 'Consent Evidence Patient',
+            'gender' => 'female',
+            'age_years' => 32,
+            'consent_treatment' => 1,
+            'confirm_new' => 1,
+        ])->assertRedirect();
+
+        $patient = HealthPatient::firstOrFail();
+        $recordedAt = $patient->consent_recorded_at?->toAtomString();
+
+        $this->assertTrue($patient->consent_treatment);
+        $this->assertSame(HealthPatient::CONSENT_POLICY_VERSION, $patient->consent_policy_version);
+        $this->assertSame($this->receptionist->id, (int) $patient->consent_recorded_by);
+        $this->assertNotNull($recordedAt);
+        $this->assertNull($patient->consent_withdrawn_at);
+        $this->assertNull($patient->consent_withdrawn_by);
+
+        // Demographic corrections must not rewrite who/when evidence for an
+        // unchanged consent decision.
+        $this->put('/health/patients/' . $patient->id, [
+            'name' => 'Consent Evidence Patient Corrected',
+            'gender' => 'female',
+            'age_years' => 32,
+            'consent_treatment' => 1,
+        ])->assertRedirect();
+
+        $patient->refresh();
+        $this->assertSame($recordedAt, $patient->consent_recorded_at?->toAtomString());
+        $this->assertSame($this->receptionist->id, (int) $patient->consent_recorded_by);
+        $this->assertNull($patient->consent_withdrawn_at);
+
+        // Removing the final granted permission must remain distinguishable
+        // from a patient who never granted consent at all.
+        $this->put('/health/patients/' . $patient->id, [
+            'name' => 'Consent Evidence Patient Corrected',
+            'gender' => 'female',
+            'age_years' => 32,
+        ])->assertRedirect();
+
+        $patient->refresh();
+        $this->assertFalse($patient->consent_treatment);
+        $this->assertNull($patient->consent_recorded_at);
+        $this->assertNull($patient->consent_recorded_by);
+        $this->assertSame(HealthPatient::CONSENT_POLICY_VERSION, $patient->consent_policy_version);
+        $this->assertNotNull($patient->consent_withdrawn_at);
+        $this->assertSame($this->receptionist->id, (int) $patient->consent_withdrawn_by);
+
+        // A later grant records the current decision and clears only the
+        // current-row withdrawal marker. The append-only audit trail retains
+        // the earlier transition independently.
+        $this->put('/health/patients/' . $patient->id, [
+            'name' => 'Consent Evidence Patient Corrected',
+            'gender' => 'female',
+            'age_years' => 32,
+            'consent_contact' => 1,
+        ])->assertRedirect();
+
+        $patient->refresh();
+        $this->assertTrue($patient->consent_contact);
+        $this->assertNotNull($patient->consent_recorded_at);
+        $this->assertSame($this->receptionist->id, (int) $patient->consent_recorded_by);
+        $this->assertSame(HealthPatient::CONSENT_POLICY_VERSION, $patient->consent_policy_version);
+        $this->assertNull($patient->consent_withdrawn_at);
+        $this->assertNull($patient->consent_withdrawn_by);
+    }
+
     /* ───────────────── 2. Queue and fee ───────────────── */
 
     public function test_a_walk_in_checks_itself_in_and_freezes_the_fee_onto_the_visit(): void

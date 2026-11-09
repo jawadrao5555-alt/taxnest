@@ -25,9 +25,16 @@
             <div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6">
                 <div class="mb-6">
                     <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100">Anomaly & Compliance Thresholds</h3>
-                    <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Configure the risk detection parameters used by the compliance engine.</p>
+                    <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">{{ $canManageSensitiveConfiguration ? 'Configure' : 'Current read-only values for' }} the risk detection parameters used by the compliance engine.</p>
                 </div>
 
+                @unless($canManageSensitiveConfiguration)
+                    <div class="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 dark:bg-amber-900/20 dark:border-amber-800 dark:text-amber-200 text-sm">
+                        Risk configuration is read-only for this account.
+                    </div>
+                @endunless
+
+                @if($canManageSensitiveConfiguration)
                 <form method="POST" action="/admin/risk-settings" class="space-y-6">
                     @csrf
 
@@ -61,6 +68,14 @@
                         </button>
                     </div>
                 </form>
+                @else
+                    <dl class="space-y-4">
+                        <div><dt class="text-sm font-medium text-gray-700 dark:text-gray-300">MoM Spike Threshold (%)</dt><dd class="mt-1 text-sm text-gray-900 dark:text-gray-100">{{ $settings['mom_spike_threshold'] }}</dd></div>
+                        <div><dt class="text-sm font-medium text-gray-700 dark:text-gray-300">Tax Drop Threshold (%)</dt><dd class="mt-1 text-sm text-gray-900 dark:text-gray-100">{{ $settings['tax_drop_threshold'] }}</dd></div>
+                        <div><dt class="text-sm font-medium text-gray-700 dark:text-gray-300">Critical Score Threshold</dt><dd class="mt-1 text-sm text-gray-900 dark:text-gray-100">{{ $settings['critical_score_threshold'] }}</dd></div>
+                        <div><dt class="text-sm font-medium text-gray-700 dark:text-gray-300">Stability Bonus Weight</dt><dd class="mt-1 text-sm text-gray-900 dark:text-gray-100">{{ $settings['stability_bonus_weight'] }}</dd></div>
+                    </dl>
+                @endif
             </div>
 
             <div class="mt-6 flex flex-wrap gap-3">

@@ -59,8 +59,42 @@ class ReadOnlyImpersonation
 
         $path = ltrim($request->path(), '/');
 
+        // The grant belongs to one CURRENT super-admin and one panel tenant.
+        // A live admin cookie alone is insufficient after a role change, another
+        // operator signing in, or a panel identity moving to a different tenant.
+        // Re-read persisted identities: a long-lived guard object must not keep
+        // authorizing a revoked role or disabled company user.
+        $guards = array_merge(['web', 'pos', 'fbrpos'], array_column(\App\Support\NestErps::VERTICALS, 'guard'));
+        $guard = $imp['guard'] ?? null;
+        $admin = auth('admin')->user()?->fresh();
+        $panel = in_array($guard, $guards, true) ? auth($guard)->user()?->fresh() : null;
+        $valid = $admin && $admin->role === 'super_admin'
+            && (int) $admin->id === (int) ($imp['admin_id'] ?? 0)
+            && $panel && $panel->is_active
+            && (int) $panel->company_id === (int) ($imp['company_id'] ?? 0)
+            && (int) $panel->company_id > 0;
+        if (!$valid) {
+            if (in_array($guard, $guards, true)) auth($guard)->logoutCurrentDevice();
+            $request->session()->forget('impersonation');
+            // Keep the admin's own panel / Exit accessible. Company handlers
+            // never run with a revoked or misattributed impersonation grant.
+            if ($path !== 'admin' && !str_starts_with($path, 'admin/')) {
+                if ($request->expectsJson() || $request->ajax()) {
+                    return response()->json(['error' => 'Company access has ended. Open a new authorized session.'], 403);
+                }
+                return redirect('/admin/dashboard')->with('error', 'Company access has ended. Open a new authorized session.');
+            }
+        }
+
         // Admin panel is always allowed (admin guard actions + exit/lock routes).
         if ($path === 'admin' || str_starts_with($path, 'admin/')) {
+            return $next($request);
+        }
+
+        // This verifies the admin's own factor; it never writes company data
+        // or allows enrolling/disabling a factor while impersonating.
+        if (($path === 'security/two-step/admin/challenge' && $request->isMethod('GET'))
+            || ($path === 'security/two-step/admin/verify' && $request->isMethod('POST'))) {
             return $next($request);
         }
 

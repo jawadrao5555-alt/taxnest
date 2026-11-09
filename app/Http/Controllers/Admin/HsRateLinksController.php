@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\AdminUser;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -13,6 +14,8 @@ class HsRateLinksController extends Controller
 
     public function index(Request $request)
     {
+        $currentAdmin = auth('admin')->user()?->fresh();
+        $canManageSensitiveConfiguration = (bool) $currentAdmin?->canManageSensitiveConfiguration();
         $q = trim((string) $request->input('q', ''));
         $schedule = $request->input('schedule', '');
         $status = $request->input('status', '');
@@ -44,11 +47,14 @@ class HsRateLinksController extends Controller
             'stats'     => $stats,
             'schedules' => $this->schedules,
             'filters'   => compact('q', 'schedule', 'status'),
+            'canManageSensitiveConfiguration' => $canManageSensitiveConfiguration,
         ]);
     }
 
     public function store(Request $request)
     {
+        AdminUser::requireSensitiveConfigurationAdministrator();
+
         $data = $request->validate([
             'hs_code'       => 'required|string|max:20',
             'schedule_type' => 'required|string|in:'.implode(',', $this->schedules),
@@ -74,6 +80,8 @@ class HsRateLinksController extends Controller
 
     public function update(Request $request, $id)
     {
+        AdminUser::requireSensitiveConfigurationAdministrator();
+
         $data = $request->validate([
             'tax_rate'   => 'nullable|numeric|min:0|max:100',
             'rate_label' => 'nullable|string|max:50',
@@ -91,12 +99,16 @@ class HsRateLinksController extends Controller
 
     public function destroy($id)
     {
+        AdminUser::requireSensitiveConfigurationAdministrator();
+
         DB::table('fbr_hs_rate_links')->where('id', $id)->delete();
         return back()->with('success', 'Mapping deleted.');
     }
 
     public function toggle($id)
     {
+        AdminUser::requireSensitiveConfigurationAdministrator();
+
         $row = DB::table('fbr_hs_rate_links')->find($id);
         if (!$row) return back()->with('error', 'Not found.');
         DB::table('fbr_hs_rate_links')->where('id', $id)
@@ -141,6 +153,8 @@ class HsRateLinksController extends Controller
 
     public function importCsv(Request $request)
     {
+        AdminUser::requireSensitiveConfigurationAdministrator();
+
         $request->validate([
             'csv_file'      => 'required|file|mimes:csv,txt|max:10240',
             'duplicate_mode'=> 'required|in:update,skip',

@@ -194,4 +194,43 @@ class AdminCompanyAccountOverviewTest extends TestCase
         $this->assertSame('approved',$company->fresh()->status);
         $this->assertSame(0,AdminAuditLog::count());
     }
+
+    public function test_persisted_role_downgrade_revokes_cached_company_lifecycle_actions(): void
+    {
+        [$admin,$company,$sub] = $this->fixture();
+        $this->actingAs($admin,'admin');
+        \App\Models\PosTransaction::create([
+            'company_id' => $company->id,
+            'invoice_number' => 'EXEMPT-ROLE-DOWNGRADE-ONLY',
+            'status' => 'draft',
+            'pra_status' => 'exempt_internal',
+            'total_amount' => 1,
+        ]);
+
+        $before = $company->fresh()->getAttributes();
+        $term = $sub->fresh()->getAttributes();
+        $admin->update(['role'=>'support']);
+
+        $this->post('/admin/companies/'.$company->id.'/suspend',['reason'=>'Must not land'])->assertForbidden();
+        $this->post('/admin/companies/'.$company->id.'/reject')->assertForbidden();
+
+        $this->assertSame($before,$company->fresh()->getAttributes());
+        $this->assertSame($term,$sub->fresh()->getAttributes());
+        $this->assertSame(0,AdminAuditLog::count());
+        $this->get('/admin/companies/'.$company->id)->assertOk()
+            ->assertSee('Read-only company access')
+            ->assertSee('Billing limits and grants are read-only for this account.')
+            ->assertSee('Product assignment is read-only for this account.')
+            ->assertSee('Subscription override history is visible')
+            ->assertDontSee('EXEMPT-ROLE-DOWNGRADE-ONLY')
+            ->assertDontSee('data-company-state-action')
+            ->assertDontSee('Edit Profile')
+            ->assertDontSee('View as Company')
+            ->assertDontSee('Manage as Company')
+            ->assertDontSee('action="'.route('saas.admin.companies.limits', $company->id).'"', false)
+            ->assertDontSee('action="'.route('saas.admin.companies.changeType', $company->id).'"', false)
+            ->assertDontSee('action="'.route('saas.admin.companies.cloneProduct', $company->id).'"', false)
+            ->assertDontSee('action="'.route('saas.admin.companies.override.lifetime', $company->id).'"', false)
+            ->assertDontSee('action="'.route('saas.admin.companies.resetPassword', $company->id).'"', false);
+    }
 }

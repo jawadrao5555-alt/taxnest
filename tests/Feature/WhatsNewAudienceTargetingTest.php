@@ -41,6 +41,7 @@ use Tests\TestCase;
  */
 class WhatsNewAudienceTargetingTest extends TestCase
 {
+    use \Tests\Concerns\CreatesImpersonationActor;
     // Unique markers — safe to assertSee/assertDontSee in full-page HTML.
     private const T_POS = 'WNMARK-PRA-ONLY-73kd1';
     private const T_FBR = 'WNMARK-FBR-ONLY-73kd2';
@@ -463,11 +464,11 @@ class WhatsNewAudienceTargetingTest extends TestCase
     {
         // A real impersonation always has the admin's own login alive in the same
         // session — without it the flag is orphaned and gets cleared on sight.
-        auth('admin')->setUser((new \App\Models\AdminUser())->forceFill(['id' => 1]));
+        $this->loginImpersonatingAdmin();
         $this->assertSame(0, AppUpdateSeen::count());
 
         $resp = $this->actingAs(User::find($this->posAdminId), 'pos')
-            ->withSession(['impersonation' => ['readonly' => true, 'admin_id' => 1, 'company_id' => $this->posCompanyId]])
+            ->withSession(['impersonation' => ['readonly' => true, 'admin_id' => 1, 'company_id' => $this->posCompanyId, 'guard' => 'pos']])
             ->get('/pos/my-profile');
 
         $resp->assertStatus(200);
@@ -483,11 +484,11 @@ class WhatsNewAudienceTargetingTest extends TestCase
 
     public function test_readonly_impersonation_shows_targeted_fbr_history_without_popup_or_writes(): void
     {
-        auth('admin')->setUser((new \App\Models\AdminUser())->forceFill(['id' => 1]));
+        $this->loginImpersonatingAdmin();
         $this->assertSame(0, AppUpdateSeen::count());
 
         $resp = $this->actingAs(User::find($this->fbrAdminId), 'fbrpos')
-            ->withSession(['impersonation' => ['readonly' => true, 'admin_id' => 1, 'company_id' => $this->fbrCompanyId]])
+            ->withSession(['impersonation' => ['readonly' => true, 'admin_id' => 1, 'company_id' => $this->fbrCompanyId, 'guard' => 'fbrpos']])
             ->get('/fbr-pos/my-profile');
 
         $resp->assertStatus(200);
@@ -503,10 +504,11 @@ class WhatsNewAudienceTargetingTest extends TestCase
 
     public function test_full_access_impersonation_still_shows_popup(): void
     {
+        $this->loginImpersonatingAdmin();
         // readonly=false (full "Manage as Company") — POSTs are allowed, so
         // the popup must still show; only READ-ONLY mode is skipped.
         $resp = $this->actingAs(User::find($this->posAdminId), 'pos')
-            ->withSession(['impersonation' => ['readonly' => false, 'admin_id' => 1, 'company_id' => $this->posCompanyId]])
+            ->withSession(['impersonation' => ['readonly' => false, 'admin_id' => 1, 'company_id' => $this->posCompanyId, 'guard' => 'pos']])
             ->get('/pos/my-profile');
 
         $resp->assertStatus(200);

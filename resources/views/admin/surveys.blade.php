@@ -2,10 +2,12 @@
     <x-slot name="header">
         <div class="flex items-center justify-between flex-wrap gap-3">
             <h2 class="font-bold text-xl text-gray-800 dark:text-gray-100 leading-tight">POS Surveys</h2>
+            @if($canManageRelease)
             <button onclick="openCreateModal()" class="inline-flex items-center px-3 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition">
                 <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                 New Survey
             </button>
+            @endif
         </div>
     </x-slot>
 
@@ -17,15 +19,22 @@
             @if(session('error'))
                 <div class="mb-4 p-4 bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300 rounded-lg">{{ session('error') }}</div>
             @endif
+            @unless($canManageRelease)
+                <div class="mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 text-blue-800 dark:text-blue-200 rounded-lg" role="status">Survey release history and results are read-only. Publishing and release controls require an administrator.</div>
+            @endunless
 
             <div class="mb-5 flex items-center justify-between gap-3 flex-wrap">
                 <p class="text-sm text-gray-500 dark:text-gray-400">One-question-set advice surveys shown as a popup on the PRA POS panel (admins/managers only).</p>
+                @if($canManageRelease)
                 <form method="POST" action="{{ route('admin.surveys.feature-toggle') }}">
                     @csrf
                     <button type="submit" class="px-3.5 py-2 rounded-lg text-xs font-bold transition {{ $featureOn ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300 hover:bg-green-200' : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300 hover:bg-red-200' }}">
                         Popups: {{ $featureOn ? 'ON — click to disable' : 'OFF — click to enable' }}
                     </button>
                 </form>
+                @else
+                    <span class="px-3.5 py-2 rounded-lg text-xs font-bold {{ $featureOn ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' }}">Popups: {{ $featureOn ? 'ON' : 'OFF' }}</span>
+                @endif
             </div>
 
             <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700">
@@ -69,6 +78,7 @@
                                         <div class="flex items-center gap-2 flex-wrap">
                                             <a href="{{ route('admin.surveys.show', $sv->id) }}" class="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-emerald-600 text-white hover:bg-emerald-700">Results</a>
 
+                                            @if($canManageRelease)
                                             {{-- Edit: always show, but warn if has responses + published --}}
                                             @php
                                                 $surveyPublication = ['starts_at'=>$sv->starts_at?->copy()->setTimezone('Asia/Karachi')->format('Y-m-d\TH:i'),'expires_at'=>$sv->expires_at?->copy()->setTimezone('Asia/Karachi')->format('Y-m-d\TH:i'),'response_policy'=>$sv->response_policy ?? 'user','targeting'=>$sv->targeting ?? []];
@@ -104,6 +114,7 @@
                                                     <button type="submit" class="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400 hover:bg-red-100">Delete</button>
                                                 </form>
                                             @endif
+                                            @endif
                                         </div>
                                     </td>
                                 </tr>
@@ -120,6 +131,7 @@
         </div>
     </div>
 
+    @if($canManageRelease)
     {{-- ===== CREATE MODAL ===== --}}
     <div id="createSurveyModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4" style="background: rgba(0,0,0,0.5);">
         <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-2xl max-h-[92vh] overflow-y-auto">
@@ -424,4 +436,5 @@
             document.getElementById('editQuestionsJson').value = JSON.stringify(qs);
         });
     </script>
+    @endif
 </x-admin-layout>

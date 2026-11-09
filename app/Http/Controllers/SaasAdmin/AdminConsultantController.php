@@ -4,6 +4,7 @@ namespace App\Http\Controllers\SaasAdmin;
 
 use App\Http\Controllers\Controller;
 use App\Models\AdminAuditLog;
+use App\Models\AdminUser;
 use App\Models\ConsultantClientLink;
 use App\Models\ConsultantCommission;
 use App\Models\ConsultantProfile;
@@ -20,6 +21,8 @@ class AdminConsultantController extends Controller
 {
     public function index(Request $request)
     {
+        $currentAdmin = auth('admin')->user()?->fresh();
+        $canManageBilling = (bool) $currentAdmin?->canManageBilling();
         $profiles = ConsultantProfile::with('user')
             ->orderByDesc('id')
             ->get();
@@ -74,12 +77,14 @@ class AdminConsultantController extends Controller
             'pendingTotals' => $pendingTotals,
             'paidCommissions' => $paidCommissions,
             'links' => $links,
+            'canManageBilling' => $canManageBilling,
         ]);
     }
 
     /** Enable/disable a consultant. Disabled: no console, no switches, no NEW commissions. */
     public function toggle($id)
     {
+        AdminUser::requireBillingAdministrator();
         $profile = ConsultantProfile::with('user')->findOrFail($id);
         $newStatus = $profile->status === 'active' ? 'disabled' : 'active';
         $profile->update(['status' => $newStatus]);
@@ -94,6 +99,7 @@ class AdminConsultantController extends Controller
     /** Update a consultant's commission rate (applies to FUTURE commissions only). */
     public function updateRate(Request $request, $id)
     {
+        AdminUser::requireBillingAdministrator();
         $request->validate(['commission_rate' => 'required|numeric|min:0|max:100']);
 
         $profile = ConsultantProfile::findOrFail($id);
@@ -111,6 +117,7 @@ class AdminConsultantController extends Controller
     /** Admin-side revoke of any active/pending link. */
     public function revokeLink($id)
     {
+        AdminUser::requireBillingAdministrator();
         $link = ConsultantClientLink::findOrFail($id);
 
         if ($link->status === 'revoked') {
@@ -130,6 +137,7 @@ class AdminConsultantController extends Controller
     /** Optional minimum payout threshold (Rs) — 0 disables it. */
     public function updateMinPayout(Request $request)
     {
+        AdminUser::requireBillingAdministrator();
         $request->validate(['min_payout' => 'required|numeric|min:0|max:10000000']);
 
         \App\Models\SystemSetting::set('consultant_min_payout', (string) (float) $request->min_payout, 'Minimum consultant payout threshold (Rs); 0 = no minimum');
@@ -144,6 +152,7 @@ class AdminConsultantController extends Controller
     /** Mark a pending commission as paid (manual payout already made outside). */
     public function markPaid(Request $request, $id)
     {
+        AdminUser::requireBillingAdministrator();
         $request->validate(['payout_reference' => 'nullable|string|max:255']);
 
         $commission = ConsultantCommission::findOrFail($id);

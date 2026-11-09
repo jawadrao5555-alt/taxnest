@@ -18,6 +18,12 @@
             <div class="mb-4 p-4 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-700">{{ session('success') }}</div>
             @endif
 
+            @unless($canManageBilling || $canManageCompanyLifecycle)
+            <div class="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 dark:bg-amber-900/20 dark:border-amber-800 dark:text-amber-200">
+                Legacy company history is read-only for this account. Billing, lifecycle and feature controls are restricted.
+            </div>
+            @endunless
+
             <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 p-6 mb-8">
                 {{-- Package picked before signing up — approval activates exactly this
                      plan, on the period that product sells (Task 1484). --}}
@@ -31,20 +37,26 @@
                 @if($company->company_status === 'pending')
                 <div class="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-center justify-between">
                     <span class="text-sm text-amber-700 font-medium">This company is pending approval</span>
+                    @if($canManageCompanyLifecycle)
                     <div class="flex items-center gap-2">
                         <form method="POST" action="/admin/company/{{ $company->id }}/approve">@csrf<button type="submit" class="text-xs px-3 py-1 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700">Approve</button></form>
                         <form method="POST" action="/admin/company/{{ $company->id }}/reject" onsubmit="return confirm('Are you sure you want to reject this company?')">@csrf<button type="submit" class="text-xs px-3 py-1 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700">Reject</button></form>
                     </div>
+                    @endif
                 </div>
                 @elseif($company->company_status === 'suspended')
                 <div class="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center justify-between">
                     <span class="text-sm text-red-700 font-medium">This company is suspended{{ $company->suspended_at ? ' (since ' . $company->suspended_at->format('d M Y') . ')' : '' }}</span>
+                    @if($canManageCompanyLifecycle)
                     <form method="POST" action="/admin/company/{{ $company->id }}/suspend">@csrf<button type="submit" class="text-xs px-3 py-1 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700">Unsuspend</button></form>
+                    @endif
                 </div>
                 @elseif($company->company_status === 'rejected')
                 <div class="mb-4 p-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg flex items-center justify-between">
                     <span class="text-sm text-gray-700 dark:text-gray-300 font-medium">This company registration was rejected</span>
+                    @if($canManageCompanyLifecycle)
                     <form method="POST" action="/admin/company/{{ $company->id }}/approve">@csrf<button type="submit" class="text-xs px-3 py-1 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700">Approve</button></form>
+                    @endif
                 </div>
                 @endif
 
@@ -53,12 +65,14 @@
                         <span class="text-sm text-gray-700 dark:text-gray-300 font-medium">Invoice Watermark</span>
                         <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{{ $company->force_watermark ? 'Watermark is enabled on invoices' : 'No watermark on invoices' }}</p>
                     </div>
+                    @if($canManageCompanyLifecycle)
                     <form method="POST" action="/admin/company/{{ $company->id }}/toggle-watermark">
                         @csrf
                         <button type="submit" class="text-xs px-3 py-1 {{ $company->force_watermark ? 'bg-red-600 hover:bg-red-700' : 'bg-gray-600 hover:bg-gray-700' }} text-white rounded-lg font-medium transition">
                             {{ $company->force_watermark ? 'Remove Watermark' : 'Add Watermark' }}
                         </button>
                     </form>
+                    @endif
                 </div>
 
                 <div class="grid grid-cols-2 md:grid-cols-5 gap-6">
@@ -99,13 +113,16 @@
                 </div>
 
                 <div class="mt-6 pt-4 border-t border-gray-100 dark:border-gray-800 flex flex-wrap items-center gap-3">
+                    @if($canManageCompanyLifecycle)
                     @if($company->company_status === 'active')
                     <form method="POST" action="/admin/company/{{ $company->id }}/suspend" onsubmit="return confirm('Are you sure you want to suspend this company?')">
                         @csrf
                         <button type="submit" class="px-4 py-2 bg-red-600 text-white text-sm rounded-lg font-medium hover:bg-red-700 transition">Suspend Company</button>
                     </form>
                     @endif
+                    @endif
 
+                    @if($canManageBilling)
                     <div x-data="{ showPlan: false }" class="inline-flex items-center gap-2">
                         <button @click="showPlan = !showPlan" class="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg font-medium hover:bg-blue-700 transition">Change Plan</button>
                         <form x-show="showPlan" method="POST" action="/admin/company/{{ $company->id }}/change-plan" class="inline-flex items-center gap-2">
@@ -118,6 +135,7 @@
                             <button type="submit" class="px-3 py-2 bg-emerald-600 text-white text-sm rounded-lg font-medium hover:bg-emerald-700">Apply</button>
                         </form>
                     </div>
+                    @endif
                 </div>
             </div>
 
@@ -381,6 +399,7 @@
                     <h4 class="text-sm font-bold text-gray-800 dark:text-gray-100 mb-4">Limit Overrides</h4>
                     <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">Override the subscription plan limits for this company. Leave empty to use the plan default. Set to <strong>-1</strong> for unlimited.</p>
 
+                    @if($canManageBilling)
                     <form method="POST" action="/admin/company/{{ $company->id }}/update-limits" class="space-y-4">
                         @csrf
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -433,6 +452,9 @@
                         </div>
                     </form>
                     <form id="resetLimitsForm" method="POST" action="/admin/company/{{ $company->id }}/reset-limits" class="hidden">@csrf</form>
+                    @else
+                    <p class="text-sm text-gray-500 dark:text-gray-400">Current overrides: invoices {{ $company->invoice_limit_override ?? 'plan default' }}, users {{ $company->user_limit_override ?? 'plan default' }}, branches {{ $company->branch_limit_override ?? 'plan default' }}.</p>
+                    @endif
                 </div>
 
                 <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 p-6">
@@ -443,12 +465,14 @@
                             <span class="inline-block w-3 h-3 rounded-full {{ $company->is_internal_account ? 'bg-emerald-500' : 'bg-gray-400' }}"></span>
                             <span class="text-sm font-semibold {{ $company->is_internal_account ? 'text-emerald-800' : 'text-gray-700 dark:text-gray-300' }}">{{ $company->is_internal_account ? 'Internal Account Active' : 'Standard Account' }}</span>
                         </div>
+                        @if($canManageBilling)
                         <form method="POST" action="/admin/company/{{ $company->id }}/toggle-internal" onsubmit="return confirm('{{ $company->is_internal_account ? 'Remove internal account status? This will re-enable subscription enforcement.' : 'Enable internal account? This will bypass all subscription/billing limits.' }}')">
                             @csrf
                             <button type="submit" class="px-4 py-2 {{ $company->is_internal_account ? 'bg-red-600 hover:bg-red-700' : 'bg-emerald-600 hover:bg-emerald-700' }} text-white text-sm rounded-lg font-medium transition">
                                 {{ $company->is_internal_account ? 'Disable Internal' : 'Enable Internal' }}
                             </button>
                         </form>
+                        @endif
                     </div>
 
                     <div class="flex items-center justify-between p-4 rounded-lg {{ $company->inventory_enabled ? 'bg-cyan-50 border border-cyan-200' : 'bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700' }}">
@@ -456,12 +480,14 @@
                             <span class="inline-block w-3 h-3 rounded-full {{ $company->inventory_enabled ? 'bg-cyan-500' : 'bg-gray-400' }}"></span>
                             <span class="text-sm font-semibold {{ $company->inventory_enabled ? 'text-cyan-800' : 'text-gray-700 dark:text-gray-300' }}">{{ $company->inventory_enabled ? 'Inventory Module Active' : 'Inventory Module Disabled' }}</span>
                         </div>
+                        @if($canManageBilling)
                         <form method="POST" action="/admin/company/{{ $company->id }}/toggle-inventory" onsubmit="return confirm('{{ $company->inventory_enabled ? 'Disable inventory module for this company?' : 'Enable inventory module? This will allow stock tracking, suppliers, and purchase orders.' }}')">
                             @csrf
                             <button type="submit" class="px-4 py-2 {{ $company->inventory_enabled ? 'bg-red-600 hover:bg-red-700' : 'bg-cyan-600 hover:bg-cyan-700' }} text-white text-sm rounded-lg font-medium transition">
                                 {{ $company->inventory_enabled ? 'Disable Inventory' : 'Enable Inventory' }}
                             </button>
                         </form>
+                        @endif
                     </div>
                 </div>
             </div>
@@ -480,12 +506,14 @@
                             <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium {{ ($company->fbr_pos_environment ?? 'sandbox') === 'production' ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-800' }}">{{ ucfirst($company->fbr_pos_environment ?? 'sandbox') }}</span>
                             @endif
                         </div>
+                        @if($canManageBilling)
                         <form method="POST" action="/admin/company/{{ $company->id }}/toggle-fbr-pos" onsubmit="return confirm('{{ $company->fbr_pos_enabled ? 'Disable FBR POS module for this company?' : 'Enable FBR POS module? This allows the company to submit POS invoices to FBR.' }}')">
                             @csrf
                             <button type="submit" class="px-4 py-2 {{ $company->fbr_pos_enabled ? 'bg-red-600 hover:bg-red-700' : 'bg-emerald-600 hover:bg-emerald-700' }} text-white text-sm rounded-lg font-medium transition">
                                 {{ $company->fbr_pos_enabled ? 'Disable FBR POS' : 'Enable FBR POS' }}
                             </button>
                         </form>
+                        @endif
                     </div>
                     @if($company->fbr_pos_enabled)
                     <div class="mt-4 grid grid-cols-2 gap-4 text-sm">

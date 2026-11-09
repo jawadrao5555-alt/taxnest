@@ -1,5 +1,5 @@
 <x-admin-layout>
-@if(auth('admin')->user()?->isSuperAdmin() && $company->product_type === 'pos')
+@if($isSuperAdmin && $company->product_type === 'pos')
 <div class="px-6 pt-4"><a class="text-teal-500 underline" href="{{ route('saas.admin.local-bill-records', $company->id) }}">SaaS local bill records &amp; retention</a></div>
 @endif
 
@@ -16,8 +16,9 @@
         <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {{ $sc[$company->status] ?? 'bg-gray-800 text-gray-400' }}">{{ $company->status }}</span>
         <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase {{ \App\Support\ProductCatalog::chipClass($company->product_type) }}">{{ \App\Support\ProductCatalog::label($company->product_type, $erpsVertical) }}</span>
         @if(!$company->trashed())
+        @if($canManageCompanyLifecycle)
         <div class="w-full sm:w-auto sm:ml-auto flex flex-wrap items-center gap-2">
-            @if(($company->company_status ?? null) === 'active')
+            @if($isSuperAdmin && ($company->company_status ?? null) === 'active')
             <form method="POST" action="{{ route('saas.admin.companies.impersonate', $company->id) }}" onsubmit="return confirm('Open this company in VIEW-ONLY mode? You will see their panel exactly as they do, but cannot make any changes.');">
                 @csrf
                 <input type="hidden" name="mode" value="view">
@@ -40,6 +41,7 @@
                 Edit Profile
             </a>
         </div>
+        @endif
         @endif
     </div>
 
@@ -222,6 +224,7 @@
                 <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">Current Password</span><span class="text-gray-500 italic text-right min-w-0 break-words">Hidden — one-way encrypted, cannot be shown</span></div>
                 <p class="text-xs text-gray-500 pt-1">Passwords are stored one-way encrypted for security — nobody (including admins) can view them. To help a locked-out company, set a new password on the right and share it with the owner.</p>
             </div>
+            @if($isSuperAdmin)
             <form method="POST" action="{{ route('saas.admin.companies.resetPassword', $company->id) }}"
                   onsubmit="return confirm('Change this company\'s login password? Their old password will stop working immediately.');"
                   class="space-y-3">
@@ -237,6 +240,9 @@
                 </div>
                 <button type="submit" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium rounded-lg">Change Password</button>
             </form>
+            @else
+                <p class="text-sm text-gray-400">Credential reset is restricted to a super administrator.</p>
+            @endif
         </div>
         @else
         <div class="text-center py-4 text-xs text-gray-500 border border-dashed border-gray-700 rounded-lg">No admin login account found for this company.</div>
@@ -324,9 +330,11 @@
                 <div>
                     <label class="block text-xs text-gray-400 mb-1">Agent API Key</label>
                     <div class="flex gap-2">
-                        <input :type="showKey ? 'text' : 'password'" readonly value="{{ $company->agent_api_key ?? '' }}" placeholder="Not generated yet" x-ref="agkey" class="w-full min-w-0 rounded-lg bg-gray-800 border-gray-700 text-gray-200 text-xs font-mono">
+                        <input :type="showKey ? 'text' : 'password'" readonly value="{{ $isSuperAdmin ? ($company->agent_api_key ?? '') : '' }}" placeholder="{{ $isSuperAdmin ? 'Not generated yet' : 'Restricted to super administrator' }}" x-ref="agkey" class="w-full min-w-0 rounded-lg bg-gray-800 border-gray-700 text-gray-200 text-xs font-mono">
+                        @if($isSuperAdmin)
                         <button type="button" @click="showKey = !showKey" class="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-200 text-xs rounded-lg" x-text="showKey ? 'Hide' : 'Show'"></button>
                         <button type="button" @click="copy($refs.agkey, $el)" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded-lg">Copy</button>
+                        @endif
                     </div>
                 </div>
             </div>
@@ -335,7 +343,7 @@
                 <template x-if="!code">
                     <div class="flex items-center gap-2">
                         <span class="text-gray-500 text-xs">{{ $company->fbr_access_code ? 'Saved (encrypted) — reveal to view' : 'Not saved yet — client adds it in FBR POS settings' }}</span>
-                        @if($company->fbr_access_code)
+                        @if($isSuperAdmin && $company->fbr_access_code)
                         <button type="button" @click="reveal()" :disabled="loading" class="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs rounded-lg" x-text="loading ? '...' : 'Reveal'"></button>
                         @endif
                     </div>
@@ -433,6 +441,7 @@
         <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
             <h3 class="text-sm font-semibold text-white mb-3">Limit Overrides</h3>
             <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">Set custom limits. Leave empty to use plan defaults.</p>
+            @if($canManageBilling)
             <form method="POST" action="{{ route('saas.admin.companies.limits', $company->id) }}" class="space-y-3">
                 @csrf
                 <div>
@@ -470,6 +479,9 @@
                 @endif
                 <button type="submit" class="w-full px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition">Update Limits</button>
             </form>
+            @else
+                <p class="text-sm text-gray-400">Billing limits and grants are read-only for this account.</p>
+            @endif
 
             {{-- AI Reader pages: monthly allowance comes from the package, this
                  adds to the purchased balance (never expires, spent only after
@@ -483,6 +495,7 @@
                         purchased balance <span class="text-fuchsia-300 font-semibold">{{ number_format($aiPages['purchased']) }}</span> ·
                         resets {{ $aiPages['resets_on'] }}
                     </p>
+                    @if($canManageBilling)
                     <form method="POST" action="{{ route('saas.admin.companies.aiPages', $company->id) }}" class="space-y-2">
                         @csrf
                         <div class="flex gap-2">
@@ -492,6 +505,7 @@
                         <button type="submit" class="w-full px-4 py-2 bg-fuchsia-600 hover:bg-fuchsia-700 text-white text-sm font-semibold rounded-lg transition">Add Pages</button>
                     </form>
                     <p class="text-[11px] text-gray-500 mt-1">Paid top-ups normally arrive through the payment-proof queue. Use this for goodwill pages or money collected outside the panel — every grant is logged.</p>
+                    @endif
                 </div>
             @endif
         </div>
@@ -499,6 +513,13 @@
 
     <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-6">
         <h3 id="company-access-actions" class="text-sm font-semibold text-white mb-3">Quick Actions</h3>
+        @if($companyDeletionRequest)
+        <div class="mb-3 px-3 py-2 rounded-lg bg-red-950/40 border border-red-800/50">
+            <p class="text-xs text-red-200"><span class="font-semibold">Password-verified deletion request #{{ $companyDeletionRequest->id }}</span> &middot; {{ str_replace('_', ' ', $companyDeletionRequest->status) }}</p>
+            <p class="text-[11px] text-red-300/80 mt-1">Requested {{ \Illuminate\Support\Carbon::parse($companyDeletionRequest->requested_at)->format('d M Y, h:i A') }}. Moving to Bin starts the recoverable seven-day hold; this request alone deleted nothing.</p>
+            @if($companyDeletionRequest->reason)<p class="text-[11px] text-gray-400 mt-1">Reason: {{ $companyDeletionRequest->reason }}</p>@endif
+        </div>
+        @endif
         {{-- Package picked before signing up — approval activates exactly this
              plan, on the period that product sells (Task 1484). --}}
         @php $requestedPackage = \App\Services\RequestedPackageService::pendingSummary($company); @endphp
@@ -508,6 +529,7 @@
         </div>
         @endif
         <div class="flex flex-wrap gap-2">
+            @if($canManageCompanyLifecycle)
             @if(!$company->trashed())
                 @if($company->status === 'pending')
                 <form method="POST" action="{{ route('saas.admin.companies.approve', $company->id) }}">@csrf<button class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm rounded-lg transition font-medium">Approve</button></form>
@@ -523,12 +545,16 @@
                 <p class="text-sm text-red-400">This company is in the bin (deleted on {{ $company->deleted_at->format('d M Y') }}).</p>
                 <form method="POST" action="{{ route('saas.admin.companies.restore', $company->id) }}">@csrf<button class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm rounded-lg transition font-medium">Restore</button></form>
             @endif
+            @else
+                <p class="text-sm text-gray-400">Read-only company access. Company lifecycle actions require an administrator.</p>
+            @endif
         </div>
     </div>
 
     <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
         <h3 class="text-sm font-semibold text-white mb-3">Change Company Type</h3>
         <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">Switch between Digital Invoice, TaxNest PRA POS, FBR POS and {{ \App\Support\NestErps::LABEL }}.</p>
+        @if($canManageCompanyLifecycle)
         <div class="flex flex-wrap items-center gap-3">
             @if($company->product_type !== 'di')
             <form method="POST" action="{{ route('saas.admin.companies.changeType', $company->id) }}">
@@ -566,6 +592,9 @@
             </form>
             @endif
         </div>
+        @else
+            <p class="text-sm text-gray-400">Product assignment is read-only for this account.</p>
+        @endif
     </div>
 
     {{-- ============================================================
@@ -620,6 +649,7 @@
             }
         @endphp
 
+        @if($canManageCompanyLifecycle)
         <form method="POST" action="{{ route('saas.admin.companies.cloneProduct', $company->id) }}"
               onsubmit="return confirm('Create a separate account for this customer on the selected product(s)? Only the owner login is copied — team accounts are not.');">
             @csrf
@@ -650,6 +680,9 @@
                 <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition">Create account(s)</button>
             </div>
         </form>
+        @else
+            <p class="text-sm text-gray-400">Existing sibling accounts are visible, but creating another product account requires an administrator.</p>
+        @endif
     </div>
     @endif
 
@@ -686,6 +719,7 @@
             </div>
         @endif
 
+        @if($canManageBilling)
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
             <button type="button" @click="open = open === 'lifetime' ? null : 'lifetime'" class="px-3 py-2 bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-400 text-xs font-semibold rounded-lg border border-emerald-800 transition">Grant Lifetime</button>
             <button type="button" @click="open = open === 'temporary' ? null : 'temporary'" class="px-3 py-2 bg-blue-600/20 hover:bg-blue-600/40 text-blue-400 text-xs font-semibold rounded-lg border border-blue-800 transition">Grant Temporary</button>
@@ -737,9 +771,12 @@
                 <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg font-medium transition">Grant Temporary</button>
             </form>
         </div>
+        @else
+            <p class="text-sm text-gray-400">Subscription override history is visible, but grant and removal controls require an administrator.</p>
+        @endif
     </div>
 
-    @if($company->product_type === 'pos' && auth('admin')->user()?->isSuperAdmin())
+    @if($company->product_type === 'pos' && $isSuperAdmin)
     <div class="bg-gradient-to-br from-amber-950/40 to-slate-900 border border-amber-800/40 rounded-xl p-5 mt-6" x-data="{ showCreate: false, editingId: null }">
         <div class="flex items-center justify-between mb-3">
             <div>
@@ -807,7 +844,7 @@
     </div>
     @endif
 
-    @if($company->product_type === 'pos' && auth('admin')->user()?->isSuperAdmin() && $exemptInternalBills->isNotEmpty())
+    @if($company->product_type === 'pos' && $isSuperAdmin && $exemptInternalBills->isNotEmpty())
     <div class="bg-gradient-to-br from-amber-950/30 to-slate-900 border border-amber-800/40 rounded-xl p-5 mt-6">
         <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
             <div>
@@ -918,7 +955,7 @@
     </script>
     @endif
 
-    @if($company->product_type === 'pos' && auth('admin')->user()?->isSuperAdmin())
+    @if($company->product_type === 'pos' && $isSuperAdmin)
     @php
         // Cap is company-wide and SHARED with the owner's own section on
         // /pos/local-bills (Task 665) — the service is the single truth.
@@ -1001,6 +1038,7 @@
     </div>
     @endif
 
+    @if($canManageCompanyLifecycle)
     <div x-show="showDeleteModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/60" @click.self="showDeleteModal = false">
         <div class="bg-gray-900 border border-gray-700 rounded-2xl p-6 w-full max-w-md mx-4" @click.stop>
             <h3 class="text-lg font-bold text-white mb-2">Move to Bin</h3>
@@ -1018,5 +1056,6 @@
             </form>
         </div>
     </div>
+    @endif
 </div>
 </x-admin-layout>

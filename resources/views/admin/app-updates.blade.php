@@ -2,10 +2,12 @@
     <x-slot name="header">
         <div class="flex items-center justify-between flex-wrap gap-3">
             <h2 class="font-bold text-xl text-gray-800 dark:text-gray-100 leading-tight">POS What's New</h2>
-            <button onclick="document.getElementById('addUpdateModal').classList.remove('hidden')" class="inline-flex items-center px-3 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition">
-                <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                New Update
-            </button>
+            @if($canManageRelease)
+                <button onclick="document.getElementById('addUpdateModal').classList.remove('hidden')" class="inline-flex items-center px-3 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition">
+                    <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                    New Update
+                </button>
+            @endif
         </div>
     </x-slot>
 
@@ -36,6 +38,11 @@
             @if($errors->any())
                 <div class="mb-4 p-4 bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300 rounded-lg" role="alert">{{ $errors->first() }}</div>
             @endif
+            @unless($canManageRelease)
+                <div class="mb-4 p-4 bg-amber-50 dark:bg-amber-900/20 text-amber-900 dark:text-amber-200 border border-amber-200 dark:border-amber-800 rounded-lg" role="status">
+                    Release history is read-only for this account. An administrator must publish, edit, archive or reannounce customer updates.
+                </div>
+            @endunless
 
             {{-- Master feature switch --}}
             <div class="mb-6 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-5 flex items-center justify-between flex-wrap gap-3">
@@ -43,13 +50,19 @@
                     <div class="font-semibold text-gray-800 dark:text-gray-100">What's New Notifications (POS)</div>
                     <p class="text-sm text-gray-500 dark:text-gray-400 mt-0.5">Controls the one-time popup and the bell icon on the entire TaxNest PRA POS panel. When OFF, POS users see nothing.</p>
                 </div>
-                <form method="POST" action="/admin/app-updates/feature-toggle">
-                    @csrf
-                    <button type="submit" class="inline-flex items-center px-4 py-2 rounded-lg text-sm font-semibold transition {{ $featureOn ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-400' }}">
-                        <span class="w-2 h-2 rounded-full mr-2 {{ $featureOn ? 'bg-white' : 'bg-gray-500 dark:bg-gray-400' }}"></span>
-                        {{ $featureOn ? 'ENABLED — click to disable' : 'DISABLED — click to enable' }}
-                    </button>
-                </form>
+                @if($canManageRelease)
+                    <form method="POST" action="/admin/app-updates/feature-toggle">
+                        @csrf
+                        <button type="submit" class="inline-flex items-center px-4 py-2 rounded-lg text-sm font-semibold transition {{ $featureOn ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-400' }}">
+                            <span class="w-2 h-2 rounded-full mr-2 {{ $featureOn ? 'bg-white' : 'bg-gray-500 dark:bg-gray-400' }}"></span>
+                            {{ $featureOn ? 'ENABLED — click to disable' : 'DISABLED — click to enable' }}
+                        </button>
+                    </form>
+                @else
+                    <span class="px-3 py-1.5 rounded-full text-xs font-semibold {{ $featureOn ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-600' }}">
+                        {{ $featureOn ? 'ENABLED' : 'DISABLED' }} · read only
+                    </span>
+                @endif
             </div>
 
             {{-- Search + filters (owner, 20 Jul 2026) --}}
@@ -155,6 +168,7 @@
                                     <td class="px-4 py-3 text-gray-600 dark:text-gray-300">{{ number_format($upd->seens_count) }} users</td>
                                     <td class="px-4 py-3 text-gray-500 dark:text-gray-400 whitespace-nowrap">{{ $upd->created_at->format('d M Y, h:i A') }}</td>
                                     <td class="px-4 py-3">
+                                        @if($canManageRelease)
                                         <div class="flex items-center gap-1.5 flex-wrap">
                                             <button type="button"
                                                 onclick='openEditModal(@json($upd->id), @json($upd->title), @json(implode("\n", $upd->points ?? [])), @json($upd->image_path ? asset("storage/" . $upd->image_path) : null), @json($upd->audience), @json((bool) ($upd->is_featured ?? false)), @json($upd->type), @json(array_values((array) ($upd->target_categories ?? []))), @json($upd->audience_family))'
@@ -180,6 +194,9 @@
                                                 <button type="submit" class="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300 hover:bg-red-200">Archive</button>
                                             </form>
                                         </div>
+                                        @else
+                                            <span class="text-xs text-gray-500 dark:text-gray-400">Read only</span>
+                                        @endif
                                     </td>
                                 </tr>
                             @empty
@@ -203,6 +220,7 @@
         </div>
     </div>
 
+    @if($canManageRelease)
     {{-- Add modal --}}
     <div id="addUpdateModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4" style="background: rgba(0,0,0,0.5);">
         <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
@@ -478,4 +496,5 @@
             document.getElementById('editUpdateModal').classList.remove('hidden');
         }
     </script>
+    @endif
 </x-admin-layout>

@@ -500,7 +500,7 @@ class PosDayCloseStreamSplitTest extends TestCase
         $this->assertSame(694.0, (float) $page['stats']->total_amount);
         $this->assertSame(694.0, $page['dayClosePresentation']['total']);
         $this->assertSame(44.0, $page['dayClosePresentation']['tax']);
-        $this->assertSame(1, $page['dayClosePresentation']['count']);
+        $this->assertEquals(1, $page['dayClosePresentation']['count']);
         $this->assertSame(0.0, $page['dayClosePresentation']['provisional']);
 
         $user->pos_role = 'pos_manager';

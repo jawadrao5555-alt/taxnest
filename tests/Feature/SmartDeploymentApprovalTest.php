@@ -226,7 +226,7 @@ class SmartDeploymentApprovalTest extends TestCase
         $base = 'https://api.github.com/repos/jawadrao5555-alt/taxnest/';
         Http::preventStrayRequests();
         Http::fake([
-            $base.'pulls?state=closed*' => Http::response([$pr]),
+            $base.'pulls?state=all*' => Http::response([$pr]),
             $base.'pulls/55' => Http::response($pr),
             $base.'commits/main' => Http::response(['sha' => $merge]),
             $base.'commits/'.self::SHA.'/check-runs*' => Http::response([
@@ -272,6 +272,83 @@ class SmartDeploymentApprovalTest extends TestCase
         $this->get('/admin/deployment-approval?history=1')->assertOk()
             ->assertSee('Passed for this commit')->assertSee('actions/runs/123')
             ->assertDontSee('Approve deployment of this commit');
+        $this->get('/admin/deployment-approval?history=1&deployment=verified')->assertOk()
+            ->assertSee('1 PR found')->assertSee('Passed for this commit');
+        $row->update(['deployed_sha' => str_repeat('c', 40)]);
+        $this->get('/admin/deployment-approval?history=1&deployment=verified')->assertOk()
+            ->assertSee('No PRs match these filters.');
+    }
+
+    public function test_pr_history_searches_every_github_page_before_filtering_and_paginating(): void
+    {
+        $base = 'https://api.github.com/repos/jawadrao5555-alt/taxnest/';
+        $listing = $base.'pulls?state=all&sort=created&direction=asc&per_page=100&page=';
+        $pr = fn (int $number, array $fields = []) => array_replace($this->eligiblePr(), [
+            'number' => $number,
+            'title' => 'Synthetic open PR '.$number,
+            'updated_at' => '2026-11-06T19:02:00Z',
+        ], $fields);
+        $first = array_map($pr, range(1, 100));
+        $first[2] = $pr(3, [
+            'title' => 'PRA kitchen printing fallback',
+            'body' => "## Summary\nRepairs the kitchen queue. Fixes #502.\n<script>fixtureUnsafe()</script>",
+            'state' => 'closed',
+        ]);
+        $second = array_map($pr, range(101, 130));
+        $second[29] = $pr(130, [
+            'title' => 'DI packing follow-up',
+            'draft' => true,
+            'body' => 'Tracks https://github.com/jawadrao5555-alt/taxnest/issues/502',
+        ]);
+        Http::preventStrayRequests();
+        Http::fake([
+            $listing.'1' => Http::response($first),
+            $listing.'2' => Http::response($second),
+        ]);
+        $owner = AdminUser::query()->create([
+            'name' => 'Owner', 'email' => 'history-owner@example.test',
+            'password' => 'secret-password', 'role' => 'super_admin',
+        ]);
+        $history = '/admin/deployment-approval?history=1';
+        $this->actingAs($owner, 'admin')->get($history)
+            ->assertOk()->assertSee('130 PRs found')->assertSee('Page 1 of 6')
+            ->assertSee('DI packing follow-up')->assertDontSee('PRA kitchen printing fallback');
+        $this->get($history.'&page=6')->assertOk()->assertSee('Page 6 of 6')
+            ->assertSee('PRA kitchen printing fallback')->assertDontSee('DI packing follow-up');
+        $this->get($history.'&q=issue+%23502')->assertOk()->assertSee('2 PRs found')
+            ->assertSee('Repairs the kitchen queue.')->assertSee('DI packing follow-up')
+            ->assertDontSee('<script>fixtureUnsafe()</script>', false);
+        $this->get($history.'&q=502&state=closed&module=pra&from=2026-11-07&to=2026-11-07&deployment=missing')
+            ->assertOk()->assertSee('1 PR found')->assertSee('PRA kitchen printing fallback')
+            ->assertSee('Closed without merge')->assertDontSee('DI packing follow-up');
+        $this->get($history.'&q=130&state=draft&module=di')->assertOk()
+            ->assertSee('1 PR found')->assertSee('DI packing follow-up')->assertSee('Draft');
+        $this->get($history.'&q=KITCHEN+QUEUE&from=2026-11-08')->assertOk()->assertSee('No PRs match these filters.');
+        $this->get($history.'&q=KITCHEN+QUEUE')->assertOk()->assertSee('1 PR found');
+        Http::assertSentCount(2);
+        $this->assertDatabaseCount('owner_deployment_approval_requests', 0);
+    }
+
+    public function test_pr_history_reports_failure_instead_of_showing_a_partial_repository(): void
+    {
+        $listing = 'https://api.github.com/repos/jawadrao5555-alt/taxnest/pulls?state=all&sort=created&direction=asc&per_page=100&page=';
+        Http::preventStrayRequests();
+        Http::fake([
+            $listing.'1' => Http::response(array_map(fn ($number) => array_replace($this->eligiblePr(), [
+                'number' => $number,
+                'title' => 'Partial snapshot PR '.$number,
+            ]), range(1, 100))),
+            $listing.'2' => Http::response(['message' => 'upstream sensitive detail'], 429, ['Retry-After' => '30']),
+        ]);
+        $owner = AdminUser::query()->create([
+            'name' => 'Owner', 'email' => 'history-owner@example.test',
+            'password' => 'secret-password', 'role' => 'super_admin',
+        ]);
+        $this->actingAs($owner, 'admin')->get('/admin/deployment-approval?history=1')->assertOk()
+            ->assertSee('GitHub deployment validation temporarily unavailable')
+            ->assertDontSee('upstream sensitive detail')
+            ->assertDontSee('Partial snapshot PR 100')
+            ->assertDontSee('No PRs match these filters.');
     }
 
     private function eligiblePr(): array

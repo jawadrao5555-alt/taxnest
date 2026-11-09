@@ -35,13 +35,16 @@ secret is stored in the web application.
 
 ## A PR was manually merged before the relay picked it up
 
-Open **Deploy Approvals → Release history** to view recent GitHub merges and
-TaxNest deployment evidence for each exact merge SHA. A trusted PR whose merge
+Open **Deploy Approvals → PR history** to browse all repository PRs. Search by
+PR or issue number, title, or description, and filter by PR status, module,
+activity date, and deployment outcome. GitHub metadata is cached for five
+minutes. Modules are inferred from labels, titles, and branch names. TaxNest
+matches deployment and live verification to the exact merge SHA. A trusted PR whose merge
 commit is still the current `main` tip can receive a fresh password approval
 from this screen. The existing relay and owner workflow verify the original PR
 HEAD and merge SHA, then use their dispatch-only path. If the tip changes, the
 approval cannot deploy the stale merge. The recovery procedure below remains
-available on installations that do not have Release history yet.
+available on installations that do not have PR history yet.
 
 A merged PR disappears from the Admin release selector, which lists only open,
 validated PRs. A successful Approval Relay run with zero claims did **not**

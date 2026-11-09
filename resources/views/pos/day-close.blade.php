@@ -35,7 +35,7 @@
     @endif
 
     @php
-$presentation = \App\Services\PosReportPresentation::forView($financialHistory ?? null, $streamSplit ?? null, auth('pos')->user(), (bool)($showLocalStream ?? false));
+$presentation = $dayClosePresentation ?? \App\Services\PosReportPresentation::forView($financialHistory ?? null, $streamSplit ?? null, auth('pos')->user(), (bool)($showLocalStream ?? false));
 @endphp
     @if($presentation)<div class="rounded-xl border bg-white dark:bg-gray-900 p-4 mb-4 overflow-auto">@include('pos.partials.report-summary-tables')</div>@endif
     {{-- Stranded-day banner (Task 455): prior business day(s) never closed —

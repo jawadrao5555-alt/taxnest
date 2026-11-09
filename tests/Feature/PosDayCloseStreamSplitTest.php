@@ -466,6 +466,54 @@ class PosDayCloseStreamSplitTest extends TestCase
         $this->assertSame(6, DB::table('pos_transactions')->count(), 'no wash — every bill survives');
     }
 
+    public function test_default_admin_preview_counts_final_reporting_off_bills_in_the_summary(): void
+    {
+        $companyId = $this->makeCompany();
+        $user = $this->makePosUser($companyId);
+        DB::table('users')->where('id', $user->id)->update(['role' => 'company_admin']);
+        $user = User::find($user->id);
+        $this->makeTxn($companyId, 'L032', [
+            'pra_status' => 'local',
+            'pra_invoice_number' => null,
+            'subtotal' => 650,
+            'tax_amount' => 44,
+            'total_amount' => 694,
+            'created_by' => $user->id,
+        ]);
+        $this->makeTxn($companyId, 'L-SEPARATE', [
+            'invoice_mode' => 'local',
+            'pra_status' => 'local',
+            'pra_invoice_number' => null,
+            'total_amount' => 999,
+            'created_by' => $user->id,
+        ]);
+        $this->makeTxn($this->makeCompany(), 'P-OTHER', ['total_amount' => 1234]);
+
+        Auth::guard('pos')->setUser($user);
+        app()->instance('currentCompanyId', $companyId);
+
+        $page = (new PosController())->dayCloseReport(
+            Request::create('/pos/day-close', 'GET', ['date' => now()->toDateString()])
+        )->getData();
+
+        $this->assertFalse($page['showLocalStream']);
+        $this->assertSame(694.0, (float) $page['stats']->total_amount);
+        $this->assertSame(694.0, $page['dayClosePresentation']['total']);
+        $this->assertSame(44.0, $page['dayClosePresentation']['tax']);
+        $this->assertSame(1, $page['dayClosePresentation']['count']);
+        $this->assertSame(0.0, $page['dayClosePresentation']['provisional']);
+
+        $user->pos_role = 'pos_manager';
+        $managerPage = (new PosController())->dayCloseReport(
+            Request::create('/pos/day-close', 'GET', ['date' => now()->toDateString()])
+        )->getData();
+        $this->assertNull($managerPage['dayClosePresentation']);
+        $managerPresentation = \App\Services\PosReportPresentation::forView(
+            null, $managerPage['streamSplit'], $user, $managerPage['showLocalStream']
+        );
+        $this->assertArrayNotHasKey('local', $managerPresentation['streams']);
+    }
+
     public function test_open_day_and_x_report_do_not_reintroduce_archived_local_rows(): void
     {
         $companyId = $this->makeCompany();

@@ -14126,7 +14126,6 @@ class PosController extends Controller
             : $this->buildDayCloseStreamSplit($streamTransactions, $hotelRefunds);
         // New reports freeze the tax split inside the existing stream snapshot,
         // so historical screen/PDF/thermal values survive a local-bill wash.
-        if (!$existingReport || $dayCloseIso) $streamSplit['report_groups']=\App\Services\PosFinancialHistory::groups($streamTransactions)->all();
         $frozenTaxSplit = $streamSplit['tax_split'] ?? null;
         if (is_array($frozenTaxSplit)) {
             $stats->taxable_value = (float) ($frozenTaxSplit['taxable'] ?? 0);
@@ -14137,6 +14136,21 @@ class PosController extends Controller
         // khufia local-check mode ON = Local stream figures too. LOCAL-scoped
         // viewers always see their own local world (scope forcing intact).
         $showLocalStream = (bool) session('pos_local_check') || $dayCloseScope === 'local';
+
+        // Default admin preview uses the same scoped bills as the headline.
+        // A finalized reporting-OFF bill can have invoice_mode=pra while its
+        // financial-history stream is local. Keep it without adding rows that
+        // belong only to the separate Local check view.
+        $useHeadlineRows = !$existingReport && !$showLocalStream
+            && $dayCloseScope === 'both' && $dayCloseUser?->isPosAdmin()
+            && !$dayCloseUser->posHidesLocalStream();
+        if (!$existingReport || $dayCloseIso) {
+            $reportRows = $useHeadlineRows ? $transactions : $streamTransactions;
+            $streamSplit['report_groups'] = \App\Services\PosFinancialHistory::groups($reportRows)->all();
+        }
+        $dayClosePresentation = $useHeadlineRows
+            ? \App\Services\PosReportPresentation::fromFrozen($streamSplit['report_groups'], ['pra', 'local', 'exempt'])
+            : null;
 
         // Delivery Riders (Jul 2026): live rider cash figures for the recon preview
         // (unsettled rider cash is OUT of the drawer; earlier-day settlements are IN).
@@ -14238,7 +14252,7 @@ class PosController extends Controller
              return view('pos.day-close-summary', compact('company', 'date', 'stats', 'existingReport', 'streamSplit', 'showLocalStream', 'dcIso', 'dcBranchName', 'dcAllBranches', 'counterCashTotals', 'summary'));
          }
 
-         return view('pos.day-close', compact('parkedBills', 'company', 'date', 'stats', 'existingReport', 'cashierBreakdown', 'terminalBreakdown', 'previousReports', 'transactions', 'localWash', 'washBills', 'analytics', 'riderFigures', 'dayOpening', 'openOrders', 'occupiedTables', 'openHeld', 'unclosedPriorDays', 'streamSplit', 'showLocalStream', 'pendingDeliveries', 'dcBlockersAllClearable', 'dcReturnDetail', 'dcReturnParents', 'dcIso', 'dcBranchName', 'dcAllBranches', 'dayOpeningTotal', 'counterCash', 'counterCashTotals', 'counterCashLive', 'hotelOccupancy'));
+         return view('pos.day-close', compact('dayClosePresentation', 'parkedBills', 'company', 'date', 'stats', 'existingReport', 'cashierBreakdown', 'terminalBreakdown', 'previousReports', 'transactions', 'localWash', 'washBills', 'analytics', 'riderFigures', 'dayOpening', 'openOrders', 'occupiedTables', 'openHeld', 'unclosedPriorDays', 'streamSplit', 'showLocalStream', 'pendingDeliveries', 'dcBlockersAllClearable', 'dcReturnDetail', 'dcReturnParents', 'dcIso', 'dcBranchName', 'dcAllBranches', 'dayOpeningTotal', 'counterCash', 'counterCashTotals', 'counterCashLive', 'hotelOccupancy'));
     }
 
      /**

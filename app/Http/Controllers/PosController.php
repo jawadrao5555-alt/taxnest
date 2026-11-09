@@ -5876,6 +5876,7 @@ class PosController extends Controller
         $companyId = app('currentCompanyId');
         $validated = $request->validate(['date' => ['nullable', 'date_format:Y-m-d'], 'search'=>['nullable','string','max:100'], 'order_type'=>['nullable','in:dine_in,takeaway,delivery'], 'payment_method'=>['nullable','in:cash,card,debit_card,credit_card,qr_payment,bank_transfer']]);
         $businessDate = $validated['date'] ?? \App\Services\PosBusinessDay::current($companyId);
+        $hasDeliveryAddress = \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'delivery_address');
 
         // Visibility MUST mirror receipt(): archived bills are listed ONLY when
         // invoice_mode='local' (post-finalize archive) — archived PRA bills stay
@@ -5912,10 +5913,13 @@ class PosController extends Controller
             // Task 1197: isolated cashier's Reprint list = OWN bills only.
             // ANDs with the scope closure above (compose, never replace).
             ->tap(fn ($q) => PosTransaction::applyCashierIsolation($q, auth('pos')->user()))
-            ->when(!empty($validated['search']), function ($q) use ($validated) {
+            ->when(!empty($validated['search']), function ($q) use ($validated, $hasDeliveryAddress) {
                 $term = trim($validated['search']);
-                $q->where(function ($match) use ($term) {
+                $q->where(function ($match) use ($term, $hasDeliveryAddress) {
                     foreach (['invoice_number','pra_invoice_number','customer_name'] as $field) $match->orWhere($field, \App\Helpers\DbCompat::like(), '%'.$term.'%');
+                    if ($hasDeliveryAddress) {
+                        $match->orWhere(fn ($delivery) => $delivery->where('order_type', 'delivery')->where('delivery_address', \App\Helpers\DbCompat::like(), '%'.$term.'%'));
+                    }
                     if (strlen(\App\Services\PosCustomerPhoneIdentity::searchDigits($term)) >= 3) $match->orWhere(fn ($phoneQuery) => \App\Services\PosCustomerPhoneIdentity::constrain($phoneQuery, 'customer_phone', $term));
                     if (is_numeric($term)) $match->orWhereRaw('CAST(total_amount AS CHAR) LIKE ?', ['%'.$term.'%']);
                     if (\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions','bill_token') && preg_match('/^(?:[LPE]-?)?0*(\d+)$/iD', $term, $token)) $match->orWhereRaw('CAST(bill_token AS CHAR) LIKE ?', ['%'.$token[1].'%']);
@@ -5930,6 +5934,7 @@ class PosController extends Controller
             ->orderBy('id', 'desc')
             ->limit(301)
             ->get(['id', 'invoice_number', 'pra_invoice_number', 'customer_name', 'customer_phone', 'total_amount', 'payment_method', 'order_type', 'invoice_mode', 'pra_status', 'created_at',
+                   ...($hasDeliveryAddress ? ['delivery_address'] : []),
                    ...(\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'bill_token') ? ['bill_token'] : [])]);
 
         $hasMore=$bills->count()>300;
@@ -5983,6 +5988,7 @@ class PosController extends Controller
                 'pra_invoice_number' => $b->pra_invoice_number,
                 'customer_name'      => $b->customer_name,
                 'customer_phone'     => $b->customer_phone,
+                'delivery_address'  => $b->order_type === 'delivery' ? $b->delivery_address : null,
                 'total_amount'       => (float) $b->total_amount,
                 'payment_method'     => $b->payment_method,
                 'payment_label'      => \App\Support\PosPaymentLabels::label($b->payment_method),

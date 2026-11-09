@@ -493,8 +493,11 @@
         @if($transaction->customer_name)
         <tr><td class="info-label">{{ __('pos.receipt_customer') }}:</td><td class="info-value">{{ $transaction->customer_name }}</td></tr>
         @endif
+        @if($transaction->customer_phone && ($transaction->order_type === 'delivery' || $transaction->delivery_address))
+        <tr><td class="info-label">{{ __('pos.receipt_phone') }}:</td><td class="info-value"><strong>{{ $transaction->customer_phone }}</strong></td></tr>
+        @endif
         @if($transaction->delivery_address)
-        <tr><td class="info-label">{{ __('pos.receipt_deliver') }}:</td><td class="info-value">{{ $transaction->delivery_address }}</td></tr>
+        <tr><td class="info-label">{{ __('pos.receipt_deliver') }}:</td><td class="info-value"><strong>{{ $transaction->delivery_address }}</strong></td></tr>
         @endif
         {{-- Delivery Riders (Jul 2026): assigned rider on delivery receipts (display-only, all branches). --}}
         @if($transaction->rider)

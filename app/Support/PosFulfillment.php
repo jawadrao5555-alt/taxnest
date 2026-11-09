@@ -150,8 +150,9 @@ final class PosFulfillment
 
     public static function paymentResponse($bill): array
     {
-        if ($bill->rider_collection_amount === null) return [];
-        return ['rider_collection_amount' => (float) $bill->rider_collection_amount,
+        $method = ['payment_method' => $bill->payment_method];
+        if ($bill->rider_collection_amount === null) return $method;
+        return $method + ['rider_collection_amount' => (float) $bill->rider_collection_amount,
             'counter_amount' => round((float) $bill->total_amount - (float) $bill->rider_collection_amount, 2),
             'cash_received' => (float) $bill->cash_received, 'change_due' => (float) $bill->change_due];
     }

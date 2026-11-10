@@ -216,10 +216,16 @@
                 </div>
             </div>
 
-            @if($callerApkVisible && $callerPlusApkVisible)
+            @if($callerPlusApkVisible)
             <div id="caller-whatsapp" class="mt-8 bg-white rounded-xl border border-sky-200 p-6 scroll-mt-24">
                 <h4 class="font-serif text-lg text-[#052730]">Caller ID Plus for WhatsApp</h4>
-                <p class="mt-2 text-sm text-gray-600">If Android blocks Caller ID Plus, keep Play Protect on and contact TaxNest support for a supported installation option. The standard Caller ID download above supports calls to your shop SIM.</p>
+                <p class="mt-1 text-xs font-semibold uppercase tracking-widest text-gray-400">Android · APK · v{{ $callerPlusApkVersion }}</p>
+                <p class="mt-2 text-sm text-gray-600">Supports calls to your shop SIM and WhatsApp. WhatsApp call detection requires Android notification access.</p>
+                <p class="mt-2 text-sm text-gray-600">If Play Protect blocks the installation, keep it on and <a href="/contact" class="text-sky-700 underline hover:no-underline">contact TaxNest support</a>.</p>
+                @if($callerApkVisible)
+                <p class="mt-2 text-sm text-gray-600">For SIM calls only, you can use the standard Caller ID download above.</p>
+                @endif
+                <a href="{{ url('downloads/taxnest-caller-plus.apk') }}" class="mt-4 inline-block rounded-lg bg-sky-700 px-5 py-3 text-center text-sm font-semibold text-white transition-colors hover:bg-sky-800">Download Caller ID Plus APK</a>
             </div>
             @endif
 

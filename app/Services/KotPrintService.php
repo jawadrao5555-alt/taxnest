@@ -790,7 +790,7 @@ class KotPrintService
     /**
      * @return array{printed: bool, reason?: string, job_ids?: array<int>}
      */
-    public static function enqueueForOrder(Company $company, RestaurantOrder $order, ?int $userId, bool $delta = false, bool $queueWhileOffline = false, ?string $dedupeKey = null): array
+    public static function enqueueForOrder(Company $company, RestaurantOrder $order, ?int $userId, bool $delta = false, bool $queueWhileOffline = false, ?string $dedupeKey = null, ?array $snapshotLineIds = null): array
     {
         try {
             $settings = $company->printerSettings();
@@ -827,11 +827,22 @@ class KotPrintService
                 ? $order->items->whereNull('kot_printed_at')->pluck('id')->map(fn ($i) => (int) $i)
                     ->reject(fn ($i) => in_array($i, $handoffIds, true))->values()->all()
                 : null;
+            if ($snapshotLineIds !== null) {
+                $eligible = $delta ? $deltaIds : $order->items->pluck('id')->all();
+                $snapshotLineIds = array_values(array_intersect($snapshotLineIds, $eligible));
+                if (!$snapshotLineIds) {
+                    return ['printed' => true, 'job_ids' => []];
+                }
+            }
             if ($delta && empty($deltaIds)) {
                 return ['printed' => true, 'job_ids' => [], 'reason' => $handoffIds ? 'local_handoff' : 'nothing_unprinted'];
             }
             $makeJob = fn (?string $printer, ?string $renderQuery, ?string $ownerDeviceUid = null) =>
-                self::queueOrderSlip($order, $userId, $printer, $renderQuery, $ownerDeviceUid, $deltaIds, $dedupeKey);
+                self::queueOrderSlip(
+                    $order, $userId, $printer,
+                    $snapshotLineIds === null ? $renderQuery : ($renderQuery ? $renderQuery . '&' : '') . 'waiter_snapshot=1',
+                    $ownerDeviceUid, $snapshotLineIds ?? $deltaIds, $dedupeKey,
+                );
 
             $stations = PosStation::activeFor($company->id);
 
@@ -858,7 +869,8 @@ class KotPrintService
             }
 
             // Stations configured: SPLIT — one job per station that has items.
-            $baseItems = $delta ? $order->items->whereIn('id', $deltaIds)->values() : $order->items;
+            $routeLineIds = $snapshotLineIds ?? $deltaIds;
+            $baseItems = $routeLineIds === null ? $order->items : $order->items->whereIn('id', $routeLineIds)->values();
             $itemMap = PosStation::mapItems($company->id, $stations, $baseItems);
             $sids = collect($itemMap)->values()->unique()->sort()->values();
             if ($sids->isEmpty()) {
@@ -874,11 +886,14 @@ class KotPrintService
                 }
                 $plan[] = [$printer, 'station=' . $sid . $deltaQ, self::stationDeviceUid($station, $settings)];
             }
-            $jobIds = [];
-            foreach ($plan as [$printer, $rq, $ownerUid]) {
-                $jobIds[] = $makeJob($printer, $rq, $ownerUid)->id;
-            }
-            $counterCopy();
+            $jobIds = DB::transaction(function () use ($plan, $makeJob, $counterCopy) {
+                $ids = [];
+                foreach ($plan as [$printer, $rq, $ownerUid]) {
+                    $ids[] = $makeJob($printer, $rq, $ownerUid)->id;
+                }
+                $counterCopy();
+                return $ids;
+            });
             return ['printed' => true, 'job_ids' => $jobIds];
         } catch (\Throwable $e) {
             \Log::warning('KotPrintService enqueue failed: ' . $e->getMessage(), ['order_id' => $order->id ?? null]);
@@ -916,7 +931,8 @@ class KotPrintService
                 if (!$lineIds) {
                     return $jobs->first();
                 }
-                if ($pending = $jobs->firstWhere('status', 'pending')) {
+                if (!str_contains((string) $renderQuery, 'waiter_snapshot=1')
+                    && ($pending = $jobs->firstWhere('status', 'pending'))) {
                     $pending->update(['printed_item_ids' => array_merge($pending->printed_item_ids ?? [], $lineIds)]);
                     return $pending;
                 }
@@ -940,6 +956,29 @@ class KotPrintService
             }
             return PosPrintJob::create($attrs);
         });
+    }
+
+    /**
+     * A waiter-owned slip already exists for these kitchen lines. KDS auto
+     * printing must leave that slip with the queue even while the agent is down
+     * or the outcome is awaiting an operator check.
+     */
+    public static function waiterSnapshotsCover(RestaurantOrder $order): bool
+    {
+        $jobs = PosPrintJob::where('company_id', $order->company_id)
+            ->where('restaurant_order_id', $order->id)->where('type', 'kot')
+            ->where('render_query', 'like', '%waiter_snapshot=1')
+            ->whereIn('status', ['pending', 'printing', 'failed', 'done'])
+            ->get(['printed_item_ids']);
+        if ($jobs->isEmpty()) {
+            return false;
+        }
+
+        \App\Support\PosKitchenLines::pruneOrder($order);
+        $unprinted = $order->items->whereNull('kot_printed_at')->pluck('id')->all();
+        $covered = $jobs->flatMap(fn (PosPrintJob $job) => $job->printed_item_ids ?? [])->all();
+
+        return !array_diff($unprinted, $covered);
     }
 
     /**

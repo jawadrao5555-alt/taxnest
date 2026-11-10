@@ -1257,6 +1257,14 @@ class PosController extends Controller
             ]);
         }
 
+        if ($validated['type'] === 'kot' && $request->boolean('kds_auto') && $request->filled('restaurant_order_id')) {
+            $waiterOrder = \App\Models\RestaurantOrder::where('company_id', $companyId)
+                ->where('source', 'waiter')->with('items')->find((int) $validated['restaurant_order_id']);
+            if ($waiterOrder && \App\Services\KotPrintService::waiterSnapshotsCover($waiterOrder)) {
+                return response()->json(['success' => true, 'job_ids' => [], 'deduped' => true]);
+            }
+        }
+
         if (!$settings['silent_print_enabled']) {
             return $this->rejectPrintJob($request, 'disabled');
         }

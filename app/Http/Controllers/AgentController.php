@@ -2249,7 +2249,8 @@ class AgentController extends Controller
             // route — delta request + new rows => print the WHOLE order (new rows
             // flagged NEW); delta with nothing new stays empty => 204 (no blank,
             // no duplicate). Explicit full prints unchanged.
-            $fullMode = (bool) ($company->pos_kot_full_mode ?? false);
+            $waiterSnapshot = ($q['waiter_snapshot'] ?? null) === '1';
+            $fullMode = !$waiterSnapshot && (bool) ($company->pos_kot_full_mode ?? false);
             // Delta snapshot (Pizza Master edit-path bug, Aug 2026): delta jobs
             // now BAKE their unprinted row ids at enqueue (printed_item_ids).
             // Without it, the FIRST job's result-time stamping emptied every
@@ -2258,7 +2259,7 @@ class AgentController extends Controller
             // whereNull rows → 204 → no slip at the counter. Baked ids keep all
             // copies of one send identical; legacy/blank jobs fall back to the
             // old whereNull resolution.
-            $baked = ($delta && is_array($job->printed_item_ids) && count($job->printed_item_ids))
+            $baked = (($delta || $waiterSnapshot) && is_array($job->printed_item_ids) && count($job->printed_item_ids))
                 ? array_map('intval', $job->printed_item_ids)
                 : null;
             // Offline KOT local handoff (Sep 2026): lines the shop PC has
@@ -2295,7 +2296,7 @@ class AgentController extends Controller
                 $ticketItems = $order->items;
                 $newItemIds = $unprinted->pluck('id');
             } else {
-                $ticketItems = $delta ? $unprinted->values() : $order->items;
+                $ticketItems = ($delta || $waiterSnapshot) ? $unprinted->values() : $order->items;
                 $newItemIds = $fullMode ? $unprinted->pluck('id') : collect();
             }
 
@@ -2330,7 +2331,7 @@ class AgentController extends Controller
             // SAME items (still NULL), so retries print identical content.
             $job->update(['printed_item_ids' => $ticketItems->pluck('id')->values()->all()]);
 
-            return response(view('pos.restaurant.kitchen-ticket', compact('order', 'company', 'ticketItems', 'delta', 'kotBatchNo', 'grouped', 'stationLabel', 'newItemIds'))->render())
+            return response(view('pos.restaurant.kitchen-ticket', compact('order', 'company', 'ticketItems', 'delta', 'kotBatchNo', 'grouped', 'stationLabel', 'newItemIds', 'waiterSnapshot'))->render())
                 ->header('Content-Type', 'text/html; charset=UTF-8');
         }
 

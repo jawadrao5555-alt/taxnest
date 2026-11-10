@@ -2673,6 +2673,11 @@ class RestaurantPosController extends Controller
 
         $company = Company::find($companyId);
 
+        if ($request->boolean('kds_auto') && $order->source === 'waiter'
+            && \App\Services\KotPrintService::waiterSnapshotsCover($order)) {
+            return response('', 204);
+        }
+
         // Delivery Charges (aur aaindah koi bhi non-kitchen line) KOT par kabhi
         // nahi jati — bawarchi ke liye woh koi dish nahi hai. Chhant-phatak
         // YAHIN, sab kuch hone se PEHLE: agar isay neeche prepareTicket par

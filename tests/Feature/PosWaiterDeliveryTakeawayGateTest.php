@@ -53,6 +53,7 @@ class PosWaiterDeliveryTakeawayGateTest extends TestCase
             $table->boolean('agent_enabled')->default(false);
             $table->timestamp('agent_last_seen')->nullable();
             $table->boolean('pos_waiter_takeaway_enabled')->nullable();
+            $table->boolean('pos_kot_full_mode')->default(false);
             $table->string('order_match_style')->nullable();
             $table->softDeletes();
             $table->timestamps();
@@ -104,6 +105,7 @@ class PosWaiterDeliveryTakeawayGateTest extends TestCase
             $table->decimal('subtotal', 12, 2)->default(0);
             $table->string('special_notes')->nullable();
             $table->timestamp('kot_printed_at')->nullable();
+            $table->integer('kot_batch_no')->nullable();
             $table->timestamps();
         });
     }
@@ -168,6 +170,56 @@ class PosWaiterDeliveryTakeawayGateTest extends TestCase
             'target_printer' => 'Kitchen USB',
         ]);
         $this->assertDatabaseHas('restaurant_order_items', ['order_id' => $orderId, 'kot_printed_at' => null]);
+    }
+
+    public function test_offline_waiter_initial_and_each_addon_render_as_separate_slips_for_the_same_order(): void
+    {
+        (require database_path('migrations/2026_07_15_150000_add_pos_print_jobs_and_printer_settings.php'))->up();
+        (require database_path('migrations/2026_07_16_150000_add_pos_stations.php'))->up();
+        $company = $this->makeCompany([
+            'agent_enabled' => true,
+            'agent_last_seen' => now()->subMinutes(3),
+            'pos_printer_settings' => ['silent_print_enabled' => true, 'kot_printer' => 'Kitchen USB'],
+        ]);
+        DB::table('companies')->where('id', $company->id)->update(['pos_kot_full_mode' => true]);
+        $this->makeUser($company, 'pos_waiter');
+        $order = $this->punch('takeaway')->getData(true);
+        $orderId = $order['order_id'];
+        foreach ([['Extra Naan', 'No butter'], ['Extra Tikka', 'Less spice']] as [$name, $note]) {
+            $request = Request::create("/pos/waiter/orders/{$orderId}/items", 'POST', [
+                'items' => [['name' => $name, 'quantity' => 2, 'unit_price' => 30, 'special_notes' => $note]],
+            ]);
+            $this->assertSame(200, app(RestaurantWaiterController::class)->appendItems($request, $orderId)->getStatusCode());
+        }
+
+        $this->assertTrue(\App\Services\KotPrintService::waiterSnapshotsCover(\App\Models\RestaurantOrder::findOrFail($orderId)));
+        $auto = Request::create('/pos/api/print-jobs', 'POST', [
+            'type' => 'kot', 'restaurant_order_id' => $orderId, 'kds_auto' => true,
+        ]);
+        $this->assertTrue(app(\App\Http\Controllers\PosController::class)->apiCreatePrintJob($auto)->getData(true)['deduped']);
+        $fallback = Request::create("/pos/restaurant/orders/{$orderId}/kitchen-ticket?kds_auto=1", 'GET');
+        $this->assertSame(204, app(\App\Http\Controllers\RestaurantPosController::class)->kitchenTicket($fallback, $orderId)->getStatusCode());
+
+        $jobs = DB::table('pos_print_jobs')->where('restaurant_order_id', $orderId)->orderBy('id')->pluck('id');
+        $this->assertCount(3, $jobs);
+        $names = ['Bottle', 'Extra Naan', 'Extra Tikka'];
+        foreach ($jobs as $i => $job) {
+            $contentRequest = Request::create("/api/agent/print-jobs/{$job}/content");
+            $contentRequest->attributes->set('agent_company', $company->fresh());
+            $html = app(\App\Http\Controllers\AgentController::class)->printJobContent($contentRequest, $job)->getContent();
+            $this->assertStringContainsString($order['order_number'], $html);
+            foreach ($names as $j => $name) {
+                if ($i === $j) {
+                    $this->assertStringContainsString($name, $html);
+                } else {
+                    $this->assertStringNotContainsString($name, $html);
+                }
+            }
+            if ($i > 0) {
+                $this->assertStringContainsString(__('pos.kot_addon_marker'), $html);
+                $this->assertStringContainsString($i === 1 ? 'No butter' : 'Less spice', $html);
+            }
+        }
     }
 
     // ── 1. Delivery: always blocked for waiters ──────────────────────────

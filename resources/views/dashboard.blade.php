@@ -204,7 +204,7 @@
                         </div>
                     </a>
 
-                    <a href="/fbr/connection-status" class="group relative flex flex-col items-center justify-center p-5 rounded-2xl bg-gradient-to-br from-indigo-500 to-indigo-600 shadow-lg shadow-indigo-500/20 hover:shadow-xl hover:shadow-indigo-500/30 hover:-translate-y-1 transition-all duration-300 overflow-hidden">
+                    <a href="{{ url('/company/fbr-settings') }}" class="group relative flex flex-col items-center justify-center p-5 rounded-2xl bg-gradient-to-br from-indigo-500 to-indigo-600 shadow-lg shadow-indigo-500/20 hover:shadow-xl hover:shadow-indigo-500/30 hover:-translate-y-1 transition-all duration-300 overflow-hidden">
                         <div class="absolute inset-0 bg-white/0 group-hover:bg-white/10 transition-all duration-300"></div>
                         <div class="relative">
                             <div class="p-2.5 bg-white/20 rounded-xl mb-2.5 backdrop-blur-sm">

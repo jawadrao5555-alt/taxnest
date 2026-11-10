@@ -848,6 +848,7 @@ class PosController extends Controller
 
         return response()->json([
             'jobs' => $jobs,
+            'status_jobs' => \App\Services\KotPrintService::statusJobs($company),
             'failover_ms' => round($ms, 3),
         ]);
     }
@@ -1459,91 +1460,15 @@ class PosController extends Controller
         // one FULL (non-station-split) copy of the KOT on the counter printer,
         // in ADDITION to the normal kitchen job(s). Best-effort: never blocks
         // or fails the main kitchen print.
-        $counterCopy = function () use ($settings, $order, $companyId, $user, $delta, $deltaIds) {
+        $makeJob = fn (?string $printer, ?string $renderQuery, ?string $ownerDeviceUid = null) =>
+            \App\Services\KotPrintService::queueOrderSlip($order, $user->id, $printer, $renderQuery, $ownerDeviceUid, $deltaIds);
+        $counterCopy = function () use ($settings, $order, $makeJob, $delta) {
             try {
                 if (!($settings['counter_kot_enabled'] ?? false)) return;
                 $printer = $settings['counter_kot_printer'] ?? null;
                 if (!$printer || ($order->order_type ?? null) !== 'dine_in') return;
-                // In-flight dedupe — client retry must not double the counter copy.
-                // Delta dedupe-hit MERGES fresh ids into the still-PENDING job
-                // (same rule as $makeJob) so a rapid second edit isn't dropped.
-                $dupe = \App\Models\PosPrintJob::where('company_id', $companyId)
-                    ->where('type', 'kot')
-                    ->where('restaurant_order_id', $order->id)
-                    ->where('target_printer', $printer)
-                    ->where(fn($q) => $delta ? $q->where('render_query', 'delta=1') : $q->whereNull('render_query'))
-                    ->whereIn('status', ['pending', 'printing'])
-                    ->where('created_at', '>=', now()->subMinutes(2))
-                    ->orderByDesc('id')->first();
-                if ($dupe) {
-                    if ($delta && $deltaIds && $dupe->status === 'pending') {
-                        $merged = collect($dupe->printed_item_ids ?? [])->map(fn ($i) => (int) $i)
-                            ->merge($deltaIds)->unique()->values()->all();
-                        if ($merged !== ($dupe->printed_item_ids ?? [])) {
-                            $dupe->update(['printed_item_ids' => $merged]);
-                        }
-                    }
-                    return;
-                }
-                $attrs = [
-                    'company_id' => $companyId,
-                    'type' => 'kot',
-                    'target_printer' => $printer,
-                    'restaurant_order_id' => $order->id,
-                    'render_query' => $delta ? 'delta=1' : null,
-                    'printed_item_ids' => $delta ? $deltaIds : null,
-                    'status' => 'pending',
-                    'created_by' => $user->id,
-                ];
-                // Task 1194: counter copy routes to ITS owning counter (online only).
-                if ($stamp = \App\Services\KotPrintService::deviceStampFor($companyId, $settings['counter_kot_printer_device'] ?? null)) {
-                    $attrs['device_uid'] = $stamp;
-                }
-                \App\Models\PosPrintJob::create($attrs);
+                $makeJob($printer, $delta ? 'delta=1' : null, $settings['counter_kot_printer_device'] ?? null);
             } catch (\Throwable $e) { /* copy is optional — kitchen print already queued */ }
-        };
-        $makeJob = function (?string $printer, ?string $renderQuery, ?string $ownerDeviceUid = null) use ($companyId, $order, $user, $delta, $deltaIds) {
-            // In-flight dedupe (client retry + KDS/cashier race, 30 Jul 2026):
-            // an identical queued/printing job < 2 min old = same physical ticket
-            // already on its way. Delta jobs now carry a BAKED id snapshot, so a
-            // deduped second fire MERGES any newly-unprinted ids into the still-
-            // PENDING job (render reads the row fresh at claim time); an already-
-            // printing job keeps its rendered set — result-time stamping must
-            // only cover rows that physically printed.
-            $inFlight = \App\Models\PosPrintJob::where('company_id', $companyId)
-                ->where('type', 'kot')
-                ->where('restaurant_order_id', $order->id)
-                ->where('target_printer', $printer)
-                ->where(fn($q) => $renderQuery === null ? $q->whereNull('render_query') : $q->where('render_query', $renderQuery))
-                ->whereIn('status', ['pending', 'printing'])
-                ->where('created_at', '>=', now()->subMinutes(2))
-                ->orderByDesc('id')->first();
-            if ($inFlight) {
-                if ($delta && $deltaIds && $inFlight->status === 'pending') {
-                    $merged = collect($inFlight->printed_item_ids ?? [])->map(fn ($i) => (int) $i)
-                        ->merge($deltaIds)->unique()->values()->all();
-                    if ($merged !== ($inFlight->printed_item_ids ?? [])) {
-                        $inFlight->update(['printed_item_ids' => $merged]);
-                    }
-                }
-                return $inFlight;
-            }
-            $attrs = [
-                'company_id' => $companyId,
-                'type' => 'kot',
-                'target_printer' => $printer,
-                'restaurant_order_id' => $order->id,
-                'render_query' => $renderQuery,
-                'printed_item_ids' => ($delta && $deltaIds) ? $deltaIds : null,
-                'status' => 'pending',
-                'created_by' => $user->id,
-            ];
-            // Task 1194: owning-counter stamp — only that counter's agent claims
-            // the job. Online-device rule + column guard live in the helper.
-            if ($stamp = \App\Services\KotPrintService::deviceStampFor($companyId, $ownerDeviceUid)) {
-                $attrs['device_uid'] = $stamp;
-            }
-            return \App\Models\PosPrintJob::create($attrs);
         };
 
         // Delta with nothing unprinted = nothing to print anywhere — succeed with

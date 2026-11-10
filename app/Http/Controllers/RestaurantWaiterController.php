@@ -512,7 +512,7 @@ class RestaurantWaiterController extends Controller
             // print job existed, so the kitchen never got the KOT. Best-effort:
             // a printer problem must never lose the order.
             $company = Company::find($companyId);
-            $kot = \App\Services\KotPrintService::enqueueForOrder($company, $order, $user->id);
+            $kot = \App\Services\KotPrintService::enqueueForOrder($company, $order, $user->id, queueWhileOffline: true);
             if ($kot['printed'] && !empty($kot['job_ids'])) {
                 $order->update(['kot_print_count' => 1]);
             }

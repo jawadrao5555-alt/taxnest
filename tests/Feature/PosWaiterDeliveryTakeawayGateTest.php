@@ -146,6 +146,30 @@ class PosWaiterDeliveryTakeawayGateTest extends TestCase
         return app(RestaurantWaiterController::class)->storeOrder($request);
     }
 
+    public function test_waiter_punch_persists_kot_while_the_print_agent_restarts(): void
+    {
+        (require database_path('migrations/2026_07_15_150000_add_pos_print_jobs_and_printer_settings.php'))->up();
+        (require database_path('migrations/2026_07_16_150000_add_pos_stations.php'))->up();
+        $company = $this->makeCompany([
+            'agent_enabled' => true,
+            'agent_last_seen' => now()->subMinutes(3),
+            'pos_printer_settings' => ['silent_print_enabled' => true, 'kot_printer' => 'Kitchen USB'],
+        ]);
+        $this->makeUser($company, 'pos_waiter');
+
+        $response = $this->punch('takeaway');
+        $this->assertSame(200, $response->getStatusCode());
+        $orderId = $response->getData(true)['order_id'];
+        $this->assertDatabaseHas('pos_print_jobs', [
+            'company_id' => $company->id,
+            'restaurant_order_id' => $orderId,
+            'type' => 'kot',
+            'status' => 'pending',
+            'target_printer' => 'Kitchen USB',
+        ]);
+        $this->assertDatabaseHas('restaurant_order_items', ['order_id' => $orderId, 'kot_printed_at' => null]);
+    }
+
     // ── 1. Delivery: always blocked for waiters ──────────────────────────
 
     public function test_waiter_delivery_is_always_403(): void

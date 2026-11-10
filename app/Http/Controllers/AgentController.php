@@ -1725,6 +1725,8 @@ class AgentController extends Controller
         DB::table('pos_print_jobs')
             ->where('company_id', $company->id)
             ->where('status', 'pending')
+            ->when($deviceAware, fn ($q) => $q->where(fn ($route) =>
+                $route->whereNull('device_uid')->when($deviceUid, fn ($assigned) => $assigned->orWhere('device_uid', $deviceUid))))
             ->whereIn('id', $claimIds)
             ->update($claimFields);
 
@@ -1917,8 +1919,8 @@ class AgentController extends Controller
                 // and fail (and with several such agents it would bounce).
                 // Retarget only when another ONLINE counter reports the SAME
                 // printer name (LAN/shared printer) — re-stamp to that counter.
-                // Nobody else has it → park as failed so it surfaces on the
-                // recent-failed strip instead of sitting stranded forever.
+                // PRA tickets without a carrier stay queued for the owning
+                // counter after a restart, up to the pending expiry horizon.
                 $onlineDevices = collect();
                 try {
                     $onlineDevices = \App\Models\PosAgentDevice::where('company_id', $company->id)
@@ -1933,11 +1935,13 @@ class AgentController extends Controller
                             return $d->device_uid !== $row->device_uid
                                 && PrinterIdentity::reportedHas($d->printers ?? [], $row->target_printer);
                         });
+                        $pendingRoute = DB::table('pos_print_jobs')->where('id', $row->id)
+                            ->where('company_id', $company->id)->where('status', 'pending')
+                            ->where('device_uid', $row->device_uid);
                         if ($carrier) {
-                            DB::table('pos_print_jobs')->where('id', $row->id)
-                                ->update(['device_uid' => $carrier->device_uid, 'updated_at' => now()]);
-                        } else {
-                            DB::table('pos_print_jobs')->where('id', $row->id)->update([
+                            $pendingRoute->update(['device_uid' => $carrier->device_uid, 'updated_at' => now()]);
+                        } elseif ($row->type === 'fbr_kot') {
+                            $pendingRoute->update([
                                 'status' => 'failed',
                                 'error' => 'Counter owning printer "' . $row->target_printer . '" is offline and no other online counter reports this printer.',
                                 'updated_at' => now(),
@@ -2021,18 +2025,18 @@ class AgentController extends Controller
             ->where('attempts', '>=', 3)
             ->update(['status' => 'failed', 'claim_token' => null, 'error' => 'Print attempt timed out repeatedly (agent lost the job mid-print).', 'updated_at' => now()]);
 
-        // Expired unclaimed jobs: an unstamped pending job nobody claimed for
+        // Expired unclaimed jobs: a PRA KOT or an unstamped pending job nobody claimed for
         // `print.pending_expiry_hours` (default 24h — e.g. every agent was
         // switched off) must not surprise-print a day-old bill when a counter
-        // comes back. Park as failed, never delete (evidence retained). Stamped
-        // jobs are handled by the stranded rescue above and only reach here
-        // once unstamped. 0/negative config disables the horizon.
+        // comes back. Park as failed (evidence retained). Other stamped jobs
+        // continue to use stranded rescue. 0/negative disables the horizon.
         $expiryHours = (int) config('print.pending_expiry_hours', 24);
         if ($expiryHours > 0) {
             DB::table('pos_print_jobs')
                 ->where('company_id', $company->id)
                 ->where('status', 'pending')
-                ->when(self::deviceRoutingReady(), fn ($q) => $q->whereNull('device_uid'))
+                ->when(self::deviceRoutingReady(), fn ($q) => $q->where(fn ($route) =>
+                    $route->whereNull('device_uid')->orWhereIn('type', ['kot', 'kot_void'])))
                 ->where('created_at', '<', now()->subHours($expiryHours))
                 ->update([
                     'status' => 'failed',

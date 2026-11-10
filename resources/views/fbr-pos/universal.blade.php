@@ -3163,7 +3163,7 @@ window.addEventListener('popstate', function() {
                           :class="lastIsOffline ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300' : (lastFbrStatus === 'submitted' ? 'bg-emerald-600 text-white' : (lastFbrStatus === 'pending' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' : ((lastFbrStatus === 'offline' || lastFbrStatus === 'failed') ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300')))">
                         <svg x-show="!lastIsOffline && lastFbrStatus === 'submitted'" class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.704 5.29a1 1 0 010 1.42l-7.5 7.5a1 1 0 01-1.42 0l-3.5-3.5a1 1 0 111.42-1.42l2.79 2.8 6.79-6.8a1 1 0 011.42 0z" clip-rule="evenodd"/></svg>
                         <svg x-show="!lastIsOffline && lastFbrStatus === 'pending'" class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
-                        <span x-text="lastIsOffline ? window.TXT.saved_offline_autosync : (lastFbrStatus === 'submitted' ? window.TXT.fbr_verified : (lastFbrStatus === 'pending' ? window.TXT.reporting_to_fbr : ((lastFbrStatus === 'offline' || lastFbrStatus === 'failed') ? window.TXT.saved_will_sync_fbr : window.TXT.local_bill)))"></span>
+                        <span x-text="lastIsOffline ? window.TXT.saved_offline_autosync : (lastFbrStatus === 'submitted' ? window.TXT.fbr_verified : (lastFbrStatus === 'pending' ? window.TXT.reporting_to_fbr : ((lastFbrStatus === 'offline' || lastFbrStatus === 'failed') ? window.TXT.saved_will_sync_fbr : (lastFbrStatus === 'verification_pending' ? {{ Js::from(__('pos.fbr_verification_pending')) }} : window.TXT.local_bill))))"></span>
                     </span>
                 </div>
                 <p x-show="!lastIsOffline && lastFbrStatus === 'submitted'"
@@ -8427,8 +8427,8 @@ function restaurantPos() {
                 // so the popup's slip button is a FIRST print for everyone. Cleared
                 // the moment a slip is actually fired (auto-KOT chain or K key).
                 this.lastKotPending = !!data.transaction_id;
-                this.lastTotal = savedTotal || data.total_amount || 0;
-                this.lastPaymentMethod = method;
+                this.lastTotal = Number(data.total_amount ?? savedTotal ?? 0);
+                this.lastPaymentMethod = data.payment_method || method;
                 this.lastFbrNumber = data.fbr_invoice_number || '';
                 this.lastFbrStatus = data.fbr_status || '';
                 this.lastItemsCount = (this.cart || []).reduce((s, i) => s + (parseFloat(i.quantity) || 0), 0);
@@ -8437,7 +8437,7 @@ function restaurantPos() {
                 this.consumeActiveDraft(); // recalled draft is now billed — drop the draft row
                 // ── Push to Akhri Bills strip (keep last 5) ──────────────────
                 if (data.transaction_id && data.invoice_number) {
-                    this.recentBills = [{ id: data.transaction_id, invoice_number: data.invoice_number, total: savedTotal, method }].concat(this.recentBills).slice(0, 5);
+                    this.recentBills = [{ id: data.transaction_id, invoice_number: data.invoice_number, total: this.lastTotal, method: this.lastPaymentMethod }].concat(this.recentBills).slice(0, 5);
                 }
                 // store() returns a `warning` when the sale saved but FBR submission is
                 // pending/queued (auto-retry engine) — surface it without blocking the flow.
@@ -9557,14 +9557,14 @@ function restaurantPos() {
                     this.lastInvoiceNumber = data.invoice_number || ''; this.lastTransactionId = data.transaction_id || null;
                     this.lastOrderId = orderId || null;
                     this.lastKotPending = false; // Task 1389: PRA-shim path — this order's KOT already went out at hold time
-                    this.lastTotal = savedTotal || data.total_amount || 0; this.lastPaymentMethod = method;
+                    this.lastTotal = Number(data.total_amount ?? savedTotal ?? 0); this.lastPaymentMethod = data.payment_method || method;
                     this.lastFbrNumber = data.fbr_invoice_number || ''; this.lastFbrStatus = data.fbr_status || '';
                     this.lastItemsCount = (this.cart || []).reduce((s, i) => s + (parseFloat(i.quantity) || 0), 0);
                     this.lastSaleAt = Date.now();
                     this.setWaBill(data); // Task 1271: WA extras ride payOrder's JSON when routable
                     // ── Push to Akhri Bills strip ────────────────────────────────────────
                     if (data.transaction_id && data.invoice_number) {
-                        this.recentBills = [{ id: data.transaction_id, invoice_number: data.invoice_number, total: savedTotal, method }].concat(this.recentBills).slice(0, 5);
+                        this.recentBills = [{ id: data.transaction_id, invoice_number: data.invoice_number, total: this.lastTotal, method: this.lastPaymentMethod }].concat(this.recentBills).slice(0, 5);
                     }
                     this.showReceipt = true;
                     this.scheduleReceiptAutoClose();

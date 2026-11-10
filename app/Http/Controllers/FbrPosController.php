@@ -2031,7 +2031,7 @@ class FbrPosController extends Controller
                         'replayed'         => true,
                         'transaction_id'   => $existing->id,
                         'invoice_number'   => $existing->invoice_number,
-                        'total_amount'     => (float) $existing->total_amount,
+                        'total_amount'     => (float) $existing->total_amount,                        'payment_method' => $existing->payment_method,
                         'fbr_invoice_number' => $existing->fbr_invoice_number,
                         'fbr_status'       => $existing->fbr_status,
                         'invoice_mode'     => $existing->invoice_mode,
@@ -3144,7 +3144,7 @@ class FbrPosController extends Controller
                         'success' => true,
                         'transaction_id' => $transaction->id,
                         'invoice_number' => $transaction->invoice_number,
-                        'total_amount' => (float) $transaction->total_amount,
+                        'total_amount' => (float) $transaction->total_amount,                        'payment_method' => $transaction->payment_method,
                         'change_due' => (float) $transaction->change_due,
                         'invoice_mode' => 'local',
                         'fbr_status' => 'local',
@@ -3164,7 +3164,7 @@ class FbrPosController extends Controller
                         'success' => true,
                         'transaction_id' => $transaction->id,
                         'invoice_number' => $transaction->invoice_number,
-                        'total_amount' => (float) $transaction->total_amount,
+                        'total_amount' => (float) $transaction->total_amount,                        'payment_method' => $transaction->payment_method,
                         'change_due' => (float) $transaction->change_due,
                         'wa_phone' => $waExtras['wa_phone'],
                         'share_url' => $waExtras['share_url'],
@@ -3189,7 +3189,7 @@ class FbrPosController extends Controller
                         'success' => true,
                         'transaction_id' => $transaction->id,
                         'invoice_number' => $transaction->invoice_number,
-                        'total_amount' => (float) $transaction->total_amount,
+                        'total_amount' => (float) $transaction->total_amount,                        'payment_method' => $transaction->payment_method,
                         'change_due' => (float) $transaction->change_due,
                         'wa_phone' => $waExtras['wa_phone'],
                         'share_url' => $waExtras['share_url'],
@@ -3213,12 +3213,12 @@ class FbrPosController extends Controller
                         'success' => true,
                         'transaction_id' => $transaction->id,
                         'invoice_number' => $transaction->invoice_number,
-                        'total_amount' => (float) $transaction->total_amount,
+                        'total_amount' => (float) $transaction->total_amount,                        'payment_method' => $transaction->payment_method,
                         'change_due' => (float) $transaction->change_due,
                         'wa_phone' => $waExtras['wa_phone'],
                         'share_url' => $waExtras['share_url'],
                         'invoice_mode' => 'fbr',
-                        'fbr_status' => 'success',
+                        'fbr_status' => 'submitted',
                         'fbr_invoice_number' => $fbrResult['fbr_invoice_number'] ?? null,
                         'message' => __('pos.sale_submitted_fbr_json', ['number' => $transaction->invoice_number, 'fbr' => $fbrResult['fbr_invoice_number'] ?? '']),
                     ]);
@@ -3240,14 +3240,15 @@ class FbrPosController extends Controller
                 || str_contains($errorString, 'unexpected response')
                 || (isset($fbrResult['http_status']) && $fbrResult['http_status'] >= 500);
 
-            if ($isTransient) {
+            $verificationPending = $fbrResult['status'] === 'verification_pending';
+            if (!$verificationPending && $isTransient) {
                 \App\Jobs\RetryFbrPosSubmissionJob::dispatch($transaction->id)->delay(now()->addSeconds(10));
                 if ($request->wantsJson()) {
                     return response()->json([
                         'success' => true,
                         'transaction_id' => $transaction->id,
                         'invoice_number' => $transaction->invoice_number,
-                        'total_amount' => (float) $transaction->total_amount,
+                        'total_amount' => (float) $transaction->total_amount,                        'payment_method' => $transaction->payment_method,
                         'change_due' => (float) $transaction->change_due,
                         'wa_phone' => $waExtras['wa_phone'],
                         'share_url' => $waExtras['share_url'],
@@ -3265,21 +3266,23 @@ class FbrPosController extends Controller
 
             // ✅ Sale was saved locally. FBR is a separate retry-able step — don't scare the cashier with red error.
             $isTokenIssue = str_contains(strtolower($fbrErrors), 'token');
-            $warningMsg = $isTokenIssue
+            $warningMsg = $verificationPending
+                ? __('pos.fbr_verification_pending_no_retry')
+                : ($isTokenIssue
                 ? __('pos.bill_saved_token_pending')
-                : __('pos.bill_saved_fbr_pending', ['error' => $fbrErrors]);
+                : __('pos.bill_saved_fbr_pending', ['error' => $fbrErrors]));
 
             if ($request->wantsJson()) {
                 return response()->json([
                     'success' => true,
                     'transaction_id' => $transaction->id,
                     'invoice_number' => $transaction->invoice_number,
-                    'total_amount' => (float) $transaction->total_amount,
+                    'total_amount' => (float) $transaction->total_amount,                    'payment_method' => $transaction->payment_method,
                     'change_due' => (float) $transaction->change_due,
                     'wa_phone' => $waExtras['wa_phone'],
                     'share_url' => $waExtras['share_url'],
                     'invoice_mode' => 'fbr',
-                    'fbr_status' => 'failed',
+                    'fbr_status' => $verificationPending ? 'verification_pending' : 'failed',
                     'fbr_invoice_number' => null,
                     'message' => __('pos.bill_created_amount', ['number' => $transaction->invoice_number, 'amount' => number_format($transaction->total_amount, 2)]),
                     'warning' => $warningMsg,
@@ -3345,7 +3348,7 @@ class FbrPosController extends Controller
                             'replayed'           => true,
                             'transaction_id'     => $winner->id,
                             'invoice_number'     => $winner->invoice_number,
-                            'total_amount'       => (float) $winner->total_amount,
+                            'total_amount'       => (float) $winner->total_amount,                            'payment_method' => $winner->payment_method,
                             'fbr_invoice_number' => $winner->fbr_invoice_number,
                             'fbr_status'         => $winner->fbr_status,
                             'invoice_mode'       => $winner->invoice_mode,

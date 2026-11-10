@@ -7,10 +7,12 @@ const source = fs.readFileSync(new URL('../../resources/views/pos/universal.blad
 function method(name) {
   const start = source.search(new RegExp('^        (?:async |get )?' + name + '\\(', 'm'));
   assert(start >= 0, name);
+  const firstLine = source.slice(start, source.indexOf('\n', start));
+  if (firstLine.trimEnd().endsWith('},')) return firstLine.trim();
   return source.slice(start, source.indexOf('\n        },', start) + 11).trim();
 }
 function fixture() {
-  const ui = vm.runInNewContext('({' + ['addToCart', 'toggleItemNote', 'historicalMixedPayment', 'restoreFulfillmentCart', 'hasDeliveryPortion', 'hasMixedService', '_localCoreHold', 'payModalRiderCash', 'heldOrderEstimate'].map(method).join('\n') + '})', {
+  const ui = vm.runInNewContext('({' + ['addToCart', 'toggleItemNote', 'historicalMixedPayment', 'restoreFulfillmentCart', 'hasDeliveryPortion', 'hasMixedService', '_localCoreHold', 'payModalRiderCash', 'heldOrderEstimate', 'payingOrderAwaitingOnline', 'r2'].map(method).join('\n') + '})', {
     window: { TXT: {}, NestPosLocal: { heldOrder: { hold() { throw Error('must not silently print mixed service'); } } } }, setTimeout() {},
   });
   Object.assign(ui, { cart: [], typeFlowGate: true, orderType: 'dine_in', fulfillmentMode: null, animateQty() {}, scrollToCartItem() {}, showToast() {}, removeDeliveryCharge() {} });
@@ -68,6 +70,8 @@ test('payment modal quotes the same discounted taxable delivery share as the ser
   assert.equal(ui.payModalRiderCash, 122.51);
   ui.deliveryCollectionMode = 'counter'; assert.equal(ui.payModalRiderCash, 0);
   ui.deliveryCollectionMode = 'rider'; ui.payMethodIndex = 1; assert.equal(ui.payModalRiderCash, 0);
+  ui.payMethodIndex = 0; ui.recalledOrderMeta = { online_payment_awaited_at: '2026-11-10 11:00:00' };
+  assert.equal(ui.payModalRiderCash, 0);
 });
 
 test('recalled held bill keeps an explicit zero-percent tax when quoting counter and rider amounts', () => {

@@ -27,10 +27,15 @@
                     View as Company
                 </button>
             </form>
-            <form method="POST" action="{{ route('saas.admin.companies.impersonate', $company->id) }}" onsubmit="return confirm('FULL ACCESS: you will act AS this company and any change you make (invoices, settings, and live FBR/PRA submissions) is REAL. Continue?');">
+            <form method="POST" action="{{ route('saas.admin.companies.impersonate', $company->id) }}"
+                  class="flex flex-wrap items-center gap-2">
                 @csrf
                 <input type="hidden" name="mode" value="full">
-                <button type="submit" class="flex items-center gap-1.5 px-3 py-1.5 bg-red-100 hover:bg-red-200 text-red-900 text-xs font-semibold rounded-lg transition border border-red-500">
+                <p id="manage-company-warning" class="max-w-xs rounded-md bg-amber-100 px-2 py-1 text-xs text-amber-950">
+                    <strong>Full Access.</strong> Changes to invoices and settings, and live FBR or PRA submissions, are real.
+                </p>
+                <button type="submit" aria-describedby="manage-company-warning"
+                        class="flex items-center gap-1.5 px-3 py-1.5 bg-red-100 hover:bg-red-200 text-red-900 text-xs font-semibold rounded-lg transition border border-red-500">
                     <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
                     Manage as Company
                 </button>

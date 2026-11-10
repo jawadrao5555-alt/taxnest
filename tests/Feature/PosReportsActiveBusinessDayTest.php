@@ -20,6 +20,39 @@ class PosReportsActiveBusinessDayTest extends TestCase
         $method=new \ReflectionMethod(PosController::class,'resolveReportRange');
         return $method->invoke(new PosController(),Request::create('/pos/reports','GET',$query));
     }
+    public function test_dashboard_and_report_pages_render_the_shared_presentation_with_their_own_actions(): void
+    {
+        $company = $this->company('06:00');
+        DB::table('companies')->where('id', $company->id)->update([
+            'is_internal_account' => true,
+            'pos_setup_completed' => true,
+        ]);
+        $user = \App\Models\User::factory()->create([
+            'company_id' => $company->id, 'pos_role' => 'pos_admin', 'role' => 'company_admin',
+        ]);
+        auth('pos')->setUser($user);
+        app()->instance('currentCompanyId', $company->id);
+        $controller = new PosController();
+        $date = PosBusinessDay::current($company->id);
+
+        $dashboard = $controller->dashboard(Request::create('/pos/dashboard', 'GET'))->render();
+        $this->assertStringContainsString('data-pos-report-header', $dashboard);
+        $this->assertStringContainsString('data-dashboard-metric="revenue"', $dashboard);
+        $sales = $controller->reports(Request::create('/pos/reports', 'GET', ['from' => $date, 'to' => $date]))->render();
+        $this->assertStringContainsString('data-pos-report-header', $sales);
+        $this->assertStringContainsString('data-pos-report-filters', $sales);
+        $tax = $controller->taxReports(Request::create('/pos/tax-reports', 'GET'))->render();
+        $this->assertStringContainsString('data-pos-report-header', $tax);
+        $this->assertStringContainsString('data-pos-report-results', $tax);
+        $this->assertStringContainsString(route('pos.tax-reports.pdf'), $tax);
+        $dayClose = $controller->dayCloseReport(Request::create('/pos/day-close', 'GET', ['date' => $date]))->render();
+        $this->assertStringContainsString('data-pos-report-header', $dayClose);
+        $this->assertStringContainsString('data-pos-report-filters', $dayClose);
+        $detail = $controller->dashboardDetail(Request::create('/pos/dashboard/detail/revenue', 'GET', ['date' => $date]), 'revenue')->render();
+        $this->assertStringContainsString('data-pos-report-header', $detail);
+        $this->assertStringContainsString('data-pos-report-results', $detail);
+    }
+
     public function test_after_midnight_default_uses_each_company_cutoff_and_rolls_after_cutoff(): void {
         config(['app.timezone'=>'Asia/Karachi']);Carbon::setTestNow(Carbon::parse('2026-10-22 00:30:00','Asia/Karachi'));
         $night=$this->company('06:00');$calendar=$this->company('00:00');

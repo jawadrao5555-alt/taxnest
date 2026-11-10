@@ -1780,16 +1780,8 @@ class PosController extends Controller
         // to the LOCAL stream instead (their whole world is offline billing —
         // showing them PRA figures would leak the other stream).
         $dashScope = auth('pos')->user()?->posBillingScope() ?? 'both';
+        $excludeLocal = fn ($q) => $this->applyDashboardBillStream($q, $dashScope);
         if ($dashScope === 'local') {
-            $excludeLocal = function ($q) {
-                // Same local stream predicate as pos.reports, except dashboards
-                // retain their normal archived-row scope.
-                $q->where(function ($s) {
-                    $s->where('invoice_mode', 'local')->orWhere(function ($r) {
-                        $r->whereNull('pra_status')->whereNull('pra_invoice_number');
-                    });
-                })->where(fn ($s) => $s->whereNull('pra_status')->orWhere('pra_status', '!=', PosTransaction::EXEMPT_INTERNAL));
-            };
             $excludeLocalRaw = function ($q) {
                 $q->where(function ($s) {
                     $s->where('t.invoice_mode', 'local')->orWhere(function ($r) {
@@ -1798,16 +1790,6 @@ class PosController extends Controller
                 })->where(fn ($s) => $s->whereNull('t.pra_status')->orWhere('t.pra_status', '!=', PosTransaction::EXEMPT_INTERNAL));
             };
         } else {
-            $excludeLocal = function ($q) {
-                // A mode alone is not fiscal: reporting-OFF finals are local
-                // report rows. Keep the PRA dashboard aligned with
-                // PosTransaction::applyStreamTab('pra').
-                $q->where(function ($s) {
-                    $s->where('invoice_mode', 'pra')->orWhereNull('invoice_mode');
-                })->where(function ($s) {
-                    $s->whereNotNull('pra_status')->orWhereNotNull('pra_invoice_number');
-                })->where(fn ($s) => $s->whereNull('pra_status')->orWhere('pra_status', '!=', PosTransaction::EXEMPT_INTERNAL));
-            };
             $excludeLocalRaw = function ($q) {
                 $q->where(function ($s) {
                     $s->where('t.invoice_mode', 'pra')->orWhereNull('t.invoice_mode');
@@ -1825,12 +1807,7 @@ class PosController extends Controller
         // never replace). Drafts / notifications / opening cash stay shared
         // (holds are a handover workflow, not sales).
         $dashUser = auth('pos')->user();
-        $dashCashierId = null;
-        if ($dashUser?->posSalesIsolated()) {
-            $dashCashierId = (int) $dashUser->id;
-        } elseif (($dashUser?->isPosAdmin() ?? false) && $request->filled('cashier') && $request->get('cashier') !== 'all') {
-            $dashCashierId = (int) $request->get('cashier');
-        }
+        $dashCashierId = $this->dashboardCashier($request, $dashUser);
         $dashOnly = function ($q) use ($dashCashierId) {
             if ($dashCashierId) {
                 $q->where('created_by', $dashCashierId);
@@ -11994,28 +11971,82 @@ class PosController extends Controller
         ]);
     }
 
+    private function dashboardCashier(Request $request, ?User $user): ?int
+    {
+        if ($user?->posSalesIsolated()) {
+            return (int) $user->id;
+        }
+
+        return $user?->isPosAdmin() && $request->filled('cashier') && $request->input('cashier') !== 'all'
+            ? (int) $request->input('cashier')
+            : null;
+    }
+
+    private function applyDashboardBillStream($query, string $scope): void
+    {
+        if ($scope === 'local') {
+            $query->where(fn ($stream) => $stream->where('invoice_mode', 'local')
+                ->orWhere(fn ($unreported) => $unreported->whereNull('pra_status')->whereNull('pra_invoice_number')));
+        } else {
+            $query->where(fn ($stream) => $stream->where('invoice_mode', 'pra')->orWhereNull('invoice_mode'))
+                ->where(fn ($reporting) => $reporting->whereNotNull('pra_status')->orWhereNotNull('pra_invoice_number'));
+        }
+
+        $query->where(fn ($stream) => $stream->whereNull('pra_status')
+            ->orWhere('pra_status', '!=', PosTransaction::EXEMPT_INTERNAL));
+    }
+
     public function dashboardDetail(Request $request, string $metric)
     {
-        abort_unless(in_array($metric,['orders','customers'],true),404);
-        $request->validate(['date'=>'required|date_format:Y-m-d','source'=>'nullable|in:orders,bills','cashier'=>'nullable']);
-        $companyId=(int)app('currentCompanyId'); $user=auth('pos')->user();
-        $cashier=$user->posSalesIsolated() ? (int)$user->id : ($request->input('cashier')==='all' ? null : (int)$request->input('cashier'));
-        [$start,$end]=\App\Services\PosBusinessDay::windowFor($companyId,$request->date,$request->date);
-        if($metric==='customers') {
-            $q=PosCustomer::where('company_id',$companyId)->where('created_at','>=',$start)->where('created_at','<',$end);
-            if($cashier)$q->whereIn('id',PosTransaction::withoutGlobalScope('hide_archived')->where('company_id',$companyId)->where('created_by',$cashier)->whereNotNull('customer_id')->select('customer_id'));
-            $rows=$q->orderBy('name')->paginate(100)->withQueryString();
-        } elseif($request->input('source')==='orders') {
-            abort_unless($user->isPosAdmin(),403);
-            $rows=\App\Models\RestaurantOrder::where('company_id',$companyId)->where('created_at','>=',$start)->where('created_at','<',$end)->where('status','!=','cancelled')->tap(fn($q)=>app(\App\Services\BranchContextService::class)->applyToQuery($q,'branch_id'))->orderByDesc('id')->paginate(100)->withQueryString();
-        } else {
-            $tab=$user->posBillingScope()==='local' ? 'local':'pra';
-            $q=PosTransaction::where('company_id',$companyId)->where('business_date',$request->date)->where('status','completed')
-                ->where(fn($q)=>$q->whereNull('transaction_type')->orWhere('transaction_type','!=','return'));
-            $this->applyReportFilters($q,$tab,$cashier,$user);
-            $rows=$q->orderByDesc('id')->paginate(100)->withQueryString();
+        abort_unless(in_array($metric, ['revenue', 'orders', 'customers'], true), 404);
+        abort_if(auth('pos')->user()->posCustomAllows('reports') === false, 403);
+        $validated = $request->validate([
+            'date' => 'required|date_format:Y-m-d',
+            'source' => 'nullable|in:orders,bills',
+            'cashier' => ['nullable', 'regex:/^(?:all|[1-9][0-9]*)$/'],
+        ]);
+        $date = $validated['date'];
+        $companyId = (int) app('currentCompanyId');
+        $user = auth('pos')->user();
+        $cashier = $this->dashboardCashier($request, $user);
+        $cashierName = $cashier ? User::where('company_id', $companyId)->whereKey($cashier)->value('name') : null;
+        $branch = fn ($q) => app(\App\Services\BranchContextService::class)->applyToQuery($q, 'branch_id');
+        [$start, $end] = \App\Services\PosBusinessDay::windowFor($companyId, $date, $date);
+
+        if ($metric === 'revenue') {
+            $ledger = \App\Services\PosTodayKhata::build($companyId, $date, $user, $cashier, $branch);
+            return view('pos.dashboard-detail', compact('metric', 'date', 'ledger', 'cashier', 'cashierName'));
         }
-        return view('pos.dashboard-detail',compact('rows','metric'));
+
+        if ($metric === 'customers') {
+            $query = PosCustomer::where('company_id', $companyId)->where('created_at', '>=', $start)->where('created_at', '<', $end);
+            if ($cashier) {
+                if (\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'customer_id')) {
+                    $query->whereIn('id', PosTransaction::withoutGlobalScope('hide_archived')->where('company_id', $companyId)
+                        ->where('created_by', $cashier)->whereNotNull('customer_id')->select('customer_id'));
+                } else {
+                    $query->whereRaw('1 = 0');
+                }
+            }
+            $rows = $query->orderBy('name')->paginate(100)->withQueryString();
+        } elseif ($request->input('source') === 'orders') {
+            abort_unless($user->isPosAdmin(), 403);
+            $rows = \App\Models\RestaurantOrder::where('company_id', $companyId)
+                ->where('created_at', '>=', $start)->where('created_at', '<', $end)
+                ->where('status', '!=', 'cancelled')->tap($branch)
+                ->orderByDesc('id')->paginate(100)->withQueryString();
+        } else {
+            $query = PosTransaction::where('company_id', $companyId)->where('business_date', $date)
+                ->where('status', 'completed')->tap($branch)
+                ->tap(fn ($q) => $this->applyDashboardBillStream($q, $user->posBillingScope() ?? 'both'))
+                ->when($cashier, fn ($q) => $q->where('created_by', $cashier));
+            if (\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'transaction_type')) {
+                $query->where(fn ($q) => $q->whereNull('transaction_type')->orWhere('transaction_type', '!=', 'return'));
+            }
+            $rows = $query->orderByDesc('id')->paginate(100)->withQueryString();
+        }
+
+        return view('pos.dashboard-detail', compact('rows', 'metric', 'date', 'cashier', 'cashierName'));
     }
 
     public function customers(Request $request)

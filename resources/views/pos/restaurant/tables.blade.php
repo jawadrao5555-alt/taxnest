@@ -186,12 +186,8 @@
 })();
 </script>
 <div x-data="tableView()" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-    <div class="flex items-center justify-between mb-6">
-        <div>
-            <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ __('pos.tables_overview') }}</h1>
-            <p class="text-sm text-gray-500 dark:text-gray-400">{{ __('pos.realtime_table_status') }}</p>
-        </div>
-        <div class="flex items-center gap-2 flex-wrap">
+    <x-pos.report-header :title="__('pos.tables_overview')" :subtitle="__('pos.realtime_table_status')">
+        <x-slot:actions>
             @php $tvUser = auth('pos')->user(); @endphp
             {{-- Task 976: Takeaway / Delivery quick-start buttons — visible to all
                  roles (including cashiers). Set a sessionStorage flag so the sale
@@ -220,8 +216,8 @@
             </a>
             @endif
             <button @click="refreshStatus()" class="px-4 py-2 text-sm rounded-lg bg-purple-600 text-white hover:bg-purple-700 font-medium">{{ __('pos.refresh_btn') }}</button>
-        </div>
-    </div>
+        </x-slot:actions>
+    </x-pos.report-header>
 
     {{-- ZFC (11 Aug 2026): dashboard ka "Open orders" tile is page par lata hai,
          lekin bina-table held orders (misal: held delivery) yahan dikhte hi nahi

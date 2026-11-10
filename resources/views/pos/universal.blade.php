@@ -12045,8 +12045,8 @@ function restaurantPos() {
             const ratio = sub > 0 ? Math.max(0, (sub - disc) / sub) : 1;
             const taxable = items.reduce((sum, item) => {
                 const lineTotal = Number(item.subtotal) || 0;
-                return sum + (window.PosDealAllocation
-                    ? window.PosDealAllocation.taxable(item.deal_snapshot, lineTotal, !!item.is_tax_exempt)
+                return sum + (globalThis.PosDealAllocation
+                    ? globalThis.PosDealAllocation.taxable(item.deal_snapshot, lineTotal, !!item.is_tax_exempt)
                     : (item.is_tax_exempt ? 0 : lineTotal));
             }, 0);
             const rate = method === 'card'

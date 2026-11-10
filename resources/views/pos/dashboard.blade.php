@@ -5,8 +5,7 @@
 @endphp
 
 <div class="tn-dashboard tn-retail-dashboard w-full overflow-x-hidden">
-    <div class="tn-page px-4 sm:px-6 lg:px-8 py-6 max-w-7xl mx-auto">
-        @include('pos.partials.dashboard-report-header')
+    <div class="tn-page px-4 sm:px-6 py-5 max-w-7xl mx-auto">
         <x-pwa-banner color="purple" appName="TaxNest PRA POS" />
         <x-pwa-push scope="pos" />
 
@@ -373,13 +372,10 @@
         @include('pos.partials.pending-bills-tile')
         @if($dashboardRidersRelevant) @include('pos.partials.rider-settlement-pending') @endif
         @include('pos.partials.inactive-customers')
-        @php
-        $dashboardMetricsRelocated = true;
-        @endphp
-        @include('pos.partials.dashboard-metrics')
         @if($dashboardKhataRelevant) @include('pos.partials.today-khata') @endif
-        @include('pos.dashboard-styles.' . ($dashboardStyle ?? 'default'))
+        @include('pos.partials.dashboard-theme')
         @include('pos.dashboard-styles._drafts-section')
+        @include('pos.partials.dashboard-report-header')
     </div>
 </div>
 

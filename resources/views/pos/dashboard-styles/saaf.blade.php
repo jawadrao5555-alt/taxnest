@@ -69,7 +69,7 @@
     {{-- 4 clean KPI cards --}}
     @if(!($dashboardMetricsRelocated ?? false))
 <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <div class="rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 p-4 sm:p-5 hover:border-teal-600 dark:hover:border-teal-500 transition">
+        <x-pos.dashboard-metric metric="revenue" :href="$dashboardMetricUrls['revenue'] ?? null" class="rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 p-4 sm:p-5 hover:border-teal-600 dark:hover:border-teal-500 transition">
             <div class="flex items-center gap-2">
                 <span class="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style="background:#ccfbf1;">
                     <svg class="w-4 h-4" style="color:#0A4D5C;" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"/></svg>
@@ -86,9 +86,9 @@
             @else
                 <p class="text-[11px] text-gray-400 dark:text-gray-500 mt-1">{{ __("pos.aaj_ka_total") }}</p>
             @endif
-        </div>
+        </x-pos.dashboard-metric>
 
-        <div class="rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 p-4 sm:p-5 hover:border-teal-600 dark:hover:border-teal-500 transition">
+        <x-pos.dashboard-metric metric="orders" :href="$dashboardMetricUrls['orders'] ?? null" class="rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 p-4 sm:p-5 hover:border-teal-600 dark:hover:border-teal-500 transition">
             <div class="flex items-center gap-2">
                 <span class="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style="background:#ccfbf1;">
                     <svg class="w-4 h-4" style="color:#0A4D5C;" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
@@ -101,7 +101,7 @@
             @else
                 <p class="text-[11px] text-gray-400 dark:text-gray-500 mt-1">{{ __("pos.complete_ho_chuke") }}</p>
             @endif
-        </div>
+        </x-pos.dashboard-metric>
 
         @if(empty($isCashier))
         <div class="rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 p-4 sm:p-5 hover:border-teal-600 dark:hover:border-teal-500 transition">
@@ -116,7 +116,7 @@
         </div>
         @else
         {{-- Task 988: Average Bill tile replaced by New Customers (owner voice note, 16 Aug 2026) --}}
-        <div class="rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 p-4 sm:p-5 hover:border-teal-600 dark:hover:border-teal-500 transition">
+        <x-pos.dashboard-metric metric="customers" :href="$dashboardMetricUrls['customers'] ?? null" class="rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 p-4 sm:p-5 hover:border-teal-600 dark:hover:border-teal-500 transition">
             <div class="flex items-center gap-2">
                 <span class="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style="background:#ccfbf1;">
                     <svg class="w-4 h-4" style="color:#0A4D5C;" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
@@ -125,11 +125,11 @@
             </div>
             <p class="text-xl sm:text-2xl font-black text-gray-900 dark:text-white mt-2">{{ number_format($newCustomersToday ?? 0) }}</p>
             <p class="text-[11px] text-gray-400 dark:text-gray-500 mt-1">{{ number_format($newCustomersMonth ?? 0) }} {{ __("pos.period_this_month") }}</p>
-        </div>
+        </x-pos.dashboard-metric>
         @endif
 
         @if(!empty($isRestaurant) && $saafTablesRelevant)
-        <div class="rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 p-4 sm:p-5 hover:border-teal-600 dark:hover:border-teal-500 transition">
+        <x-pos.dashboard-metric metric="tables" :href="$dashboardMetricUrls['tables'] ?? null" class="rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 p-4 sm:p-5 hover:border-teal-600 dark:hover:border-teal-500 transition">
             <div class="flex items-center gap-2">
                 <span class="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style="background:#ccfbf1;">
                     <svg class="w-4 h-4" style="color:#0A4D5C;" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M5 10v9m14-9v9M9 10v4m6-4v4M4 5h16a1 1 0 011 1v3H3V6a1 1 0 011-1z"/></svg>
@@ -138,7 +138,7 @@
             </div>
             <p class="text-xl sm:text-2xl font-black text-gray-900 dark:text-white mt-2">{{ $occupiedTables ?? 0 }}<span class="text-sm text-gray-400">/{{ $totalTables ?? 0 }}</span></p>
             <p class="text-[11px] text-gray-400 dark:text-gray-500 mt-1">{{ __("pos.abhi_occupied_hain") }}</p>
-        </div>
+        </x-pos.dashboard-metric>
         @elseif($saafOpening !== null)
         <div class="rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 p-4 sm:p-5 hover:border-teal-600 dark:hover:border-teal-500 transition">
             <div class="flex items-center gap-2">

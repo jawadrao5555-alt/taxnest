@@ -21,8 +21,7 @@
 </style>
 
 <div class="tn-restaurant-dashboard w-full overflow-x-hidden" x-data="rDash()">
-    <div class="tn-page px-4 sm:px-6 lg:px-8 py-6 max-w-7xl mx-auto">
-        @include('pos.partials.dashboard-report-header')
+    <div class="tn-page px-4 sm:px-6 py-5 max-w-7xl mx-auto">
         @include('pos.partials.pra-coverage-alert')
         @include('pos.partials.pending-bills-tile')
         @if(!empty($hotelOccupancy))
@@ -37,15 +36,8 @@
              hi karte hain, is liye dono jagah. --}}
         @if($dashboardRidersRelevant) @include('pos.partials.rider-settlement-pending') @endif
         @include('pos.partials.inactive-customers')
-        @php
-        $dashboardMetricsRelocated = true;
-        @endphp
-        @php
-        $dashboardOrderSource = 'orders';
-        @endphp
-        @include('pos.partials.dashboard-metrics')
         @if($dashboardKhataRelevant) @include('pos.partials.today-khata') @endif
-        @include('pos.dashboard-styles.' . ($dashboardStyle ?? 'default'))
+        @include('pos.partials.dashboard-theme', ['dashboardOrderSource' => 'orders'])
 
         {{-- ─── Kitchen Efficiency (owner, Jul 2026) — KDS timing report ─── --}}
         @if($dashboardKitchenRelevant && isset($kitchenStats))
@@ -93,6 +85,7 @@
             @endif
         </div>
         @endif
+        @include('pos.partials.dashboard-report-header')
     </div>
 </div>
 

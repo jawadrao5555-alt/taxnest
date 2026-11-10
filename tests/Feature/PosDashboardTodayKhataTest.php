@@ -507,10 +507,9 @@ class PosDashboardTodayKhataTest extends TestCase
     {
         $companyId=$this->makeCompany();$user=$this->makeUser($companyId);
         auth('pos')->setUser($user);app()->instance('currentCompanyId',$companyId);
-        $html=view('pos.partials.dashboard-metrics',[
-            'company'=>\App\Models\Company::find($companyId),'todayKhata'=>['date'=>'2026-10-30'],
-            'dashCashierId'=>42,'todayTotalSale'=>1234,'todayStats'=>(object)['count'=>2],
-        ])->render();
+        $dashboard = (new PosController())->dashboard(Request::create('/pos/dashboard', 'GET'));
+        $data = array_replace($dashboard->getData(), ['todayKhata' => ['date' => '2026-10-30'], 'dashCashierId' => 42]);
+        $html = view('pos.partials.dashboard-theme', $data)->render();
         $document=new \DOMDocument();@$document->loadHTML($html);$xpath=new \DOMXPath($document);
         $links=$xpath->query('//a[@data-dashboard-metric]');$this->assertGreaterThanOrEqual(3,$links->length);
         foreach($links as $link)if($link->getAttribute('data-dashboard-metric')!=='tables') {
@@ -543,7 +542,7 @@ class PosDashboardTodayKhataTest extends TestCase
 
         $controller = new PosController();
         $dashboard = $controller->dashboard(Request::create('/pos/dashboard', 'GET', ['cashier' => $cashier->id]));
-        $html = view('pos.partials.dashboard-metrics', $dashboard->getData())->render();
+        $html = view('pos.partials.dashboard-theme', $dashboard->getData())->render();
         $dom = new \DOMDocument();
         @$dom->loadHTML($html);
         $link = (new \DOMXPath($dom))->query('//a[@data-dashboard-metric="revenue"]')->item(0);

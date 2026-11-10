@@ -21,7 +21,8 @@
 </style>
 
 <div class="tn-restaurant-dashboard w-full overflow-x-hidden" x-data="rDash()">
-    <div class="tn-page px-4 sm:px-6 py-5 max-w-7xl mx-auto">
+    <div class="tn-page px-4 sm:px-6 lg:px-8 py-6 max-w-7xl mx-auto">
+        @include('pos.partials.dashboard-report-header')
         @include('pos.partials.pra-coverage-alert')
         @include('pos.partials.pending-bills-tile')
         @if(!empty($hotelOccupancy))

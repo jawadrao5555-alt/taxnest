@@ -508,8 +508,8 @@ class PosDashboardTodayKhataTest extends TestCase
         $companyId=$this->makeCompany();$user=$this->makeUser($companyId);
         auth('pos')->setUser($user);app()->instance('currentCompanyId',$companyId);
         $html=view('pos.partials.dashboard-metrics',[
-            'company'=>\App\Models\Company::find($companyId),'todayKhata'=>['business_date'=>'2026-10-30'],
-            'cashierFilter'=>'42','todayTotalSale'=>1234,'todayStats'=>(object)['count'=>2],
+            'company'=>\App\Models\Company::find($companyId),'todayKhata'=>['date'=>'2026-10-30'],
+            'dashCashierId'=>42,'todayTotalSale'=>1234,'todayStats'=>(object)['count'=>2],
         ])->render();
         $document=new \DOMDocument();@$document->loadHTML($html);$xpath=new \DOMXPath($document);
         $links=$xpath->query('//a[@data-dashboard-metric]');$this->assertGreaterThanOrEqual(3,$links->length);
@@ -518,6 +518,41 @@ class PosDashboardTodayKhataTest extends TestCase
             $this->assertSame('42',$query['cashier']);
             $this->assertSame('2026-10-30',$query['date'] ?? $query['from']);
         }
+    }
+
+    public function test_revenue_card_detail_matches_the_selected_cashier_dashboard_total(): void
+    {
+        $companyId = $this->makeCompany();
+        $admin = $this->makeUser($companyId);
+        $cashier = $this->makeUser($companyId, 'pos_cashier', 'pra');
+        $date = \App\Services\PosBusinessDay::current($companyId);
+        $this->makeTxn($companyId, 'P-CARD', ['created_by' => $cashier->id, 'total_amount' => 150]);
+        $this->makeTxn($companyId, 'L-CARD', [
+            'created_by' => $cashier->id, 'invoice_mode' => 'local', 'pra_status' => null,
+            'pra_invoice_number' => null, 'total_amount' => 40,
+        ]);
+        $this->makeTxn($companyId, 'E-CARD', [
+            'created_by' => $cashier->id, 'pra_status' => 'exempt_internal',
+            'pra_invoice_number' => null, 'total_amount' => 10,
+        ]);
+        $this->makeTxn($companyId, 'P-OTHER', ['created_by' => $admin->id, 'total_amount' => 900]);
+        $other = $this->makeCompany();
+        $this->makeTxn($other, 'P-FOREIGN', ['created_by' => $cashier->id, 'total_amount' => 300]);
+        auth('pos')->setUser($admin);
+        app()->instance('currentCompanyId', $companyId);
+
+        $controller = new PosController();
+        $dashboard = $controller->dashboard(Request::create('/pos/dashboard', 'GET', ['cashier' => $cashier->id]));
+        $html = view('pos.partials.dashboard-metrics', $dashboard->getData())->render();
+        $dom = new \DOMDocument();
+        @$dom->loadHTML($html);
+        $link = (new \DOMXPath($dom))->query('//a[@data-dashboard-metric="revenue"]')->item(0);
+        $this->assertStringContainsString('Rs. 200', $link->textContent);
+        $detail = $controller->dashboardDetail(Request::create($link->getAttribute('href')), 'revenue');
+        $ledger = $detail->getData()['ledger'];
+        $this->assertSame([150.0, 40.0, 10.0], array_map(fn ($stream) => $ledger[$stream]['sale'], ['pra', 'local', 'exempt']));
+        $this->assertSame($date, $detail->getData()['date']);
+        $this->assertSame($cashier->id, $detail->getData()['cashier']);
     }
 
     public static function detailHours(): array

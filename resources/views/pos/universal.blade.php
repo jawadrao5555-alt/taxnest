@@ -1535,10 +1535,10 @@ window.addEventListener('popstate', function() {
                     <div class="w-8 h-8 rounded-full bg-blue-200 dark:bg-blue-800 flex items-center justify-center flex-shrink-0 mt-0.5"><span class="text-xs font-bold text-blue-700 dark:text-blue-300" x-text="selectedCustomer.name.charAt(0)"></span></div>
                     <div class="flex-1 min-w-0">
                         <div class="flex items-center gap-1.5">
-                            <p class="text-xs font-semibold text-blue-800 dark:text-blue-200 truncate" x-text="selectedCustomer.name"></p>
+                            <p class="text-xs font-semibold text-blue-800 dark:text-blue-200 truncate" x-text="orderCustomerName"></p>
                             <template x-if="customerStats && customerStats.is_frequent"><span class="freq-badge">VIP</span></template>
                         </div>
-                        <p class="text-xs text-blue-600 dark:text-blue-400" x-text="selectedCustomer.phone || window.TXT.no_phone"></p>
+                        <p class="text-xs text-blue-600 dark:text-blue-400" x-text="orderCustomerPhone || window.TXT.no_phone"></p>
                         <template x-if="selectedCustomer.address">
                             <p class="text-xs text-blue-500 dark:text-blue-400 truncate" x-text="'📍 ' + selectedCustomer.address"></p>
                         </template>
@@ -1588,6 +1588,32 @@ window.addEventListener('popstate', function() {
                     <button type="button" data-edit-customer-contact x-show="selectedCustomer && selectedCustomer.id" x-cloak
                             @click="editCustomerContact(selectedCustomer)" :disabled="editingCustomerId !== null"
                             class="flex-shrink-0 px-2 py-1.5 rounded-lg text-xs font-bold text-purple-800 dark:text-purple-200 bg-purple-100 dark:bg-purple-900/40 disabled:opacity-50">{{ __('pos.edit') }}</button>
+                    <button type="button" x-show="hasDeliveryPortion()" x-cloak data-edit-delivery-contact
+                            @click="openDeliveryContactEditor()" class="flex-shrink-0 rounded-lg bg-blue-100 px-2 py-1.5 text-xs font-bold text-blue-800">
+                        Edit delivery
+                    </button>
+                    <dialog x-ref="deliveryContactEditor" @keydown.stop aria-labelledby="delivery-contact-title"
+                            class="m-auto w-11/12 max-w-sm rounded-xl bg-white p-4 text-gray-900 shadow-xl backdrop:bg-black/60 dark:bg-gray-900 dark:text-white">
+                        <form @submit.prevent="saveDeliveryContact()" class="space-y-3">
+                            <h2 id="delivery-contact-title" class="font-bold">Delivery contact</h2>
+                            <p class="text-xs text-gray-500">Changes apply to this order.</p>
+                            <label class="block text-sm">Customer name
+                                <input x-model="deliveryContactDraft.name" maxlength="255" class="mt-1 block w-full rounded border-gray-300 dark:bg-gray-800">
+                            </label>
+                            <label class="block text-sm">Delivery contact number
+                                <input type="tel" x-model="deliveryContactDraft.phone" maxlength="20" autocomplete="off"
+                                       class="mt-1 block w-full rounded border-gray-300 dark:bg-gray-800">
+                            </label>
+                            <label class="block text-sm">Delivery address
+                                <textarea x-model="deliveryContactDraft.address" maxlength="500" rows="2"
+                                          class="mt-1 block w-full rounded border-gray-300 dark:bg-gray-800"></textarea>
+                            </label>
+                            <div class="flex justify-end gap-2">
+                                <button type="button" @click="$refs.deliveryContactEditor.close()" class="rounded border px-3 py-1">{{ __('pos.cancel') }}</button>
+                                <button type="submit" class="rounded bg-blue-700 px-3 py-1 text-white">{{ __('pos.save_btn') }}</button>
+                            </div>
+                        </form>
+                    </dialog>
                     {{-- Task 1380 (owner video, Aug 2026): attached customer ko YAHIN se
                          hatane ka rasta. Pehle clear ka ✕ sirf products column ke customer
                          search box par tha, is liye call se bana customer is card par
@@ -2080,16 +2106,17 @@ window.addEventListener('popstate', function() {
         <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden" x-transition.scale.90>
             <div class="p-5 text-center border-b border-gray-100 dark:border-gray-800">
                 <h3 class="text-lg font-bold text-gray-900 dark:text-white">{{ __('pos.payment') }}</h3>
+                <span hidden x-effect="loadCheckoutOnlineQuote(showPayModal && payingOrderAwaitingOnline() ? checkoutOnlineOrderId() : null)"></span>
                 {{-- Item #8 (owner, Jul 2026): held/dine-in orders pay with an EMPTY cart, so
                      the cart-based roundedTotal showed Rs. 0 here. payModalTotal switches to a
                      method-aware estimate computed from the held order itself (server total
                      from payOrder stays authoritative on the receipt). --}}
-                <p class="text-3xl font-extrabold mt-2 text-purple-600 dark:text-purple-400" x-text="'Rs. ' + Number(payModalTotal).toLocaleString()"></p>
+                <p x-show="!payingOrderAwaitingOnline()" class="text-3xl font-extrabold mt-2 text-purple-600 dark:text-purple-400" x-text="'Rs. ' + Number(payModalTotal).toLocaleString()"></p>
                 <label x-show="payModalHasDelivery && historicalMixedPayment()" class="block text-sm font-semibold mt-2">{{ __('pos.fulfill_collection') }}<select data-pay-delivery-collection :value="deliveryCollectionMode || (payModalOrderType() === 'delivery' ? 'rider' : 'counter')" @change="deliveryCollectionMode = $event.target.value; cashReceived = ''" class="mt-1 w-full rounded text-sm text-gray-900"><option value="counter">{{ __('pos.fulfill_paid_counter') }}</option><option value="rider">{{ __('pos.fulfill_rider_cash') }}</option></select></label>
                 <div x-show="payModalRiderCash > 0" class="text-sm mt-2 space-y-1" data-payment-collection-summary><p><span>{{ __('pos.fulfill_counter_amount') }}</span> <strong x-text="'Rs. ' + payModalCounterCash.toLocaleString()"></strong></p><p><span>{{ __('pos.fulfill_rider_amount') }}</span> <strong x-text="'Rs. ' + payModalRiderCash.toLocaleString()"></strong></p></div>
-                <p x-show="!payingHeldOrderId && Math.abs(roundOff) > 0.001" class="text-[10px] text-gray-400 mt-0.5" x-text="(roundOff >= 0 ? window.TXT.rounded_up_by : window.TXT.rounded_down_by) + 'Rs. ' + Math.abs(roundOff).toFixed(2)"></p>
+                <p x-show="!payingOrderAwaitingOnline() && !payingHeldOrderId && Math.abs(roundOff) > 0.001" class="text-[10px] text-gray-400 mt-0.5" x-text="(roundOff >= 0 ? window.TXT.rounded_up_by : window.TXT.rounded_down_by) + 'Rs. ' + Math.abs(roundOff).toFixed(2)"></p>
                 {{-- Card-save mode: live bachat hint — total above is method-aware. --}}
-                <p x-show="modalCardSaving > 0" x-cloak class="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 mt-1" x-text="payMethodIndex === 1 ? (window.TXT.card_discount_rs + Number(modalCardSaving).toLocaleString() + window.TXT.savings_suffix) : (window.TXT.card_pay_rs_prefix + Number(modalCardSaving).toLocaleString() + window.TXT.saved_amount_sfx)"></p>
+                <p x-show="!payingOrderAwaitingOnline() && modalCardSaving > 0" x-cloak class="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 mt-1" x-text="payMethodIndex === 1 ? (window.TXT.card_discount_rs + Number(modalCardSaving).toLocaleString() + window.TXT.savings_suffix) : (window.TXT.card_pay_rs_prefix + Number(modalCardSaving).toLocaleString() + window.TXT.saved_amount_sfx)"></p>
                 <p x-show="stockError" class="text-xs text-red-500 mt-2 bg-red-50 dark:bg-red-900/20 p-2 rounded-lg" x-text="stockError"></p>
                 <p x-show="submitting" class="text-xs text-purple-500 mt-2">{{ __('pos.processing_payment') }}</p>
             </div>
@@ -2116,6 +2143,7 @@ window.addEventListener('popstate', function() {
                     <svg x-show="submitting" class="w-8 h-8 mx-auto mb-1 animate-spin text-green-600" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
                     <svg x-show="!submitting" class="w-8 h-8 mx-auto mb-1 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
                     <span class="text-sm font-bold text-green-700 dark:text-green-400" x-text="submitting ? window.TXT.processing_ellipsis : window.TXT.cash_title"></span>
+                    <span class="block text-lg font-black tabular-nums text-green-700 dark:text-green-300" x-text="'Rs. ' + paymentAmountFor('cash').toLocaleString()"></span>
                     <span class="block text-[10px] font-semibold mt-0.5 text-green-600/60" x-text="(taxInclusive ? window.TXT.incl_tax_prefix : window.TXT.tax_colon) + (taxRules['cash'] || 16) + '%'"></span>
                     <kbd x-show="!submitting" class="block mt-0.5 text-[9px] font-mono text-green-500/60">{{ __('pos.press_1') }}</kbd>
                 </button>
@@ -2123,17 +2151,19 @@ window.addEventListener('popstate', function() {
                     <svg x-show="submitting" class="w-8 h-8 mx-auto mb-1 animate-spin text-blue-600" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
                     <svg x-show="!submitting" class="w-8 h-8 mx-auto mb-1 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
                     <span class="text-sm font-bold text-blue-700 dark:text-blue-400" x-text="submitting ? window.TXT.processing_ellipsis : window.TXT.card_title"></span>
+                    <span class="block text-lg font-black tabular-nums text-blue-700 dark:text-blue-300" x-text="'Rs. ' + paymentAmountFor('card').toLocaleString()"></span>
                     <span class="block text-[10px] font-semibold mt-0.5 text-blue-600/60" x-text="(taxInclusive ? window.TXT.incl_tax_prefix : window.TXT.tax_colon) + (taxRules['debit_card'] || taxRules['card'] || 8) + '%' + (modalCardSaving > 0 ? ' • Save Rs. ' + Number(modalCardSaving).toLocaleString() : '')"></span>
                     <kbd x-show="!submitting" class="block mt-0.5 text-[9px] font-mono text-blue-500/60">{{ __('pos.press_2') }}</kbd>
                 </button>
             </div>
             <div x-show="payingOrderAwaitingOnline()" class="p-4">
                 <div class="mb-3 rounded-xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-900/20 px-3 py-2 text-xs">
-                    <div class="flex justify-between font-black text-indigo-700 dark:text-indigo-300"><span>{{ __('pos.online_amount_label') }}</span><span x-text="'Rs ' + Number(payModalTotal).toLocaleString()"></span></div>
-                    <div class="flex justify-between mt-1 font-bold text-amber-700 dark:text-amber-300"><span>{{ __('pos.remaining_amount_label') }}</span><span x-text="'Rs ' + Number(payModalTotal).toLocaleString()"></span></div>
+                    <div class="flex justify-between font-black text-indigo-700 dark:text-indigo-300"><span>{{ __('pos.online_amount_label') }}</span><span x-text="checkoutOnlineAmountText"></span></div>
+                    <div class="flex justify-between mt-1 font-bold text-amber-700 dark:text-amber-300"><span>{{ __('pos.remaining_amount_label') }}</span><span x-text="checkoutOnlineAmountText"></span></div>
                     <p class="mt-1 text-[10px] font-black uppercase tracking-wide text-indigo-600 dark:text-indigo-300">{{ __('pos.online_payment_pending_status') }}</p>
                 </div>
-                <button @click="confirmAwaitedPayment()" :disabled="submitting" class="w-full py-4 rounded-xl text-sm font-black text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 transition">{{ __('pos.confirm_online_received') }}</button>
+                <button x-show="checkoutOnlineQuote?.error" type="button" @click="loadCheckoutOnlineQuote(checkoutOnlineOrderId())" class="mb-2 w-full rounded-lg border border-red-200 px-3 py-2 text-xs font-bold text-red-700 dark:text-red-300">{{ __('pos.online_quote_retry') }}</button>
+                <button @click="confirmAwaitedPayment()" :disabled="submitting || checkoutOnlineAmount === null" class="w-full py-4 rounded-xl text-sm font-black text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 transition">{{ __('pos.confirm_online_received') }}</button>
             </div>
             {{-- Cash Received / Wapsi (owner request, Jul 2026): optional input — cashier
                  types the note customer gave; big green "Wapas dein" shows the change.
@@ -2143,7 +2173,7 @@ window.addEventListener('popstate', function() {
                  (default OFF, switch at POS Customize); column rides posConfigRev so
                  cached offline screens refresh when a company flips it. --}}
             @if(!empty($company->pos_cash_received_enabled))
-            <div x-show="payMethodIndex === 0" class="px-4 pb-2" @click.stop>
+            <div x-show="payMethodIndex === 0 && !payingOrderAwaitingOnline()" class="px-4 pb-2" @click.stop>
                 <div class="flex items-center gap-2">
                     <input type="text" inputmode="decimal" x-model="cashReceived" data-cash-input
                         autocomplete="off" name="pos_cash_received_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
@@ -3499,6 +3529,10 @@ window.addEventListener('popstate', function() {
                                 <span x-text="bill.created_time"></span>
                                 <template x-if="bill.customer_name"><span x-text="' • ' + bill.customer_name"></span></template>
                                 <template x-if="bill.payment_method"><span class="uppercase" x-text="' • ' + (bill.payment_label || bill.payment_method.replace('_', ' '))"></span></template>
+                                <template x-if="bill.order_type === 'delivery' && (bill.customer_phone || bill.delivery_address)">
+                                    <span class="block break-words font-semibold"
+                                          x-text="[bill.customer_phone, bill.delivery_address].filter(Boolean).join(' • ')"></span>
+                                </template>
                             </p>
                             {{-- Task 1036: WhatsApp Bill — purana bill dobara bhejna (share link
                                  on-demand mint hota hai). Sirf routable number wale bills par. --}}
@@ -5168,6 +5202,7 @@ function restaurantPos() {
         deliveryChargeInput: '',
         customerAddresses: [],
         selectedDeliveryAddress: '',
+        deliveryContactDraft: { customer: null, name: '', phone: '', address: '' },
         _deliveryAddressChoiceVersion: 0,
         _deliveryAddressGeneration: 0,
         _deliveryAddressLoad: null,
@@ -5780,7 +5815,7 @@ function restaurantPos() {
         },
         cartTotalBeforeImsFee(method) {
             const rate = method === 'card'
-                ? (this.taxRules['debit_card'] || this.taxRules['card'] || 8)
+                ? (this.taxRules['debit_card'] ?? this.taxRules['card'] ?? 8)
                 : (this.taxRules['cash'] ?? this.taxRate);
             const allocated = this.allocatedDealBill(rate);
             if (allocated) return allocated.total_amount;
@@ -8362,6 +8397,18 @@ function restaurantPos() {
             // swallowed by the qty-input block below.
             // ═══════════════════════════════════════════════════════════════
             if (this.showPayModal) {
+                if (this.payingOrderAwaitingOnline()) {
+                    if (e.key === 'Enter' && !e.repeat && !e.target?.closest?.('input, textarea, select, button')) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        this.confirmAwaitedPayment();
+                    } else if (e.key === 'Escape') {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        this.showPayModal = false;
+                    }
+                    return;
+                }
                 // Bill-note input guard: while typing in the pay modal's note field,
                 // ALL modal shortcuts (1/2/arrows/Enter) must type, not fire payments.
                 // Enter/Escape blur the field so shortcuts resume after.
@@ -10595,6 +10642,41 @@ function restaurantPos() {
             this.$nextTick(() => { this.$refs.searchInput?.focus(); });
         },
 
+        get orderCustomerName() {
+            const customer = this.selectedCustomer;
+            return (this.hasDeliveryPortion() && customer?.deliveryOrderName) || customer?.name || '';
+        },
+        get orderCustomerPhone() {
+            const customer = this.selectedCustomer;
+            return (this.hasDeliveryPortion() && customer?.deliveryOrderPhone) || customer?.phone || '';
+        },
+        openDeliveryContactEditor() {
+            if (!this.selectedCustomer || !this.hasDeliveryPortion()) return;
+            this.deliveryContactDraft = {
+                customer: this.selectedCustomer,
+                name: this.orderCustomerName,
+                phone: this.orderCustomerPhone,
+                address: this.selectedDeliveryAddress || '',
+            };
+            this.$refs.deliveryContactEditor.showModal();
+        },
+        saveDeliveryContact() {
+            const draft = this.deliveryContactDraft;
+            this.$refs.deliveryContactEditor.close();
+            if (!this.selectedCustomer || draft.customer !== this.selectedCustomer || !this.hasDeliveryPortion()) return;
+            this.selectedCustomer = {
+                ...this.selectedCustomer,
+                deliveryOrderName: draft.name.trim(),
+                deliveryOrderPhone: draft.phone.trim(),
+            };
+            const address = draft.address.trim();
+            if (address && !this.customerAddresses.some(row => row.address === address)) {
+                this.customerAddresses.push({ id: null, label: null, address });
+            }
+            this._deliveryAddressChoiceVersion = (this._deliveryAddressChoiceVersion || 0) + 1;
+            this.selectedDeliveryAddress = address;
+        },
+
         async editCustomerContact(customer) {
             if (!customer || !customer.id || this.editingCustomerId) return;
             const entered = window.prompt(window.TXT.edit_customer_name, customer.name || '');
@@ -10746,7 +10828,7 @@ function restaurantPos() {
                 kitchen_notes: this.kitchenNotes || '',
                 discount_type: this.discountType || 'percentage',
                 discount_value: Number(this.discountValue) || 0,
-                customer: this.selectedCustomer ? { id: this.selectedCustomer.id, name: this.selectedCustomer.name, phone: this.selectedCustomer.phone } : null,
+                customer: this.selectedCustomer ? { id: this.selectedCustomer.id, name: this.selectedCustomer.name, phone: this.selectedCustomer.phone, deliveryOrderName: this.selectedCustomer.deliveryOrderName, deliveryOrderPhone: this.selectedCustomer.deliveryOrderPhone } : null,
             };
         },
         retailHoldStart() {
@@ -10772,8 +10854,8 @@ function restaurantPos() {
                 hold_uuid: uuid,
                 hold_name: name,
                 customer_id: this.selectedCustomer?.id || null,
-                customer_name: this.selectedCustomer?.name || null,
-                customer_phone: this.selectedCustomer?.phone || null,
+                customer_name: this.orderCustomerName || null,
+                customer_phone: this.orderCustomerPhone || null,
                 total_amount: Number(this.roundedTotal || 0),
                 cart_data: cartData,
             };
@@ -11018,8 +11100,8 @@ function restaurantPos() {
                 order_type: this.orderType || 'takeaway',
                 customer_ref: this.selectedCustomer ? {
                     id: this.selectedCustomer.id || null,
-                    name: this.selectedCustomer.name || null,
-                    phone: this.selectedCustomer.phone || null,
+                    name: this.orderCustomerName || null,
+                    phone: this.orderCustomerPhone || null,
                 } : null,
                 terminal_id: this.terminalId || null,
                 table_id: this.selectedTable?.id ? String(this.selectedTable.id) : null,
@@ -11064,8 +11146,8 @@ function restaurantPos() {
                     status: 'held', source: 'shop_pc', created_at: new Date().toISOString(),
                     kot_sent_at: kotDocument ? new Date().toISOString() : null,
                     kitchen_notes: this.kitchenNotes || null, priority: !!this.priorityOrder,
-                    customer_id: this.selectedCustomer?.id || null, customer_name: this.selectedCustomer?.name || null,
-                    customer_phone: this.selectedCustomer?.phone || null,
+                    customer_id: this.selectedCustomer?.id || null, customer_name: this.orderCustomerName || null,
+                    customer_phone: this.orderCustomerPhone || null,
                     table: this.selectedTable || null, table_id: this.selectedTable?.id || null,
                     items: this.cart.map((item, index) => ({ ...item, id: lines[index] ? lines[index].line_id : String(index),
                         subtotal: Number(item.quantity || 0) * Number(item.unit_price || 0) })),
@@ -11088,7 +11170,7 @@ function restaurantPos() {
 
         async holdOrder(opts) {
             if (this.hasDeliveryPortion() && await this.waitForDeliveryAddress() === false) return;
-            if (this.hasMixedService() && this.hasDeliveryPortion() && (!this.selectedCustomer?.phone || !this.selectedDeliveryAddress?.trim())) { this.showToast(window.TXT.fulfill_delivery_contact, 'error'); return; }
+            if (this.hasMixedService() && this.hasDeliveryPortion() && (!this.orderCustomerPhone || !this.selectedDeliveryAddress?.trim())) { this.showToast(window.TXT.fulfill_delivery_contact, 'error'); return; }
             // EDIT MODE: a provisional bill can't be turned into a held order —
             // F9 Update Bill is the only save path while editing.
             if (this.editingBillId) {
@@ -11131,7 +11213,7 @@ function restaurantPos() {
             try {
                 const res = await fetch('{{ route("pos.restaurant.orders.hold") }}', {
                     method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
-                    body: JSON.stringify({ items: this.cart, order_type: this.orderType, table_id: this.selectedTable?.id || null, customer_id: this.selectedCustomer?.id || null, customer_name: this.selectedCustomer?.name || null, customer_phone: this.selectedCustomer?.phone || null, kitchen_notes: this.kitchenNotes, priority: this.priorityOrder, recalled_order_id: this.recalledOrderId, discount_type: this.discountAmount > 0 ? this.discountType : null, discount_value: this.discountAmount > 0 ? this.discountValue : 0, discount_amount: this.discountAmount, delivery_collection_mode: this.deliveryCollectionMode || (this.orderType === 'delivery' ? 'rider' : 'counter'), delivery_address: this.hasDeliveryPortion() ? ((this.selectedDeliveryAddress || '').trim() || null) : null, hold_uuid: this.holdAttemptUuid }),
+                    body: JSON.stringify({ items: this.cart, order_type: this.orderType, table_id: this.selectedTable?.id || null, customer_id: this.selectedCustomer?.id || null, customer_name: this.orderCustomerName || null, customer_phone: this.orderCustomerPhone || null, kitchen_notes: this.kitchenNotes, priority: this.priorityOrder, recalled_order_id: this.recalledOrderId, discount_type: this.discountAmount > 0 ? this.discountType : null, discount_value: this.discountAmount > 0 ? this.discountValue : 0, discount_amount: this.discountAmount, delivery_collection_mode: this.deliveryCollectionMode || (this.orderType === 'delivery' ? 'rider' : 'counter'), delivery_address: this.hasDeliveryPortion() ? ((this.selectedDeliveryAddress || '').trim() || null) : null, hold_uuid: this.holdAttemptUuid }),
                 });
                 const data = await res.json();
                 if (data.success) {
@@ -11357,8 +11439,8 @@ function restaurantPos() {
                     payment_method: (this.editingBillData && this.editingBillData.payment_method) || 'cash',
                     discount_type: this.discountType || 'percentage',
                     discount_value: this.discountAmount > 0 ? this.discountValue : 0,
-                    customer_name: this.selectedCustomer?.name || null,
-                    customer_phone: this.selectedCustomer?.phone || null,
+                    customer_name: this.orderCustomerName || null,
+                    customer_phone: this.orderCustomerPhone || null,
                     delivery_collection_mode: this.deliveryCollectionMode || (this.orderType === 'delivery' ? 'rider' : 'counter'), delivery_address: this.hasDeliveryPortion() ? ((this.selectedDeliveryAddress || '').trim() || null) : null,
                     kitchen_notes: this.kitchenNotes,
                     terminal_id: (this.editingBillData && this.editingBillData.terminal_id) || null,
@@ -11448,12 +11530,12 @@ function restaurantPos() {
             if (this.staffDiscount) {
                 if (!this.staffDiscount.employee_id || this.staffDiscount.reason.trim().length < 3 || this.saveAsProvisional) { this.showToast(window.TXT.sale_staff_payment_instructions, 'error'); return; }
                 if (this.staffDiscountRequest && this.staffDiscountRequest.status !== 'approved') { this.showToast(window.TXT.sale_staff_check_before_payment, 'error'); return; }
-                if (this.staffDiscountRequest?.status === 'approved') this.reserveWaWindow(this.selectedCustomer?.phone);
+                if (this.staffDiscountRequest?.status === 'approved') this.reserveWaWindow(this.orderCustomerPhone);
                 return await this.processPaymentManual(method, false, !this.payPrintReceipt);
             }
             if (!this.confirmRecalledAdditions()) return;
             if (this.hasDeliveryPortion() && await this.waitForDeliveryAddress() === false) return;
-            if (this.hasMixedService() && this.hasDeliveryPortion() && (!this.selectedCustomer?.phone || !this.selectedDeliveryAddress?.trim())) { this.showToast(window.TXT.fulfill_delivery_contact, 'error'); return; }
+            if (this.hasMixedService() && this.hasDeliveryPortion() && (!this.orderCustomerPhone || !this.selectedDeliveryAddress?.trim())) { this.showToast(window.TXT.fulfill_delivery_contact, 'error'); return; }
             if (this.submitting) return;
             if (this.incomingOrderId && this.recalledCartDirty() && !await this.saveIncomingOrder()) return;
             // A recalled/held online-marked order has already chosen its payment
@@ -11478,7 +11560,7 @@ function restaurantPos() {
 
             // Task 1036: reserve the WhatsApp auto-open tab INSIDE this gesture
             // (synchronously, before any await) — provisionals are never shared.
-            if (!provisional) this.reserveWaWindow(this.selectedCustomer?.phone);
+            if (!provisional) this.reserveWaWindow(this.orderCustomerPhone);
 
             if (this.payingHeldOrderId) {
                 this.submitting = true; this.stockError = '';
@@ -11547,7 +11629,7 @@ function restaurantPos() {
                     // action. Backend skips the dine_in-only flow gate when this flag is set;
                     // the explicit Hold button / F5 (holdOrder fn above) sends no flag and
                     // stays gated client + server.
-                    body: JSON.stringify({ items: this.cart, order_type: this.orderType, table_id: this.selectedTable?.id || null, customer_id: this.selectedCustomer?.id || null, customer_name: this.selectedCustomer?.name || null, customer_phone: this.selectedCustomer?.phone || null, kitchen_notes: this.kitchenNotes, priority: this.priorityOrder, recalled_order_id: this.recalledOrderId, discount_type: this.discountAmount > 0 ? this.discountType : null, discount_value: this.discountAmount > 0 ? this.discountValue : 0, discount_amount: this.discountAmount, billing_flow: true, pay_uuid: this.payAttemptUuid, delivery_collection_mode: this.deliveryCollectionMode || (this.orderType === 'delivery' ? 'rider' : 'counter'), delivery_address: this.hasDeliveryPortion() ? ((this.selectedDeliveryAddress || '').trim() || null) : null }),
+                    body: JSON.stringify({ items: this.cart, order_type: this.orderType, table_id: this.selectedTable?.id || null, customer_id: this.selectedCustomer?.id || null, customer_name: this.orderCustomerName || null, customer_phone: this.orderCustomerPhone || null, kitchen_notes: this.kitchenNotes, priority: this.priorityOrder, recalled_order_id: this.recalledOrderId, discount_type: this.discountAmount > 0 ? this.discountType : null, discount_value: this.discountAmount > 0 ? this.discountValue : 0, discount_amount: this.discountAmount, billing_flow: true, pay_uuid: this.payAttemptUuid, delivery_collection_mode: this.deliveryCollectionMode || (this.orderType === 'delivery' ? 'rider' : 'counter'), delivery_address: this.hasDeliveryPortion() ? ((this.selectedDeliveryAddress || '').trim() || null) : null }),
                 });
                 let holdRes;
                 try {
@@ -11691,8 +11773,8 @@ function restaurantPos() {
                     order_type: this.orderType,
                     discount_type: this.discountType || 'percentage',
                     discount_value: this.discountAmount > 0 ? this.discountValue : 0,
-                    customer_name: this.selectedCustomer?.name || null,
-                    customer_phone: this.selectedCustomer?.phone || null,
+                    customer_name: this.orderCustomerName || null,
+                    customer_phone: this.orderCustomerPhone || null,
                     // Item #1: delivery-address snapshot — only rides on Delivery orders.
                     delivery_collection_mode: this.deliveryCollectionMode || (this.orderType === 'delivery' ? 'rider' : 'counter'), delivery_address: this.hasDeliveryPortion() ? ((this.selectedDeliveryAddress || '').trim() || null) : null,
                     kitchen_notes: this.kitchenNotes,
@@ -11866,9 +11948,9 @@ function restaurantPos() {
                 this.lastOrderType = this.orderType || null;
                 // The server's settled bill is authoritative; the pre-pay quote
                 // can be stale when discount/tax/payment method changed.
-                this.lastTotal = Math.round(Number(data.total_amount ?? savedTotal ?? 0));
-                this.lastChangeDue = Number(data.change_due ?? Math.max(0, this.lastCashReceived - this.lastTotal));
-                this.lastPaymentMethod = method;
+                this.lastTotal = Number(data.total_amount ?? savedTotal ?? 0);
+                this.lastPaymentMethod = data.payment_method || method;
+                this.lastChangeDue = Number(data.change_due ?? (this.lastPaymentMethod === 'cash' ? Math.max(0, this.lastCashReceived - this.lastTotal) : 0));
                 this.lastPraNumber = data.pra_invoice_number || '';
                 this.lastPraStatus = data.pra_status || '';
                 this.lastWaiterName = (this.incomingOrderInfo && this.incomingOrderInfo.waiter) ? this.incomingOrderInfo.waiter : '';
@@ -11961,7 +12043,12 @@ function restaurantPos() {
             const sub = items.reduce((s, i) => s + (parseFloat(i.subtotal) || 0), 0);
             const disc = parseFloat(o.discount_amount) || 0;
             const ratio = sub > 0 ? Math.max(0, (sub - disc) / sub) : 1;
-            const taxable = items.filter(i => !i.is_tax_exempt).reduce((s, i) => s + (parseFloat(i.subtotal) || 0), 0);
+            const taxable = items.reduce((sum, item) => {
+                const lineTotal = Number(item.subtotal) || 0;
+                return sum + (globalThis.PosDealAllocation
+                    ? globalThis.PosDealAllocation.taxable(item.deal_snapshot, lineTotal, !!item.is_tax_exempt)
+                    : (item.is_tax_exempt ? 0 : lineTotal));
+            }, 0);
             const rate = method === 'card'
                 ? (this.taxRules['debit_card'] ?? this.taxRules['card'] ?? 8)
                 : (this.taxRules['cash'] ?? this.taxRate ?? 16);
@@ -11970,13 +12057,15 @@ function restaurantPos() {
             if (this.taxInclusive) {
                 if (this.taxMenuRate !== null && this.taxMenuRate > 0 && Math.abs(this.taxMenuRate - rate) >= 0.005) {
                     const after = Math.max(0, sub - disc);
-                    const taxableAfter = taxable * ratio;
-                    const exemptShare = Math.max(0, after - taxableAfter);
-                    return Math.round(exemptShare + taxableAfter * (100 + rate) / (100 + this.taxMenuRate)) + Number(this.imsFee || 0);
+                    const taxableAfter = this.r2(taxable * ratio);
+                    const exemptShare = this.r2(after - taxableAfter);
+                    const base = this.r2(taxableAfter * 100 / (100 + this.taxMenuRate));
+                    const tax = this.r2(taxableAfter * rate / (100 + this.taxMenuRate));
+                    return Math.round(exemptShare + base + tax) + Number(this.imsFee || 0);
                 }
                 return Math.round(sub - disc) + Number(this.imsFee || 0);
             }
-            const tax = Math.round(taxable * ratio * rate / 100);
+            const tax = Math.round(this.r2(taxable * ratio) * rate / 100);
             return Math.round(sub - disc + tax) + Number(this.imsFee || 0);
         },
         payingOrderAwaitingOnline() {
@@ -11987,9 +12076,48 @@ function restaurantPos() {
             }
             return !!(this.recalledOrderMeta && this.recalledOrderMeta.online_payment_awaited_at);
         },
+        checkoutOnlineQuote: null,
+        checkoutOnlineOrderId() {
+            return this.payingHeldOrderId || this.incomingOrderId || this.recalledOrderId;
+        },
+        async loadCheckoutOnlineQuote(orderId) {
+            const quote = orderId ? { orderId, amount: null, error: false, request: Symbol() } : null;
+            this.checkoutOnlineQuote = quote;
+            if (!quote) return;
+
+            try {
+                const res = await this.fetchWithTimeout('/pos/restaurant/orders/' + encodeURIComponent(orderId) + '/payment-quote?payment_method=qr_payment', {
+                    headers: { 'Accept': 'application/json' },
+                    cache: 'no-store',
+                });
+                if (!res.ok) throw new Error('quote_failed');
+                const data = await res.json();
+                const amount = Number(data.total_amount);
+                if (data.success !== true || Number(data.order_id) !== Number(orderId) || data.total_amount == null || !Number.isFinite(amount)) {
+                    throw new Error('quote_invalid');
+                }
+                quote.amount = amount;
+            } catch {
+                quote.error = true;
+            }
+            if (this.showPayModal && this.checkoutOnlineOrderId() === orderId && this.checkoutOnlineQuote?.request === quote.request) {
+                this.checkoutOnlineQuote = { ...quote };
+            }
+        },
+        get checkoutOnlineAmount() {
+            const quote = this.checkoutOnlineQuote;
+            return quote && quote.orderId === this.checkoutOnlineOrderId() ? quote.amount : null;
+        },
+        get checkoutOnlineAmountText() {
+            if (this.checkoutOnlineAmount !== null) return 'Rs. ' + this.checkoutOnlineAmount.toLocaleString();
+            return this.checkoutOnlineQuote?.error
+                ? {{ Js::from(__('pos.online_quote_unavailable')) }}
+                : {{ Js::from(__('pos.online_quote_loading')) }};
+        },
         confirmAwaitedPayment() {
-            const orderId = this.payingHeldOrderId || this.incomingOrderId || this.recalledOrderId;
-            if (orderId) this._onlineOkByOrder[orderId] = true;
+            const orderId = this.checkoutOnlineOrderId();
+            if (this.submitting || !orderId || this.checkoutOnlineAmount === null) return;
+            this._onlineOkByOrder[orderId] = true;
             this.processPayment('qr_payment');
         },
         orderTypeName(type) {
@@ -12005,7 +12133,7 @@ function restaurantPos() {
             const items = held ? held.items : this.cart;
             const orderType = held?.order_type || this.orderType;
             const mode = this.deliveryCollectionMode || held?.delivery_collection_mode || (orderType === 'delivery' ? 'rider' : 'counter');
-            if (this.payMethodIndex === 1 || mode !== 'rider' || !items?.some(i => i.fulfillment === 'delivery')) return 0;
+            if (this.payingOrderAwaitingOnline() || this.payMethodIndex === 1 || mode !== 'rider' || !items?.some(i => i.fulfillment === 'delivery')) return 0;
             const inclusive = !!this.taxInclusive;
             const rate = Number(this.taxRules?.cash ?? this.taxRate ?? 0);
             const sub = items.reduce((sum, item) => sum + (held ? Number(item.subtotal || 0) : this.getItemTotal(item)), 0);
@@ -12023,13 +12151,16 @@ function restaurantPos() {
             return all > 0 ? Math.round(this.payModalTotal * delivery / all * 100) / 100 : 0;
         },
         get payModalCounterCash() { return Math.round((this.payModalTotal - this.payModalRiderCash) * 100) / 100; },
-        get payModalTotal() {
-            if (this.payingHeldOrderId) return this.heldOrderEstimate(this.payMethodIndex === 1 ? 'card' : 'cash');
+        paymentAmountFor(method) {
+            if (this.payingHeldOrderId) return this.heldOrderEstimate(method);
             // Method-aware for the live cart in EVERY tax mode (Jul 2026 redesign):
             // exclusive = card's own (lower) rate, card-save = cheaper card total,
             // plain inclusive = method-independent menu total. Matches the amounts
             // shown on the one-tap CASH/CARD buttons AND what the backend charges.
-            return this.cartTotalForMethod(this.payMethodIndex === 1 ? 'card' : 'cash');
+            return this.cartTotalForMethod(method);
+        },
+        get payModalTotal() {
+            return this.paymentAmountFor(this.payMethodIndex === 1 ? 'card' : 'cash');
         },
 
         startNewAfterPayment() {
@@ -13325,6 +13456,7 @@ function restaurantPos() {
                     || (b.invoice_number || '').toLowerCase().includes(q)
                     || (b.pra_invoice_number || '').toLowerCase().includes(q)
                     || (b.customer_name || '').toLowerCase().includes(q)
+                    || (b.delivery_address || '').toLowerCase().includes(q)
                     || String(b.total_amount || '').includes(q);
             });
         },
@@ -13663,8 +13795,8 @@ function restaurantPos() {
             // Task 1025: paid bill ki order type ka snapshot (payOrderType pehle hi
             // held-order/override se capture ho chuka) — tables-first wapsi ka gate.
             this.lastOrderType = payOrderType || null;
-            this.lastTotal = Math.round(Number(data.total_amount ?? savedTotal ?? 0)); this.lastPaymentMethod = method;
-            this.lastChangeDue = Number(data.change_due ?? Math.max(0, this.lastCashReceived - this.lastTotal));
+            this.lastTotal = Number(data.total_amount ?? savedTotal ?? 0); this.lastPaymentMethod = data.payment_method || method;
+            this.lastChangeDue = Number(data.change_due ?? (this.lastPaymentMethod === 'cash' ? Math.max(0, this.lastCashReceived - this.lastTotal) : 0));
             this.lastPraNumber = data.pra_invoice_number || ''; this.lastPraStatus = data.pra_status || '';
             this.lastWaiterName = (this.incomingOrderInfo && this.incomingOrderInfo.waiter) ? this.incomingOrderInfo.waiter : ((heldOrd && heldOrd.waiter) ? heldOrd.waiter : '');
             // Task 921: clear the claimed-waiter state once its order is paid so the NEXT

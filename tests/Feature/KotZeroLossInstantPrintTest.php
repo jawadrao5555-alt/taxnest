@@ -292,6 +292,61 @@ class KotZeroLossInstantPrintTest extends TestCase
         $this->assertCount(8, $claimed, 'batch of 10 covers a >7 order burst');
     }
 
+    public function test_append_during_print_queues_only_lines_missing_from_claimed_slip(): void
+    {
+        $this->seedDevice('dev-kitchen', [['name' => 'Kitchen Printer']]);
+        $company = $this->companyA();
+        $order = $this->holdOrder($company->id, 'ZL-APPEND', $this->waiterId);
+        $first = KotPrintService::enqueueForOrder($company, $order, $this->waiterId, true);
+        $claimedId = $first['job_ids'][0];
+        $this->assertSame($claimedId, $this->claim()[0]['id']);
+        $claimedLines = PosPrintJob::findOrFail($claimedId)->printed_item_ids;
+
+        $extraLine = DB::table('restaurant_order_items')->insertGetId([
+            'order_id' => $order->id, 'item_name' => 'Extra dish', 'quantity' => 1,
+        ]);
+        $second = KotPrintService::enqueueForOrder($company, $order->fresh(), $this->waiterId, true);
+        $next = PosPrintJob::findOrFail($second['job_ids'][0]);
+        $this->assertNotSame($claimedId, $next->id);
+        $this->assertSame([$extraLine], $next->printed_item_ids);
+        $this->assertSame($claimedLines, PosPrintJob::findOrFail($claimedId)->printed_item_ids);
+        KotPrintService::enqueueForOrder($company, $order->fresh(), $this->waiterId, true);
+        $this->assertSame(2, PosPrintJob::where('restaurant_order_id', $order->id)->count());
+    }
+
+    public function test_kot_status_keeps_each_printer_outcome_and_isolates_tenants(): void
+    {
+        Schema::table('pos_print_jobs', function (Blueprint $table) {
+            $table->string('result_outcome')->nullable();
+        });
+        $order = $this->holdOrder($this->companyA, 'ZL-STATUS');
+        $makeJob = fn (string $printer, string $status, array $extra = []) => PosPrintJob::create($extra + [
+            'company_id' => $this->companyA, 'type' => 'kot', 'target_printer' => $printer,
+            'restaurant_order_id' => $order->id, 'status' => $status,
+        ]);
+        $queued = $makeJob('Kitchen', 'pending');
+        $printing = $makeJob('Drinks', 'printing');
+        $printed = $makeJob('Grill', 'done', ['result_outcome' => 'spool_accepted']);
+        $empty = $makeJob('Counter', 'done', ['result_outcome' => 'no_document']);
+        $failed = $makeJob('Dessert', 'failed', ['error' => 'Paper jam']);
+        $waiting = $makeJob('Cold Kitchen', 'pending');
+        PosPrintJob::whereKey($waiting->id)->update(['updated_at' => now()->subSeconds(45)]);
+        $other = $makeJob('Private kitchen', 'failed', ['company_id' => $this->companyB]);
+
+        app()->instance('currentCompanyId', $this->companyA);
+        $response = app(\App\Http\Controllers\PosController::class)->apiKotPrintAttention(
+            \Illuminate\Http\Request::create('/pos/api/kot-print-attention')
+        );
+        $states = collect($response->getData(true)['status_jobs'])->pluck('state', 'id');
+        $this->assertSame('pending', $states[$queued->id]);
+        $this->assertSame('printing', $states[$printing->id]);
+        $this->assertSame('printed', $states[$printed->id]);
+        $this->assertSame('no_document', $states[$empty->id]);
+        $this->assertSame('action_required', $states[$failed->id]);
+        $this->assertSame('waiting', $states[$waiting->id]);
+        $this->assertFalse($states->has($other->id));
+    }
+
     public function test_silent_print_off_and_missing_printer_do_not_invent_a_cloud_job(): void
     {
         $company = $this->companyA();

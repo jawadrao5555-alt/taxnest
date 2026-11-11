@@ -559,7 +559,7 @@ class PosKotDeviceRoutingTest extends TestCase
         $this->assertSame('LAN-Kitchen', $job->target_printer);
     }
 
-    public function test_stranded_kot_with_no_capable_counter_parks_failed(): void
+    public function test_stranded_kot_waits_for_its_original_counter_to_restart(): void
     {
         // USB printer only the dead counter has — nobody else can print it.
         $this->seedDevice('dev-dead', [
@@ -572,10 +572,12 @@ class PosKotDeviceRoutingTest extends TestCase
         $res = $this->agentGet('/api/agent/print-jobs')->assertOk();
 
         $job = DB::table('pos_print_jobs')->where('id', $stuck)->first();
-        $this->assertSame('failed', $job->status, 'no capable counter → park failed (recent-failed strip), never bounce');
-        $this->assertStringContainsString('USB-Kitchen', $job->error);
-        // …and no agent claimed it.
+        $this->assertSame('pending', $job->status);
+        $this->assertSame('dev-dead', $job->device_uid);
         $this->assertNotContains($stuck, collect($res->json('jobs'))->pluck('id')->all());
+        $this->agentGet('/api/agent/print-jobs?device_uid=dev-dead')->assertOk()
+            ->assertJsonPath('jobs.0.id', $stuck);
+        $this->assertSame('printing', DB::table('pos_print_jobs')->where('id', $stuck)->value('status'));
     }
 
     public function test_stranded_bill_stays_at_its_counter_while_kot_rescue_remains_separate(): void

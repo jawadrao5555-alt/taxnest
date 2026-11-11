@@ -1725,6 +1725,8 @@ class AgentController extends Controller
         DB::table('pos_print_jobs')
             ->where('company_id', $company->id)
             ->where('status', 'pending')
+            ->when($deviceAware, fn ($q) => $q->where(fn ($route) =>
+                $route->whereNull('device_uid')->when($deviceUid, fn ($assigned) => $assigned->orWhere('device_uid', $deviceUid))))
             ->whereIn('id', $claimIds)
             ->update($claimFields);
 
@@ -1917,8 +1919,8 @@ class AgentController extends Controller
                 // and fail (and with several such agents it would bounce).
                 // Retarget only when another ONLINE counter reports the SAME
                 // printer name (LAN/shared printer) — re-stamp to that counter.
-                // Nobody else has it → park as failed so it surfaces on the
-                // recent-failed strip instead of sitting stranded forever.
+                // PRA tickets without a carrier stay queued for the owning
+                // counter after a restart, up to the pending expiry horizon.
                 $onlineDevices = collect();
                 try {
                     $onlineDevices = \App\Models\PosAgentDevice::where('company_id', $company->id)
@@ -1933,11 +1935,13 @@ class AgentController extends Controller
                             return $d->device_uid !== $row->device_uid
                                 && PrinterIdentity::reportedHas($d->printers ?? [], $row->target_printer);
                         });
+                        $pendingRoute = DB::table('pos_print_jobs')->where('id', $row->id)
+                            ->where('company_id', $company->id)->where('status', 'pending')
+                            ->where('device_uid', $row->device_uid);
                         if ($carrier) {
-                            DB::table('pos_print_jobs')->where('id', $row->id)
-                                ->update(['device_uid' => $carrier->device_uid, 'updated_at' => now()]);
-                        } else {
-                            DB::table('pos_print_jobs')->where('id', $row->id)->update([
+                            $pendingRoute->update(['device_uid' => $carrier->device_uid, 'updated_at' => now()]);
+                        } elseif ($row->type === 'fbr_kot') {
+                            $pendingRoute->update([
                                 'status' => 'failed',
                                 'error' => 'Counter owning printer "' . $row->target_printer . '" is offline and no other online counter reports this printer.',
                                 'updated_at' => now(),
@@ -2021,18 +2025,18 @@ class AgentController extends Controller
             ->where('attempts', '>=', 3)
             ->update(['status' => 'failed', 'claim_token' => null, 'error' => 'Print attempt timed out repeatedly (agent lost the job mid-print).', 'updated_at' => now()]);
 
-        // Expired unclaimed jobs: an unstamped pending job nobody claimed for
+        // Expired unclaimed jobs: a PRA KOT or an unstamped pending job nobody claimed for
         // `print.pending_expiry_hours` (default 24h — e.g. every agent was
         // switched off) must not surprise-print a day-old bill when a counter
-        // comes back. Park as failed, never delete (evidence retained). Stamped
-        // jobs are handled by the stranded rescue above and only reach here
-        // once unstamped. 0/negative config disables the horizon.
+        // comes back. Park as failed (evidence retained). Other stamped jobs
+        // continue to use stranded rescue. 0/negative disables the horizon.
         $expiryHours = (int) config('print.pending_expiry_hours', 24);
         if ($expiryHours > 0) {
             DB::table('pos_print_jobs')
                 ->where('company_id', $company->id)
                 ->where('status', 'pending')
-                ->when(self::deviceRoutingReady(), fn ($q) => $q->whereNull('device_uid'))
+                ->when(self::deviceRoutingReady(), fn ($q) => $q->where(fn ($route) =>
+                    $route->whereNull('device_uid')->orWhereIn('type', ['kot', 'kot_void'])))
                 ->where('created_at', '<', now()->subHours($expiryHours))
                 ->update([
                     'status' => 'failed',
@@ -2245,7 +2249,8 @@ class AgentController extends Controller
             // route — delta request + new rows => print the WHOLE order (new rows
             // flagged NEW); delta with nothing new stays empty => 204 (no blank,
             // no duplicate). Explicit full prints unchanged.
-            $fullMode = (bool) ($company->pos_kot_full_mode ?? false);
+            $waiterSnapshot = ($q['waiter_snapshot'] ?? null) === '1';
+            $fullMode = !$waiterSnapshot && (bool) ($company->pos_kot_full_mode ?? false);
             // Delta snapshot (Pizza Master edit-path bug, Aug 2026): delta jobs
             // now BAKE their unprinted row ids at enqueue (printed_item_ids).
             // Without it, the FIRST job's result-time stamping emptied every
@@ -2254,7 +2259,7 @@ class AgentController extends Controller
             // whereNull rows → 204 → no slip at the counter. Baked ids keep all
             // copies of one send identical; legacy/blank jobs fall back to the
             // old whereNull resolution.
-            $baked = ($delta && is_array($job->printed_item_ids) && count($job->printed_item_ids))
+            $baked = (($delta || $waiterSnapshot) && is_array($job->printed_item_ids) && count($job->printed_item_ids))
                 ? array_map('intval', $job->printed_item_ids)
                 : null;
             // Offline KOT local handoff (Sep 2026): lines the shop PC has
@@ -2291,7 +2296,7 @@ class AgentController extends Controller
                 $ticketItems = $order->items;
                 $newItemIds = $unprinted->pluck('id');
             } else {
-                $ticketItems = $delta ? $unprinted->values() : $order->items;
+                $ticketItems = ($delta || $waiterSnapshot) ? $unprinted->values() : $order->items;
                 $newItemIds = $fullMode ? $unprinted->pluck('id') : collect();
             }
 
@@ -2326,7 +2331,7 @@ class AgentController extends Controller
             // SAME items (still NULL), so retries print identical content.
             $job->update(['printed_item_ids' => $ticketItems->pluck('id')->values()->all()]);
 
-            return response(view('pos.restaurant.kitchen-ticket', compact('order', 'company', 'ticketItems', 'delta', 'kotBatchNo', 'grouped', 'stationLabel', 'newItemIds'))->render())
+            return response(view('pos.restaurant.kitchen-ticket', compact('order', 'company', 'ticketItems', 'delta', 'kotBatchNo', 'grouped', 'stationLabel', 'newItemIds', 'waiterSnapshot'))->render())
                 ->header('Content-Type', 'text/html; charset=UTF-8');
         }
 

@@ -493,8 +493,9 @@ class RestaurantWaiterController extends Controller
             }
             $order = RestaurantOrder::create($orderData);
 
+            $lineIds = [];
             foreach ($validated['items'] as $it) {
-                RestaurantOrderItem::create([
+                $lineIds[] = (int) RestaurantOrderItem::create([
                     'order_id' => $order->id,
                     'item_type' => !empty($it['item_id']) ? 'product' : 'manual',
                     'item_id' => $it['item_id'] ?? null,
@@ -504,7 +505,7 @@ class RestaurantWaiterController extends Controller
                     'subtotal' => round((float) $it['quantity'] * (float) $it['unit_price'], 2),
                     'special_notes' => $it['special_notes'] ?? null,
                     // kot_printed_at stays NULL — stamped when a ticket actually prints.
-                ]);
+                ])->id;
             }
 
             // ZFC issue #10 (28 Jul 2026): waiter punch must ACTUALLY print the
@@ -512,7 +513,7 @@ class RestaurantWaiterController extends Controller
             // print job existed, so the kitchen never got the KOT. Best-effort:
             // a printer problem must never lose the order.
             $company = Company::find($companyId);
-            $kot = \App\Services\KotPrintService::enqueueForOrder($company, $order, $user->id);
+            $kot = \App\Services\KotPrintService::enqueueForOrder($company, $order, $user->id, queueWhileOffline: true, snapshotLineIds: $lineIds);
             if ($kot['printed'] && !empty($kot['job_ids'])) {
                 $order->update(['kot_print_count' => 1]);
             }
@@ -700,6 +701,7 @@ class RestaurantWaiterController extends Controller
             }
 
             $added = 0;
+            $lineIds = [];
             foreach ($validated['items'] as $it) {
                 $row = [
                     'order_id' => $order->id,
@@ -717,7 +719,7 @@ class RestaurantWaiterController extends Controller
                 if ($appendUuid !== '' && $hasAppendUuidColumn) {
                     $row['append_uuid'] = $appendUuid;
                 }
-                RestaurantOrderItem::create($row);
+                $lineIds[] = (int) RestaurantOrderItem::create($row)->id;
                 $added += round((float) $it['quantity'] * (float) $it['unit_price'], 2);
             }
 
@@ -736,7 +738,7 @@ class RestaurantWaiterController extends Controller
 
             // ZFC issue #10: print the DELTA ticket (only unprinted rows) right away.
             $company = Company::find($companyId);
-            $kot = \App\Services\KotPrintService::enqueueForOrder($company, $order, $user->id, true, true);
+            $kot = \App\Services\KotPrintService::enqueueForOrder($company, $order, $user->id, true, true, snapshotLineIds: $lineIds);
             if ($kot['printed'] && !empty($kot['job_ids'])) {
                 // Query-builder update (NOT $order->update): the model's
                 // 'integer' cast chokes on DB::raw Expression —
@@ -810,7 +812,7 @@ class RestaurantWaiterController extends Controller
                     ])];
                 }
                 return ['order' => $order->fresh(['items', 'table']), 'void' => $attemptModel->void_payload ?? [],
-                    'new' => !empty($attemptModel->add_payload), 'attempt' => $attemptModel, 'resume' => true];
+                    'new' => array_column($attemptModel->add_payload ?? [], 'line_id'), 'attempt' => $attemptModel, 'resume' => true];
             }
             $actualRevision = (int) ($order->edit_revision ?? 0);
             if ($actualRevision !== (int) $validated['revision']) {
@@ -830,7 +832,7 @@ class RestaurantWaiterController extends Controller
             // order lines. Keying by dish collapsed them: retained lines were
             // recreated while the originals survived, doubling the bill/KOT.
             $remaining = $order->items->keyBy('id');
-            $voidItems = []; $changed = []; $hasNewKitchen = false;
+            $voidItems = []; $changed = []; $newKitchenLineIds = [];
             foreach ($validated['items'] as $input) {
                 $key = implode('|', [
                     $input['item_type'] ?? (!empty($input['item_id']) ? 'product' : 'manual'),
@@ -876,7 +878,7 @@ class RestaurantWaiterController extends Controller
                         'special_notes' => $notes, 'kot_printed_at' => null,
                         'is_tax_exempt' => (bool) ($input['is_tax_exempt'] ?? false),
                     ]);
-                    $hasNewKitchen = true;
+                    $newKitchenLineIds[] = (int) $new->id;
                     $changed[] = ['action' => 'ADD', 'item_name' => $input['name'], 'quantity' => $qty];
                     continue;
                 }
@@ -889,7 +891,7 @@ class RestaurantWaiterController extends Controller
                     // also emit a quantity-decrease void for this same line.
                     $voidItems[] = ['item_type' => $line->item_type, 'item_id' => $line->item_id,
                         'item_name' => $line->item_name, 'notes' => $oldNotes, 'qty' => $oldQty];
-                    $hasNewKitchen = true;
+                    $newKitchenLineIds[] = (int) $line->id;
                     $changed[] = ['action' => 'MODIFIER', 'item_name' => $line->item_name,
                         'before' => $oldNotes, 'after' => (string) $notes, 'quantity' => $qty];
                     $line->kot_printed_at = null;
@@ -898,14 +900,14 @@ class RestaurantWaiterController extends Controller
                         'item_name' => $line->item_name, 'notes' => $oldNotes, 'qty' => $oldQty - $qty];
                 } elseif ($qty > $oldQty && $line->kot_printed_at) {
                     $increment = $qty - $oldQty;
-                    RestaurantOrderItem::create([
+                    $incrementLine = RestaurantOrderItem::create([
                         'order_id' => $order->id, 'item_type' => $line->item_type, 'item_id' => $line->item_id,
                         'item_name' => $line->item_name, 'quantity' => $increment,
                         'unit_price' => $line->unit_price, 'subtotal' => round($increment * (float) $line->unit_price, 2),
                         'special_notes' => $notes, 'kot_printed_at' => null,
                     ]);
                     $qty = $oldQty;
-                    $hasNewKitchen = true;
+                    $newKitchenLineIds[] = (int) $incrementLine->id;
                     $changed[] = ['action' => 'ADD', 'item_name' => $line->item_name, 'quantity' => $increment];
                 }
                 $line->quantity = $qty;
@@ -940,7 +942,7 @@ class RestaurantWaiterController extends Controller
             }
             $order->save();
             $savedOrder = $order->fresh(['items', 'table']);
-            $addPayload = $savedOrder->items->whereNull('kot_printed_at')->map(fn ($item) => [
+            $addPayload = $savedOrder->items->whereIn('id', $newKitchenLineIds)->map(fn ($item) => [
                 'item_id' => $item->item_id, 'item_type' => $item->item_type,
                 'item_name' => $item->item_name, 'notes' => (string) ($item->special_notes ?? ''),
                 'qty' => (float) $item->quantity, 'line_id' => (int) $item->id,
@@ -950,7 +952,7 @@ class RestaurantWaiterController extends Controller
                 $attempt = \App\Models\RestaurantOrderEditAttempt::create([
                     'company_id' => $companyId, 'order_id' => $order->id, 'edit_uuid' => $editUuid,
                     'revision' => (int) ($order->edit_revision ?? ($actualRevision + 1)), 'kot_status' => 'pending',
-                    'add_payload' => $hasNewKitchen ? $addPayload : null,
+                    'add_payload' => $addPayload ?: null,
                     'void_payload' => $voidItems ?: null,
                 ]);
             }
@@ -962,7 +964,7 @@ class RestaurantWaiterController extends Controller
                         $companyId, $user->id);
                 }
             } catch (\Throwable $e) { Log::warning('waiter edit audit failed: '.$e->getMessage()); }
-            return ['order' => $savedOrder, 'void' => $voidItems, 'new' => $hasNewKitchen, 'attempt' => $attempt];
+            return ['order' => $savedOrder, 'void' => $voidItems, 'new' => $newKitchenLineIds, 'attempt' => $attempt];
         });
         if (isset($result['response'])) return $result['response'];
         $company = Company::find($companyId);
@@ -970,7 +972,7 @@ class RestaurantWaiterController extends Controller
         try {
             $dedupeBase = $result['attempt'] ? 'waiter-edit:' . $result['attempt']->id : null;
             if ($company && $result['new']) {
-                $queued['add'] = \App\Services\KotPrintService::enqueueForOrder($company, $result['order'], $user->id, true, true, $dedupeBase . ':add');
+                $queued['add'] = \App\Services\KotPrintService::enqueueForOrder($company, $result['order'], $user->id, true, true, snapshotLineIds: $result['new']);
             }
             if ($company && $result['void']) {
                 $queued['void'] = \App\Services\KotPrintService::enqueueVoid($company, $result['order'], $result['void'], $user->id, true, $dedupeBase . ':void');

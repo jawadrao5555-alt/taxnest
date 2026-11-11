@@ -6,6 +6,7 @@
      class="mx-3 mt-2 mb-1 rounded-xl border-2 border-rose-500 bg-rose-600 text-white shadow-lg px-3 py-2.5">
     <p class="text-xs font-extrabold uppercase tracking-wide">{{ __('pos.kot_action_required_title') }}</p>
     <p class="text-[12px] font-semibold mt-1 leading-snug">{{ __('pos.kot_action_required_body') }}</p>
+    @if($canOfferKotReprint)
     <div class="mt-2 flex flex-wrap gap-2">
         <template x-for="job in kotActionRequired" :key="job.id">
             <button type="button"
@@ -17,4 +18,5 @@
             </button>
         </template>
     </div>
+    @endif
 </div>

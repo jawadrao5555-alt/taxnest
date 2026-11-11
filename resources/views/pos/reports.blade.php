@@ -1,5 +1,6 @@
 <x-pos-layout>
-<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+@include('pos.partials.report-screen-style')
+<div class="pos-report-document max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
     @php
         // Plan gates (Aug 2026 package matrix) — service caches per request.
         $planCoReports = \App\Models\Company::find(app('currentCompanyId'));

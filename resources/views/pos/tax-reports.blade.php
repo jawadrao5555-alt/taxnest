@@ -1,5 +1,6 @@
 <x-pos-layout>
-<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+@include('pos.partials.report-screen-style')
+<div class="pos-report-document max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
     <x-pos.report-header :title="($tab ?? 'pra') === 'local' ? __('pos.local_tax_reports') : __('pos.tax_reports')" :subtitle="$dateLabel . ' — ' . $taxRateLabel">
         <x-slot:actions>
             <a href="{{ route('pos.tax-reports.csv', request()->all()) }}" class="inline-flex items-center px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-lg transition shadow-sm">
@@ -125,28 +126,9 @@
     });
     </script>
 
-    @php
-        $money = fn ($amount) => 'PKR ' . number_format($amount, 2);
-        $taxStats = ($taxRateFilter ?? false) ? [
-            [__('pos.kpi_invoices'), number_format($summary->total_invoices)],
-            [__('pos.kpi_rate_value', ['rate' => $taxRateLabel]), $money($summary->total_sales)],
-            [__('pos.kpi_rate_tax', ['rate' => $taxRateLabel]), $money($summary->total_tax)],
-            [__('pos.kpi_rate_total', ['rate' => $taxRateLabel]), $money($summary->total_sales + $summary->total_tax)],
-        ] : [
-            [__('pos.kpi_total_invoices'), number_format($summary->total_invoices)],
-            [__('pos.kpi_total_sales'), $money($summary->total_sales)],
-            [__('pos.kpi_total_discount'), $money($summary->total_discount)],
-            [__('pos.kpi_total_taxable'), $money($summary->total_taxable)],
-            [__('pos.kpi_third_schedule'), $money($summary->total_third_schedule ?? 0)],
-            [__('pos.kpi_tax_exempt_other'), $money($summary->total_exempt_other ?? max(0, ($summary->total_exempt ?? 0) - ($summary->total_third_schedule ?? 0)))],
-            [__('pos.kpi_total_tax'), $money($summary->total_tax)],
-        ];
-    @endphp
-    <div class="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-4" data-pos-report-summary>
-        @foreach($taxStats as [$label, $value])
-            <x-pos.report-stat :label="$label" :value="$value" />
-        @endforeach
-    </div>
+    <x-pos.report-panel class="mb-5 p-4" data-pos-report-summary>
+        @include('pos.partials.tax-report-summary')
+    </x-pos.report-panel>
 
     {{-- Credit-note summary line (Task 695): shown whenever returns exist in the
          filtered set (or the credit-notes-only view is active) so the netted
@@ -184,7 +166,7 @@
             $showHotelCreditActions = auth('pos')->user()?->isPosAdmin() && count($hotelStayLinks) > 0;
         @endphp
         <div class="overflow-x-auto" data-tax-report-scroll="1">
-            <table class="w-full text-sm table-cards">
+            <table class="data w-full text-sm table-cards">
                 <thead>
                     <tr class="text-left text-xs text-gray-500 dark:text-gray-400 uppercase border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
                         <th class="px-4 py-3">{{ __('pos.th_pos_invoice_no') }}</th>

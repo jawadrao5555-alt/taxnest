@@ -38,6 +38,12 @@ class PosReportsActiveBusinessDayTest extends TestCase
         $dashboard = $controller->dashboard(Request::create('/pos/dashboard', 'GET'))->render();
         $this->assertStringContainsString('data-pos-report-header', $dashboard);
         $this->assertStringContainsString('data-dashboard-metric="revenue"', $dashboard);
+        $this->assertMatchesRegularExpression('/data-dashboard-metric="revenue"[^>]*class="[^"]*stat-card[^"]*from-emerald-500/', $dashboard);
+        $this->assertLessThan(strpos($dashboard, 'data-dashboard-report-section'), strpos($dashboard, 'data-dashboard-theme'));
+        $overview = $controller->dashboardSalesOverview(Request::create('/pos/reports/dashboard-overview', 'GET'));
+        $this->assertSame('sales', $overview->headers->get('X-Pos-Report-Fragment'));
+        $this->assertStringContainsString('data-report-summary', $overview->getContent());
+        $this->assertStringContainsString('data-report-products', $overview->getContent());
         $sales = $controller->reports(Request::create('/pos/reports', 'GET', ['from' => $date, 'to' => $date]))->render();
         $this->assertStringContainsString('data-pos-report-header', $sales);
         $this->assertStringContainsString('data-pos-report-filters', $sales);
@@ -51,6 +57,31 @@ class PosReportsActiveBusinessDayTest extends TestCase
         $detail = $controller->dashboardDetail(Request::create('/pos/dashboard/detail/revenue', 'GET', ['date' => $date]), 'revenue')->render();
         $this->assertStringContainsString('data-pos-report-header', $detail);
         $this->assertStringContainsString('data-pos-report-results', $detail);
+    }
+
+    public function test_each_saved_dashboard_theme_renders_its_own_metric_shapes(): void
+    {
+        $company = $this->company('06:00');
+        DB::table('companies')->where('id', $company->id)->update(['pos_setup_completed' => true]);
+        $user = \App\Models\User::factory()->create([
+            'company_id' => $company->id, 'pos_role' => 'pos_admin', 'role' => 'company_admin',
+        ]);
+        auth('pos')->setUser($user);
+        app()->instance('currentCompanyId', $company->id);
+        $data = (new PosController())->dashboard(Request::create('/pos/dashboard', 'GET'))->getData();
+
+        foreach (['default', 'toast', 'lightspeed', 'clover', 'oscar', 'shopify', 'saaf'] as $theme) {
+            $html = view('pos.partials.dashboard-theme', array_replace($data, ['dashboardStyle' => $theme]))->render();
+            $doc = new \DOMDocument();
+            @$doc->loadHTML($html);
+            $xpath = new \DOMXPath($doc);
+            $cards = $xpath->query('//a[@data-dashboard-metric="revenue" or @data-dashboard-metric="orders" or @data-dashboard-metric="customers"]');
+            $this->assertSame($theme === 'saaf' ? 2 : 3, $cards->length, $theme);
+            $this->assertStringContainsString('data-dashboard-theme="' . $theme . '"', $html);
+            foreach ($cards as $card) {
+                $this->assertStringContainsString('/pos/dashboard/detail/' . $card->getAttribute('data-dashboard-metric'), $card->getAttribute('href'));
+            }
+        }
     }
 
     public function test_after_midnight_default_uses_each_company_cutoff_and_rolls_after_cutoff(): void {

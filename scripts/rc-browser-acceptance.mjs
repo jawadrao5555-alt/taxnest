@@ -2353,19 +2353,26 @@ async function customerBulkNavigation(page,t,v) {
  if(!opened?.ok())throw new Error('Dashboard did not render for metric navigation');
  await waitForOperationalSurface(page);await dismiss(page);
  const root=page.locator('[data-dashboard-metrics]');await root.waitFor();
- const ledger=page.locator('#today-khata');
- if(await ledger.count() && await root.evaluate(el=>el.getBoundingClientRect().bottom)>await ledger.evaluate(el=>el.getBoundingClientRect().top))throw new Error('Metrics were not moved above ledger');
+ const reports=page.locator('[data-dashboard-report-section]');
+ if(await root.evaluate(el=>el.getBoundingClientRect().bottom)>await reports.evaluate(el=>el.getBoundingClientRect().top))throw new Error('Reports must appear below the themed dashboard');
+ await reports.scrollIntoViewIfNeeded();
+ await reports.locator('[data-report-summary]').waitFor();
+ await reports.locator('[data-report-products]').waitFor();
  const returnToDashboard=async()=>{
   await page.goto(baseUrl+'/pos/restaurant/dashboard',{waitUntil:'domcontentloaded'});
   await waitForOperationalSurface(page);await dismiss(page);
  };
  for(const metric of ['revenue','orders','customers']) {
   const link=page.locator('[data-dashboard-metric="'+metric+'"]');await link.waitFor();
-  const cardValue=(await link.locator('strong').innerText()).replace(/^Rs\.\s*/,'');
+  const animatedValue=link.locator('[data-count-target]');
+  const cardValue=await animatedValue.count()
+   ? Number(await animatedValue.first().getAttribute('data-count-target'))
+   : Number((await link.locator('p').filter({hasText:/^(Rs\.\s*)?[\d,]+$/}).first().innerText()).replace(/[^\d.]/g,''));
+
   await Promise.all([page.waitForURL('**/pos/dashboard/detail/'+metric+'?*'),link.click()]);
   await page.locator('[data-pos-report-header]').waitFor();
   const value=await page.locator('[data-pos-report-summary] strong').innerText();
-  if(value.replace(/^PKR\s*/,'')!==cardValue)throw new Error('Dashboard metric value differs from its detail: '+metric);
+  if(Number(value.replace(/^PKR\s*/,'').replaceAll(',',''))!==cardValue)throw new Error('Dashboard metric value differs from its detail: '+metric);
   await page.locator('[data-pos-report-results]').waitFor();
   await returnToDashboard();
  }

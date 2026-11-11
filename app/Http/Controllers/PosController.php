@@ -7315,6 +7315,25 @@ class PosController extends Controller
         return 'pra';
     }
 
+    public function dashboardSalesOverview(Request $request)
+    {
+        $companyId = (int) app('currentCompanyId');
+        $company = Company::findOrFail($companyId);
+        $user = auth('pos')->user();
+        abort_if($user->posCustomAllows('reports') === false, 403);
+        $date = \App\Services\PosBusinessDay::current($companyId);
+        $tab = $this->salesReportTab($request, $user);
+        $cashier = $user->isPosCashier() ? (int) $user->id : $this->dashboardCashier($request, $user);
+        $history = \App\Services\PosFinancialHistory::report($companyId, $date, $date, $tab, $cashier, $user,
+            fn ($query) => $this->applyReportFilters($query, $tab, $cashier, $user));
+        $presentation = \App\Services\PosReportPresentation::fromHistory($history);
+        $showProducts = PosFeatureService::planAllows($company, 'analytics_enabled');
+
+        return response()->view('pos.partials.dashboard-sales-overview', compact('presentation', 'showProducts'))
+            ->header('Cache-Control', 'private, no-store')
+            ->header('X-Pos-Report-Fragment', 'sales');
+    }
+
     public function reports(Request $request)
     {
         $companyId = app('currentCompanyId');
@@ -12002,7 +12021,7 @@ class PosController extends Controller
         abort_if(auth('pos')->user()->posCustomAllows('reports') === false, 403);
         $validated = $request->validate([
             'date' => 'required|date_format:Y-m-d',
-            'source' => 'nullable|in:orders,bills',
+            'source' => 'nullable|in:orders,bills,completed-orders',
             'cashier' => ['nullable', 'regex:/^(?:all|[1-9][0-9]*)$/'],
         ]);
         $date = $validated['date'];
@@ -12029,11 +12048,12 @@ class PosController extends Controller
                 }
             }
             $rows = $query->orderBy('name')->paginate(100)->withQueryString();
-        } elseif ($request->input('source') === 'orders') {
+        } elseif (in_array($validated['source'] ?? null, ['orders', 'completed-orders'], true)) {
             abort_unless($user->isPosAdmin(), 403);
             $rows = \App\Models\RestaurantOrder::where('company_id', $companyId)
                 ->where('created_at', '>=', $start)->where('created_at', '<', $end)
                 ->where('status', '!=', 'cancelled')->tap($branch)
+                ->when($validated['source'] === 'completed-orders', fn ($query) => $query->where('status', 'completed'))
                 ->orderByDesc('id')->paginate(100)->withQueryString();
         } else {
             $query = PosTransaction::where('company_id', $companyId)->where('business_date', $date)

@@ -1,7 +1,7 @@
 <x-admin-layout>
     <x-slot name="header">
         <div class="flex items-center justify-between flex-wrap gap-3">
-            <h2 class="font-bold text-xl text-gray-800 dark:text-gray-100 leading-tight">POS What's New</h2>
+            <h2 class="font-bold text-xl text-gray-800 dark:text-gray-100 leading-tight">Product Notifications</h2>
             @if($canManageRelease)
                 <button onclick="document.getElementById('addUpdateModal').classList.remove('hidden')" class="inline-flex items-center px-3 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition">
                     <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
@@ -47,8 +47,8 @@
             {{-- Master feature switch --}}
             <div class="mb-6 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-5 flex items-center justify-between flex-wrap gap-3">
                 <div>
-                    <div class="font-semibold text-gray-800 dark:text-gray-100">What's New Notifications (POS)</div>
-                    <p class="text-sm text-gray-500 dark:text-gray-400 mt-0.5">Controls the one-time popup and the bell icon on the entire TaxNest PRA POS panel. When OFF, POS users see nothing.</p>
+                    <div class="font-semibold text-gray-800 dark:text-gray-100">What's New notifications</div>
+                    <p class="text-sm text-gray-500 dark:text-gray-400 mt-0.5">Controls release announcements for PRA POS, FBR POS and Digital Invoicing. Routine updates stay in the bell. Featured updates can open a popup on POS.</p>
                 </div>
                 @if($canManageRelease)
                     <form method="POST" action="/admin/app-updates/feature-toggle">
@@ -78,6 +78,15 @@
                             <option value="">All</option>
                             <option value="published" {{ request('status') === 'published' ? 'selected' : '' }}>Published</option>
                             <option value="hidden" {{ request('status') === 'hidden' ? 'selected' : '' }}>Hidden</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="update-product" class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Configured product</label>
+                        <select id="update-product" name="product" class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 text-sm">
+                            <option value="">All products</option>
+                            @foreach(['pra' => 'PRA POS', 'fbr' => 'FBR POS', 'di' => 'Digital Invoicing'] as $value => $label)
+                                <option value="{{ $value }}" @selected(request('product') === $value)>{{ $label }}</option>
+                            @endforeach
                         </select>
                     </div>
                     <div>
@@ -159,8 +168,12 @@
                                             <span class="mt-1 block px-2 py-1 rounded-full text-[10px] font-medium text-center bg-gray-100 text-gray-500">Archived — history only</span>
                                         @elseif($upd->isCustomerDuplicate())
                                             <span class="mt-1 block px-2 py-1 rounded-full text-[10px] font-medium text-center bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400">Duplicate — history only</span>
+                                        @elseif($upd->isInternalTrackerNotice())
+                                            <span class="mt-1 block text-xs font-medium text-gray-500">Internal tracker — history only</span>
+                                        @elseif($updLive && !$featureOn)
+                                            <span class="mt-1 block text-xs font-medium text-gray-500">Delivery paused</span>
                                         @elseif($updLive)
-                                            <span class="mt-1 block px-2 py-1 rounded-full text-[10px] font-bold text-center bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300">● Live on POS</span>
+                                            <span class="mt-1 block px-2 py-1 rounded-full text-[10px] font-bold text-center bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300">Eligible for customer bell</span>
                                         @elseif($upd->is_published)
                                             <span class="mt-1 block px-2 py-1 rounded-full text-[10px] font-medium text-center bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400" title="Published updates auto-disappear from POS users {{ \App\Models\AppUpdate::LIVE_DAYS }} days after publish (history stays here)">Expired ({{ \App\Models\AppUpdate::LIVE_DAYS }} din guzar gaye)</span>
                                         @endif

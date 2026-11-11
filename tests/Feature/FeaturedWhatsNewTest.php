@@ -488,6 +488,20 @@ class FeaturedWhatsNewTest extends TestCase
         $this->assertSame(0, AppUpdateSeen::count());
     }
 
+    public function test_internal_release_tracker_stays_in_history_and_out_of_customer_delivery(): void
+    {
+        $tracker = $this->makeUpdate('TaxNest updates ka poora record', 'all', true);
+        $customerUpdate = $this->makeUpdate('Receipt and billing improvements', 'all', false);
+
+        foreach (['pra' => $this->posCompanyId, 'fbr' => $this->fbrCompanyId] as $panel => $companyId) {
+            $company = \App\Models\Company::find($companyId);
+            $updates = AppUpdate::forCompany($company, $panel)->published()->liveWindow()->pluck('id');
+            $this->assertSame([$customerUpdate->id], $updates->all());
+        }
+
+        $this->assertTrue(AppUpdate::findOrFail($tracker->id)->isInternalTrackerNotice());
+    }
+
     public function test_complete_history_does_not_start_old_featured_popup_queue(): void
     {
         $old = $this->makeUpdate('Older featured notice in history', 'pos', true);

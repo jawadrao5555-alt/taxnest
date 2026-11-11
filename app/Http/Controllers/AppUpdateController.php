@@ -35,6 +35,17 @@ class AppUpdateController extends Controller
             $query->where('is_published', 0);
         }
 
+        $product = $request->query('product');
+        $productAudiences = [
+            'pra' => ['pos', 'all'],
+            'fbr' => ['fbr_pos', 'all'],
+            'di' => ['di'],
+        ];
+        $productFilterActive = is_string($product) && isset($productAudiences[$product]);
+        if ($productFilterActive) {
+            $query->whereIn('audience', $productAudiences[$product]);
+        }
+
         // Date range filter (invalid dates are silently ignored)
         foreach (['from' => '>=', 'to' => '<='] as $key => $op) {
             $val = $request->query($key);
@@ -49,7 +60,7 @@ class AppUpdateController extends Controller
 
         $updates = $query->orderByDesc('created_at')->paginate(10)->withQueryString();
         $featureOn = SystemSetting::get('pos_whats_new_enabled', '1') === '1';
-        $filtersActive = $q !== '' || in_array($status, ['published', 'hidden'], true) || $request->filled('from') || $request->filled('to');
+        $filtersActive = $q !== '' || in_array($status, ['published', 'hidden'], true) || $productFilterActive || $request->filled('from') || $request->filled('to');
 
         $canManageRelease = auth('admin')->user()?->fresh()?->canManageRelease() ?? false;
 

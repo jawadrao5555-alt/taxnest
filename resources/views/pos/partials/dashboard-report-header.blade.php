@@ -3,7 +3,8 @@
     $reportCashier = $dashCashierId ?? $cashierFilter ?? 'all';
     $reportDate = $todayKhata['date'] ?? \App\Services\PosBusinessDay::current((int) $company->id);
 @endphp
-<section class="mt-6" data-dashboard-report-section>
+@include('pos.partials.report-screen-style')
+<section class="pos-report-document mt-6" data-dashboard-report-section>
 <x-pos.report-header :title="__('pos.reports_word')" :subtitle="__('pos.business_day_label') . ' · ' . $reportDate" :back="false" heading="h2">
     <x-slot:actions>
         @if(($reportUser?->posCustomAllows('reports') ?? true))

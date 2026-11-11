@@ -1,5 +1,6 @@
 <x-pos-layout>
-<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+@include('pos.partials.report-screen-style')
+<div class="pos-report-document max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
     <x-pos.report-header :title="__('pos.dc_report_title')" :subtitle="__('pos.pra_compliance_eod')">
         <x-slot:actions>
             @if($existingReport || $stats->total_invoices > 0)

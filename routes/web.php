@@ -1064,6 +1064,7 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     Route::get('/transaction/{id}/pdf', [PosController::class, 'downloadInvoicePdf'])->name('pos.invoice.pdf');
     Route::post('/transaction/{id}/share-link', [PosController::class, 'generateShareLink'])->name('pos.invoice.share-link');
     Route::get('/reports', [PosController::class, 'reports'])->name('pos.reports');
+    Route::get('/reports/dashboard-overview', [PosController::class, 'dashboardSalesOverview'])->name('pos.reports.dashboard-overview');
     Route::get('/tax-reports', [PosController::class, 'taxReports'])->name('pos.tax-reports');
     Route::get('/reports/csv', [PosController::class, 'exportReportCsv'])->name('pos.reports.csv');
     // Staff Hazri (owner batch, 26 Jul 2026) — ADMIN/MANAGER-ONLY (403 in controller).

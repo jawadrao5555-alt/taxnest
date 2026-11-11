@@ -66,7 +66,7 @@
                             <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100">Current Plan: {{ $currentSubscription->entitlementPlan()->name }}</h3>
                             <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
                                 {{ \App\Models\Subscription::getCycleLabel($usageData['billing_cycle']) }} billing
-                                &middot; Active until {{ \Carbon\Carbon::parse($currentSubscription->end_date)->format('d M Y') }}
+                                &middot; {{ !empty($usageData['is_expired']) ? 'Expired on' : 'Active until' }} {{ \Carbon\Carbon::parse($currentSubscription->end_date)->format('d M Y') }}
                             </p>
                         </div>
                         <div class="flex flex-col items-end gap-2">

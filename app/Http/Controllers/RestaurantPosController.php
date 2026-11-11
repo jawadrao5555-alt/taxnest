@@ -3183,6 +3183,7 @@ class RestaurantPosController extends Controller
         $completedCount = RestaurantOrder::where('company_id', $companyId)
             ->where('created_at', '>=', $today)
             ->where('status', 'completed')
+            ->tap(fn ($query) => app(\App\Services\BranchContextService::class)->applyToQuery($query, 'branch_id'))
             ->count();
 
         // Task 109 (ZFC, 2 Aug 2026): Pending Bills tile — dashboard se hi pata

@@ -2,7 +2,7 @@
 @php
     $presentation = \App\Services\PosReportPresentation::fromHistory($financialHistory);
 @endphp
-<section id="financial-products" class="bg-white dark:bg-gray-900 rounded-xl border p-4 my-5 overflow-auto">
+<x-pos.report-panel id="financial-products" class="my-5 overflow-auto p-4" data-pos-report-results>
     @include('pos.partials.report-product-table')
-</section>
+</x-pos.report-panel>
 @endif

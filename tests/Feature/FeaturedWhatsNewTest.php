@@ -502,6 +502,21 @@ class FeaturedWhatsNewTest extends TestCase
         $this->assertTrue(AppUpdate::findOrFail($tracker->id)->isInternalTrackerNotice());
     }
 
+    public function test_view_all_includes_old_product_updates_without_replaying_them(): void
+    {
+        $old = $this->makeUpdate('Older PRA notice', 'pos', true);
+        $old->forceFill(['created_at' => now()->subDays(30)])->save();
+        $other = $this->makeUpdate('Older FBR notice', 'fbr_pos', false);
+        $other->forceFill(['created_at' => now()->subDays(30)])->save();
+
+        $this->actingAs(User::find($this->posAdminId), 'pos')->get('/pos/my-profile')
+            ->assertOk()->assertSee('/pos/whats-new/history')->assertDontSee('Older PRA notice');
+
+        $this->get('/pos/whats-new/history')
+            ->assertOk()->assertSee('Older PRA notice')->assertDontSee('Older FBR notice');
+        $this->assertSame(0, AppUpdateSeen::count());
+    }
+
     public function test_complete_history_does_not_start_old_featured_popup_queue(): void
     {
         $old = $this->makeUpdate('Older featured notice in history', 'pos', true);

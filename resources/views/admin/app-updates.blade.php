@@ -266,6 +266,7 @@
                         <option value="all">Both (PRA + FBR POS)</option>
                     </select>
                 </div>
+                @include('admin.partials.elaan-audience-guidance', ['prefix' => 'add'])
                 @include('admin.partials.elaan-categories', ['prefix' => 'add'])
                 <div>
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Audience family</label>
@@ -329,6 +330,7 @@
                         <option value="all">Both (PRA + FBR POS)</option>
                     </select>
                 </div>
+                @include('admin.partials.elaan-audience-guidance', ['prefix' => 'edit'])
                 @include('admin.partials.elaan-categories', ['prefix' => 'edit'])
                 <div>
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Audience family</label>
@@ -383,12 +385,25 @@
         ['add', 'edit'].forEach(function (prefix) {
             var trigger = document.querySelector('[data-audience-check="' + prefix + '"]');
             var form = trigger.closest('form');
+            const audience = document.getElementById(prefix + 'Audience');
+            const shared = form.querySelector('[data-shared-pos-confirmation]');
+            const confirm = shared.querySelector('input');
+            function syncSharedConfirmation(reset) {
+                const show = audience.value === 'all';
+                shared.classList.toggle('hidden', !show);
+                confirm.disabled = !show;
+                confirm.required = show;
+                if (reset) confirm.checked = false;
+            }
+            audience.addEventListener('change', () => syncSharedConfirmation(true));
+            form.addEventListener('reset', () => queueMicrotask(() => syncSharedConfirmation(true)));
             form.addEventListener('change', function (event) {
                 if (['audience', 'audience_family', 'audience_scope', 'target_categories[]'].includes(event.target.name)) {
                     resetAudienceCheck(prefix);
                 }
             });
             trigger.addEventListener('click', async function () {
+                syncSharedConfirmation(false);
                 resetAudienceCheck(prefix);
                 var version = audienceVersions[prefix];
                 var result = document.querySelector('[data-audience-result="' + prefix + '"]');
@@ -400,7 +415,10 @@
                     var data = await response.json();
                     if (version !== audienceVersions[prefix]) return;
                     if (!response.ok) throw new Error(Object.values(data.errors || {}).flat().join(' ') || 'Preview unavailable.');
-                    result.textContent = data.count + ' companies: ' + (data.examples.length ? data.examples.join(', ') : 'none') + (data.count > 5 ? '…' : '');
+                    const breakdown = Object.entries({ pra: 'PRA POS', fbr: 'FBR POS', di: 'Digital Invoicing' })
+                        .filter(([panel]) => audience.value === 'all' ? panel !== 'di' : panel === ({pos:'pra',fbr_pos:'fbr',di:'di'}[audience.value]))
+                        .map(([panel, label]) => label + ': ' + data.products[panel]).join(' · ');
+                    result.textContent = breakdown + ' — ' + data.count + ' companies: ' + (data.examples.length ? data.examples.join(', ') : 'none') + (data.count > 5 ? '…' : '');
                     document.querySelector('[data-audience-submit="' + prefix + '"]').disabled = data.count === 0;
                 } catch (error) {
                     if (version !== audienceVersions[prefix]) return;
@@ -432,7 +450,7 @@
             var family = document.getElementById(prefix + 'AudienceFamily').value;
             var all = box.querySelector('[data-elaan-scope=all]').checked;
             var chosen = Array.from(box.querySelectorAll('input[data-elaan-cat]:checked')).map(function (c) { return c.closest('label').textContent.trim(); });
-            box.querySelector('[data-elaan-preview]').textContent = 'Audience preview: ' + (audience === 'all' ? 'PRA + FBR' : audience === 'pos' ? 'PRA' : audience === 'di' ? 'Digital Invoicing' : 'FBR') + ' · ' + (family === 'all' ? 'all families' : family.replace('_', ' ')) + ' · ' + (all ? 'all categories (explicit)' : chosen.length ? chosen.join(', ') : 'select a category before publishing');
+            box.querySelector('[data-elaan-preview]').textContent = 'Audience preview: ' + (audience === 'all' ? 'PRA + FBR' : audience === 'pos' ? 'PRA' : audience === 'di' ? 'Digital Invoicing' : audience === 'fbr_pos' ? 'FBR' : 'select a product') + ' · ' + (family === 'all' ? 'all families' : family.replace('_', ' ')) + ' · ' + (all ? 'all categories (explicit)' : chosen.length ? chosen.join(', ') : 'select a category before publishing');
         }
 
         function elaanSyncScope(prefix) {
@@ -490,6 +508,7 @@
             document.getElementById('editTitle').value = title;
             document.getElementById('editPoints').value = pointsText;
             document.getElementById('editAudience').value = ['pos','fbr_pos','di','all'].includes(audience) ? audience : 'pos';
+            document.getElementById('editAudience').dispatchEvent(new Event('change'));
             document.getElementById('editAudienceFamily').value = ['all','food_service','goods_retail','pharmacy','services','accommodation'].includes(audienceFamily) ? audienceFamily : 'all';
             document.getElementById('editType').value = type === 'feature' ? 'feature' : 'improvement';
             elaanSyncPanels('edit', document.getElementById('editAudience').value);

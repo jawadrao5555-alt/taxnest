@@ -78,7 +78,7 @@ class AppUpdateController extends Controller
             'target_categories.*' => 'string|max:50',
         ]);
         $categories = $this->validatedCategories($request);
-        $count = 0;
+        $counts = ['pra' => 0, 'fbr' => 0, 'di' => 0];
         $examples = [];
         foreach (Company::whereIn('product_type', ['pos', 'fbrpos', 'di'])
             ->cursor() as $company) {
@@ -92,13 +92,13 @@ class AppUpdateController extends Controller
                 || ($categories && !array_intersect(AppUpdate::recipientCategories($company), $categories))) {
                 continue;
             }
-            $count++;
+            $counts[$panel]++;
             if (count($examples) < 5) {
                 $examples[] = $company->name;
             }
         }
 
-        return response()->json(['count' => $count, 'examples' => $examples]);
+        return response()->json(['count' => array_sum($counts), 'products' => $counts, 'examples' => $examples]);
     }
 
     public function store(Request $request)
@@ -110,7 +110,8 @@ class AppUpdateController extends Controller
             'points_text' => 'required|string|max:3000',
             'image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:3072',
             // Audience (Aug 2026): 'pos' = PRA POS, 'fbr_pos' = FBR POS, 'all' = both panels.
-            'audience' => 'nullable|in:pos,fbr_pos,di,all',
+            'audience' => 'required|in:pos,fbr_pos,di,all',
+            'shared_pos_confirmed' => 'exclude_unless:audience,all|required|accepted',
             'audience_family' => 'nullable|in:all,food_service,goods_retail,pharmacy,services,accommodation',
             'audience_scope' => 'required|in:all,cats',
             // Type (Task 1286): 'feature' = Naya Feature, 'improvement' = Behtari / Masla Hal.
@@ -137,7 +138,7 @@ class AppUpdateController extends Controller
             'title' => $request->title,
             'points' => $points,
             'image_path' => $this->storeImage($request),
-            'audience' => $request->input('audience') ?: 'pos',
+            'audience' => $request->input('audience'),
             'is_published' => $request->boolean('is_published', true),
             'created_by' => auth()->id(),
             // Featured "bara elaan" (Task 722) — hasColumn guard: prod schema
@@ -182,6 +183,7 @@ class AppUpdateController extends Controller
             'points_text' => 'required|string|max:3000',
             'image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:3072',
             'audience' => 'nullable|in:pos,fbr_pos,di,all',
+            'shared_pos_confirmed' => 'exclude_unless:audience,all|required|accepted',
             'audience_family' => 'nullable|in:all,food_service,goods_retail,pharmacy,services,accommodation',
             'audience_scope' => 'required|in:all,cats',
             'type' => 'nullable|in:feature,improvement',
@@ -395,6 +397,25 @@ class AppUpdateController extends Controller
     }
 
     // ---- POS SIDE ----
+
+    public function history(Request $request)
+    {
+        $panel = $request->route('announcement_panel');
+        $user = auth(['pra' => 'pos', 'fbr' => 'fbrpos', 'di' => 'web'][$panel])->user();
+        abort_unless($user?->isPosAdmin(), 403);
+
+        $company = Company::find($user->company_id);
+        $expectedProduct = ['pra' => 'pos', 'fbr' => 'fbrpos', 'di' => 'di'][$panel];
+        abort_unless($company?->product_type === $expectedProduct
+            && ($panel === 'di' ? $company->status === 'approved' : $company->status !== 'pending')
+            && SystemSetting::get('pos_whats_new_enabled', '1') === '1', 404);
+
+        $updates = AppUpdate::forCompany($company, $panel)->forCompanyFamily($company)->published()
+            ->orderByDesc('created_at')->orderByDesc('id')->paginate(20);
+        $layout = ['pra' => 'pos-layout', 'fbr' => 'fbr-pos-layout', 'di' => 'app-layout'][$panel];
+
+        return view('partials.app-update-history', compact('layout', 'updates'));
+    }
 
     /**
      * Mark published POS updates as seen for the logged-in POS user.

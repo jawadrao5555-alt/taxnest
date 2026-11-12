@@ -855,6 +855,29 @@ class PraDiSandboxTest extends TestCase
         }
     }
 
+    public function test_ims_central_callback_requires_matching_production_reference_and_is_idempotent(): void
+    {
+        Http::fake();
+        $this->imsProfile('production', 'fiscal_device');
+        $svc = app(\App\Services\PosImsReportingService::class);
+        $record = $svc->capture($this->company, $this->bill(), $this->owner->id, 'production');
+        $svc->prepare($this->company->id, $record->id, $this->imsPayload($record));
+        $svc->submit($this->company->id, $record->id, $this->owner->id);
+        $claim = $svc->claim($this->company->id, 'synthetic-device')['claim'];
+        $reply = ['Code' => '100', 'InvoiceNumber' => '054321FK6N1234567', 'CentralStatus' => 'verified'];
+        $callback = fn (array $response) => $svc->callback($this->company->id, $record->id, 'synthetic-device',
+            $claim, $response, 'response_received');
+
+        $local = $callback($reply + ['CentralReference' => '054321FK6N7654321']);
+        $this->assertSame('local_accepted', $local->state);
+        $verified = $callback($reply + ['CentralReference' => $reply['InvoiceNumber']]);
+        $this->assertSame('accepted', $verified->state);
+        $this->assertSame($reply['InvoiceNumber'], $verified->fiscal_number);
+        $this->assertSame('fbr_ims_callback', collect($verified->attempts)->last()['central_confirmation']['source']);
+        $this->assertSame($verified->attempts, $callback($reply + ['CentralReference' => $reply['InvoiceNumber']])->attempts);
+        Http::assertNothingSent();
+    }
+
     private function imsProfile(string $environment='sandbox', string $mode='cloud'): \App\Models\PosImsProfile
     {
         PosDiSandboxProfile::where('company_id',$this->company->id)->update(['enabled'=>false]);

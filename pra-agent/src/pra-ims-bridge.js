@@ -42,7 +42,7 @@ function createBridge({ axios, directory = path.join(os.homedir(), '.taxnest-pra
         try {
           const res = soap.endpoint(invoice.endpoint) ? await soap.submit(axios, invoice.endpoint, invoice.payload) : await axios.post(invoice.endpoint, invoice.payload, { timeout: 45000, maxRedirects: 0, headers: { 'Content-Type': 'application/json' } });
           body.response_fields = describeResponse(res.data);
-          body.response = resultOnly(res.data);
+          body.response = resultOnly(res.data, { includeCentral: true });
           body.diagnostic = body.response ? 'response_received' : 'unrecognized_response';
         } catch (error) {
           // Enum only: never persist raw response XML, headers, URLs or credentials.

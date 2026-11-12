@@ -171,6 +171,7 @@ return [
     'apk_nudge_banner' => 'TaxNest POS ki Android app maujood hai.',
     'apk_update_banner' => 'App ka naya version aa gaya hai.',
     'apk_update_download' => 'Abhi download karein',
+    'app_updates_empty' => 'Abhi koi update nahi hai.',
     'app_updates_heading' => '🔔 App Updates',
     'app_updates_subtitle' => 'Nayi features aur behtari',
     'appearance_desc' => 'Theme, dashboard design aur billing flow yahin se badal lein — fauran apply ho jata hai',

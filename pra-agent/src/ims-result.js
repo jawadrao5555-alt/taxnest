@@ -3,8 +3,8 @@ const {fiscalNumber}=require('./fiscal-result');
 
 // Normalize only explicit fiscal acknowledgement names and bounded JSON envelopes.
 // Never turn an invoice number alone, prose, or a transport status into Code 100.
-function resultOnly(data) {
-  const codes=[],numbers=[];let invalid=false,visited=0;
+function resultOnly(data, { includeCentral = false } = {}) {
+  const codes=[],numbers=[],centralStatuses=[],centralReferences=[];let invalid=false,visited=0;
   function visit(value,depth) {
     if(depth>2 || ++visited>16) {invalid=true;return;}
     if(typeof value==='string') {
@@ -23,6 +23,10 @@ function resultOnly(data) {
         if(v===null || (typeof v==='string' && v.trim()==='')) continue;
         const candidate=typeof v==='number' && Number.isSafeInteger(v) ? String(v) : v;
         const number=fiscalNumber(candidate);if(number) numbers.push(number);else invalid=true;
+      } else if(includeCentral && ['centralstatus','centralsyncstatus'].includes(name)) {
+        centralStatuses.push(typeof v==='string' && v.length<=80 ? v.trim().toLowerCase() : null);
+      } else if(includeCentral && name==='centralreference') {
+        centralReferences.push(fiscalNumber(v) || null);
       } else if(name==='response' && typeof v==='string' && /^(?:[0-9]{6}|[A-Z][A-Z-]*-[0-9]{3,}$)/.test(v.trim()) && fiscalNumber(v)) {
         numbers.push(v.trim());
       } else if(['result','data','d','response','getfbrinvoicenumberbymodelresult'].includes(name)) {
@@ -37,6 +41,14 @@ function resultOnly(data) {
   if(invalid || statuses.length>1 || references.length>3) result.Code='AMBIGUOUS';
   else if(statuses.length) result.Code=statuses[0];
   references.slice(0,3).forEach((number,i)=>{result[['InvoiceNumber','FBRInvoiceNumber','invoiceNumber'][i]]=number;});
+  const central = [...new Set(centralStatuses)];
+  const centralIds = [...new Set(centralReferences)];
+  if (!invalid && statuses.length===1 && statuses[0]==='100' && references.length===1
+      && central.length===1 && ['confirmed','verified'].includes(central[0])
+      && centralIds.length===1 && centralIds[0]===references[0]) {
+    result.CentralStatus=central[0];
+    result.CentralReference=centralIds[0];
+  }
   return result;
 }
 // Schema only, never response values: makes an unknown serializer diagnosable.

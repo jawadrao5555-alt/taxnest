@@ -64,3 +64,18 @@ test('actual alongside bridge normalizes nested response fields once and holds c
   }finally{fs.rmSync(directory,{recursive:true,force:true});}
  }
 });
+
+
+test('PRA IMS callback forwards only matching explicit central evidence', () => {
+ const ack = {Code: 100, FBRInvoiceNumber: '054321FK6N1234567'};
+ const evidence = {CentralSyncStatus: 'Verified', CentralReference: ack.FBRInvoiceNumber};
+ const normalized = {Code: '100', InvoiceNumber: ack.FBRInvoiceNumber};
+ const options = {includeCentral: true};
+ assert.deepEqual(resultOnly({...ack, ...evidence, BuyerCNIC: 'synthetic'}, options),
+   {...normalized, CentralStatus: 'verified', CentralReference: ack.FBRInvoiceNumber});
+ assert.deepEqual(resultOnly({...ack, ...evidence}), normalized);
+ assert.deepEqual(resultOnly({...ack, ...evidence, CentralStatus: 'uploaded'}, options), normalized);
+ assert.deepEqual(resultOnly({...ack, ...evidence, CentralReference: '054321FK6N7654321'}, options), normalized);
+ assert.deepEqual(resultOnly({FBRInvoiceNumber: ack.FBRInvoiceNumber, ...evidence}, options),
+   {InvoiceNumber: ack.FBRInvoiceNumber});
+});

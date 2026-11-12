@@ -171,6 +171,7 @@ return [
     'apk_nudge_banner' => 'TaxNest POS کی Android ایپ دستیاب ہے۔',
     'apk_update_banner' => 'ایپ کا نیا ورژن دستیاب ہے۔',
     'apk_update_download' => 'ابھی ڈاؤن لوڈ کریں',
+    'app_updates_empty' => 'ابھی کوئی اپ ڈیٹ موجود نہیں۔',
     'app_updates_heading' => '🔔 ایپ اپڈیٹس',
     'app_updates_subtitle' => 'نئے فیچرز اور بہتری',
     'appearance_desc' => 'یہاں تھیم، ڈیش بورڈ ڈیزائن اور بلنگ کا طریقہ تبدیل کریں — فوری لاگو ہوگا',

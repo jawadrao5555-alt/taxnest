@@ -352,7 +352,7 @@ class PosOfflineUuidRaceTest extends TestCase
     {
         [$company, $user] = $this->makeShop();
         $uuid = 'race-uuid-0002';
-        $this->plantConcurrentWinner($company->id, $uuid);
+        $this->plantConcurrentWinner($company->id, $uuid, ['payment_method' => 'bank_transfer']);
 
         $raceLoser = $this->actingAs($user, 'pos')
             ->postJson('/pos/invoice/store', $this->queuedBillPayload($uuid));
@@ -365,8 +365,9 @@ class PosOfflineUuidRaceTest extends TestCase
 
         $this->assertSame($preCheck->json(), $raceLoser->json(),
             'the client queue drain must not be able to tell the two recovery paths apart');
-        $this->assertSame(['success', 'replayed', 'transaction_id', 'invoice_number', 'total_amount', 'pra_invoice_number', 'pra_status', 'message'],
+        $this->assertSame(['success', 'replayed', 'transaction_id', 'invoice_number', 'total_amount', 'payment_method', 'pra_invoice_number', 'pra_status', 'message'],
             array_keys($raceLoser->json()));
+        $raceLoser->assertJsonPath('payment_method', 'bank_transfer');
     }
 
     // ── 2. other integrity errors are NOT swallowed ─────────────────────────

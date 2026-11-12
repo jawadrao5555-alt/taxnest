@@ -2673,6 +2673,11 @@ class RestaurantPosController extends Controller
 
         $company = Company::find($companyId);
 
+        if ($request->boolean('kds_auto') && $order->source === 'waiter'
+            && \App\Services\KotPrintService::waiterSnapshotsCover($order)) {
+            return response('', 204);
+        }
+
         // Delivery Charges (aur aaindah koi bhi non-kitchen line) KOT par kabhi
         // nahi jati — bawarchi ke liye woh koi dish nahi hai. Chhant-phatak
         // YAHIN, sab kuch hone se PEHLE: agar isay neeche prepareTicket par
@@ -3178,6 +3183,7 @@ class RestaurantPosController extends Controller
         $completedCount = RestaurantOrder::where('company_id', $companyId)
             ->where('created_at', '>=', $today)
             ->where('status', 'completed')
+            ->tap(fn ($query) => app(\App\Services\BranchContextService::class)->applyToQuery($query, 'branch_id'))
             ->count();
 
         // Task 109 (ZFC, 2 Aug 2026): Pending Bills tile — dashboard se hi pata

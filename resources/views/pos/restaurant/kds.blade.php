@@ -558,12 +558,12 @@ function kdsScreen() {
                         this.printedIds.push(o.id); this.savePrintedIds();
                         if (!this.printQueue.some(q => q.id === o.id && q.delta)) {
                             this._deltaFiredAt[o.id] = Date.now();
-                            this.printQueue.push({ id: o.id, delta: true });
+                            this.printQueue.push({ id: o.id, automatic: true, delta: true });
                         }
                         return;
                     }
                     if (!this.printQueue.some(q => q.id === o.id && !q.delta)) {
-                        this.printQueue.push({ id: o.id, delta: false });
+                        this.printQueue.push({ id: o.id, automatic: true, delta: false });
                     }
                     return;
                 }
@@ -578,7 +578,7 @@ function kdsScreen() {
                     const last = this._deltaFiredAt[o.id] || 0;
                     if (!this.printQueue.some(q => q.id === o.id && q.delta) && (Date.now() - last) > 30000) {
                         this._deltaFiredAt[o.id] = Date.now();
-                        this.printQueue.push({ id: o.id, delta: true });
+                        this.printQueue.push({ id: o.id, automatic: true, delta: true });
                     }
                 }
             });
@@ -610,7 +610,7 @@ function kdsScreen() {
             // (agent offline, feature disabled server-side, network) falls back to
             // the classic hidden-iframe print for THIS job only.
             if (this.silentKotPrint) {
-                const payload = { type: 'kot', restaurant_order_id: job.id, delta: !!job.delta };
+                const payload = { type: 'kot', restaurant_order_id: job.id, delta: !!job.delta, kds_auto: !!job.automatic };
                 // Pinned counter device: enqueue ONLY this counter's ticket (its
                 // printer). Un-pinned: server splits across counters by itself.
                 if (this.stationPinned) payload.station_id = Number(this.stationFilter);
@@ -633,7 +633,7 @@ function kdsScreen() {
             const frame = document.createElement('iframe');
             frame.id = 'kdsPrintFrame';
             const stationQ = this.stationPinned ? `&station=${encodeURIComponent(this.stationFilter)}` : '';
-            frame.src = `/pos/restaurant/orders/${job.id}/kitchen-ticket?auto_print=1${job.delta ? '&delta=1' : ''}${stationQ}&_signal=kds-${job.id}`;
+            frame.src = `/pos/restaurant/orders/${job.id}/kitchen-ticket?auto_print=1${job.delta ? '&delta=1' : ''}${stationQ}${job.automatic ? '&kds_auto=1' : ''}&_signal=kds-${job.id}`;
             host.appendChild(frame);
             // Fallback: if the iframe never signals (blocked dialog etc.), move on.
             this.printFallbackTimer = setTimeout(() => this.finishCurrentPrint(), 25000);

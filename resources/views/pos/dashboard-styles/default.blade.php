@@ -134,22 +134,22 @@
 
     @if(!($dashboardMetricsRelocated ?? false))
 <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 slide-up slide-up-3">
-        <div class="stat-card card-reveal bg-gradient-to-br from-emerald-500 to-emerald-700 p-4 shadow-lg shadow-emerald-500/15">
+        <x-pos.dashboard-metric metric="revenue" :href="$dashboardMetricUrls['revenue'] ?? null" class="stat-card card-reveal bg-gradient-to-br from-emerald-500 to-emerald-700 p-4 shadow-lg shadow-emerald-500/15">
             <div class="relative z-10">
                 {{-- Task 988: combined PRA+Local (+exempt) figure — matches the Aaj ka Khaata sum this user sees --}}
                 <span class="text-[9px] font-bold uppercase tracking-wider text-emerald-100/70">{{ __("pos.todays_revenue") }}</span>
                 <p class="text-xl font-extrabold text-white mt-1">Rs. <span data-count-target="{{ $todayTotalSale ?? $todaySales ?? $todayStats->revenue ?? 0 }}">{{ number_format($todayTotalSale ?? $todaySales ?? $todayStats->revenue ?? 0, 0) }}</span></p>
                 <div class="progress-bar bg-white/10 mt-2"><div class="progress-fill bg-white/40" style="width: {{ min(100, ($monthTotalSale ?? $monthSales ?? $monthStats->revenue ?? 1) > 0 ? (($todayTotalSale ?? $todaySales ?? $todayStats->revenue ?? 0) / ($monthTotalSale ?? $monthSales ?? $monthStats->revenue ?? 1) * 100) : 0) }}%"></div></div>
             </div>
-        </div>
-        <div class="stat-card card-reveal bg-gradient-to-br from-teal-600 to-teal-800 p-4 shadow-lg shadow-teal-600/15">
+        </x-pos.dashboard-metric>
+        <x-pos.dashboard-metric metric="orders" :href="$dashboardMetricUrls['orders'] ?? null" class="stat-card card-reveal bg-gradient-to-br from-teal-600 to-teal-800 p-4 shadow-lg shadow-teal-600/15">
             <div class="relative z-10">
                 <span class="text-[9px] font-bold uppercase tracking-wider text-teal-100/70">{{ __("pos.orders_word") }}</span>
                 <p class="text-xl font-extrabold text-white mt-1"><span data-count-target="{{ $todayOrders ?? $todayStats->count ?? 0 }}">{{ number_format($todayOrders ?? $todayStats->count ?? 0) }}</span></p>
                 <div class="progress-bar bg-white/10 mt-2"><div class="progress-fill bg-white/40" style="width: {{ min(100, ($todayOrders ?? $todayStats->count ?? 0) * 5) }}%"></div></div>
             </div>
-        </div>
-        <div class="stat-card card-reveal bg-gradient-to-br from-purple-500 to-purple-700 p-4 shadow-lg">
+        </x-pos.dashboard-metric>
+        <x-pos.dashboard-metric metric="customers" :href="$dashboardMetricUrls['customers'] ?? null" class="stat-card card-reveal bg-gradient-to-br from-purple-500 to-purple-700 p-4 shadow-lg">
             <div class="relative z-10">
                 {{-- Task 988: Avg. Order card replaced by New Customers (owner voice note, 16 Aug 2026) --}}
                 <span class="text-[9px] font-bold uppercase tracking-wider text-white/70">{{ __("pos.new_customers") }}</span>
@@ -157,15 +157,15 @@
                 <p class="text-[9px] font-bold text-white/70 mt-1">{{ number_format($newCustomersMonth ?? 0) }} {{ __("pos.period_this_month") }}</p>
                 <div class="progress-bar bg-white/10 mt-2"><div class="progress-fill bg-white/40" style="width: {{ ($newCustomersMonth ?? 0) > 0 ? min(100, round(($newCustomersToday ?? 0) / max(1, $newCustomersMonth ?? 1) * 100)) : 0 }}%"></div></div>
             </div>
-        </div>
+        </x-pos.dashboard-metric>
         @if($isRestaurant)
-        <div class="stat-card card-reveal bg-gradient-to-br from-amber-500 to-orange-600 p-4 shadow-lg shadow-amber-500/15">
+        <x-pos.dashboard-metric metric="tables" :href="$dashboardMetricUrls['tables'] ?? null" class="stat-card card-reveal bg-gradient-to-br from-amber-500 to-orange-600 p-4 shadow-lg shadow-amber-500/15">
             <div class="relative z-10">
                 <span class="text-[9px] font-bold uppercase tracking-wider text-amber-100/70">{{ __("pos.tables_word") }}</span>
                 <p class="text-xl font-extrabold text-white mt-1"><span data-count-target="{{ $occupiedTables ?? 0 }}">{{ $occupiedTables ?? 0 }}</span><span class="text-sm text-white/80">/{{ $totalTables ?? 0 }}</span></p>
                 <div class="progress-bar bg-white/10 mt-2"><div class="progress-fill bg-white/40" style="width: {{ ($totalTables ?? 0) > 0 ? round(($occupiedTables ?? 0) / ($totalTables ?? 1) * 100) : 0 }}%"></div></div>
             </div>
-        </div>
+        </x-pos.dashboard-metric>
         @else
         <div class="stat-card card-reveal bg-gradient-to-br from-amber-500 to-orange-600 p-4 shadow-lg shadow-amber-500/15">
             <div class="relative z-10">

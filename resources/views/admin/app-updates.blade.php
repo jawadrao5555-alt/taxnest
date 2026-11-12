@@ -1,7 +1,7 @@
 <x-admin-layout>
     <x-slot name="header">
         <div class="flex items-center justify-between flex-wrap gap-3">
-            <h2 class="font-bold text-xl text-gray-800 dark:text-gray-100 leading-tight">POS What's New</h2>
+            <h2 class="font-bold text-xl text-gray-800 dark:text-gray-100 leading-tight">Product Notifications</h2>
             @if($canManageRelease)
                 <button onclick="document.getElementById('addUpdateModal').classList.remove('hidden')" class="inline-flex items-center px-3 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition">
                     <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
@@ -47,8 +47,8 @@
             {{-- Master feature switch --}}
             <div class="mb-6 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-5 flex items-center justify-between flex-wrap gap-3">
                 <div>
-                    <div class="font-semibold text-gray-800 dark:text-gray-100">What's New Notifications (POS)</div>
-                    <p class="text-sm text-gray-500 dark:text-gray-400 mt-0.5">Controls the one-time popup and the bell icon on the entire TaxNest PRA POS panel. When OFF, POS users see nothing.</p>
+                    <div class="font-semibold text-gray-800 dark:text-gray-100">What's New notifications</div>
+                    <p class="text-sm text-gray-500 dark:text-gray-400 mt-0.5">Controls release announcements for PRA POS, FBR POS and Digital Invoicing. Routine updates stay in the bell. Featured updates can open a popup on POS.</p>
                 </div>
                 @if($canManageRelease)
                     <form method="POST" action="/admin/app-updates/feature-toggle">
@@ -78,6 +78,15 @@
                             <option value="">All</option>
                             <option value="published" {{ request('status') === 'published' ? 'selected' : '' }}>Published</option>
                             <option value="hidden" {{ request('status') === 'hidden' ? 'selected' : '' }}>Hidden</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="update-product" class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Configured product</label>
+                        <select id="update-product" name="product" class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 text-sm">
+                            <option value="">All products</option>
+                            @foreach(['pra' => 'PRA POS', 'fbr' => 'FBR POS', 'di' => 'Digital Invoicing'] as $value => $label)
+                                <option value="{{ $value }}" @selected(request('product') === $value)>{{ $label }}</option>
+                            @endforeach
                         </select>
                     </div>
                     <div>
@@ -159,8 +168,12 @@
                                             <span class="mt-1 block px-2 py-1 rounded-full text-[10px] font-medium text-center bg-gray-100 text-gray-500">Archived — history only</span>
                                         @elseif($upd->isCustomerDuplicate())
                                             <span class="mt-1 block px-2 py-1 rounded-full text-[10px] font-medium text-center bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400">Duplicate — history only</span>
+                                        @elseif($upd->isInternalTrackerNotice())
+                                            <span class="mt-1 block text-xs font-medium text-gray-500">Internal tracker — history only</span>
+                                        @elseif($updLive && !$featureOn)
+                                            <span class="mt-1 block text-xs font-medium text-gray-500">Delivery paused</span>
                                         @elseif($updLive)
-                                            <span class="mt-1 block px-2 py-1 rounded-full text-[10px] font-bold text-center bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300">● Live on POS</span>
+                                            <span class="mt-1 block px-2 py-1 rounded-full text-[10px] font-bold text-center bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300">Eligible for customer bell</span>
                                         @elseif($upd->is_published)
                                             <span class="mt-1 block px-2 py-1 rounded-full text-[10px] font-medium text-center bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400" title="Published updates auto-disappear from POS users {{ \App\Models\AppUpdate::LIVE_DAYS }} days after publish (history stays here)">Expired ({{ \App\Models\AppUpdate::LIVE_DAYS }} din guzar gaye)</span>
                                         @endif
@@ -253,6 +266,7 @@
                         <option value="all">Both (PRA + FBR POS)</option>
                     </select>
                 </div>
+                @include('admin.partials.elaan-audience-guidance', ['prefix' => 'add'])
                 @include('admin.partials.elaan-categories', ['prefix' => 'add'])
                 <div>
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Audience family</label>
@@ -316,6 +330,7 @@
                         <option value="all">Both (PRA + FBR POS)</option>
                     </select>
                 </div>
+                @include('admin.partials.elaan-audience-guidance', ['prefix' => 'edit'])
                 @include('admin.partials.elaan-categories', ['prefix' => 'edit'])
                 <div>
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Audience family</label>
@@ -370,12 +385,25 @@
         ['add', 'edit'].forEach(function (prefix) {
             var trigger = document.querySelector('[data-audience-check="' + prefix + '"]');
             var form = trigger.closest('form');
+            const audience = document.getElementById(prefix + 'Audience');
+            const shared = form.querySelector('[data-shared-pos-confirmation]');
+            const confirm = shared.querySelector('input');
+            function syncSharedConfirmation(reset) {
+                const show = audience.value === 'all';
+                shared.classList.toggle('hidden', !show);
+                confirm.disabled = !show;
+                confirm.required = show;
+                if (reset) confirm.checked = false;
+            }
+            audience.addEventListener('change', () => syncSharedConfirmation(true));
+            form.addEventListener('reset', () => queueMicrotask(() => syncSharedConfirmation(true)));
             form.addEventListener('change', function (event) {
                 if (['audience', 'audience_family', 'audience_scope', 'target_categories[]'].includes(event.target.name)) {
                     resetAudienceCheck(prefix);
                 }
             });
             trigger.addEventListener('click', async function () {
+                syncSharedConfirmation(false);
                 resetAudienceCheck(prefix);
                 var version = audienceVersions[prefix];
                 var result = document.querySelector('[data-audience-result="' + prefix + '"]');
@@ -387,7 +415,10 @@
                     var data = await response.json();
                     if (version !== audienceVersions[prefix]) return;
                     if (!response.ok) throw new Error(Object.values(data.errors || {}).flat().join(' ') || 'Preview unavailable.');
-                    result.textContent = data.count + ' companies: ' + (data.examples.length ? data.examples.join(', ') : 'none') + (data.count > 5 ? '…' : '');
+                    const breakdown = Object.entries({ pra: 'PRA POS', fbr: 'FBR POS', di: 'Digital Invoicing' })
+                        .filter(([panel]) => audience.value === 'all' ? panel !== 'di' : panel === ({pos:'pra',fbr_pos:'fbr',di:'di'}[audience.value]))
+                        .map(([panel, label]) => label + ': ' + data.products[panel]).join(' · ');
+                    result.textContent = breakdown + ' — ' + data.count + ' companies: ' + (data.examples.length ? data.examples.join(', ') : 'none') + (data.count > 5 ? '…' : '');
                     document.querySelector('[data-audience-submit="' + prefix + '"]').disabled = data.count === 0;
                 } catch (error) {
                     if (version !== audienceVersions[prefix]) return;
@@ -419,7 +450,7 @@
             var family = document.getElementById(prefix + 'AudienceFamily').value;
             var all = box.querySelector('[data-elaan-scope=all]').checked;
             var chosen = Array.from(box.querySelectorAll('input[data-elaan-cat]:checked')).map(function (c) { return c.closest('label').textContent.trim(); });
-            box.querySelector('[data-elaan-preview]').textContent = 'Audience preview: ' + (audience === 'all' ? 'PRA + FBR' : audience === 'pos' ? 'PRA' : audience === 'di' ? 'Digital Invoicing' : 'FBR') + ' · ' + (family === 'all' ? 'all families' : family.replace('_', ' ')) + ' · ' + (all ? 'all categories (explicit)' : chosen.length ? chosen.join(', ') : 'select a category before publishing');
+            box.querySelector('[data-elaan-preview]').textContent = 'Audience preview: ' + (audience === 'all' ? 'PRA + FBR' : audience === 'pos' ? 'PRA' : audience === 'di' ? 'Digital Invoicing' : audience === 'fbr_pos' ? 'FBR' : 'select a product') + ' · ' + (family === 'all' ? 'all families' : family.replace('_', ' ')) + ' · ' + (all ? 'all categories (explicit)' : chosen.length ? chosen.join(', ') : 'select a category before publishing');
         }
 
         function elaanSyncScope(prefix) {
@@ -477,6 +508,7 @@
             document.getElementById('editTitle').value = title;
             document.getElementById('editPoints').value = pointsText;
             document.getElementById('editAudience').value = ['pos','fbr_pos','di','all'].includes(audience) ? audience : 'pos';
+            document.getElementById('editAudience').dispatchEvent(new Event('change'));
             document.getElementById('editAudienceFamily').value = ['all','food_service','goods_retail','pharmacy','services','accommodation'].includes(audienceFamily) ? audienceFamily : 'all';
             document.getElementById('editType').value = type === 'feature' ? 'feature' : 'improvement';
             elaanSyncPanels('edit', document.getElementById('editAudience').value);

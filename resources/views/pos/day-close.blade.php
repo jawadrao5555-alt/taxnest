@@ -1,17 +1,20 @@
 <x-pos-layout>
-<div class="max-w-7xl mx-auto">
-    @include('pos.partials.back-link')
-    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
-        <div>
-            <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ __('pos.dc_report_title') }}</h1>
-            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">{{ __('pos.pra_compliance_eod') }}</p>
-        </div>
+@include('pos.partials.report-screen-style')
+<div class="pos-report-document max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    <x-pos.report-header :title="__('pos.dc_report_title')" :subtitle="__('pos.pra_compliance_eod')">
+        <x-slot:actions>
+            @if($existingReport || $stats->total_invoices > 0)
+                @include('pos.partials.day-close-report-actions')
+            @endif
+        </x-slot:actions>
+    </x-pos.report-header>
+    <x-pos.report-panel class="mb-5 p-4" data-pos-report-filters>
         <form method="GET" action="{{ route('pos.day-close') }}" class="flex items-center gap-2">
             <input type="date" name="date" value="{{ $date }}" max="{{ today()->format('Y-m-d') }}"
                 class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-purple-500 focus:border-purple-500">
             <button type="submit" class="px-4 py-2 bg-purple-600 text-white text-sm font-semibold rounded-lg hover:bg-purple-700 transition">{{ __('pos.view_btn') }}</button>
         </form>
-    </div>
+    </x-pos.report-panel>
 
     {{-- Per-branch day close (Task 1360): say WHOSE day this is. The preview,
          the saved Z-report and the local-bill wash all follow the branch named
@@ -35,9 +38,9 @@
     @endif
 
     @php
-$presentation = \App\Services\PosReportPresentation::forView($financialHistory ?? null, $streamSplit ?? null, auth('pos')->user(), (bool)($showLocalStream ?? false));
+$presentation = $dayClosePresentation ?? \App\Services\PosReportPresentation::forView($financialHistory ?? null, $streamSplit ?? null, auth('pos')->user(), (bool)($showLocalStream ?? false));
 @endphp
-    @if($presentation)<div class="rounded-xl border bg-white dark:bg-gray-900 p-4 mb-4 overflow-auto">@include('pos.partials.report-summary-tables')</div>@endif
+    @if($presentation)<x-pos.report-panel class="mb-5 overflow-auto p-4" data-pos-report-summary>@include('pos.partials.report-summary-tables')</x-pos.report-panel>@endif
     {{-- Stranded-day banner (Task 455): prior business day(s) never closed —
          auto-close skipped (open orders) or nobody closed manually. Surface
          them loudly before more bills pile onto today. --}}
@@ -87,11 +90,6 @@ $presentation = \App\Services\PosReportPresentation::forView($financialHistory ?
                     <p class="text-xs text-emerald-600 dark:text-emerald-400">{{ __('pos.closed_on', ['datetime' => $existingReport->created_at->format('d M Y h:i A')]) }}</p>
                 </div>
             </div>
-            {{-- Task 1197: Z prints are COMPANY-WIDE documents — isolated
-                 cashiers get no links (the routes redirect them anyway). --}}
-            @if(!($dcIso ?? false))
-            @include('pos.partials.day-close-report-actions')
-            @endif
         </div>
     </div>
     @endif
@@ -108,7 +106,6 @@ $presentation = \App\Services\PosReportPresentation::forView($financialHistory ?
                 <p class="font-bold text-sky-800 dark:text-sky-300">{{ __('pos.dc_report_open') }}</p>
                 <p class="text-xs text-sky-600 dark:text-sky-400">{{ __('pos.dc_xreport_hint') }}</p>
             </div>
-            @include('pos.partials.day-close-report-actions')
         </div>
     </div>
     @endif
@@ -118,10 +115,8 @@ $presentation = \App\Services\PosReportPresentation::forView($financialHistory ?
         $lbPending = ($localWash->prov_count ?? 0) + ($localWash->final_count ?? 0);
     @endphp
     @if($stats->total_invoices > 0 || $lbPending > 0)
-    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
-        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">
-            <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">{{ __('pos.kpi_total_invoices') }}</p>
-            <p class="text-2xl font-bold text-gray-900 dark:text-white mt-1">{{ $stats->total_invoices }}</p>
+    <div class="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-4" data-pos-report-kpis>
+        <x-pos.report-stat :label="__('pos.kpi_total_invoices')" :value="number_format($stats->total_invoices)">
             <div class="flex flex-wrap gap-2 mt-2">
                 <span class="text-xs px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400">{{ __('pos.badge_pra_count', ['count' => $stats->pra_invoices]) }}</span>
                 {{-- Task 705: Local badge only in khufia local-check mode (or LOCAL-scoped viewer) --}}
@@ -132,27 +127,21 @@ $presentation = \App\Services\PosReportPresentation::forView($financialHistory ?
                 <span class="text-xs px-1.5 py-0.5 rounded bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400">{{ __('pos.badge_offline_count', ['count' => $stats->offline_invoices]) }}</span>
                 @endif
             </div>
-        </div>
-        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">
-            <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">{{ __('pos.kpi_gross_sales') }}</p>
-            <p class="text-2xl font-bold text-gray-900 dark:text-white mt-1">PKR {{ number_format($stats->gross_sales) }}</p>
+        </x-pos.report-stat>
+        <x-pos.report-stat :label="__('pos.kpi_gross_sales')" :value="'PKR ' . number_format($stats->gross_sales)">
             @if($stats->total_discount > 0)
             <p class="text-xs text-red-500 mt-1">{{ __('pos.discount_minus_pkr', ['amount' => number_format($stats->total_discount)]) }}</p>
             @endif
-        </div>
-        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">
-            <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">{{ __('pos.kpi_total_tax') }}</p>
-            <p class="text-2xl font-bold text-purple-600 mt-1">PKR {{ number_format($stats->total_tax) }}</p>
+        </x-pos.report-stat>
+        <x-pos.report-stat :label="__('pos.kpi_total_tax')" :value="'PKR ' . number_format($stats->total_tax)">
             @if((float)($stats->total_fbr_fee ?? 0)!=0)<p class="text-xs mt-1">FBR POS Fee: PKR {{ number_format($stats->total_fbr_fee,2) }}</p>@endif
             {{-- PRA segregation (owner 9 Aug 2026): taxable vs exempt values --}}
             <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ __('pos.dc_taxable_value') }}: PKR {{ number_format($stats->taxable_value) }}</p>
             @if($stats->exempt_value > 0)
             <p class="text-xs text-gray-500 dark:text-gray-400">{{ __('pos.dc_exempt_value') }}: PKR {{ number_format($stats->exempt_value) }}</p>
             @endif
-        </div>
-        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">
-            <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">{{ __('pos.kpi_net_revenue') }}</p>
-            <p class="text-2xl font-bold text-emerald-600 mt-1">PKR {{ number_format($stats->total_amount) }}</p>
+        </x-pos.report-stat>
+        <x-pos.report-stat :label="__('pos.kpi_net_revenue')" :value="'PKR ' . number_format($stats->total_amount)">
             {{-- Returns / credit notes (Task 570): figures above are already netted --}}
             @if(($stats->returns_count ?? 0) > 0)
             <p class="text-xs text-rose-500 mt-1">{{ __('pos.dc_returns_netted', ['count' => $stats->returns_count, 'amount' => number_format($stats->returns_amount, 2)]) }}</p>
@@ -161,7 +150,7 @@ $presentation = \App\Services\PosReportPresentation::forView($financialHistory ?
             @if(($stats->wastage_count ?? 0) > 0)
             <p class="text-xs text-amber-600 dark:text-amber-400 mt-0.5">{{ __('pos.dc_wastage_line', ['count' => $stats->wastage_count, 'amount' => number_format($stats->wastage_amount, 2)]) }}</p>
             @endif
-        </div>
+        </x-pos.report-stat>
     </div>
 
     {{-- Returns detail (Task 678): each return with WHO processed it, so
@@ -1648,6 +1637,10 @@ $presentation = \App\Services\PosReportPresentation::forView($financialHistory ?
         </div>
     </div>
     @endif
+    @if($presentation)
+        <x-pos.report-panel class="mb-5 overflow-auto p-4" data-pos-report-results>
+            @include('pos.partials.report-product-table')
+        </x-pos.report-panel>
+    @endif
 </div>
-    @if($presentation)<div class="rounded-xl border bg-white dark:bg-gray-900 p-4 mb-4 overflow-auto">@include('pos.partials.report-product-table')</div>@endif
 </x-pos-layout>

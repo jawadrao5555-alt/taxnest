@@ -16,25 +16,25 @@
     <div class="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden t-anim t-d2">
         @if(!($dashboardMetricsRelocated ?? false))
 <div class="grid grid-cols-2 sm:grid-cols-4 divide-x divide-gray-100 dark:divide-gray-800">
-            <div class="p-4 sm:p-5">
+            <x-pos.dashboard-metric metric="revenue" :href="$dashboardMetricUrls['revenue'] ?? null" class="p-4 sm:p-5">
                 <div class="flex items-center gap-1.5 mb-1"><span class="w-2 h-2 rounded-full bg-amber-500"></span><span class="text-[9px] font-bold text-gray-400 uppercase tracking-wider">{{ __("pos.revenue_word") }}</span></div>
                 {{-- Task 988: combined PRA+Local (+exempt) figure — matches the Aaj ka Khaata sum this user sees --}}
                 <p class="text-xl sm:text-2xl font-black text-gray-900 dark:text-white" style="font-variant-numeric:tabular-nums">Rs.{{ number_format($todayTotalSale ?? $todaySales ?? $todayStats->revenue ?? 0) }}</p>
                 @php $yest=$yesterdayTotalSale??$yesterdaySales??0;$today=$todayTotalSale??$todaySales??$todayStats->revenue??0;$pct=$yest>0?round(($today-$yest)/$yest*100):0; @endphp
                 @if($pct!=0)<p class="text-[9px] font-bold mt-1 {{ $pct>=0?'text-green-600':'text-red-500' }}">{{ $pct>=0?'+':'' }}{{ $pct }}% {{ __("pos.vs_yesterday") }}</p>@endif
-            </div>
-            <div class="p-4 sm:p-5">
+            </x-pos.dashboard-metric>
+            <x-pos.dashboard-metric metric="orders" :href="$dashboardMetricUrls['orders'] ?? null" class="p-4 sm:p-5">
                 <div class="flex items-center gap-1.5 mb-1"><span class="w-2 h-2 rounded-full bg-blue-500"></span><span class="text-[9px] font-bold text-gray-400 uppercase tracking-wider">{{ __("pos.orders_word") }}</span></div>
                 <p class="text-xl sm:text-2xl font-black text-gray-900 dark:text-white">{{ $todayOrders ?? $todayStats->count ?? 0 }}</p>
                 <p class="text-[9px] text-gray-400 mt-1">{{ $completedCount ?? $todayStats->count ?? 0 }} {{ __("pos.completed_lc") }}</p>
-            </div>
-            <div class="p-4 sm:p-5">
+            </x-pos.dashboard-metric>
+            <x-pos.dashboard-metric metric="customers" :href="$dashboardMetricUrls['customers'] ?? null" class="p-4 sm:p-5">
                 {{-- Task 988: Avg. Ticket cell replaced by New Customers (owner voice note, 16 Aug 2026) --}}
                 <div class="flex items-center gap-1.5 mb-1"><span class="w-2 h-2 rounded-full bg-purple-500"></span><span class="text-[9px] font-bold text-gray-400 uppercase tracking-wider">{{ __("pos.new_customers") }}</span></div>
                 <p class="text-xl sm:text-2xl font-black text-gray-900 dark:text-white">{{ number_format($newCustomersToday ?? 0) }}</p>
                 <p class="text-[9px] text-gray-400 mt-1">{{ number_format($newCustomersMonth ?? 0) }} {{ __("pos.period_this_month") }}</p>
-            </div>
-            <div class="p-4 sm:p-5">
+            </x-pos.dashboard-metric>
+            <x-pos.dashboard-metric metric="tables" :href="$isRestaurant ? ($dashboardMetricUrls['tables'] ?? null) : null" class="p-4 sm:p-5">
                 @if($isRestaurant)
                 <div class="flex items-center gap-1.5 mb-1"><span class="w-2 h-2 rounded-full bg-emerald-500"></span><span class="text-[9px] font-bold text-gray-400 uppercase tracking-wider">{{ __("pos.tables_word") }}</span></div>
                 <p class="text-xl sm:text-2xl font-black text-gray-900 dark:text-white">{{ $occupiedTables ?? 0 }}<span class="text-base text-gray-300 dark:text-gray-600">/{{ $totalTables ?? 0 }}</span></p>
@@ -44,7 +44,7 @@
                 <p class="text-xl sm:text-2xl font-black text-gray-900 dark:text-white">Rs.{{ number_format($monthTotalSale ?? $monthSales ?? $monthStats->revenue ?? 0) }}</p>
                 <p class="text-[9px] text-gray-400 mt-1">{{ $monthStats->count ?? 0 }} {{ __("pos.orders_lc") }}</p>
                 @endif
-            </div>
+            </x-pos.dashboard-metric>
         </div>
 @endif
         <div class="h-1 flex">

@@ -1,14 +1,8 @@
 <x-pos-layout>
-<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-    @include('pos.partials.back-link')
-    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4">
-        <div>
-            <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
-                {{ ($tab ?? 'pra') === 'local' ? __('pos.local_tax_reports') : __('pos.tax_reports') }}
-            </h1>
-            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">{{ $dateLabel }} &mdash; {{ $taxRateLabel }}</p>
-        </div>
-        <div class="flex items-center gap-2 mt-3 sm:mt-0">
+@include('pos.partials.report-screen-style')
+<div class="pos-report-document max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    <x-pos.report-header :title="($tab ?? 'pra') === 'local' ? __('pos.local_tax_reports') : __('pos.tax_reports')" :subtitle="$dateLabel . ' — ' . $taxRateLabel">
+        <x-slot:actions>
             <a href="{{ route('pos.tax-reports.csv', request()->all()) }}" class="inline-flex items-center px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-lg transition shadow-sm">
                 <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
                 {{ __('pos.download_csv') }}
@@ -17,12 +11,12 @@
                 <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
                 {{ __('pos.download_pdf') }}
             </a>
-        </div>
-    </div>
+        </x-slot:actions>
+    </x-pos.report-header>
 
     @include('pos.partials.mode-tabs', ['baseUrl' => route('pos.tax-reports')])
 
-    <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5 mb-6">
+    <x-pos.report-panel class="mb-5 p-4" data-pos-report-filters>
         <form method="GET" action="{{ route('pos.tax-reports') }}" class="space-y-4" id="taxReportForm">
             <input type="hidden" name="tab" value="{{ $tab ?? 'pra' }}">
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -106,7 +100,7 @@
                 </div>
             </div>
         </form>
-    </div>
+    </x-pos.report-panel>
     <script>
     document.addEventListener('DOMContentLoaded', function() {
         var periodSelect = document.getElementById('periodSelect');
@@ -132,66 +126,9 @@
     });
     </script>
 
-    @if($taxRateFilter ?? false)
-    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
-        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-4 text-center">
-            <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">{{ __('pos.kpi_invoices') }}</p>
-            <p class="text-xl font-bold text-gray-900 dark:text-white">{{ number_format($summary->total_invoices) }}</p>
-        </div>
-        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-4 text-center">
-            <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">{{ __('pos.kpi_rate_value', ['rate' => $taxRateLabel]) }}</p>
-            <p class="text-xl font-bold text-emerald-600">PKR {{ number_format($summary->total_sales, 2) }}</p>
-        </div>
-        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-4 text-center">
-            <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">{{ __('pos.kpi_rate_tax', ['rate' => $taxRateLabel]) }}</p>
-            <p class="text-xl font-bold text-purple-600">PKR {{ number_format($summary->total_tax, 2) }}</p>
-        </div>
-        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-4 text-center">
-            <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">{{ __('pos.kpi_rate_total', ['rate' => $taxRateLabel]) }}</p>
-            <p class="text-xl font-bold text-gray-900 dark:text-white">PKR {{ number_format($summary->total_sales + $summary->total_tax, 2) }}</p>
-        </div>
-    </div>
-    @else
-    <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-4 mb-6">
-        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-4 text-center">
-            <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">{{ __('pos.kpi_total_invoices') }}</p>
-            <p class="text-xl font-bold text-gray-900 dark:text-white">{{ number_format($summary->total_invoices) }}</p>
-        </div>
-        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-4 text-center">
-            <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">{{ __('pos.kpi_total_sales') }}</p>
-            <p class="text-xl font-bold text-emerald-600">PKR {{ number_format($summary->total_sales, 2) }}</p>
-        </div>
-        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-4 text-center">
-            <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">{{ __('pos.kpi_total_discount') }}</p>
-            <p class="text-xl font-bold text-red-500">PKR {{ number_format($summary->total_discount, 2) }}</p>
-        </div>
-        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-4 text-center">
-            <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">{{ __('pos.kpi_total_taxable') }}</p>
-            <p class="text-xl font-bold text-gray-900 dark:text-white">PKR {{ number_format($summary->total_taxable, 2) }}</p>
-        </div>
-        {{-- Third Schedule (Aug 2026): manufacturer-paid tax items — shown in no-filter view only --}}
-        @if(!isset($taxRateFilter) || !$taxRateFilter)
-        <div class="bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-700 shadow-md p-4 text-center">
-            <p class="text-xs text-blue-600 dark:text-blue-400 mb-1 font-semibold">{{ __('pos.kpi_third_schedule') }}</p>
-            <p class="text-xl font-bold text-blue-700 dark:text-blue-300">PKR {{ number_format($summary->total_third_schedule ?? 0, 2) }}</p>
-        </div>
-        <div class="bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-700 shadow-md p-4 text-center">
-            <p class="text-xs text-amber-600 dark:text-amber-400 mb-1 font-semibold">{{ __('pos.kpi_tax_exempt_other') }}</p>
-            <p class="text-xl font-bold text-amber-600">PKR {{ number_format($summary->total_exempt_other ?? max(0, ($summary->total_exempt ?? 0) - ($summary->total_third_schedule ?? 0)), 2) }}</p>
-        </div>
-        @else
-        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-4 text-center">
-            <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">{{ __('pos.kpi_tax_exempt') }}</p>
-            <p class="text-xl font-bold text-amber-600">PKR {{ number_format($summary->total_exempt ?? 0, 2) }}</p>
-        </div>
-        <div class="hidden lg:block"></div>{{-- spacer --}}
-        @endif
-        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-4 text-center">
-            <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">{{ __('pos.kpi_total_tax') }}</p>
-            <p class="text-xl font-bold text-purple-600">PKR {{ number_format($summary->total_tax, 2) }}</p>
-        </div>
-    </div>
-    @endif
+    <x-pos.report-panel class="mb-5 p-4" data-pos-report-summary>
+        @include('pos.partials.tax-report-summary')
+    </x-pos.report-panel>
 
     {{-- Credit-note summary line (Task 695): shown whenever returns exist in the
          filtered set (or the credit-notes-only view is active) so the netted
@@ -223,13 +160,13 @@
     </div>
     @endif
 
-    <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md overflow-hidden">
+    <x-pos.report-panel class="overflow-hidden" data-pos-report-results>
         @php
             $hotelStayLinks = \App\Services\HotelBillDirectory::stayLinks($transactions->getCollection());
             $showHotelCreditActions = auth('pos')->user()?->isPosAdmin() && count($hotelStayLinks) > 0;
         @endphp
         <div class="overflow-x-auto" data-tax-report-scroll="1">
-            <table class="w-full text-sm table-cards">
+            <table class="data w-full text-sm table-cards">
                 <thead>
                     <tr class="text-left text-xs text-gray-500 dark:text-gray-400 uppercase border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
                         <th class="px-4 py-3">{{ __('pos.th_pos_invoice_no') }}</th>
@@ -373,7 +310,7 @@
                 @endif
             </table>
         </div>
-    </div>
+    </x-pos.report-panel>
 
     @if($transactions->hasPages())
     <div class="mt-4">

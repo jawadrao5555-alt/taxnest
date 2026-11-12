@@ -195,11 +195,21 @@ class PosImsReportingService
         return DB::transaction(function() use($companyId,$id,$result,$claim,$diagnostic){
             $r=$this->locked($companyId,$id);
             if ($claim !== null) abort_unless(is_string($r->agent_claim) && hash_equals($r->agent_claim,$claim),409);
+            // A later authenticated callback may promote the same local reference exactly once.
+            if ($r->state === 'local_accepted' && isset($result['central_confirmation'])
+                && $r->fiscal_number === $result['reference']) {
+                $attempts = $r->attempts ?? [];
+                $attempts[] = ['at' => now()->toIso8601String(), 'state' => 'accepted', 'error_codes' => [],
+                    'previous_state' => 'local_accepted', 'central_confirmation' => $result['central_confirmation']];
+                $r->fill(['state' => 'accepted', 'attempts' => $attempts])->save();
+                return $r;
+            }
             // Replayed callbacks are idempotent and never overwrite terminal evidence.
             if ($r->state !== 'submitting') return $r;
             $a=$r->attempts;$a[array_key_last($a)]['state']=$result['state'];$a[array_key_last($a)]['error_codes']=$result['error_codes'];
             if ($diagnostic !== null && in_array($diagnostic,['invalid_endpoint','response_received','unrecognized_response','transport_timeout','http_error','invalid_json_result','unconfirmed_soap_or_transport'],true)) $a[array_key_last($a)]['diagnostic']=$diagnostic;
             if (!empty($result['response_fields'])) $a[array_key_last($a)]['response_fields']=$result['response_fields'];
+            if (isset($result['central_confirmation'])) $a[array_key_last($a)]['central_confirmation']=$result['central_confirmation'];
             if (isset($result['acknowledgement'])) $a[array_key_last($a)]['acknowledgement']=$result['acknowledgement'];
             $r->fill(['state'=>$result['state'],'fiscal_number'=>$result['reference'],'attempts'=>$a])->save();return $r;
         });
@@ -240,6 +250,20 @@ class PosImsReportingService
                 && preg_match('/[0-9]/', substr($number, 6))) {
                 $result = ['state'=>'local_accepted','reference'=>$number,'error_codes'=>[]];
             }
+        }
+
+        $centralStatus = is_array($response) ? ($response['CentralStatus'] ?? null) : null;
+        $centralReference = is_array($response) ? FbrPosFiscalResult::number($response['CentralReference'] ?? null) : null;
+        $posId = str_pad((string) ($r->payload['POSID'] ?? ''), 6, '0', STR_PAD_LEFT);
+        if ($r->environment === 'production' && $diagnostic === 'response_received'
+            && $result['state'] === 'local_accepted'
+            && is_string($centralStatus) && in_array($centralStatus, ['confirmed', 'verified'], true)
+            && $centralReference && $centralReference === $result['reference']
+            && !empty($r->payload['POSID']) && strlen($posId) === 6 && str_starts_with($centralReference, $posId)
+            && preg_match('/[0-9]/', substr($centralReference, 6))) {
+            $result['state'] = 'accepted';
+            $result['central_confirmation'] = ['source' => 'fbr_ims_callback', 'status' => $centralStatus,
+                'reference' => $centralReference];
         }
 
         // Retain only bounded, validated fiscal fields in encrypted evidence.

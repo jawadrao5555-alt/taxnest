@@ -24,6 +24,7 @@
             </div>
             @if(!($dashboardMetricsRelocated ?? false))
 <div class="bg-white/10 backdrop-blur-sm rounded-2xl p-5">
+                <x-pos.dashboard-metric metric="revenue" :href="$dashboardMetricUrls['revenue'] ?? null">
                 <p class="text-[9px] font-bold text-violet-200/60 uppercase tracking-wider mb-1">{{ __("pos.todays_revenue") }}</p>
                 <div class="flex items-end gap-4 flex-wrap">
                     {{-- Task 988: combined PRA+Local (+exempt) figure — matches the Aaj ka Khaata sum this user sees --}}
@@ -31,12 +32,13 @@
                     @php $yest=$yesterdayTotalSale??$yesterdaySales??0;$today=$todayTotalSale??$todaySales??$todayStats->revenue??0;$pct=$yest>0?round(($today-$yest)/$yest*100):0; @endphp
                     @if($pct != 0)<span class="ls-badge {{ $pct >= 0 ? 'bg-emerald-500/20 text-emerald-300' : 'bg-red-500/20 text-red-300' }}"><svg class="w-3 h-3 {{ $pct < 0 ? 'rotate-180' : '' }}" fill="currentColor" viewBox="0 0 20 20"><path d="M5.293 9.707a1 1 0 010-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 01-1.414 1.414L11 7.414V15a1 1 0 11-2 0V7.414L6.707 9.707a1 1 0 01-1.414 0z"/></svg>{{ abs($pct) }}%</span>@endif
                 </div>
+                </x-pos.dashboard-metric>
                 <div class="flex gap-8 mt-4">
-                    <div><p class="text-2xl font-black text-white">{{ $todayOrders ?? $todayStats->count ?? 0 }}</p><p class="text-[9px] text-violet-200/90 font-bold uppercase">{{ __("pos.orders_word") }}</p></div>
+                    <x-pos.dashboard-metric metric="orders" :href="$dashboardMetricUrls['orders'] ?? null"><p class="text-2xl font-black text-white">{{ $todayOrders ?? $todayStats->count ?? 0 }}</p><p class="text-[9px] text-violet-200/90 font-bold uppercase">{{ __("pos.orders_word") }}</p></x-pos.dashboard-metric>
                     {{-- Task 988: Avg. Ticket stat replaced by New Customers (today · this month) --}}
-                    <div><p class="text-2xl font-black text-white">{{ number_format($newCustomersToday ?? 0) }}<span class="text-lg text-white/70"> · {{ number_format($newCustomersMonth ?? 0) }} {{ __("pos.period_this_month") }}</span></p><p class="text-[9px] text-violet-200/90 font-bold uppercase">{{ __("pos.new_customers") }}</p></div>
+                    <x-pos.dashboard-metric metric="customers" :href="$dashboardMetricUrls['customers'] ?? null"><p class="text-2xl font-black text-white">{{ number_format($newCustomersToday ?? 0) }}<span class="text-lg text-white/70"> · {{ number_format($newCustomersMonth ?? 0) }} {{ __("pos.period_this_month") }}</span></p><p class="text-[9px] text-violet-200/90 font-bold uppercase">{{ __("pos.new_customers") }}</p></x-pos.dashboard-metric>
                     @if($isRestaurant)
-                    <div><p class="text-2xl font-black text-white">{{ $occupiedTables ?? 0 }}<span class="text-lg text-white/70">/{{ $totalTables ?? 0 }}</span></p><p class="text-[9px] text-violet-200/90 font-bold uppercase">{{ __("pos.tables_word") }}</p></div>
+                    <x-pos.dashboard-metric metric="tables" :href="$dashboardMetricUrls['tables'] ?? null"><p class="text-2xl font-black text-white">{{ $occupiedTables ?? 0 }}<span class="text-lg text-white/70">/{{ $totalTables ?? 0 }}</span></p><p class="text-[9px] text-violet-200/90 font-bold uppercase">{{ __("pos.tables_word") }}</p></x-pos.dashboard-metric>
                     @else
                     <div><p class="text-2xl font-black text-white">Rs.{{ number_format(($monthTotalSale ?? $monthSales ?? $monthStats->revenue ?? 0) / 1000) }}k</p><p class="text-[9px] text-violet-200/90 font-bold uppercase">{{ __("pos.monthly_word") }}</p></div>
                     @endif

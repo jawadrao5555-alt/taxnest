@@ -7,6 +7,11 @@ on:
         description: Full approved main SHA to build (no hosting or rollout)
         required: true
         type: string
+      caller_play_bundle:
+        description: Also prepare Caller ID for Play Console internal testing
+        required: false
+        type: boolean
+        default: false
 permissions:
   contents: read
 concurrency:
@@ -93,6 +98,35 @@ jobs:
         with:
           name: android-beta-${{ inputs.target_sha }}
           path: ${{ runner.temp }}/android-beta/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Build and verify the Caller ID Play bundle
+        if: inputs.caller_play_bundle
+        env:
+          RIDER_KS: ${{ runner.temp }}/taxnest-rider.p12
+          RIDER_KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          TARGET_SHA: ${{ inputs.target_sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$TARGET_SHA"
+          gradle -p caller-app --no-daemon --console=plain :app:testPlayReleaseUnitTest :app:bundlePlayRelease
+          bundle="$RUNNER_TEMP/caller-play/taxnest-caller-play.aab"
+          mkdir -p "$(dirname "$bundle")"
+          cp caller-app/app/build/outputs/bundle/playRelease/app-play-release.aab "$bundle"
+          bash scripts/play-build-check.sh --aab "$bundle" --sim "$RUNNER_TEMP/android-beta/taxnest-caller.apk" --plus "$RUNNER_TEMP/android-beta/taxnest-caller-plus.apk"
+          jarsigner -verify -J-Duser.language=en -J-Duser.country=US "$bundle" > "$RUNNER_TEMP/caller-play-signature.txt"
+          grep -Fx 'jar verified.' "$RUNNER_TEMP/caller-play-signature.txt"
+          signer=$(keytool -printcert -jarfile "$bundle" -rfc | openssl x509 -outform DER | sha256sum | cut -d ' ' -f 1)
+          test "$signer" = '490d5c3bae13abb212bfe2a33abac66e8387e623cc0ecd724c5fdd8ffb72245b'
+          cd "$(dirname "$bundle")"
+          printf '%s\n' "$TARGET_SHA" > source-sha.txt
+          sha256sum taxnest-caller-play.aab > SHA256SUMS
+      - name: Upload Caller ID Play bundle for internal testing
+        if: inputs.caller_play_bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: caller-play-${{ inputs.target_sha }}
+          path: ${{ runner.temp }}/caller-play/
           if-no-files-found: error
           retention-days: 14
       - name: Remove signing inputs

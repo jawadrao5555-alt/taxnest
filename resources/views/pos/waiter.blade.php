@@ -858,7 +858,12 @@ function waiterApp() {
             setInterval(() => { this.nowTick = Date.now(); }, 30000);
             // Version check: every 2 min + whenever the phone comes back to the tab.
             setInterval(() => this.checkVersion(), 120000);
-            document.addEventListener('visibilitychange', () => { if (!document.hidden) this.checkVersion(); });
+            document.addEventListener('visibilitychange', () => {
+                if (document.hidden) return;
+                this.checkVersion();
+                this.refreshLiveLists();
+            });
+            window.addEventListener('online', () => this.refreshLiveLists());
             this.checkVersion();
             // Buttons style (Task #340, Aug 2026): eagerly fetch tables on boot so
             // the home button list is populated immediately. Poll every 30 s (same
@@ -870,6 +875,20 @@ function waiterApp() {
             }
             setTimeout(() => this.loadKotAttention(), 800);
             setInterval(() => { if (!document.hidden) this.loadKotAttention(); }, 5000);
+        },
+        _liveListsRefresh: null,
+        refreshLiveLists() {
+            if (document.hidden || this._liveListsRefresh) return this._liveListsRefresh;
+            // A request started offline can still be winding down after reconnect.
+            const previousOrders = this._myOrdersRequest;
+            this._liveListsRefresh = Promise.all([
+                Promise.resolve(previousOrders).then(() => {
+                    if (!document.hidden) return this.loadMyOrders();
+                }),
+                this._buttonsMode || this.showTables ? this.reloadTablesQuiet() : null,
+                this.loadKotAttention(),
+            ]).finally(() => { this._liveListsRefresh = null; });
+            return this._liveListsRefresh;
         },
         async loadKotAttention() {
             if (this._kotStatusLoading) return;
@@ -1628,9 +1647,11 @@ function waiterApp() {
                 if (requestSerial !== this._tableRequestSerial) return;
                 if (res.status === 304) { this.tablesError = false; this.tablesLocal = false; return; }
                 if (!res.ok) { if (!this._tablesFromLocalCore()) this.tablesError = true; return; }
+                const tables = await res.json();
+                if (requestSerial !== this._tableRequestSerial) return;
                 const etag = res.headers.get('ETag');
                 if (etag) this._tableEtag = etag;
-                this.tables = await res.json();
+                this.tables = tables;
                 this.tablesError = false;
                 this.tablesLocal = false;
             } catch (e) {

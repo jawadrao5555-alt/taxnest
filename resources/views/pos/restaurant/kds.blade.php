@@ -412,6 +412,10 @@ function kdsScreen() {
             this.initAutoPrint();
             this.initAcknowledgedVoids();
             this.polling = setInterval(() => this.refreshOrders(), 15000);
+            window.addEventListener('online', () => this.refreshOrders());
+            document.addEventListener('visibilitychange', () => {
+                if (!document.hidden) this.refreshOrders();
+            });
             // Task 928: instant KDS refresh when a void/cancel happens on another
             // tab on the SAME device.  The POS sale screen writes pos_kds_void_signal
             // to localStorage after every successful order delete or item void; the
@@ -484,19 +488,20 @@ function kdsScreen() {
             } catch(e) {}
         },
 
+        _ordersRequestSerial: 0,
+        _ordersAppliedSerial: 0,
         async refreshOrders() {
+            const requestSerial = ++this._ordersRequestSerial;
             try {
-                // Task 931: snapshot void-order ids before the poll so we can detect
-                // new cancellations arriving mid-session and beep once for the cook.
-                const prevVoidIds = new Set(this.aggregateVoidOrders.map(o => o.id));
                 const res = await fetch('{{ route("pos.restaurant.live-orders") }}');
-                if (res.ok) {
-                    this.orders = await res.json();
-                    this.checkAutoPrint();
-                    // Play the urgent beep if any void order wasn't visible before this poll.
-                    const hasNew = this.aggregateVoidOrders.some(o => !prevVoidIds.has(o.id));
-                    if (hasNew) this.playUrgentBeep();
-                }
+                if (!res.ok) return;
+                const orders = await res.json();
+                if (!Array.isArray(orders) || requestSerial <= this._ordersAppliedSerial) return;
+                const prevVoidIds = new Set(this.aggregateVoidOrders.map(o => o.id));
+                this._ordersAppliedSerial = requestSerial;
+                this.orders = orders;
+                this.checkAutoPrint();
+                if (this.aggregateVoidOrders.some(o => !prevVoidIds.has(o.id))) this.playUrgentBeep();
             } catch (e) {}
         },
 

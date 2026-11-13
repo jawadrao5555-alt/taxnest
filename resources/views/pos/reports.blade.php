@@ -1,18 +1,15 @@
 <x-pos-layout>
-<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-    @include('pos.partials.back-link')
-    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
-        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
-            {{ ($tab ?? 'pra') === 'local' ? __('pos.local_reports') : __('pos.pos_reports') }}
-        </h1>
-        @php
-            // Plan gates (Aug 2026 package matrix) — service caches per request.
-            $planCoReports = \App\Models\Company::find(app('currentCompanyId'));
-            $canHazriPlan = \App\Services\PosFeatureService::planAllows($planCoReports, 'hazri_enabled');
-            $canExportsPlan = \App\Services\PosFeatureService::planAllows($planCoReports, 'reports_enabled');
-            $canAnalyticsPlan = \App\Services\PosFeatureService::planAllows($planCoReports, 'analytics_enabled');
-        @endphp
-        <div class="flex items-center gap-2 flex-wrap">
+@include('pos.partials.report-screen-style')
+<div class="pos-report-document max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    @php
+        // Plan gates (Aug 2026 package matrix) — service caches per request.
+        $planCoReports = \App\Models\Company::find(app('currentCompanyId'));
+        $canHazriPlan = \App\Services\PosFeatureService::planAllows($planCoReports, 'hazri_enabled');
+        $canExportsPlan = \App\Services\PosFeatureService::planAllows($planCoReports, 'reports_enabled');
+        $canAnalyticsPlan = \App\Services\PosFeatureService::planAllows($planCoReports, 'analytics_enabled');
+    @endphp
+    <x-pos.report-header :title="($tab ?? 'pra') === 'local' ? __('pos.local_reports') : __('pos.pos_reports')">
+        <x-slot:actions>
             @if(auth('pos')->user()?->isPosAdmin() && $canHazriPlan)
             {{-- Staff Hazri (owner batch, 26 Jul 2026) — ADMIN/MANAGER-ONLY --}}
             <a href="{{ route('pos.reports.hazri') }}" class="inline-flex items-center gap-2 px-4 py-2 bg-teal-600 text-white text-sm font-semibold rounded-lg hover:bg-teal-700 transition">
@@ -26,21 +23,21 @@
                 {{ __('pos.download_csv') }}
             </a>
             @endif
-        </div>
-    </div>
+            @if($rangeAnalytics !== null && $canAnalyticsPlan)
+                <a href="{{ route('pos.reports.analytics-pdf', ['tab' => $tab, 'cashier' => $selectedCashier, 'from' => $rangeAnalytics->from, 'to' => $rangeAnalytics->to]) }}"
+                   class="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700">{{ __('pos.download_pdf') }}</a>
+            @endif
+        </x-slot:actions>
+    </x-pos.report-header>
 
     @include('pos.partials.mode-tabs', ['baseUrl' => route('pos.reports'), 'showExempt' => true])
-    @include('pos.partials.financial-history')
-    @php
-$presentation = \App\Services\PosReportPresentation::forView($financialHistory ?? null, $streamSplit ?? null, auth('pos')->user(), (bool)($showLocalStream ?? false));
-@endphp
-    @if($presentation)<div class="rounded-xl border bg-white dark:bg-gray-900 p-4 mb-4 overflow-auto">@include('pos.partials.report-summary-tables')</div>@endif
-
-    <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-4 mb-6">
-        <form method="GET" action="{{ route('pos.reports') }}" class="flex flex-col sm:flex-row items-start sm:items-end gap-3">
+    <x-pos.report-panel class="mb-5 p-4" data-pos-report-filters>
+        <form method="GET" action="{{ route('pos.reports') }}" class="flex flex-wrap items-end gap-3">
             <input type="hidden" name="tab" value="{{ $tab }}">
+            @if($rangeAnalytics === null)
             @if(request()->filled('from'))<input type="hidden" name="from" value="{{ request('from') }}">@endif
             @if(request()->filled('to'))<input type="hidden" name="to" value="{{ request('to') }}">@endif
+            @endif
             @if($isCashier)
             {{-- Owner rule (5 Aug 2026): cashier reports are LOCKED to own sales —
                  no dropdown, no "all company" escape; server forces it anyway. --}}
@@ -70,8 +67,27 @@ $presentation = \App\Services\PosReportPresentation::forView($financialHistory ?
             </div>
             @endif
             @endif
+            @if($rangeAnalytics !== null)
+                <div>
+                    <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.lbl_from') }}</label>
+                    <input type="date" name="from" value="{{ $rangeAnalytics->from }}" max="{{ today()->toDateString() }}" class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-purple-500 focus:border-purple-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.lbl_to') }}</label>
+                    <input type="date" name="to" value="{{ $rangeAnalytics->to }}" max="{{ today()->toDateString() }}" class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-purple-500 focus:border-purple-500">
+                </div>
+                <button type="submit" class="px-4 py-2 bg-purple-600 text-white text-sm font-semibold rounded-lg hover:bg-purple-700 transition">{{ __('pos.apply_filters') }}</button>
+            @endif
         </form>
-    </div>
+    </x-pos.report-panel>
+
+    @include('pos.partials.financial-history')
+    @php
+$presentation = \App\Services\PosReportPresentation::forView($financialHistory ?? null, $streamSplit ?? null, auth('pos')->user(), (bool)($showLocalStream ?? false));
+@endphp
+    @if($presentation)<x-pos.report-panel class="mb-5 overflow-auto p-4" data-pos-report-summary>@include('pos.partials.report-summary-tables')</x-pos.report-panel>@endif
+
+
 
     @if($topItemsDetailed !== null && (!$presentation || !$canAnalyticsPlan))
     <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5 mb-6">
@@ -132,22 +148,6 @@ $presentation = \App\Services\PosReportPresentation::forView($financialHistory ?
                 <h2 class="text-lg font-bold text-gray-900 dark:text-white">{{ __('pos.sales_analytics') }}</h2>
                 <p class="text-xs text-gray-500">{{ \Carbon\Carbon::parse($ra->from)->format('d M Y') }} — {{ \Carbon\Carbon::parse($ra->to)->format('d M Y') }} {{ __('pos.days_count_paren', ['count' => \Carbon\Carbon::parse($ra->from)->diffInDays(\Carbon\Carbon::parse($ra->to)) + 1]) }}</p>
             </div>
-            <form method="GET" action="{{ route('pos.reports') }}" class="flex flex-wrap items-end gap-2">
-                <input type="hidden" name="tab" value="{{ $tab }}">
-                <input type="hidden" name="cashier" value="{{ $selectedCashier }}">
-                <div>
-                    <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.lbl_from') }}</label>
-                    <input type="date" name="from" value="{{ $ra->from }}" max="{{ today()->toDateString() }}" class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-purple-500 focus:border-purple-500">
-                </div>
-                <div>
-                    <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.lbl_to') }}</label>
-                    <input type="date" name="to" value="{{ $ra->to }}" max="{{ today()->toDateString() }}" class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-purple-500 focus:border-purple-500">
-                </div>
-                <button type="submit" class="px-4 py-2 bg-purple-600 text-white text-sm font-semibold rounded-lg hover:bg-purple-700 transition">{{ __('pos.apply_btn') }}</button>
-                @if($canAnalyticsPlan ?? true)
-                <a href="{{ route('pos.reports.analytics-pdf', ['tab' => $tab, 'cashier' => $selectedCashier, 'from' => $ra->from, 'to' => $ra->to]) }}" class="px-4 py-2 bg-emerald-600 text-white text-sm font-semibold rounded-lg hover:bg-emerald-700 transition">PDF</a>
-                @endif
-            </form>
         </div>
         <div class="flex flex-wrap gap-2 mb-5">
             @foreach([
@@ -164,34 +164,19 @@ $presentation = \App\Services\PosReportPresentation::forView($financialHistory ?
         </div>
 
         {{-- Summary KPIs + previous-period comparison --}}
-        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-5">
-            <div class="p-3 rounded-lg bg-gray-50 dark:bg-gray-800">
-                <p class="text-xs text-gray-500 uppercase font-medium">{{ __('pos.kpi_revenue') }}</p>
-                <p class="text-lg font-bold text-gray-900 dark:text-white mt-0.5">PKR {{ number_format($ra->summary->revenue) }}</p>
+        <div class="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-4" data-pos-report-kpis>
+            <x-pos.report-stat :label="__('pos.kpi_revenue')" :value="'PKR ' . number_format($ra->summary->revenue)">
                 {!! $raPct($ra->previous->revenue_pct) !!}
-            </div>
-            <div class="p-3 rounded-lg bg-gray-50 dark:bg-gray-800">
-                <p class="text-xs text-gray-500 uppercase font-medium">{{ __('pos.th_bills') }}</p>
-                <p class="text-lg font-bold text-gray-900 dark:text-white mt-0.5">{{ number_format($ra->summary->bills) }}</p>
+            </x-pos.report-stat>
+            <x-pos.report-stat :label="__('pos.th_bills')" :value="number_format($ra->summary->bills)">
                 {!! $raPct($ra->previous->bills_pct) !!}
-            </div>
-            <div class="p-3 rounded-lg bg-gray-50 dark:bg-gray-800">
-                <p class="text-xs text-gray-500 uppercase font-medium">{{ __('pos.receipt_tax') }}</p>
-                <p class="text-lg font-bold text-gray-900 dark:text-white mt-0.5">PKR {{ number_format($ra->summary->tax) }}</p>
+            </x-pos.report-stat>
+            <x-pos.report-stat :label="__('pos.receipt_tax')" :value="'PKR ' . number_format($ra->summary->tax)">
                 {!! $raPct($ra->previous->tax_pct) !!}
-            </div>
-            <div class="p-3 rounded-lg bg-gray-50 dark:bg-gray-800">
-                <p class="text-xs text-gray-500 uppercase font-medium">{{ __('pos.th_avg_bill') }}</p>
-                <p class="text-lg font-bold text-gray-900 dark:text-white mt-0.5">PKR {{ number_format($ra->summary->avg_bill) }}</p>
-            </div>
-            <div class="p-3 rounded-lg bg-gray-50 dark:bg-gray-800">
-                <p class="text-xs text-gray-500 uppercase font-medium">{{ __('pos.kpi_discounts') }}</p>
-                <p class="text-lg font-bold text-gray-900 dark:text-white mt-0.5">PKR {{ number_format($ra->summary->discount) }}</p>
-            </div>
-            <div class="p-3 rounded-lg bg-gray-50 dark:bg-gray-800">
-                <p class="text-xs text-gray-500 uppercase font-medium">{{ __('pos.kpi_customers') }}</p>
-                <p class="text-lg font-bold text-gray-900 dark:text-white mt-0.5">{{ number_format($ra->summary->unique_customers) }}</p>
-            </div>
+            </x-pos.report-stat>
+            <x-pos.report-stat :label="__('pos.th_avg_bill')" :value="'PKR ' . number_format($ra->summary->avg_bill)" />
+            <x-pos.report-stat :label="__('pos.kpi_discounts')" :value="'PKR ' . number_format($ra->summary->discount)" />
+            <x-pos.report-stat :label="__('pos.kpi_customers')" :value="number_format($ra->summary->unique_customers)" />
         </div>
         {{-- Range wastage line (Task 595): month/range-wide spoiled-goods total --}}
         @if(($rangeAnalytics->wastage ?? null) !== null)

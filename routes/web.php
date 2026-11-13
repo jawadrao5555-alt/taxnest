@@ -406,6 +406,7 @@ Route::middleware(['auth', 'company', 'rate_limit_company', 'company.approval'])
     Route::post('/onboarding/skip', [OnboardingController::class, 'skip']);
 
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    Route::get('/whats-new/history', [\App\Http\Controllers\AppUpdateController::class, 'history'])->defaults('announcement_panel', 'di')->name('di.whats-new.history');
     Route::post('/whats-new/seen', [\App\Http\Controllers\AppUpdateController::class, 'markSeen'])->name('di.whats-new.seen');
 
     // ── Tax Consultant Console (any DI web user can become a consultant) ──
@@ -935,6 +936,7 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     Route::get('/dashboard/detail/{metric}', [PosController::class, 'dashboardDetail'])->name('pos.dashboard.detail');
     Route::post('/notifications/{id}/dismiss', [PosController::class, 'dismissNotification'])->name('pos.notifications.dismiss');
     Route::post('/notifications/dismiss-all', [PosController::class, 'dismissAllNotifications'])->name('pos.notifications.dismiss-all');
+    Route::get('/whats-new/history', [\App\Http\Controllers\AppUpdateController::class, 'history'])->defaults('announcement_panel', 'pra')->name('pos.whats-new.history');
     Route::post('/whats-new/seen', [\App\Http\Controllers\AppUpdateController::class, 'markSeen'])->name('pos.whats-new.seen');
     // Task 1022: POS survey popup (Caller ID elaan) — admin/manager gated in controller.
     Route::post('/survey/{id}/respond', [\App\Http\Controllers\PosSurveyController::class, 'respond'])->name('pos.survey.respond');
@@ -1064,6 +1066,7 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     Route::get('/transaction/{id}/pdf', [PosController::class, 'downloadInvoicePdf'])->name('pos.invoice.pdf');
     Route::post('/transaction/{id}/share-link', [PosController::class, 'generateShareLink'])->name('pos.invoice.share-link');
     Route::get('/reports', [PosController::class, 'reports'])->name('pos.reports');
+    Route::get('/reports/dashboard-overview', [PosController::class, 'dashboardSalesOverview'])->name('pos.reports.dashboard-overview');
     Route::get('/tax-reports', [PosController::class, 'taxReports'])->name('pos.tax-reports');
     Route::get('/reports/csv', [PosController::class, 'exportReportCsv'])->name('pos.reports.csv');
     // Staff Hazri (owner batch, 26 Jul 2026) — ADMIN/MANAGER-ONLY (403 in controller).
@@ -2592,6 +2595,7 @@ Route::prefix('fbr-pos')->middleware(['fbrpos.auth', 'company.approval'])->group
     Route::get('/dashboard', [FbrPosController::class, 'dashboard'])->name('fbrpos.dashboard');
     Route::post('/notifications/{id}/dismiss', [FbrPosController::class, 'dismissNotification'])->name('fbrpos.notifications.dismiss');
     Route::post('/notifications/dismiss-all', [FbrPosController::class, 'dismissAllNotifications'])->name('fbrpos.notifications.dismiss-all');
+    Route::get('/whats-new/history', [\App\Http\Controllers\AppUpdateController::class, 'history'])->defaults('announcement_panel', 'fbr')->name('fbrpos.whats-new.history');
     Route::post('/whats-new/seen', [\App\Http\Controllers\AppUpdateController::class, 'markSeen'])->name('fbrpos.whats-new.seen');
     Route::post('/payment-proof', [\App\Http\Controllers\PaymentProofController::class, 'store'])
         ->name('fbrpos.payment-proof.store')->middleware('throttle:6,1');

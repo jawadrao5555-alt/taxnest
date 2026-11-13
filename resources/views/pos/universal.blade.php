@@ -587,7 +587,8 @@ window.addEventListener('popstate', function() {
      rendered shell: 60px desktop/tablet, 64px PRA phone. Auto mode picks the zoom; manual % is
      per-device via localStorage 'tn_screen_fit'. Empty string = normal 100% layout. --}}
 <div data-tn-sale-document="pra" data-tn-sale-root x-data="restaurantPos()" @wheel="handleGlobalWheel($event)" class="tn-premium-sale tn-sale-root flex flex-col overflow-hidden bg-gray-50 dark:bg-gray-950" :style="fitStyleStr">
-    @include('pos.partials.kot-action-required-banner')
+    @include('pos.partials.kot-action-required-banner', ['canOfferKotReprint' => true])
+    @include('pos.partials.kot-status-banner')
 
     {{-- Task 127: Starter offline-locked notice — persistent (while offline), dismissible.
          Shows ONLY when the shop is offline AND the plan does not allow offline billing,
@@ -5214,6 +5215,7 @@ function restaurantPos() {
         selectedTable: {!! $jsEnc($selectedTableJson, 'null') !!},
         heldOrders: {!! $jsEnc($heldOrdersJson) !!},
         kotActionRequired: [],
+        kotStatusJobs: [],
         _heldEtag: null,     // Task 1097: ETag from last held-orders poll (If-None-Match fast-path)
         _incomingEtag: null, // Task 1097: ETag from last incoming-orders poll
         _tableEtag: null,    // Task 1109: ETag from last table-status poll (If-None-Match fast-path)
@@ -9257,12 +9259,19 @@ function restaurantPos() {
             this._clampHeldCursor();
         },
         async loadKotAttention() {
+            if (this._kotStatusLoading) return;
+            this._kotStatusLoading = true;
             try {
                 const res = await fetch('{{ route('pos.api.kot-print-attention') }}', { headers: { 'Accept': 'application/json' } });
                 if (!res.ok) return;
                 const data = await res.json();
                 this.kotActionRequired = Array.isArray(data.jobs) ? data.jobs : [];
-            } catch (e) {}
+                this.kotStatusJobs = Array.isArray(data.status_jobs) ? data.status_jobs : [];
+            } catch (e) {
+                // Keep the last confirmed snapshot during a temporary outage.
+            } finally {
+                this._kotStatusLoading = false;
+            }
         },
         async reportLocalCoreDown() {
             try {

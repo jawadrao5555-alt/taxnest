@@ -48,7 +48,7 @@
                 'tab' => $tkKey,
                 'from' => $tk['date'],
                 'to' => $tk['date'],
-                'cashier' => $cashierFilter ?? null,
+                'cashier' => $dashCashierId ?? $cashierFilter ?? null,
             ], fn ($value) => $value !== null && $value !== ''));
         @endphp
         <a href="{{ $tkReportUrl }}" data-ledger-stream="{{ $tkKey }}" class="block rounded-xl border p-3 hover:shadow-md focus-visible:ring-2 focus-visible:ring-teal-600 transition {{ $tkIsPra ? 'border-teal-200 dark:border-teal-800 bg-teal-50 dark:bg-teal-900/20' : 'border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20' }}">

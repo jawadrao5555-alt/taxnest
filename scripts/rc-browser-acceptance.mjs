@@ -2353,24 +2353,48 @@ async function customerBulkNavigation(page,t,v) {
  if(!opened?.ok())throw new Error('Dashboard did not render for metric navigation');
  await waitForOperationalSurface(page);await dismiss(page);
  const root=page.locator('[data-dashboard-metrics]');await root.waitFor();
- const ledger=page.locator('#today-khata');
- if(await ledger.count() && await root.evaluate(el=>el.getBoundingClientRect().bottom)>await ledger.evaluate(el=>el.getBoundingClientRect().top))throw new Error('Metrics were not moved above ledger');
+ const reports=page.locator('[data-dashboard-report-section]');
+ if(await root.evaluate(el=>el.getBoundingClientRect().bottom)>await reports.evaluate(el=>el.getBoundingClientRect().top))throw new Error('Reports must appear below the themed dashboard');
+ await reports.scrollIntoViewIfNeeded();
+ await reports.locator('[data-report-summary]').waitFor();
+ await reports.locator('[data-report-products]').waitFor();
+ const returnToDashboard=async()=>{
+  await page.goto(baseUrl+'/pos/restaurant/dashboard',{waitUntil:'domcontentloaded'});
+  await waitForOperationalSurface(page);await dismiss(page);
+ };
  for(const metric of ['revenue','orders','customers']) {
   const link=page.locator('[data-dashboard-metric="'+metric+'"]');await link.waitFor();
-  const href=await link.getAttribute('href');if(!href)throw new Error('Metric detail link missing');
-  const r=await page.goto(href,{waitUntil:'domcontentloaded'});if(!r?.ok())throw new Error('Metric detail did not render');
-  if(metric==='revenue'&&!await page.locator('[data-report-summary]').count())throw new Error('Sales report shared summary missing');
-  if(metric==='revenue') {
+  const animatedValue=link.locator('[data-count-target]');
+  const cardValue=await animatedValue.count()
+   ? Number(await animatedValue.first().getAttribute('data-count-target'))
+   : Number((await link.locator('p').filter({hasText:/^(Rs\.\s*)?[\d,]+$/}).first().innerText()).replace(/[^\d.]/g,''));
+
+  await Promise.all([page.waitForURL('**/pos/dashboard/detail/'+metric+'?*'),link.click()]);
+  await page.locator('[data-pos-report-header]').waitFor();
+  const value=await page.locator('[data-pos-report-summary] strong').innerText();
+  if(Number(value.replace(/^PKR\s*/,'').replaceAll(',',''))!==cardValue)throw new Error('Dashboard metric value differs from its detail: '+metric);
+  await page.locator('[data-pos-report-results]').waitFor();
+  await returnToDashboard();
+ }
+ for(const [key,path] of [['sales','/pos/reports'],['tax','/pos/tax-reports'],['day-close','/pos/day-close']]) {
+  const link=page.locator('[data-pos-report-link="'+key+'"]');
+  await Promise.all([page.waitForURL(url=>url.pathname===path),link.click()]);
+  await page.locator('[data-pos-report-header]').waitFor();
+  await page.locator('[data-pos-report-filters]').waitFor();
+  if(key==='tax')await page.locator('[data-pos-report-results]').waitFor();
+  if(key==='sales') {
+   if(!await page.locator('[data-report-summary]').count())throw new Error('Sales report shared summary missing');
    const products=page.locator('[data-report-products]');
    if(await products.count()!==1)throw new Error('Sales needs one complete grouped product section');
    const ordered=await products.evaluate(el=>Array.from(document.querySelectorAll('canvas')).filter(c=>c.getClientRects().length).every(c=>c.getBoundingClientRect().bottom<=el.getBoundingClientRect().top));
    if(!ordered)throw new Error('Products appeared before report analytics');
    if(await products.locator('th.c').evaluate(el=>getComputedStyle(el).textAlign)!=='center')throw new Error('Product quantity is not centered');
   }
-  await page.goto(baseUrl+'/pos/restaurant/dashboard',{waitUntil:'domcontentloaded'});await waitForOperationalSurface(page);await dismiss(page);
+  await saveEvidenceScreenshot(page,'pra-shared-report-'+key+'-'+v.width+'.png');
+  await returnToDashboard();
  }
  await saveEvidenceScreenshot(page,'customer-bulk-metrics-'+v.width);
- pass(t.name+'/'+v.width+': metrics above ledger; real revenue/order/customer detail routes render without posting or printing');
+ pass(t.name+'/'+v.width+': dashboard card totals match their detail; Sales, Tax and Day Close share the dashboard reporting layout');
 }
 async function one(browser,label,v,t) {
   if(t.taxIntegrations)t={...t,login:t.taxIntegrations[v.width].login};

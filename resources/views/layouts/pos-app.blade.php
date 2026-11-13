@@ -810,7 +810,7 @@
 
                         @endif
 
-                        @if($whatsNewList->isNotEmpty())
+                        @if(isset($bellState))
                         {{-- What's New bell — opening history does NOT mark anything seen. --}}
                         <div class="relative" x-data="{ bellOpen: false, unseen: {{ (int) $whatsNewUnseenCount }}, unreadIds: {{ Js::from($whatsNewUnseenIds) }},
                                 }" @click.outside="bellOpen = false" @whats-new-seen.window="unreadIds = unreadIds.filter(id => Number(id) !== Number($event.detail.id)); unseen = unreadIds.length">
@@ -861,6 +861,9 @@
                                         </button>
                                     @endforeach
                                 </div>
+                                <a href="{{ route('pos.whats-new.history') }}" class="block px-4 py-3 text-sm font-semibold text-purple-700 dark:text-purple-300">
+                                    {{ __('pos.view_all_arrow') }}
+                                </a>
                             </div>
                         </div>
                         @endif

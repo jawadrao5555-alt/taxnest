@@ -848,6 +848,7 @@ class PosController extends Controller
 
         return response()->json([
             'jobs' => $jobs,
+            'status_jobs' => \App\Services\KotPrintService::statusJobs($company),
             'failover_ms' => round($ms, 3),
         ]);
     }
@@ -1256,6 +1257,14 @@ class PosController extends Controller
             ]);
         }
 
+        if ($validated['type'] === 'kot' && $request->boolean('kds_auto') && $request->filled('restaurant_order_id')) {
+            $waiterOrder = \App\Models\RestaurantOrder::where('company_id', $companyId)
+                ->where('source', 'waiter')->with('items')->find((int) $validated['restaurant_order_id']);
+            if ($waiterOrder && \App\Services\KotPrintService::waiterSnapshotsCover($waiterOrder)) {
+                return response()->json(['success' => true, 'job_ids' => [], 'deduped' => true]);
+            }
+        }
+
         if (!$settings['silent_print_enabled']) {
             return $this->rejectPrintJob($request, 'disabled');
         }
@@ -1459,91 +1468,15 @@ class PosController extends Controller
         // one FULL (non-station-split) copy of the KOT on the counter printer,
         // in ADDITION to the normal kitchen job(s). Best-effort: never blocks
         // or fails the main kitchen print.
-        $counterCopy = function () use ($settings, $order, $companyId, $user, $delta, $deltaIds) {
+        $makeJob = fn (?string $printer, ?string $renderQuery, ?string $ownerDeviceUid = null) =>
+            \App\Services\KotPrintService::queueOrderSlip($order, $user->id, $printer, $renderQuery, $ownerDeviceUid, $deltaIds);
+        $counterCopy = function () use ($settings, $order, $makeJob, $delta) {
             try {
                 if (!($settings['counter_kot_enabled'] ?? false)) return;
                 $printer = $settings['counter_kot_printer'] ?? null;
                 if (!$printer || ($order->order_type ?? null) !== 'dine_in') return;
-                // In-flight dedupe — client retry must not double the counter copy.
-                // Delta dedupe-hit MERGES fresh ids into the still-PENDING job
-                // (same rule as $makeJob) so a rapid second edit isn't dropped.
-                $dupe = \App\Models\PosPrintJob::where('company_id', $companyId)
-                    ->where('type', 'kot')
-                    ->where('restaurant_order_id', $order->id)
-                    ->where('target_printer', $printer)
-                    ->where(fn($q) => $delta ? $q->where('render_query', 'delta=1') : $q->whereNull('render_query'))
-                    ->whereIn('status', ['pending', 'printing'])
-                    ->where('created_at', '>=', now()->subMinutes(2))
-                    ->orderByDesc('id')->first();
-                if ($dupe) {
-                    if ($delta && $deltaIds && $dupe->status === 'pending') {
-                        $merged = collect($dupe->printed_item_ids ?? [])->map(fn ($i) => (int) $i)
-                            ->merge($deltaIds)->unique()->values()->all();
-                        if ($merged !== ($dupe->printed_item_ids ?? [])) {
-                            $dupe->update(['printed_item_ids' => $merged]);
-                        }
-                    }
-                    return;
-                }
-                $attrs = [
-                    'company_id' => $companyId,
-                    'type' => 'kot',
-                    'target_printer' => $printer,
-                    'restaurant_order_id' => $order->id,
-                    'render_query' => $delta ? 'delta=1' : null,
-                    'printed_item_ids' => $delta ? $deltaIds : null,
-                    'status' => 'pending',
-                    'created_by' => $user->id,
-                ];
-                // Task 1194: counter copy routes to ITS owning counter (online only).
-                if ($stamp = \App\Services\KotPrintService::deviceStampFor($companyId, $settings['counter_kot_printer_device'] ?? null)) {
-                    $attrs['device_uid'] = $stamp;
-                }
-                \App\Models\PosPrintJob::create($attrs);
+                $makeJob($printer, $delta ? 'delta=1' : null, $settings['counter_kot_printer_device'] ?? null);
             } catch (\Throwable $e) { /* copy is optional — kitchen print already queued */ }
-        };
-        $makeJob = function (?string $printer, ?string $renderQuery, ?string $ownerDeviceUid = null) use ($companyId, $order, $user, $delta, $deltaIds) {
-            // In-flight dedupe (client retry + KDS/cashier race, 30 Jul 2026):
-            // an identical queued/printing job < 2 min old = same physical ticket
-            // already on its way. Delta jobs now carry a BAKED id snapshot, so a
-            // deduped second fire MERGES any newly-unprinted ids into the still-
-            // PENDING job (render reads the row fresh at claim time); an already-
-            // printing job keeps its rendered set — result-time stamping must
-            // only cover rows that physically printed.
-            $inFlight = \App\Models\PosPrintJob::where('company_id', $companyId)
-                ->where('type', 'kot')
-                ->where('restaurant_order_id', $order->id)
-                ->where('target_printer', $printer)
-                ->where(fn($q) => $renderQuery === null ? $q->whereNull('render_query') : $q->where('render_query', $renderQuery))
-                ->whereIn('status', ['pending', 'printing'])
-                ->where('created_at', '>=', now()->subMinutes(2))
-                ->orderByDesc('id')->first();
-            if ($inFlight) {
-                if ($delta && $deltaIds && $inFlight->status === 'pending') {
-                    $merged = collect($inFlight->printed_item_ids ?? [])->map(fn ($i) => (int) $i)
-                        ->merge($deltaIds)->unique()->values()->all();
-                    if ($merged !== ($inFlight->printed_item_ids ?? [])) {
-                        $inFlight->update(['printed_item_ids' => $merged]);
-                    }
-                }
-                return $inFlight;
-            }
-            $attrs = [
-                'company_id' => $companyId,
-                'type' => 'kot',
-                'target_printer' => $printer,
-                'restaurant_order_id' => $order->id,
-                'render_query' => $renderQuery,
-                'printed_item_ids' => ($delta && $deltaIds) ? $deltaIds : null,
-                'status' => 'pending',
-                'created_by' => $user->id,
-            ];
-            // Task 1194: owning-counter stamp — only that counter's agent claims
-            // the job. Online-device rule + column guard live in the helper.
-            if ($stamp = \App\Services\KotPrintService::deviceStampFor($companyId, $ownerDeviceUid)) {
-                $attrs['device_uid'] = $stamp;
-            }
-            return \App\Models\PosPrintJob::create($attrs);
         };
 
         // Delta with nothing unprinted = nothing to print anywhere — succeed with
@@ -1780,16 +1713,8 @@ class PosController extends Controller
         // to the LOCAL stream instead (their whole world is offline billing —
         // showing them PRA figures would leak the other stream).
         $dashScope = auth('pos')->user()?->posBillingScope() ?? 'both';
+        $excludeLocal = fn ($q) => $this->applyDashboardBillStream($q, $dashScope);
         if ($dashScope === 'local') {
-            $excludeLocal = function ($q) {
-                // Same local stream predicate as pos.reports, except dashboards
-                // retain their normal archived-row scope.
-                $q->where(function ($s) {
-                    $s->where('invoice_mode', 'local')->orWhere(function ($r) {
-                        $r->whereNull('pra_status')->whereNull('pra_invoice_number');
-                    });
-                })->where(fn ($s) => $s->whereNull('pra_status')->orWhere('pra_status', '!=', PosTransaction::EXEMPT_INTERNAL));
-            };
             $excludeLocalRaw = function ($q) {
                 $q->where(function ($s) {
                     $s->where('t.invoice_mode', 'local')->orWhere(function ($r) {
@@ -1798,16 +1723,6 @@ class PosController extends Controller
                 })->where(fn ($s) => $s->whereNull('t.pra_status')->orWhere('t.pra_status', '!=', PosTransaction::EXEMPT_INTERNAL));
             };
         } else {
-            $excludeLocal = function ($q) {
-                // A mode alone is not fiscal: reporting-OFF finals are local
-                // report rows. Keep the PRA dashboard aligned with
-                // PosTransaction::applyStreamTab('pra').
-                $q->where(function ($s) {
-                    $s->where('invoice_mode', 'pra')->orWhereNull('invoice_mode');
-                })->where(function ($s) {
-                    $s->whereNotNull('pra_status')->orWhereNotNull('pra_invoice_number');
-                })->where(fn ($s) => $s->whereNull('pra_status')->orWhere('pra_status', '!=', PosTransaction::EXEMPT_INTERNAL));
-            };
             $excludeLocalRaw = function ($q) {
                 $q->where(function ($s) {
                     $s->where('t.invoice_mode', 'pra')->orWhereNull('t.invoice_mode');
@@ -1825,12 +1740,7 @@ class PosController extends Controller
         // never replace). Drafts / notifications / opening cash stay shared
         // (holds are a handover workflow, not sales).
         $dashUser = auth('pos')->user();
-        $dashCashierId = null;
-        if ($dashUser?->posSalesIsolated()) {
-            $dashCashierId = (int) $dashUser->id;
-        } elseif (($dashUser?->isPosAdmin() ?? false) && $request->filled('cashier') && $request->get('cashier') !== 'all') {
-            $dashCashierId = (int) $request->get('cashier');
-        }
+        $dashCashierId = $this->dashboardCashier($request, $dashUser);
         $dashOnly = function ($q) use ($dashCashierId) {
             if ($dashCashierId) {
                 $q->where('created_by', $dashCashierId);
@@ -7338,6 +7248,25 @@ class PosController extends Controller
         return 'pra';
     }
 
+    public function dashboardSalesOverview(Request $request)
+    {
+        $companyId = (int) app('currentCompanyId');
+        $company = Company::findOrFail($companyId);
+        $user = auth('pos')->user();
+        abort_if($user->posCustomAllows('reports') === false, 403);
+        $date = \App\Services\PosBusinessDay::current($companyId);
+        $tab = $this->salesReportTab($request, $user);
+        $cashier = $user->isPosCashier() ? (int) $user->id : $this->dashboardCashier($request, $user);
+        $history = \App\Services\PosFinancialHistory::report($companyId, $date, $date, $tab, $cashier, $user,
+            fn ($query) => $this->applyReportFilters($query, $tab, $cashier, $user));
+        $presentation = \App\Services\PosReportPresentation::fromHistory($history);
+        $showProducts = PosFeatureService::planAllows($company, 'analytics_enabled');
+
+        return response()->view('pos.partials.dashboard-sales-overview', compact('presentation', 'showProducts'))
+            ->header('Cache-Control', 'private, no-store')
+            ->header('X-Pos-Report-Fragment', 'sales');
+    }
+
     public function reports(Request $request)
     {
         $companyId = app('currentCompanyId');
@@ -11994,28 +11923,83 @@ class PosController extends Controller
         ]);
     }
 
+    private function dashboardCashier(Request $request, ?User $user): ?int
+    {
+        if ($user?->posSalesIsolated()) {
+            return (int) $user->id;
+        }
+
+        return $user?->isPosAdmin() && $request->filled('cashier') && $request->input('cashier') !== 'all'
+            ? (int) $request->input('cashier')
+            : null;
+    }
+
+    private function applyDashboardBillStream($query, string $scope): void
+    {
+        if ($scope === 'local') {
+            $query->where(fn ($stream) => $stream->where('invoice_mode', 'local')
+                ->orWhere(fn ($unreported) => $unreported->whereNull('pra_status')->whereNull('pra_invoice_number')));
+        } else {
+            $query->where(fn ($stream) => $stream->where('invoice_mode', 'pra')->orWhereNull('invoice_mode'))
+                ->where(fn ($reporting) => $reporting->whereNotNull('pra_status')->orWhereNotNull('pra_invoice_number'));
+        }
+
+        $query->where(fn ($stream) => $stream->whereNull('pra_status')
+            ->orWhere('pra_status', '!=', PosTransaction::EXEMPT_INTERNAL));
+    }
+
     public function dashboardDetail(Request $request, string $metric)
     {
-        abort_unless(in_array($metric,['orders','customers'],true),404);
-        $request->validate(['date'=>'required|date_format:Y-m-d','source'=>'nullable|in:orders,bills','cashier'=>'nullable']);
-        $companyId=(int)app('currentCompanyId'); $user=auth('pos')->user();
-        $cashier=$user->posSalesIsolated() ? (int)$user->id : ($request->input('cashier')==='all' ? null : (int)$request->input('cashier'));
-        [$start,$end]=\App\Services\PosBusinessDay::windowFor($companyId,$request->date,$request->date);
-        if($metric==='customers') {
-            $q=PosCustomer::where('company_id',$companyId)->where('created_at','>=',$start)->where('created_at','<',$end);
-            if($cashier)$q->whereIn('id',PosTransaction::withoutGlobalScope('hide_archived')->where('company_id',$companyId)->where('created_by',$cashier)->whereNotNull('customer_id')->select('customer_id'));
-            $rows=$q->orderBy('name')->paginate(100)->withQueryString();
-        } elseif($request->input('source')==='orders') {
-            abort_unless($user->isPosAdmin(),403);
-            $rows=\App\Models\RestaurantOrder::where('company_id',$companyId)->where('created_at','>=',$start)->where('created_at','<',$end)->where('status','!=','cancelled')->tap(fn($q)=>app(\App\Services\BranchContextService::class)->applyToQuery($q,'branch_id'))->orderByDesc('id')->paginate(100)->withQueryString();
-        } else {
-            $tab=$user->posBillingScope()==='local' ? 'local':'pra';
-            $q=PosTransaction::where('company_id',$companyId)->where('business_date',$request->date)->where('status','completed')
-                ->where(fn($q)=>$q->whereNull('transaction_type')->orWhere('transaction_type','!=','return'));
-            $this->applyReportFilters($q,$tab,$cashier,$user);
-            $rows=$q->orderByDesc('id')->paginate(100)->withQueryString();
+        abort_unless(in_array($metric, ['revenue', 'orders', 'customers'], true), 404);
+        abort_if(auth('pos')->user()->posCustomAllows('reports') === false, 403);
+        $validated = $request->validate([
+            'date' => 'required|date_format:Y-m-d',
+            'source' => 'nullable|in:orders,bills,completed-orders',
+            'cashier' => ['nullable', 'regex:/^(?:all|[1-9][0-9]*)$/'],
+        ]);
+        $date = $validated['date'];
+        $companyId = (int) app('currentCompanyId');
+        $user = auth('pos')->user();
+        $cashier = $this->dashboardCashier($request, $user);
+        $cashierName = $cashier ? User::where('company_id', $companyId)->whereKey($cashier)->value('name') : null;
+        $branch = fn ($q) => app(\App\Services\BranchContextService::class)->applyToQuery($q, 'branch_id');
+        [$start, $end] = \App\Services\PosBusinessDay::windowFor($companyId, $date, $date);
+
+        if ($metric === 'revenue') {
+            $ledger = \App\Services\PosTodayKhata::build($companyId, $date, $user, $cashier, $branch);
+            return view('pos.dashboard-detail', compact('metric', 'date', 'ledger', 'cashier', 'cashierName'));
         }
-        return view('pos.dashboard-detail',compact('rows','metric'));
+
+        if ($metric === 'customers') {
+            $query = PosCustomer::where('company_id', $companyId)->where('created_at', '>=', $start)->where('created_at', '<', $end);
+            if ($cashier) {
+                if (\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'customer_id')) {
+                    $query->whereIn('id', PosTransaction::withoutGlobalScope('hide_archived')->where('company_id', $companyId)
+                        ->where('created_by', $cashier)->whereNotNull('customer_id')->select('customer_id'));
+                } else {
+                    $query->whereRaw('1 = 0');
+                }
+            }
+            $rows = $query->orderBy('name')->paginate(100)->withQueryString();
+        } elseif (in_array($validated['source'] ?? null, ['orders', 'completed-orders'], true)) {
+            abort_unless($user->isPosAdmin(), 403);
+            $rows = \App\Models\RestaurantOrder::where('company_id', $companyId)
+                ->where('created_at', '>=', $start)->where('created_at', '<', $end)
+                ->where('status', '!=', 'cancelled')->tap($branch)
+                ->when($validated['source'] === 'completed-orders', fn ($query) => $query->where('status', 'completed'))
+                ->orderByDesc('id')->paginate(100)->withQueryString();
+        } else {
+            $query = PosTransaction::where('company_id', $companyId)->where('business_date', $date)
+                ->where('status', 'completed')->tap($branch)
+                ->tap(fn ($q) => $this->applyDashboardBillStream($q, $user->posBillingScope() ?? 'both'))
+                ->when($cashier, fn ($q) => $q->where('created_by', $cashier));
+            if (\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'transaction_type')) {
+                $query->where(fn ($q) => $q->whereNull('transaction_type')->orWhere('transaction_type', '!=', 'return'));
+            }
+            $rows = $query->orderByDesc('id')->paginate(100)->withQueryString();
+        }
+
+        return view('pos.dashboard-detail', compact('rows', 'metric', 'date', 'cashier', 'cashierName'));
     }
 
     public function customers(Request $request)

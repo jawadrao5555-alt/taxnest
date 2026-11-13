@@ -159,7 +159,9 @@ const tablet = {
     selectedTable: null, customerName: 'Ahmed', customerPhone: '03001234567', kitchenNotes: 'no onion',
     priority: true, cashTaxRate: 16, holdAttemptUuid: 'hold-first', appendOrderId: null, appendAttemptUuid: null,
     appendOrderNumber: '', appendTableLabel: '', appendCustomerLabel: '', moreOpen: true, _buttonsMode: false,
-    loadMyOrders() { this.reloaded = (this.reloaded || 0) + 1; }, reloadTablesQuiet() {},
+    loadMyOrders() { this.reloaded = (this.reloaded || 0) + 1; },
+    loadKotAttention() { this.kotRefreshes = (this.kotRefreshes || 0) + 1; },
+    reloadTablesQuiet() {},
 };
 commands = [];
 const firstBody = buildBody.call(tablet);
@@ -173,6 +175,7 @@ assert.deepStrictEqual([tablet.cart, tablet.customerName, tablet.customerPhone, 
     tablet.selectedTable, tablet.holdAttemptUuid, tablet.appendAttemptUuid, tablet.appendOrderId, tablet.orderType, tablet.moreOpen],
     [[], '', '', '', false, null, null, null, null, 'dine_in', false], 'every order-scoped field is cleared after a shop-PC order');
 assert.strictEqual(tablet.reloaded, 1);
+assert.strictEqual(tablet.kotRefreshes, 1, 'successful send refreshes the KOT status banner');
 tablet.cart = [{ name: 'Water', quantity: 1, unit_price: 50, item_id: 5 }];
 tablet.holdAttemptUuid = 'hold-second';
 const secondBody = buildBody.call(tablet);

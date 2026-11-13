@@ -790,7 +790,7 @@ class KotPrintService
     /**
      * @return array{printed: bool, reason?: string, job_ids?: array<int>}
      */
-    public static function enqueueForOrder(Company $company, RestaurantOrder $order, ?int $userId, bool $delta = false, bool $queueWhileOffline = false, ?string $dedupeKey = null): array
+    public static function enqueueForOrder(Company $company, RestaurantOrder $order, ?int $userId, bool $delta = false, bool $queueWhileOffline = false, ?string $dedupeKey = null, ?array $snapshotLineIds = null): array
     {
         try {
             $settings = $company->printerSettings();
@@ -827,54 +827,22 @@ class KotPrintService
                 ? $order->items->whereNull('kot_printed_at')->pluck('id')->map(fn ($i) => (int) $i)
                     ->reject(fn ($i) => in_array($i, $handoffIds, true))->values()->all()
                 : null;
+            if ($snapshotLineIds !== null) {
+                $eligible = $delta ? $deltaIds : $order->items->pluck('id')->all();
+                $snapshotLineIds = array_values(array_intersect($snapshotLineIds, $eligible));
+                if (!$snapshotLineIds) {
+                    return ['printed' => true, 'job_ids' => []];
+                }
+            }
             if ($delta && empty($deltaIds)) {
                 return ['printed' => true, 'job_ids' => [], 'reason' => $handoffIds ? 'local_handoff' : 'nothing_unprinted'];
             }
-            $makeJob = function (?string $printer, ?string $renderQuery, ?string $ownerDeviceUid = null) use ($company, $order, $userId, $delta, $deltaIds, $dedupeKey) {
-                // Task 753: in-flight dedupe + merge — mirrors apiCreatePrintJob's
-                // rule so the hold-time server enqueue, the KDS auto-print fire and
-                // the cashier fallback all collapse into ONE physical slip. A
-                // pending delta job absorbs newly-unprinted ids (rapid second
-                // append); an already-printing job keeps its rendered set.
-                $inFlight = PosPrintJob::where('company_id', $company->id)
-                    ->where('type', 'kot')
-                    ->where('restaurant_order_id', $order->id)
-                    ->where('target_printer', $printer)
-                    ->where(fn ($q) => $renderQuery === null ? $q->whereNull('render_query') : $q->where('render_query', $renderQuery))
-                    ->whereIn('status', ['pending', 'printing'])
-                    ->when($dedupeKey, fn ($q) => $q->where('dedupe_key', $dedupeKey . ':' . ($printer ?: 'default')))
-                    ->where('created_at', '>=', now()->subMinutes(2))
-                    ->orderByDesc('id')->first();
-                if ($inFlight) {
-                    if ($delta && $deltaIds && $inFlight->status === 'pending') {
-                        $merged = collect($inFlight->printed_item_ids ?? [])->map(fn ($i) => (int) $i)
-                            ->merge($deltaIds)->unique()->values()->all();
-                        if ($merged !== ($inFlight->printed_item_ids ?? [])) {
-                            $inFlight->update(['printed_item_ids' => $merged]);
-                        }
-                    }
-                    return $inFlight;
-                }
-                $attrs = [
-                    'company_id' => $company->id,
-                    'type' => 'kot',
-                    'target_printer' => $printer,
-                    'restaurant_order_id' => $order->id,
-                    'render_query' => $renderQuery,
-                    'printed_item_ids' => ($delta && $deltaIds) ? $deltaIds : null,
-                    'status' => 'pending',
-                    'created_by' => $userId,
-                ];
-                if ($dedupeKey && \Illuminate\Support\Facades\Schema::hasColumn('pos_print_jobs', 'dedupe_key')) {
-                    $attrs['dedupe_key'] = $dedupeKey . ':' . ($printer ?: 'default');
-                }
-                // Task 1194: key only added when a stamp resolves — pre-migration
-                // prod (no device_uid column) never sees it in the INSERT.
-                if ($stamp = self::deviceStampFor($company->id, $ownerDeviceUid)) {
-                    $attrs['device_uid'] = $stamp;
-                }
-                return PosPrintJob::create($attrs);
-            };
+            $makeJob = fn (?string $printer, ?string $renderQuery, ?string $ownerDeviceUid = null) =>
+                self::queueOrderSlip(
+                    $order, $userId, $printer,
+                    $snapshotLineIds === null ? $renderQuery : ($renderQuery ? $renderQuery . '&' : '') . 'waiter_snapshot=1',
+                    $ownerDeviceUid, $snapshotLineIds ?? $deltaIds, $dedupeKey,
+                );
 
             $stations = PosStation::activeFor($company->id);
 
@@ -901,7 +869,8 @@ class KotPrintService
             }
 
             // Stations configured: SPLIT — one job per station that has items.
-            $baseItems = $delta ? $order->items->whereIn('id', $deltaIds)->values() : $order->items;
+            $routeLineIds = $snapshotLineIds ?? $deltaIds;
+            $baseItems = $routeLineIds === null ? $order->items : $order->items->whereIn('id', $routeLineIds)->values();
             $itemMap = PosStation::mapItems($company->id, $stations, $baseItems);
             $sids = collect($itemMap)->values()->unique()->sort()->values();
             if ($sids->isEmpty()) {
@@ -917,16 +886,132 @@ class KotPrintService
                 }
                 $plan[] = [$printer, 'station=' . $sid . $deltaQ, self::stationDeviceUid($station, $settings)];
             }
-            $jobIds = [];
-            foreach ($plan as [$printer, $rq, $ownerUid]) {
-                $jobIds[] = $makeJob($printer, $rq, $ownerUid)->id;
-            }
-            $counterCopy();
+            $jobIds = DB::transaction(function () use ($plan, $makeJob, $counterCopy) {
+                $ids = [];
+                foreach ($plan as [$printer, $rq, $ownerUid]) {
+                    $ids[] = $makeJob($printer, $rq, $ownerUid)->id;
+                }
+                $counterCopy();
+                return $ids;
+            });
             return ['printed' => true, 'job_ids' => $jobIds];
         } catch (\Throwable $e) {
             \Log::warning('KotPrintService enqueue failed: ' . $e->getMessage(), ['order_id' => $order->id ?? null]);
             return ['printed' => false, 'reason' => 'error'];
         }
+    }
+
+    /**
+     * Keep claimed snapshots immutable. An append during printing needs a
+     * follow-up slip for the lines that no active slip on this route covers.
+     */
+    public static function queueOrderSlip(RestaurantOrder $order, ?int $userId, ?string $printer, ?string $renderQuery, ?string $deviceUid, ?array $lineIds, ?string $dedupeKey = null): PosPrintJob
+    {
+        return DB::transaction(function () use ($order, $userId, $printer, $renderQuery, $deviceUid, $lineIds, $dedupeKey) {
+            $companyId = (int) $order->company_id;
+            RestaurantOrder::where('company_id', $companyId)->lockForUpdate()->findOrFail($order->id);
+            $key = $dedupeKey ? $dedupeKey . ':' . ($printer ?: 'default') : null;
+            $hasKey = $key && \Illuminate\Support\Facades\Schema::hasColumn('pos_print_jobs', 'dedupe_key');
+            $jobs = PosPrintJob::where('company_id', $companyId)
+                ->where('type', 'kot')
+                ->where('restaurant_order_id', $order->id)
+                ->where('target_printer', $printer)
+                ->where('render_query', $renderQuery)
+                ->whereIn('status', ['pending', 'printing'])
+                ->when($hasKey, fn ($q) => $q->where('dedupe_key', $key))
+                ->when($lineIds === null, fn ($q) => $q->where('created_at', '>=', now()->subMinutes(2)))
+                ->orderByDesc('id')->lockForUpdate()->get();
+
+            if ($jobs->isNotEmpty()) {
+                if ($lineIds === null) {
+                    return $jobs->first();
+                }
+                $covered = $jobs->flatMap(fn (PosPrintJob $job) => $job->printed_item_ids ?? [])->all();
+                $lineIds = array_values(array_diff($lineIds, $covered));
+                if (!$lineIds) {
+                    return $jobs->first();
+                }
+                if (!str_contains((string) $renderQuery, 'waiter_snapshot=1')
+                    && ($pending = $jobs->firstWhere('status', 'pending'))) {
+                    $pending->update(['printed_item_ids' => array_merge($pending->printed_item_ids ?? [], $lineIds)]);
+                    return $pending;
+                }
+            }
+
+            $attrs = [
+                'company_id' => $companyId,
+                'type' => 'kot',
+                'target_printer' => $printer,
+                'restaurant_order_id' => $order->id,
+                'render_query' => $renderQuery,
+                'printed_item_ids' => $lineIds,
+                'status' => 'pending',
+                'created_by' => $userId,
+            ];
+            if ($hasKey) {
+                $attrs['dedupe_key'] = $key;
+            }
+            if ($stamp = self::deviceStampFor($companyId, $deviceUid)) {
+                $attrs['device_uid'] = $stamp;
+            }
+            return PosPrintJob::create($attrs);
+        });
+    }
+
+    /**
+     * A waiter-owned slip already exists for these kitchen lines. KDS auto
+     * printing must leave that slip with the queue even while the agent is down
+     * or the outcome is awaiting an operator check.
+     */
+    public static function waiterSnapshotsCover(RestaurantOrder $order): bool
+    {
+        $jobs = PosPrintJob::where('company_id', $order->company_id)
+            ->where('restaurant_order_id', $order->id)->where('type', 'kot')
+            ->where('render_query', 'like', '%waiter_snapshot=1')
+            ->whereIn('status', ['pending', 'printing', 'failed', 'done'])
+            ->get(['printed_item_ids']);
+        if ($jobs->isEmpty()) {
+            return false;
+        }
+
+        \App\Support\PosKitchenLines::pruneOrder($order);
+        $unprinted = $order->items->whereNull('kot_printed_at')->pluck('id')->all();
+        $covered = $jobs->flatMap(fn (PosPrintJob $job) => $job->printed_item_ids ?? [])->all();
+
+        return !array_diff($unprinted, $covered);
+    }
+
+    /**
+     * Per-slip status. A completed slip from one station cannot hide a stalled
+     * slip for another station on the same order.
+     */
+    public static function statusJobs(Company $company): array
+    {
+        if (!\Illuminate\Support\Facades\Schema::hasTable('pos_print_jobs')) {
+            return [];
+        }
+
+        $query = PosPrintJob::where('company_id', $company->id)->whereIn('type', ['kot', 'kot_void']);
+        $recent = (clone $query)->where('status', 'done')->where('updated_at', '>=', now()->subSeconds(30))
+            ->latest('updated_at')->limit(5)->get();
+        $active = (clone $query)->whereIn('status', ['pending', 'printing', self::LOCAL_STATUS])
+            ->orderBy('created_at')->limit(10)->get();
+        $failed = $query->where('status', 'failed')->where('updated_at', '>=', now()->subHours(12))
+            ->latest('updated_at')->limit(10)->get();
+
+        return $failed->concat($active)->concat($recent)->map(function (PosPrintJob $job) {
+            $state = \App\Support\KotPrintState::forJob($job)['key'];
+            if (in_array($state, ['pending', 'printing'], true) && $job->updated_at?->lt(now()->subSeconds(30))) {
+                $state = 'waiting';
+            }
+            return [
+                'id' => (int) $job->id,
+                'restaurant_order_id' => $job->restaurant_order_id,
+                'transaction_id' => $job->transaction_id,
+                'printer' => $job->target_printer,
+                'state' => $state,
+            ];
+        })->values()->all();
     }
 
     /**

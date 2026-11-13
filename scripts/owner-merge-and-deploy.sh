@@ -47,7 +47,8 @@ echo "==> Fetch PR #${PULL} and origin/main tip"
 gh api "repos/${REPO}/pulls/${PULL}" > "$TMP/pr.json"
 gh api --paginate "repos/${REPO}/pulls/${PULL}/files?per_page=100" --jq '.[].filename' > "$TMP/pr-files.txt"
 AGENT_RELEASE_NEEDED=false
-if grep -Eq '^pra-agent/|^\.github/workflows/build-agent\.yml$' "$TMP/pr-files.txt"; then
+# Agent tests run in PR CI and do not change the Windows installer.
+if grep -Ev '^pra-agent/test/' "$TMP/pr-files.txt" | grep -E '^pra-agent/|^\.github/workflows/build-agent\.yml$' > /dev/null; then
   AGENT_RELEASE_NEEDED=true
 fi
 MAIN_SHA=$(gh api "repos/${REPO}/commits/main" --jq .sha)

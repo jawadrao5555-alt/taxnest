@@ -431,6 +431,8 @@ class FbrPosStoreReplayGuardTest extends TestCase
         $this->assertSame($txId, $data2['transaction_id'], 'same transaction_id returned');
         $this->assertSame($data1['invoice_number'], $data2['invoice_number'], 'same invoice_number');
         $this->assertSame(300.0, (float) $data2['total_amount'], 'same total_amount');
+        $this->assertSame('cash', $data1['payment_method']);
+        $this->assertSame($data1['payment_method'], $data2['payment_method']);
 
         // d) Response shape the UI expects is present
         $this->assertArrayHasKey('fbr_invoice_number', $data2);

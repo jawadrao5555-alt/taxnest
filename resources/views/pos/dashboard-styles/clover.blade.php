@@ -29,39 +29,39 @@
             <p class="text-[9px] font-bold text-emerald-300/60 uppercase tracking-widest mb-4">{{ __("pos.todays_summary") }}</p>
 
             @if(!($dashboardMetricsRelocated ?? false))
-<div class="cl-metric mb-3">
+<x-pos.dashboard-metric metric="revenue" :href="$dashboardMetricUrls['revenue'] ?? null" class="cl-metric mb-3">
                 <p class="text-[9px] text-emerald-200/60 font-bold uppercase">{{ __("pos.revenue_word") }}</p>
                 {{-- Task 988: combined PRA+Local (+exempt) figure — matches the Aaj ka Khaata sum this user sees --}}
                 <p class="text-2xl font-black text-white mt-1">Rs.{{ number_format($todayTotalSale ?? $todaySales ?? $todayStats->revenue ?? 0) }}</p>
                 @php $yest=$yesterdayTotalSale??$yesterdaySales??0;$today=$todayTotalSale??$todaySales??$todayStats->revenue??0;$pct=$yest>0?round(($today-$yest)/$yest*100):0; @endphp
                 <div class="cl-progress mt-2"><div class="cl-progress-fill" style="width: {{ min(100, $yest > 0 ? ($today / $yest * 100) : 50) }}%"></div></div>
                 @if($pct!=0)<p class="text-[9px] mt-1 {{ $pct>=0?'text-emerald-300':'text-red-300' }}">{{ $pct>=0?'↑':'↓' }} {{ abs($pct) }}% {{ __("pos.vs_yesterday") }}</p>@endif
-            </div>
+            </x-pos.dashboard-metric>
 @endif
 
             <div class="grid grid-cols-2 gap-2 mb-4">
                 @if(!($dashboardMetricsRelocated ?? false))
-<div class="cl-metric">
+<x-pos.dashboard-metric metric="orders" :href="$dashboardMetricUrls['orders'] ?? null" class="cl-metric">
                     <p class="text-[9px] text-emerald-200/60 font-bold">{{ __("pos.orders_caps") }}</p>
                     <p class="text-lg font-black text-white">{{ $todayOrders ?? $todayStats->count ?? 0 }}</p>
-                </div>
+                </x-pos.dashboard-metric>
 @endif
                 {{-- Task 988: AVG metric replaced by New Customers (owner voice note, 16 Aug 2026) --}}
                 @if(!($dashboardMetricsRelocated ?? false))
-<div class="cl-metric">
+<x-pos.dashboard-metric metric="customers" :href="$dashboardMetricUrls['customers'] ?? null" class="cl-metric">
                     <p class="text-[9px] text-emerald-200/60 font-bold">{{ __("pos.new_customers") }}</p>
                     <p class="text-lg font-black text-white">{{ number_format($newCustomersToday ?? 0) }}</p>
                     <p class="text-[9px] text-emerald-200/60">{{ number_format($newCustomersMonth ?? 0) }} {{ __("pos.period_this_month") }}</p>
-                </div>
+                </x-pos.dashboard-metric>
 @endif
             </div>
 
             @if($isRestaurant)
             @if(!($dashboardMetricsRelocated ?? false))
-<div class="cl-metric mb-4">
+<x-pos.dashboard-metric metric="tables" :href="$dashboardMetricUrls['tables'] ?? null" class="cl-metric mb-4">
                 <div class="flex items-center justify-between"><p class="text-[9px] text-emerald-200/60 font-bold">{{ __("pos.tables_caps") }}</p><p class="text-sm font-black text-white">{{ $occupiedTables ?? 0 }}/{{ $totalTables ?? 0 }}</p></div>
                 <div class="cl-progress mt-1.5"><div class="cl-progress-fill" style="width: {{ ($totalTables ?? 0) > 0 ? round(($occupiedTables ?? 0) / ($totalTables ?? 1) * 100) : 0 }}%"></div></div>
-            </div>
+            </x-pos.dashboard-metric>
 @endif
             @else
             <div class="cl-metric mb-4">

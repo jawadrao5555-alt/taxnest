@@ -34,6 +34,26 @@ identify the tested bytes; they do not prove delivery, GPS or calls work.
 Rider 1.8.0/code 14 and Caller 1.8.0/code 10 remain the current source versions.
 The public download metadata stays unchanged until owner phone acceptance.
 
+## Optional Caller ID bundle for Google Play testing
+
+Enable **caller_play_bundle** in the same workflow. It runs the Play unit
+tests, builds the signed AAB, checks the package and permission boundaries
+against both website APKs, verifies the signing certificate and records the
+source SHA and checksum. Download **caller-play-<SHA>**. The AAB is for
+Play Console internal testing, so keep it separate from the website APKs.
+
+Before upload, compare the bundle's signer to the **upload certificate**
+shown in Play Console. Check the **app-signing certificate** separately
+against the website APK to determine whether an in-place update is possible.
+The Play Console version code must also be available for this release.
+
+Install from the internal-testing link on a fresh phone with Play Protect ON.
+Verify login, the disclosure and user consent for notification access, an
+incoming WhatsApp call and a SIM call. Test in-place migration separately on
+a test phone if the app-signing certificate matches. Record the phone model,
+Android version and artifact checksum. The workflow only prepares the bundle.
+Internal testing, reviewer access and public rollout are separate steps.
+
 ## Mandatory phone acceptance (record device/Android version and artifact hash)
 
 1. In-place update over the currently installed app; no uninstall/data reset.

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// Reviewed 12 November: Agent 1.13.37 changes only the two root release version fields.
 // Reviewed 7 November: only Agent root release versions advance 1.13.35 -> 1.13.36; dependencies unchanged.
 // Reviewed 5 November: only Agent root release versions advance 1.13.34 -> 1.13.35; dependency graph unchanged.
 /**
@@ -85,7 +86,7 @@ const LOCKS = [
     lock: 'pra-agent/package-lock.json',
     packages: 294,
     resolved: 293,
-    graph: '65caad468f8c3c0cb6cd4077e71cd37ca90e38a096824607c67880dc45da90f6',
+    graph: '92327689122cee695fe213182908e5816d3517f59e3cc5f4f567f1fe1d9d263a',
   },
   {
     lock: 'tools/video-pipeline/package-lock.json',

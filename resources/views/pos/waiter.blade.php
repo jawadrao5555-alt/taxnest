@@ -56,7 +56,8 @@
          class="mb-3 rounded-xl border border-amber-300 bg-amber-50 dark:bg-amber-900/30 dark:border-amber-700 px-3 py-2 text-xs font-bold text-amber-800 dark:text-amber-200">
         {{ __('pos.waiter_offline_banner') }}
     </div>
-    @include('pos.partials.kot-action-required-banner')
+    @include('pos.partials.kot-action-required-banner', ['canOfferKotReprint' => false])
+    @include('pos.partials.kot-status-banner')
 
     {{-- ── Header ─────────────────────────────────────────────────────────── --}}
     <div class="flex items-center justify-between mb-4 flex-wrap gap-3">
@@ -845,6 +846,7 @@ function waiterApp() {
         // Occupied-timer tick (7 Aug 2026): elapsedSince() labels refresh live.
         nowTick: Date.now(),
         kotActionRequired: [],
+        kotStatusJobs: [],
 
         init() {
             this.categories = [...new Set(this.products.map(p => p.category))].sort();
@@ -889,12 +891,19 @@ function waiterApp() {
             return this._liveListsRefresh;
         },
         async loadKotAttention() {
+            if (this._kotStatusLoading) return;
+            this._kotStatusLoading = true;
             try {
                 const res = await this._fetchWithTimeout('{{ route('pos.api.kot-print-attention') }}', { headers: { 'Accept': 'application/json' } });
                 if (!res.ok) return;
                 const data = await res.json();
                 this.kotActionRequired = Array.isArray(data.jobs) ? data.jobs : [];
-            } catch (e) {}
+                this.kotStatusJobs = Array.isArray(data.status_jobs) ? data.status_jobs : [];
+            } catch (e) {
+                // Keep the last confirmed snapshot during a temporary outage.
+            } finally {
+                this._kotStatusLoading = false;
+            }
         },
         async reportLocalCoreDown() {
             try {
@@ -908,11 +917,6 @@ function waiterApp() {
                 this.kotActionRequired = Array.isArray(data.jobs) ? data.jobs : [];
             } catch (e) {}
         },
-        reprintKotAttention() {
-            // Waiter tablet has no silent reprint path — the banner tells staff
-            // to check the tray; the counter reprints deliberately.
-        },
-
         // A weak/briefly interrupted shop connection used to leave the table
         // picker on "Loading..." forever because fetch() has no browser timeout.
         // Keep the old list (if any), then let the existing offline/retry state
@@ -1548,6 +1552,7 @@ function waiterApp() {
             this.orderType = 'dine_in'; this.moreOpen = false;
             this.appendOrderId = null; this.appendOrderNumber = ''; this.appendTableLabel = ''; this.appendCustomerLabel = '';
             this.loadMyOrders();
+            this.loadKotAttention();
             // Buttons style (Task #340, Aug 2026): after send, return to the
             // home button list and silently refresh table counts/timers.
             // _buttonsMode is PHP-baked — plain JS branch, no Blade directive needed.

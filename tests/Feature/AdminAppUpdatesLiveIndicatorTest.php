@@ -11,13 +11,13 @@ use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
 /**
- * Admin App Updates history — "Live on POS" / "Expired" indicators and
+ * Admin App Updates history — "Eligible for customer bell" / "Expired" indicators and
  * type badges (Task 1286 UI, locked by Task 1296).
  *
  * The owner must be able to tell AT A GLANCE which announcements POS users
  * can still see (7-day live window) from /admin/app-updates:
  *
- *   1. A freshly published row shows the green "● Live on POS" chip.
+ *   1. A freshly published row shows the green "● Eligible for customer bell" chip.
  *   2. An 8-day-old published row shows "Expired (7 din guzar gaye)" —
  *      but is STILL LISTED (admin history is never hidden/filtered).
  *   3. An unpublished (hidden) row shows NEITHER live nor expired label.
@@ -40,7 +40,7 @@ class AdminAppUpdatesLiveIndicatorTest extends TestCase
     private const T_HIDDEN = 'AULIVE-HIDDEN-91xa3';
     private const T_LEGACY = 'AULIVE-LEGACY-NULLTYPE-91xa4';
 
-    private const LABEL_LIVE = 'Live on POS';
+    private const LABEL_LIVE = 'Eligible for customer bell';
     private const LABEL_EXPIRED = 'Expired (7 din guzar gaye)';
 
     protected function setUp(): void
@@ -147,6 +147,9 @@ class AdminAppUpdatesLiveIndicatorTest extends TestCase
         $this->assertDatabaseMissing('app_updates', ['title' => $payload['title']]);
 
         $this->actingAsAdmin()->post('/admin/app-updates', $payload + ['audience_scope' => 'all'])
+            ->assertSessionHasErrors('shared_pos_confirmed');
+
+        $this->actingAsAdmin()->post('/admin/app-updates', $payload + ['audience_scope' => 'all', 'shared_pos_confirmed' => '1'])
             ->assertRedirect();
         $this->assertNull(AppUpdate::where('title', $payload['title'])->firstOrFail()->target_categories);
     }
@@ -201,22 +204,22 @@ class AdminAppUpdatesLiveIndicatorTest extends TestCase
         $resp->assertStatus(200);
         $html = $resp->getContent();
 
-        // 1. Fresh published row → Live on POS, no Expired label.
+        // 1. Fresh published row → Eligible for customer bell, no Expired label.
         $fresh = $this->rowHtml($html, self::T_FRESH);
-        $this->assertStringContainsString(self::LABEL_LIVE, $fresh, 'Fresh published row must show Live on POS');
+        $this->assertStringContainsString(self::LABEL_LIVE, $fresh, 'Fresh published row must show Eligible for customer bell');
         $this->assertStringNotContainsString(self::LABEL_EXPIRED, $fresh);
         $this->assertStringContainsString('Naya Feature', $fresh);
 
         // 2. 8-day-old published row → still listed, Expired label, no Live.
         $expired = $this->rowHtml($html, self::T_EXPIRED);
         $this->assertStringContainsString(self::LABEL_EXPIRED, $expired, '8-day-old published row must show Expired');
-        $this->assertStringNotContainsString(self::LABEL_LIVE, $expired, 'Expired row must not claim Live on POS');
+        $this->assertStringNotContainsString(self::LABEL_LIVE, $expired, 'Expired row must not claim Eligible for customer bell');
         $this->assertStringContainsString('Behtari / Masla Hal', $expired);
 
         // 3. Unpublished row → neither live nor expired label.
         $hidden = $this->rowHtml($html, self::T_HIDDEN);
         $this->assertStringContainsString('Hidden', $hidden);
-        $this->assertStringNotContainsString(self::LABEL_LIVE, $hidden, 'Unpublished row must not show Live on POS');
+        $this->assertStringNotContainsString(self::LABEL_LIVE, $hidden, 'Unpublished row must not show Eligible for customer bell');
         $this->assertStringNotContainsString(self::LABEL_EXPIRED, $hidden, 'Unpublished row must not show Expired');
 
         // 4. Legacy NULL-type row → renders (no 500 already asserted) with
@@ -241,7 +244,7 @@ class AdminAppUpdatesLiveIndicatorTest extends TestCase
         $resp->assertStatus(200);
 
         $row = $this->rowHtml($resp->getContent(), 'AULIVE-BOUNDARY-91xa5');
-        $this->assertStringContainsString(self::LABEL_LIVE, $row, 'Row just inside the 7-day window must still show Live on POS');
+        $this->assertStringContainsString(self::LABEL_LIVE, $row, 'Row just inside the 7-day window must still show Eligible for customer bell');
         $this->assertStringNotContainsString(self::LABEL_EXPIRED, $row);
     }
 

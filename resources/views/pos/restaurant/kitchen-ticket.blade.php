@@ -249,7 +249,7 @@
     @endphp
     <div class="text-center b03-kot-header">
         @if(!$void)
-        @if(($order->kot_print_count ?? 0) > 1 && empty($delta))
+        @if(($order->kot_print_count ?? 0) > 1 && empty($delta) && empty($waiterSnapshot))
             {{-- Phase 5 — re-send marker so kitchen knows items changed.
                  Jul 2026 (Pizza Master feedback): the old white-on-black
                  "UPDATED" badge printed as an EMPTY black box on thermal
@@ -267,6 +267,9 @@
         @endphp
         @if($kotFullUpdate)
             <p class="text-sm bold" style="color:#000; font-weight:900;">{{ __('pos.kot_updated_banner') }}</p>
+        @endif
+        @if(!empty($waiterSnapshot) && !empty($delta))
+            <p class="text-sm bold">{{ __('pos.kot_addon_marker') }}</p>
         @endif
         @endif {{-- !$void: reprint/updated banners never print on a void slip --}}
         {{-- 10 Aug 2026 (Pizza Master photo): URGENT top se hata kar neeche footer
@@ -296,7 +299,7 @@
             // marker riding the KOT #N line — same order number + token as the
             // first slip, so the kitchen reads it as an update, not a new order.
             // Full-mode update tickets show the UPDATED banner instead (above).
-            $kotAddon = !empty($delta) && $kotBatchShown && ($newItemIds ?? collect())->isEmpty();
+            $kotAddon = empty($waiterSnapshot) && !empty($delta) && $kotBatchShown && ($newItemIds ?? collect())->isEmpty();
         @endphp
         {{-- 10 Aug 2026 (Pizza Master, via owner): CODE style par chhota boxed code
              "pyara nahi lagta" — poora ORD- number hi wapis (bold, complete). Matching

@@ -42,6 +42,13 @@ class AppUpdate extends Model
         'di_retail' => 'Retail', 'di_export' => 'Export', 'di_unspecified' => 'Unspecified / other sector',
     ];
 
+    private const INTERNAL_TRACKER_TITLE = 'TaxNest updates ka poora record';
+
+    public function isInternalTrackerNotice(): bool
+    {
+        return $this->title === self::INTERNAL_TRACKER_TITLE;
+    }
+
     public function isCustomerDuplicate(): bool
     {
         return $this->is_published
@@ -295,7 +302,9 @@ class AppUpdate extends Model
         }
         // Legacy 'all' means both POS panels only, never DI.
         $audiences = $panel === 'di' ? ['di'] : ($panel === 'fbr' ? ['fbr_pos', 'all'] : ['pos', 'all']);
-        $query->whereIn('audience', $audiences)->customerCanonical();
+        $query->whereIn('audience', $audiences)
+            ->where('app_updates.title', '!=', self::INTERNAL_TRACKER_TITLE)
+            ->customerCanonical();
         // Correct only the immutable FBR release receipt whose stored audience
         // was accidentally 'all'. Read-time delivery correction preserves its
         // content key, original dates and every existing acknowledgement.

@@ -318,6 +318,11 @@ class SubscriptionAccessService
     protected static function billableCount(Company $company, $since = null): int
     {
         // FBR POS bills live in their own table (fbr_pos_transactions).
+        if ($company->isSchoolFeePilot()) {
+            return \Illuminate\Support\Facades\DB::table('school_fee_receipts')
+                ->where('company_id', $company->id)
+                ->when($since, fn ($q) => $q->where('created_at', '>=', $since))->count();
+        }
         if ($company->product_type === 'fbrpos') {
             return \App\Models\FbrPosTransaction::where('company_id', $company->id)
                 ->when($since, fn ($q) => $q->where('created_at', '>=', $since))

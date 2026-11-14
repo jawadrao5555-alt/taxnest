@@ -537,9 +537,6 @@ $healthForeignPatient = DB::table('health_patients')->insertGetId([
 $categoryJourneys = [];
 foreach (['pra' => 'pos', 'fbr' => 'fbrpos'] as $panel => $product) {
     foreach (array_merge(PosFeatureService::categories($panel), ['general']) as $index => $category) {
-        // The dedicated school-fees journey verifies its native fee desk, not
-        // the generic retail billing/stock contract below.
-        if ($panel === 'fbr' && $category === 'education') continue;
         $profileCompany = new Company(['business_category' => $category, 'pos_type' => $category, 'product_type' => $product]);
         $profile = PosFeatureService::profile($profileCompany);
         $landing = $profile['landing'];
@@ -554,6 +551,20 @@ foreach (['pra' => 'pos', 'fbr' => 'fbrpos'] as $panel => $product) {
             'pos_integration_mode' => $panel === 'fbr' ? 'fbr' : 'pra',
         ]);
         $categoryUser = $user($companyCategory, "Synthetic {$category} owner", "category-user-{$panel}-{$category}@rc-browser.invalid", 'company_admin', 'pos_admin');
+        if ($panel === 'fbr' && $category === 'education') {
+            // Preserve the complete category actor matrix, but assert the native
+            // school desk rather than retail stock/service workflows. The
+            // dedicated school-fees journey performs cash and reprint mutations.
+            \App\Models\Subscription::create(['company_id' => $companyCategory->id, 'active' => true,
+                'override_type' => 'lifetime', 'start_date' => now(), 'end_date' => now()->addYear()]);
+            $categoryJourneys[] = [
+                'name' => "category-{$panel}-{$category}", 'login' => $categoryUser->email, 'password' => $password,
+                'loginPath' => '/fbr-pos/login', 'paths' => ['/fbr-pos/school-fees'],
+                'expectedPaths' => ['/fbr-pos/school-fees'], 'markers' => ['School fee collection'],
+                'mainMarkers' => ['School fee collection'],
+            ];
+            continue;
+        }
         if ($panel === 'pra' && $category === 'restaurant') {
             $inventoryOwner = $categoryUser;
         }

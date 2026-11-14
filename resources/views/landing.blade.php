@@ -227,7 +227,7 @@
                     <img src="{{ asset('images/brand/taxnest-logo.svg') }}" x-show="scrolled || mobileOpen" alt="TaxNest" class="h-8 w-auto">
                     <img src="{{ asset('images/brand/taxnest-logo-white.svg') }}" x-show="!scrolled && !mobileOpen" alt="TaxNest" class="h-8 w-auto">
                 </a>
-                <div class="hidden md:flex items-center space-x-8">
+                <div class="hidden xl:flex items-center gap-5">
                     <a href="/digital-invoice" class="text-sm font-medium transition-colors" :class="scrolled ? 'text-gray-600 hover:text-gray-900' : 'text-gray-200 hover:text-white'">TaxNest Digital Invoice</a>
                     <a href="/pos" class="text-sm font-medium transition-colors" :class="scrolled ? 'text-gray-600 hover:text-gray-900' : 'text-gray-200 hover:text-white'">TaxNest PRA POS</a>
                     <a href="/fbr-pos-landing" class="text-sm font-medium transition-colors" :class="scrolled ? 'text-gray-600 hover:text-gray-900' : 'text-gray-200 hover:text-white'">TaxNest FBR POS</a>
@@ -240,13 +240,13 @@
                 <div class="flex items-center space-x-4">
                     <a href="/login" class="hidden sm:inline text-sm font-medium transition-colors" :class="scrolled ? 'text-gray-600 hover:text-gray-900' : 'text-gray-200 hover:text-white'">Log In</a>
                     <a href="/register" class="btn-solid" :class="scrolled ? 'btn-primary' : 'bg-white text-[#052730] hover:bg-gray-100'">Get Started</a>
-                    <button @click="mobileOpen = !mobileOpen" class="md:hidden p-2 -mr-2" aria-label="Menu">
+                    <button @click="mobileOpen = !mobileOpen" class="xl:hidden p-2 -mr-2" aria-label="Menu" :aria-expanded="mobileOpen">
                         <svg x-show="!mobileOpen" class="w-6 h-6" :class="scrolled ? 'text-gray-800' : 'text-white'" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
                         <svg x-show="mobileOpen" x-cloak class="w-6 h-6 text-gray-800" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                     </button>
                 </div>
             </div>
-            <div x-show="mobileOpen" x-cloak @click.away="mobileOpen = false" class="md:hidden border-t border-gray-200 py-4 space-y-1 bg-[#FDFBF7]">
+            <div x-show="mobileOpen" x-cloak @click.away="mobileOpen = false" class="xl:hidden max-h-[calc(100dvh-5rem)] overflow-y-auto border-t border-gray-200 py-4 space-y-1 bg-[#FDFBF7]">
                 <a href="/digital-invoice" class="block px-2 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded">TaxNest Digital Invoice</a>
                 <a href="/pos" class="block px-2 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded">TaxNest PRA POS</a>
                 <a href="/fbr-pos-landing" class="block px-2 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded">TaxNest FBR POS</a>
@@ -280,7 +280,7 @@
                         <span class="text-white/80 italic">structured for Pakistan.</span>
                     </h1>
                     <p class="text-lg text-white/70 leading-relaxed mb-10 max-w-xl font-light">
-                        Three fully isolated products under one roof — FBR Digital Invoicing, PRA Point of Sale, and FBR POS. Built by a dedicated team to keep your business compliant with confidence.
+                        TaxNest brings Digital Invoice, PRA POS, FBR POS and TaxNest ERP together on one platform. Each product has its own workspace. ERP is available on request.
                     </p>
                     <div class="flex flex-col sm:flex-row items-start gap-4 mb-10">
                         <a href="#products" class="btn-solid bg-[#E7BF3B] text-[#052730] hover:bg-[#F2D06B]">
@@ -310,13 +310,13 @@
                             </div>
                             <img src="{{ asset('images/screenshots/di-dash.jpg') }}" alt="TaxNest Digital Invoice dashboard" class="w-full h-auto" onerror="this.closest('[data-hero-vignette]').style.display='none'">
                         </div>
-                        <div class="absolute -bottom-5 -left-5 bg-white rounded-lg shadow-xl border border-gray-100 px-4 py-3 flex items-center gap-3">
+                        <div class="mt-4 w-fit max-w-full bg-white rounded-lg shadow-xl border border-gray-100 px-4 py-3 flex items-center gap-3">
                             <span class="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
                                 <svg class="w-4 h-4 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
                             </span>
                             <div>
                                 <p class="text-xs font-bold text-gray-900 leading-none">Invoice submitted</p>
-                                <p class="text-[11px] text-gray-400 mt-1">Accepted by FBR · PRAL</p>
+                                <p class="text-[11px] text-gray-400 mt-1">Example Digital Invoice status</p>
                             </div>
                         </div>
                     </div>
@@ -361,7 +361,7 @@
         <div class="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8">
             <div class="max-w-3xl mb-16 fade-in-up">
                 <h2 class="text-sm font-bold tracking-widest uppercase text-gray-500 mb-4">The Suite</h2>
-                <h3 class="text-3xl sm:text-4xl font-serif text-[#052730] mb-6">Three distinct systems. <br>One standard of engineering.</h3>
+                <h3 class="text-3xl sm:text-4xl font-serif text-[#052730] mb-6">Four products. <br>One TaxNest platform.</h3>
                 <p class="text-gray-600 leading-relaxed text-lg">
                     TaxNest isn't a generic SaaS tool. It's a suite of compliance products designed specifically for Pakistan's regulatory requirements. Every module operates with complete isolation—ensuring role-based access, multi-branch integrity, and audit logs for supported events.
                 </p>

@@ -1,5 +1,6 @@
 package pk.taxnest.rider
 
+import android.content.Intent
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 import org.json.JSONArray
@@ -53,5 +54,11 @@ class PushService : FirebaseMessagingService() {
         // Empty is meaningful: reassignment may leave the previous rider with
         // no cards, and must clear stale cache/outbox work immediately.
         DeliveryNotifier.process(c, arr)
+        // Only a hint for the open screen. The Activity fetches its own /me snapshot.
+        c.sendBroadcast(Intent(ACTION_DELIVERIES_CHANGED).setPackage(c.packageName))
+    }
+
+    companion object {
+        const val ACTION_DELIVERIES_CHANGED = "pk.taxnest.rider.DELIVERIES_CHANGED"
     }
 }

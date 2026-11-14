@@ -189,7 +189,7 @@ class RequestedPackageSignupTest extends TestCase
     }
 
     /** Post an FBR POS signup, optionally carrying a package name. */
-    private function fbrSignup(string $company, string $email, ?string $requestedPlan = null): Company
+    private function fbrSignup(string $company, string $email, ?string $requestedPlan = null, string $posType = 'restaurant'): Company
     {
         $payload = [
             'company_name' => $company,
@@ -198,7 +198,7 @@ class RequestedPackageSignupTest extends TestCase
             'email' => $email,
             'password' => 'secret-pass-123',
             'password_confirmation' => 'secret-pass-123',
-            'pos_type' => 'restaurant',
+            'pos_type' => $posType,
         ];
         if ($requestedPlan !== null) {
             $payload['requested_plan'] = $requestedPlan;
@@ -254,6 +254,36 @@ class RequestedPackageSignupTest extends TestCase
     }
 
     // ── Recording the request at signup ───────────────────────────────
+
+    public function test_school_signup_uses_existing_fbr_product_and_keeps_reporting_disabled(): void
+    {
+        $this->get('/fbr-pos/register')->assertOk()->assertSee('School / Education');
+        $school = $this->fbrSignup('Synthetic School', 'school@example.test', 'Business', 'education');
+
+        $this->assertSame('fbrpos', $school->product_type);
+        $this->assertSame('education', $school->pos_type);
+        $this->assertTrue($school->isSchoolFeePilot());
+        $this->assertTrue((bool) $school->fbr_pos_enabled);
+        $this->assertFalse((bool) $school->fbr_reporting_enabled);
+        $this->assertSame('sandbox', $school->fbr_pos_environment);
+        $this->assertSame('pending', $school->status);
+        $this->assertSame($this->plan('Business', 'fbrpos')->id, (int) $school->requested_plan_id);
+        $this->assertNotNull(Subscription::where('company_id', $school->id)->first());
+    }
+
+    public function test_existing_retail_signup_defaults_remain_unchanged(): void
+    {
+        $retail = $this->fbrSignup('Synthetic Retail', 'retail@example.test', 'Business', 'retail');
+
+        $this->assertSame('fbrpos', $retail->product_type);
+        $this->assertSame('retail', $retail->pos_type);
+        $this->assertFalse($retail->isSchoolFeePilot());
+        $this->assertTrue((bool) $retail->fbr_pos_enabled);
+        $this->assertFalse((bool) $retail->fbr_reporting_enabled);
+        $this->assertSame('sandbox', $retail->fbr_pos_environment);
+        $this->assertSame('pending', $retail->status);
+        $this->assertSame($this->plan('Business', 'fbrpos')->id, (int) $retail->requested_plan_id);
+    }
 
     public function test_fbr_signup_records_the_clicked_package(): void
     {

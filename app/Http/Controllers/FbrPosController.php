@@ -1388,6 +1388,9 @@ class FbrPosController extends Controller
     {
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
+        if ($company?->isSchoolFeePilot()) {
+            return redirect()->away('/fbr-pos/school-fees');
+        }
 
         // 💊 Pharmacy Mode (Task 1558) — Step 9, scale. A medical store runs a
         // 10,000-medicine catalogue; baking every row into the sale screen's
@@ -1893,6 +1896,8 @@ class FbrPosController extends Controller
     {
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
+        // Never reinterpret tuition as retail goods or an exempt/zero-rate sale.
+        abort_if($company?->isSchoolFeePilot(), 422, __('pos.school_use_fee_desk'));
 
         // 🧹 Server-side empty-row scrub — defense-in-depth in case JS cleanEmptyItems missed any
         $rawItems = $request->input('items', []);

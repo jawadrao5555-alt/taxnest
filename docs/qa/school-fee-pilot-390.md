@@ -58,3 +58,35 @@ Run the full PHPUnit suite and local Chrome/MariaDB collection/receipt/reprint s
 - The cash flow is student reference → fee head → amount → explicit confirmation that cash was received → immutable receipt. New payment cannot be stored without confirmation; an already-saved identical retry remains retrievable without reconfirming cash.
 - Campus selection uses only the existing FBR guard's authorized active campuses, is shown only when more than one is available, and rejects foreign/inactive/ALL targets. Branchless schools retain their null campus; schools with campuses use one concrete authorized campus rather than an ALL scope. No authorized campus means no collection access.
 - These changes apply only when the stored company category satisfies `isSchoolFeePilot()`. No existing retail tenant (including the unverified live Ali Garh account) is reclassified or migrated by this PR. No live settings, merge or deployment were changed. Full School ERP stays in #314.
+
+## Review scope and existing retail history preservation
+
+Ready-for-review scope is the **School local cash pilot only**, not fiscal integration, Full School ERP, or a live retail-to-school migration. Merge/deployment and any later account/category change remain separate owner decisions.
+
+An in-place category flip is **not itself a complete migration**: `isSchoolFeePilot()` activates when either stored category field is `education`. Existing retail rows are not deleted, but normal dashboard, transactions and day-close entrypoints switch to school views. Row preservation alone does not preserve discoverability or operational access to old retail history. The explicit School legacy-invoice archive below addresses invoice discovery/reprint only, not migration of retail operations or old closing reports.
+
+Before any proposed transition:
+
+1. Verify the intended account, both saved category fields, branches/roles, subscription, reporting/agent/printer settings, pending fiscal/offline work and outstanding retail balances through an owner-approved operations process. Do not infer its category from a screenshot or rewrite settings here.
+2. Prefer retaining the original retail company and all its receipt IDs, fiscal acknowledgements/QRs, audit records, day-close snapshots, users and configuration unchanged. Provision a separate explicitly approved School account for future local cash only, subject to the real identity/NTN/email uniqueness rules. Do not fabricate identifiers or bypass signup constraints; if lawful separate provisioning is unsupported, stop for a design decision.
+3. If an in-place transition is instead required, first deliver a separately reviewed legacy retail archive with authorized history/search/reprint/export and immutable old day-close access that does not depend on the current category. Add synthetic mixed-history tenant/campus tests and a reversible cutover procedure. This PR provides a limited read-only invoice archive, not old retail day-close/tax export migration or a production cutover.
+4. Before an approved cutover, an owner-operated production workflow must create and verify a restorable backup, record counts and monetary control totals by company/campus/date and pending work, then reconcile the same receipt identities, fiscal evidence and closing snapshots after staging rehearsal. Never convert retail rows into school fee receipts or recalculate historical fiscal amounts.
+5. Obtain owner approval for the exact cutover and rollback plan. No live category change, production backup, data extraction, migration, merge or deployment is performed by this PR. Fiscal School submission stays disabled regardless of the provisioning choice.
+
+## Lost-response refresh recovery
+
+The prior backend replay test retained a known request key manually; it did not demonstrate recovery after a real page refresh. The fee form now saves only a pending request UUID in sessionStorage, scoped by signed-in user, company and campus, before an explicit POST. A failed/timeout response retains the same key. Refresh offers explicit recovery using the original details and warns **do not collect cash again**. There is no automatic retry and no student/payment detail persistence. Storage failure blocks submission rather than sending an unrecoverable request. Only opening the matching saved receipt clears that key; another receipt does not.
+
+This recovery is limited to the same browser tab/account/campus. If the tab/session is lost, use Receipts / Reprint and reconcile the saved payment before recording any new cash; do not infer that an unknown response means failure. Closed-day controls allow recovery of an already pending saved request but the server still rejects any new closed-date collection.
+
+The updated desktop/mobile browser test sends an actual POST via route.fetch, lets the server persist it, discards its response, refreshes the page, verifies the UUID survived with only a scoped UUID in application sessionStorage, explicitly retries and asserts the original receipt ID, one history row and one cash increment. Existing changed-detail422 and immutable closing assertions remain. Treat this as verified only after the latest exact-head browser CI passes.
+
+The form also submits its expected campus key. The server rejects a stale campus after another tab changes the shared active campus, before either new collection or replay. Refresh/reselect the intended authorized campus; never silently retarget cash.
+
+## Read-only legacy retail invoice access
+
+Receipts / Reprint now links to **Legacy Retail History**, a separate read-only archive. It searches original invoice numbers/stored fiscal references and displays original stored line amounts, invoice totals, mode, date, status and fiscal number. It never turns a retail invoice into a school receipt, recalculates historical tax, adds school cash, sends/retries fiscal data, creates a print job or modifies the underlying rows. Browser print produces an archive copy, not a new fiscal invoice or a pixel-identical original thermal receipt. No invented QR or raw FBR response/log payload is displayed.
+
+Access is scoped to the authenticated company and current authorized campus. An explicit owner-only unassigned view exposes only that company's legacy null-campus rows, not all campuses. Confidential local invoices stay hidden/denied until the existing rate-limited PIN is verified; the archive proof is bound to company, signed-in user, current PIN hash and a 30-minute expiry, without widening retail-panel PIN access. Read-only responses are private/no-store.
+
+This enables historical invoice discovery after an eventual approved category change. It is not evidence that any particular live invoice was inspected, and does not authorize or perform a live category switch. Old retail day-close/tax exports, pending fiscal/agent work and operational cutover still need the separate preservation/reconciliation plan above. The owner must approve and run deployment first; confirm the deployed SHA and specific original invoice access before declaring live migration verified.

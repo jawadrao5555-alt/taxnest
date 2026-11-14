@@ -9,4 +9,12 @@
 <p class="muted">{{ __('pos.school_no_tax_inference') }}</p>
 <div class="actions no-print"><button type="button" onclick="window.print()">{{ __('pos.school_print_reprint') }}</button><a href="/fbr-pos/school-fees">{{ __('pos.school_new_collection') }}</a></div>
 </article>
+<script>
+(() => {
+    const storageKey = @json('taxnest.school.pending.'.$company->id.'.'.($receipt->branch_id ?? 0).'.'.auth('fbrpos')->id());
+    try {
+        if (sessionStorage.getItem(storageKey) === @json($receipt->request_key)) sessionStorage.removeItem(storageKey);
+    } catch (_) { /* Storage failure never modifies the saved receipt. */ }
+})();
+</script>
 @endsection

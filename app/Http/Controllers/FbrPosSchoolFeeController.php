@@ -128,10 +128,14 @@ class FbrPosSchoolFeeController extends Controller
         $data = $request->validate([
             'date' => 'required|date_format:Y-m-d|before_or_equal:today',
             'confirm' => 'required|accepted',
+            'expected_branch_key' => 'required|integer|min:0',
             'expected_cash_paisa' => 'required|integer|min:0',
             'expected_receipt_count' => 'required|integer|min:0',
         ]);
         $branchKey = $this->branchId() ?? 0;
+        if ((int) $data['expected_branch_key'] !== $branchKey) {
+            throw ValidationException::withMessages(['expected_branch_key' => __('pos.school_close_campus_changed')]);
+        }
         $report = DB::transaction(function () use ($company, $data, $branchKey) {
             // Same tenant lock as collection: a close either includes a committed
             // payment or precedes it and makes that new collection fail closed.
@@ -165,6 +169,7 @@ class FbrPosSchoolFeeController extends Controller
         abort_if((bool) $request->session()->get('impersonation.readonly'), 403);
         $data = $request->validate([
             'request_key' => 'required|uuid',
+            'expected_branch_key' => 'required|integer|min:0',
             'student_reference' => 'required|string|max:100',
             'fee_head' => 'required|in:tuition,admission,exam',
             'amount' => ['required', 'regex:/^\d{1,8}(?:\.\d{1,2})?$/'],
@@ -177,6 +182,11 @@ class FbrPosSchoolFeeController extends Controller
             throw ValidationException::withMessages(['amount' => __('pos.school_invalid_collection')]);
         }
         $branchId = $this->branchId();
+        // Another tab may have changed the shared campus session since this
+        // form was rendered. Never silently collect or replay in that campus.
+        if ((int) $data['expected_branch_key'] !== ($branchId ?? 0)) {
+            throw ValidationException::withMessages(['expected_branch_key' => __('pos.school_campus_changed')]);
+        }
         $cashConfirmed = $request->boolean('cash_confirmed');
         // Lock the tenant row to serialize concurrent requests; unique key is the
         // durable backstop. A lost response/repeated click cannot collect twice.
@@ -222,6 +232,99 @@ class FbrPosSchoolFeeController extends Controller
         return $request->expectsJson()
             ? response()->json(['success' => true, 'receipt_id' => $id, 'receipt_url' => $url])
             : redirect()->away($url);
+    }
+
+    /** Read-only archive: never reinterpret old retail rows as school fees. */
+    private function legacyQuery(Company $company, Request $request)
+    {
+        $unassigned = $request->boolean('unassigned');
+        abort_if($unassigned && !app(\App\Services\BranchContextService::class)->isOwner(), 403);
+        return \App\Models\FbrPosTransaction::where('company_id', $company->id)
+            ->where('branch_id', $unassigned ? null : $this->branchId());
+    }
+
+    private function legacyPinKey(Company $company): string
+    {
+        return 'school_legacy_pin.'.$company->id.'.'.Auth::guard('fbrpos')->id();
+    }
+
+    private function legacyPinAllowed(Company $company): bool
+    {
+        if (empty($company->confidential_pin)) return true;
+        $proof = session($this->legacyPinKey($company), []);
+        return isset($proof['at'], $proof['hash'])
+            && $proof['at'] <= now()->timestamp && now()->timestamp - $proof['at'] < 1800
+            && hash_equals(hash('sha256', $company->confidential_pin), (string) $proof['hash']);
+    }
+
+    public function legacyUnlock(Request $request)
+    {
+        // Detect stale impersonation/panel context before company() canonicalizes
+        // the branch service to the authenticated FBR user.
+        $user = Auth::guard('fbrpos')->user();
+        abort_unless($user && app()->bound('currentCompanyId')
+            && (int) app('currentCompanyId') === (int) $user->company_id, 403);
+        $company = $this->company();
+        abort_unless(app()->bound('currentCompanyId')
+            && (int) app('currentCompanyId') === (int) $company->id, 403);
+        $request->validate(['pin' => 'required|string|max:32']);
+        // Reuse the existing tenant-level lockout; never grant archive access
+        // merely because an unrelated panel left a global verified flag.
+        $previous = [];
+        foreach (['fbr_pos_pin_verified', 'fbr_pos_pin_verified_at'] as $key) {
+            $previous[$key] = ['exists' => session()->exists($key), 'value' => session($key)];
+        }
+        try {
+            $response = app(FbrPosController::class)->verifyPin($request);
+        } finally {
+            // The archive unlock must not grant access in the retail panel.
+            foreach ($previous as $key => $saved) {
+                if ($saved['exists']) session([$key => $saved['value']]);
+                else session()->forget($key);
+            }
+        }
+        $result = $response->getData(true);
+        if (!($result['success'] ?? false)) {
+            return redirect()->away('/fbr-pos/school-fees/legacy-retail')
+                ->withErrors(['pin' => $result['message'] ?? __('pos.school_legacy_locked')]);
+        }
+        session([$this->legacyPinKey($company) => [
+            'at' => now()->timestamp, 'hash' => hash('sha256', (string) $company->confidential_pin),
+        ]]);
+        return redirect()->away('/fbr-pos/school-fees/legacy-retail');
+    }
+
+    public function legacyIndex(Request $request)
+    {
+        $company = $this->company();
+        $request->validate(['search' => 'nullable|string|max:100', 'unassigned' => 'nullable|boolean']);
+        $localAllowed = $this->legacyPinAllowed($company);
+        $query = $this->legacyQuery($company, $request);
+        if (!$localAllowed) {
+            $query->where(fn ($q) => $q->where('invoice_mode', '!=', 'local')->orWhereNull('invoice_mode'));
+        }
+        if ($request->filled('search')) {
+            $search = '%'.$request->input('search').'%';
+            $query->where(fn ($q) => $q->where('invoice_number', 'like', $search)
+                ->orWhere('fbr_invoice_number', 'like', $search));
+        }
+        $transactions = $query->orderByDesc('id')->paginate(20)->withQueryString();
+        $unassigned = $request->boolean('unassigned');
+        $isOwner = app(\App\Services\BranchContextService::class)->isOwner();
+        return response()->view('fbr-pos.school-fees.legacy-index', compact(
+            'company', 'transactions', 'localAllowed', 'unassigned', 'isOwner'
+        ))->header('Cache-Control', 'private, no-store');
+    }
+
+    public function legacyShow(Request $request, int $id)
+    {
+        $company = $this->company();
+        $request->validate(['unassigned' => 'nullable|boolean']);
+        $transaction = $this->legacyQuery($company, $request)->with('items')->findOrFail($id);
+        abort_if($transaction->invoice_mode === 'local' && !$this->legacyPinAllowed($company),
+            403, __('pos.school_legacy_locked'));
+        return response()->view('fbr-pos.school-fees.legacy-show', compact('company', 'transaction'))
+            ->header('Cache-Control', 'private, no-store');
     }
 
     public function receipt(int $id)

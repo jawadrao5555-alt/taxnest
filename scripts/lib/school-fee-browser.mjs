@@ -19,6 +19,26 @@ export async function schoolFeeWorkflow(page, t, v, { baseUrl, saveEvidenceScree
     await saveEvidenceScreenshot(registration, 'school-fee-registration-' + v.width);
   } finally { await guest.close(); }
 
+  const legacyId = t.legacyInvoices?.[v.width];
+  if (!legacyId) throw new Error('Missing synthetic historical retail invoice fixture');
+  await page.goto(baseUrl + '/fbr-pos/school-fees/legacy-retail', { waitUntil: 'domcontentloaded' });
+  await page.getByRole('link', { name: 'SYN-SCHOOL-LEGACY-' + v.width, exact: true }).click();
+  await page.waitForURL('**/fbr-pos/school-fees/legacy-retail/' + legacyId);
+  const legacyBody = await page.locator('body').innerText();
+  for (const value of ['SYN-SCHOOL-LEGACY-' + v.width, 'SYNTHETIC-LEGACY-' + v.width,
+    'Synthetic legacy test item', '1180.00', '180.00', 'Read-only historical retail record']) {
+    if (!legacyBody.includes(value)) throw new Error('Legacy invoice omitted original stored value: ' + value);
+  }
+  for (const secret of ['SYN-LEGACY-PRIVATE-RESPONSE', 'SYN-LEGACY-PRIVATE-ID']) {
+    if (legacyBody.includes(secret)) throw new Error('Legacy invoice exposed private stored data');
+  }
+  if (await page.locator('a[href*="retry-fbr"], a[href*="edit-failed"], form[action*="retry"], form[action*="school-fees/legacy-retail"]').count()) {
+    throw new Error('Legacy invoice exposed a mutation action');
+  }
+  await page.evaluate(() => { window.__legacyPrint = 0; window.print = () => { window.__legacyPrint++; }; });
+  await page.getByRole('button', { name: 'Print / Reprint', exact: true }).click();
+  if (await page.evaluate(() => window.__legacyPrint) !== 1) throw new Error('Legacy reprint did not invoke browser print');
+  await saveEvidenceScreenshot(page, 'school-fee-legacy-readonly-' + v.width);
   const reportTotals = async path => {
     const response = await page.goto(baseUrl + path, { waitUntil: 'domcontentloaded' });
     if (!response?.ok()) throw new Error('School cash report failed: ' + path);
@@ -52,6 +72,24 @@ export async function schoolFeeWorkflow(page, t, v, { baseUrl, saveEvidenceScree
   await page.waitForURL('**/fbr-pos/school-fees');
   const form = page.locator('#school-collection');
   await form.waitFor();
+  // If tab storage cannot preserve the idempotency key, fail before POST.
+  let storageFailurePosts = 0;
+  const countStorageFailurePost = request => {
+    if (request.method() === 'POST' && new URL(request.url()).pathname === '/fbr-pos/school-fees') storageFailurePosts++;
+  };
+  page.on('request', countStorageFailurePost);
+  await page.evaluate(() => { Storage.prototype.setItem = () => { throw new DOMException('Synthetic storage unavailable', 'QuotaExceededError'); }; });
+  await form.locator('[name="student_reference"]').fill('SYN-NOT-SENT');
+  await form.locator('[name="amount"]').fill('1.00');
+  await form.locator('[name="cash_confirmed"]').check();
+  await form.getByRole('button', { name: 'Record cash received', exact: true }).click();
+  await page.locator('#school-recovery-notice').filter({ hasText: 'No new request was sent' }).waitFor();
+  if (storageFailurePosts !== 0 || !await form.getByRole('button', { name: 'Record cash received', exact: true }).isDisabled()) {
+    throw new Error('Storage failure did not fail closed before collection');
+  }
+  page.off('request', countStorageFailurePost);
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await form.waitFor();
   const reference = 'SYN-' + v.width + '-' + randomUUID().slice(0, 8);
   const key = await form.locator('[name="request_key"]').inputValue();
   await form.locator('[name="student_reference"]').fill(reference);
@@ -61,6 +99,37 @@ export async function schoolFeeWorkflow(page, t, v, { baseUrl, saveEvidenceScree
   const overflow = await page.evaluate(() => Math.max(document.documentElement.scrollWidth, document.body.scrollWidth));
   if (overflow > v.width + 2) throw new Error('School fee form overflows viewport');
   await saveEvidenceScreenshot(page, 'school-fee-cash-entry-' + v.width);
+  // Commit the real server request, then deliberately lose its response.
+  // The cashier must refresh and explicitly recover, never send a new key.
+  let lostReceiptId;
+  const loseSavedResponse = async route => {
+    if (route.request().method() !== 'POST') return route.continue();
+    const response = await route.fetch();
+    const saved = await response.json();
+    if (!response.ok() || !saved.success) throw new Error('Lost-response setup did not actually save cash');
+    lostReceiptId = Number(saved.receipt_id);
+    await route.abort('blockedbyclient');
+  };
+  await page.route(baseUrl + '/fbr-pos/school-fees', loseSavedResponse);
+  await form.getByRole('button', { name: 'Record cash received', exact: true }).click();
+  await page.locator('#school-recovery-notice').filter({ hasText: 'Do not collect cash again' }).waitFor();
+  if (!lostReceiptId) throw new Error('Response was not lost after a real persisted save');
+  const pendingEntries = await page.evaluate(() => Object.entries(sessionStorage).filter(([name]) => name.startsWith('taxnest.school.pending.')));
+  if (pendingEntries.length !== 1 || pendingEntries[0][1] !== key
+      || !/^taxnest\.school\.pending\.\d+\.\d+\.\d+$/.test(pendingEntries[0][0])) {
+    throw new Error('Recovery storage must contain only a tenant/campus/user scoped UUID');
+  }
+  const pendingStorageKey = pendingEntries[0][0];
+  await page.unroute(baseUrl + '/fbr-pos/school-fees', loseSavedResponse);
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await form.waitFor();
+  if (await form.locator('[name="request_key"]').inputValue() !== key) throw new Error('Refresh replaced the uncertain saved payment key');
+  await page.locator('#school-recovery-notice').filter({ hasText: 'Do not collect cash again' }).waitFor();
+  await form.locator('[name="student_reference"]').fill(reference);
+  await form.locator('[name="fee_head"]').selectOption('tuition');
+  await form.locator('[name="amount"]').fill('1250.50');
+  await form.locator('[name="cash_confirmed"]').check();
+  await saveEvidenceScreenshot(page, 'school-fee-lost-response-recovery-' + v.width);
   const posted = page.waitForResponse(response => new URL(response.url()).pathname === '/fbr-pos/school-fees'
     && response.request().method() === 'POST');
   await Promise.all([
@@ -68,9 +137,11 @@ export async function schoolFeeWorkflow(page, t, v, { baseUrl, saveEvidenceScree
     form.getByRole('button', { name: 'Record cash received', exact: true }).click(),
   ]);
   const save = await posted;
-  if (![302, 303].includes(save.status())) throw new Error('Cash collection did not redirect to its persisted receipt');
+  if (save.status() !== 200) throw new Error('Cash recovery did not return its persisted receipt');
   const receiptPath = new URL(page.url()).pathname;
   const receiptId = Number(receiptPath.match(/\/(\d+)\/receipt$/)[1]);
+  if (receiptId !== lostReceiptId) throw new Error('Refresh recovery created another receipt');
+  if (await page.evaluate(name => sessionStorage.getItem(name), pendingStorageKey) !== null) throw new Error('Matching receipt did not clear pending recovery key');
   const assertReceipt = async () => {
     const body = await page.locator('body').innerText();
     for (const text of [reference, 'Tuition', 'Cash', 'PKR 1,250.50', 'LOCAL RECEIPT ONLY', 'Not submitted to FBR']) {
@@ -95,7 +166,7 @@ export async function schoolFeeWorkflow(page, t, v, { baseUrl, saveEvidenceScree
   const csrf = await form.locator('[name="_token"]').inputValue();
   const replay = await page.request.post(baseUrl + '/fbr-pos/school-fees', {
     headers: { Accept: 'application/json', 'X-CSRF-TOKEN': csrf },
-    form: { request_key: key, student_reference: reference, fee_head: 'tuition', amount: '1250.50', payment_method: 'cash' },
+    form: { request_key: key, student_reference: reference, fee_head: 'tuition', amount: '1250.50', payment_method: 'cash', expected_branch_key: '0' },
   });
   const replayed = await replay.json();
   if (!replay.ok() || !replayed.success || Number(replayed.receipt_id) !== receiptId) throw new Error('Lost-response retry did not return the same persisted receipt');
@@ -105,7 +176,7 @@ export async function schoolFeeWorkflow(page, t, v, { baseUrl, saveEvidenceScree
   for (const change of [{ amount: '999.00' }, { fee_head: 'exam' }, { student_reference: reference + '-CHANGED' }]) {
     const conflict = await page.request.post(baseUrl + '/fbr-pos/school-fees', {
       headers: { Accept: 'application/json', 'X-CSRF-TOKEN': csrf },
-      form: { request_key: key, student_reference: reference, fee_head: 'tuition', amount: '1250.50', payment_method: 'cash', ...change },
+      form: { request_key: key, student_reference: reference, fee_head: 'tuition', amount: '1250.50', payment_method: 'cash', expected_branch_key: '0', ...change },
     });
     const rejected = await conflict.json();
     if (conflict.status() !== 422 || !rejected.errors?.request_key?.[0]?.includes('different details')) {
@@ -148,7 +219,7 @@ export async function schoolFeeWorkflow(page, t, v, { baseUrl, saveEvidenceScree
   const closedTotals = await reportTotals('/fbr-pos/day-close');
   const postCloseRetry = await page.request.post(baseUrl + '/fbr-pos/school-fees', {
     headers: { Accept: 'application/json', 'X-CSRF-TOKEN': csrf },
-    form: { request_key: key, student_reference: reference, fee_head: 'tuition', amount: '1250.50', payment_method: 'cash' },
+    form: { request_key: key, student_reference: reference, fee_head: 'tuition', amount: '1250.50', payment_method: 'cash', expected_branch_key: '0' },
   });
   if (!postCloseRetry.ok() || Number((await postCloseRetry.json()).receipt_id) !== receiptId) throw new Error('Saved retry failed after final close');
   const repeatedClose = await page.request.post(closeUrl, {
@@ -158,7 +229,7 @@ export async function schoolFeeWorkflow(page, t, v, { baseUrl, saveEvidenceScree
   for (const change of [{ request_key: randomUUID(), cash_confirmed: '1' }, { amount: '999.00' }, { fee_head: 'exam' }, { student_reference: reference + '-CHANGED' }]) {
     const blocked = await page.request.post(baseUrl + '/fbr-pos/school-fees', {
       headers: { Accept: 'application/json', 'X-CSRF-TOKEN': csrf },
-      form: { request_key: key, student_reference: reference, fee_head: 'tuition', amount: '1250.50', payment_method: 'cash', ...change },
+      form: { request_key: key, student_reference: reference, fee_head: 'tuition', amount: '1250.50', payment_method: 'cash', expected_branch_key: '0', ...change },
     });
     if (blocked.status() !== 422) throw new Error('Closed school day accepted late or changed payment');
   }
@@ -169,8 +240,30 @@ export async function schoolFeeWorkflow(page, t, v, { baseUrl, saveEvidenceScree
   }
   if (await (await page.request.get(baseUrl + receiptPath)).text() !== originalReceipt) throw new Error('Final close changed original receipt');
   await saveEvidenceScreenshot(page, 'school-fee-final-close-' + v.width);
+  // The closed desk still permits only a known pending saved-request replay.
+  await page.evaluate(({ name, key }) => sessionStorage.setItem(name, key), { name: pendingStorageKey, key });
+  await page.goto(baseUrl + '/fbr-pos/school-fees', { waitUntil: 'domcontentloaded' });
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  if (await form.locator('[name="request_key"]').inputValue() !== key
+      || await form.getByRole('button', { name: 'Record cash received', exact: true }).isDisabled()) {
+    throw new Error('Closed desk stranded the known saved-request recovery');
+  }
+  await form.locator('[name="student_reference"]').fill(reference);
+  await form.locator('[name="fee_head"]').selectOption('tuition');
+  await form.locator('[name="amount"]').fill('1250.50');
+  await form.locator('[name="cash_confirmed"]').check();
+  await Promise.all([
+    page.waitForURL('**' + receiptPath),
+    form.getByRole('button', { name: 'Record cash received', exact: true }).click(),
+  ]);
+  if (await page.evaluate(name => sessionStorage.getItem(name), pendingStorageKey) !== null) throw new Error('Closed-day matching receipt did not clear recovery');
+  await page.goto(baseUrl + '/fbr-pos/school-fees', { waitUntil: 'domcontentloaded' });
+  if (await form.locator('[name="request_key"]').inputValue() === key
+      || !await form.getByRole('button', { name: 'Record cash received', exact: true }).isDisabled()) {
+    throw new Error('Closed day enabled a fresh collection without a pending saved key');
+  }
   const dashboardAfter = await dashboardTotals();
   if (dashboardAfter.count !== dashboardBefore.count + 1 || dashboardAfter.paisa !== dashboardBefore.paisa + 125050
       || dashboardBefore.status !== 'Open' || dashboardAfter.status !== 'Closed') throw new Error('School dashboard totals/status disagree with final cash close');
-  pass('SCHOOL FEE PASS: ' + v.width + ': public category selection, real cash POST, persisted receipt/history, same-key retry, print CSS and reprint action; no fiscal submission and no physical printer claim');
+  pass('SCHOOL FEE PASS: ' + v.width + ': public category selection, real cash POST with lost response, refresh recovery to same receipt, UUID-only storage/failure guard, closed-day recovery, persisted receipt/history, same-key retry, print CSS and reprint action; no fiscal submission and no physical printer claim');
 }

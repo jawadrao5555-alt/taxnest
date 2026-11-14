@@ -1,5 +1,6 @@
 @extends('fbr-pos.school-fees.layout')
 @section('content')
+@if(!$dayClose)<p class="no-print"><a href="/fbr-pos/school-fees/legacy-retail">{{ __('pos.school_legacy_title') }}</a></p>@endif
 <h1>{{ __($dayClose ? 'pos.school_nav_close' : 'pos.school_nav_receipts') }}</h1>
 <div class="notice">{{ __('pos.school_closing_policy') }} {{ __('pos.fbr_missing_school_route') }}</div>
 <section class="card">
@@ -14,6 +15,7 @@
 @if($errors->any())<div role="alert" class="error">{{ $errors->first() }}</div>@endif
 <form id="school-close-form" method="post" action="/fbr-pos/day-close" class="no-print">
 @csrf
+<input type="hidden" name="expected_branch_key" value="{{ $schoolCampusId ?? 0 }}">
 <input type="hidden" name="date" value="{{ $date }}"><input type="hidden" name="expected_cash_paisa" value="{{ $cashAmountPaisa }}"><input type="hidden" name="expected_receipt_count" value="{{ $receiptCount }}">
 <label><input style="width:auto" type="checkbox" name="confirm" value="1" required> {{ __('pos.school_confirm_close') }}</label>
 <button type="submit">{{ __('pos.school_confirm_close') }}</button>

@@ -37,6 +37,7 @@ class FbrPosSchoolFeePilotTest extends TestCase
             $table->string('pos_type');
             $table->string('business_category')->nullable();
             $table->boolean('fbr_reporting_enabled')->default(false);
+            $table->string('confidential_pin')->nullable();
             $table->boolean('fbr_pos_enabled')->default(true);
             $table->boolean('agent_enabled')->default(false);
             $table->boolean('is_internal_account')->default(false);
@@ -115,6 +116,7 @@ class FbrPosSchoolFeePilotTest extends TestCase
         return array_replace([
             'student_reference' => 'SYN-001', 'fee_head' => 'tuition',
             'amount' => '1250.50', 'payment_method' => 'cash', 'cash_confirmed' => '1',
+            'expected_branch_key' => app('currentBranchId') ?? 0,
             'request_key' => (string) Str::uuid(),
         ], $overrides);
     }
@@ -134,6 +136,8 @@ class FbrPosSchoolFeePilotTest extends TestCase
             $this->fail('Expected an HTTP exception.');
         } catch (HttpExceptionInterface $exception) {
             $this->assertSame($status, $exception->getStatusCode());
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $exception) {
+            $this->assertSame(404, $status);
         }
     }
 
@@ -305,6 +309,44 @@ class FbrPosSchoolFeePilotTest extends TestCase
         }
     }
 
+    public function test_stale_campus_form_cannot_post_cash_into_a_different_active_campus(): void
+    {
+        app()->bind('currentBranchId', fn () => 17);
+        $campusAForm = $this->payload();
+        $this->assertSame(17, $campusAForm['expected_branch_key']);
+        // Another tab changes the shared session to campus B before A submits.
+        app()->bind('currentBranchId', fn () => 18);
+        try {
+            $this->collect($campusAForm);
+            $this->fail('Stale campus form must not create a receipt in another campus.');
+        } catch (ValidationException $exception) {
+            $this->assertSame(422, $exception->status);
+            $this->assertArrayHasKey('expected_branch_key', $exception->errors());
+        }
+        $this->assertSame(0, DB::table('school_fee_receipts')->count());
+        app()->bind('currentBranchId', fn () => 17);
+        $id = $this->collect($campusAForm)->getData(true)['receipt_id'];
+        $this->assertSame(17, (int) DB::table('school_fee_receipts')->where('id', $id)->value('branch_id'));
+        Http::assertNothingSent();
+    }
+
+    public function test_stale_campus_close_cannot_snapshot_another_campus_with_identical_totals(): void
+    {
+        $this->school->forceFill(['pos_cashier_dayclose' => true])->saveQuietly();
+        app()->bind('currentBranchId', fn () => 17);
+        $this->collect($this->payload());
+        app()->bind('currentBranchId', fn () => 18);
+        $this->collect($this->payload());
+        try {
+            $this->closeSchoolDay(['expected_branch_key' => 17]);
+            $this->fail('Stale close must not close another campus with matching totals.');
+        } catch (ValidationException $exception) {
+            $this->assertSame(422, $exception->status);
+            $this->assertArrayHasKey('expected_branch_key', $exception->errors());
+        }
+        $this->assertSame(0, DB::table('school_fee_day_closes')->count());
+    }
+
     public function test_negative_campus_sentinel_fails_closed(): void
     {
         app()->bind('currentBranchId', fn () => -1);
@@ -313,6 +355,124 @@ class FbrPosSchoolFeePilotTest extends TestCase
         $this->expectHttpStatus(403, fn () => $controller->dashboard());
         $this->expectHttpStatus(403, fn () => $this->collect($this->payload()));
         $this->assertSame(0, DB::table('school_fee_receipts')->count());
+    }
+
+    private function legacySchema(): void
+    {
+        Schema::create('fbr_pos_transactions', function (Blueprint $table) {
+            $table->id(); $table->unsignedBigInteger('company_id'); $table->unsignedBigInteger('branch_id')->nullable();
+            foreach (['invoice_number', 'invoice_mode', 'fbr_status', 'fbr_invoice_number', 'payment_method', 'status', 'customer_ntn', 'fbr_response', 'fbr_submission_hash', 'share_token'] as $name) $table->string($name)->nullable();
+            foreach (['subtotal', 'tax_amount', 'total_amount', 'discount_amount', 'fbr_service_charge'] as $name) $table->decimal($name, 15, 2)->default(0);
+            $table->timestamps();
+        });
+        Schema::create('fbr_pos_transaction_items', function (Blueprint $table) {
+            $table->id(); $table->unsignedBigInteger('transaction_id'); $table->string('item_name');
+            foreach (['quantity', 'unit_price', 'tax_amount', 'subtotal', 'total'] as $name) $table->decimal($name, 15, 2)->default(0);
+            $table->timestamps();
+        });
+    }
+
+    private function legacyInvoice(array $overrides = []): int
+    {
+        $id = DB::table('fbr_pos_transactions')->insertGetId(array_replace([
+            'company_id' => $this->school->id, 'branch_id' => 17, 'invoice_number' => 'SYN-OLD-001',
+            'invoice_mode' => 'fbr', 'fbr_status' => 'submitted', 'fbr_invoice_number' => 'SYNTHETIC-OLD-FISCAL',
+            'payment_method' => 'cash', 'status' => 'completed', 'subtotal' => 1000, 'tax_amount' => 180, 'total_amount' => 1180,
+            'customer_ntn' => 'PRIVATE-ID-CANARY', 'fbr_response' => '{"secret":"PRIVATE-RESPONSE-CANARY"}',
+            'fbr_submission_hash' => 'PRIVATE-HASH-CANARY', 'share_token' => 'PRIVATE-SHARE-CANARY',
+            'created_at' => now()->subMonth(), 'updated_at' => now()->subMonth(),
+        ], $overrides));
+        DB::table('fbr_pos_transaction_items')->insert(['transaction_id' => $id, 'item_name' => 'Synthetic original item',
+            'quantity' => 1, 'unit_price' => 1000, 'subtotal' => 1000, 'tax_amount' => 180, 'total' => 1180]);
+        return $id;
+    }
+
+    public function test_school_legacy_history_and_invoice_are_read_only_private_and_campus_scoped(): void
+    {
+        $this->legacySchema();
+        app()->bind('currentBranchId', fn () => 17);
+        $id = $this->legacyInvoice();
+        $otherCampus = $this->legacyInvoice(['branch_id' => 18, 'invoice_number' => 'OTHER-CAMPUS-CANARY']);
+        $otherTenant = $this->legacyInvoice(['company_id' => 999, 'invoice_number' => 'OTHER-TENANT-CANARY']);
+        $before = DB::table('fbr_pos_transactions')->orderBy('id')->get()->toJson();
+        $itemsBefore = DB::table('fbr_pos_transaction_items')->orderBy('id')->get()->toJson();
+        $request = Request::create('/fbr-pos/school-fees/legacy-retail', 'GET');
+        $request->setLaravelSession(app('session.store'));
+        app()->instance('request', $request);
+        $controller = app(FbrPosSchoolFeeController::class);
+        foreach ([$controller->legacyIndex($request), $controller->legacyShow($request, $id)] as $response) {
+            $html = $response->getContent();
+            $this->assertStringContainsString('SYN-OLD-001', $html);
+            $this->assertStringContainsString('no-store', (string) $response->headers->get('Cache-Control'));
+            foreach (['OTHER-CAMPUS-CANARY', 'OTHER-TENANT-CANARY', 'PRIVATE-ID-CANARY', 'PRIVATE-RESPONSE-CANARY', 'PRIVATE-HASH-CANARY', 'PRIVATE-SHARE-CANARY'] as $secret) $this->assertStringNotContainsString($secret, $html);
+            $this->assertStringNotContainsString('retry-fbr', $html);
+            $this->assertStringNotContainsString('update-and-retry', $html);
+            $this->assertStringNotContainsString('edit-failed', $html);
+        }
+        $detail = $controller->legacyShow($request, $id)->getContent();
+        foreach (['Synthetic original item', '1180.00', '180.00', 'SYNTHETIC-OLD-FISCAL'] as $value) $this->assertStringContainsString($value, $detail);
+        $this->expectHttpStatus(404, fn () => $controller->legacyShow($request, $otherCampus));
+        $this->expectHttpStatus(404, fn () => $controller->legacyShow($request, $otherTenant));
+        $this->assertSame($before, DB::table('fbr_pos_transactions')->orderBy('id')->get()->toJson());
+        $this->assertSame($itemsBefore, DB::table('fbr_pos_transaction_items')->orderBy('id')->get()->toJson());
+        $this->assertSame(0, DB::table('school_fee_receipts')->count());
+        Http::assertNothingSent();
+    }
+
+    public function test_legacy_local_pin_is_scoped_to_company_user_and_expiry_not_global_flags(): void
+    {
+        $this->legacySchema();
+        $this->school->forceFill(['confidential_pin' => \Illuminate\Support\Facades\Hash::make('4567')])->saveQuietly();
+        app()->bind('currentBranchId', fn () => 17);
+        $id = $this->legacyInvoice(['invoice_mode' => 'local', 'invoice_number' => 'SYN-LOCAL-SECRET']);
+        $controller = app(FbrPosSchoolFeeController::class);
+        $request = Request::create('/fbr-pos/school-fees/legacy-retail', 'GET');
+        $request->setLaravelSession(app('session.store'));
+        app()->instance('request', $request);
+        session(['fbr_pos_pin_verified' => true, 'fbr_pos_pin_verified_at' => now()->timestamp]);
+        $this->assertStringNotContainsString('SYN-LOCAL-SECRET', $controller->legacyIndex($request)->getContent());
+        $this->expectHttpStatus(403, fn () => $controller->legacyShow($request, $id));
+        $unlock = Request::create('/fbr-pos/school-fees/legacy-retail/unlock', 'POST', ['pin' => '4567']);
+        $unlock->setLaravelSession(app('session.store'));
+        app()->instance('request', $unlock);
+        app('session.store')->forget(['fbr_pos_pin_verified', 'fbr_pos_pin_verified_at']);
+        app()->instance('currentCompanyId', 999);
+        $this->expectHttpStatus(403, fn () => $controller->legacyUnlock($unlock));
+        app()->instance('currentCompanyId', $this->school->id);
+        $controller->legacyUnlock($unlock);
+        $this->assertFalse(session()->exists('fbr_pos_pin_verified'));
+        $this->assertFalse(session()->exists('fbr_pos_pin_verified_at'));
+        $this->assertStringContainsString('SYN-LOCAL-SECRET', $controller->legacyShow($request, $id)->getContent());
+        $key = 'school_legacy_pin.'.$this->school->id.'.'.$this->cashier->id;
+        $proof = session($key);
+        session([$key => array_replace($proof, ['at' => now()->subHour()->timestamp])]);
+        $this->expectHttpStatus(403, fn () => $controller->legacyShow($request, $id));
+        session([$key => $proof]);
+        $otherUser = User::withoutEvents(fn () => User::create([
+            'company_id' => $this->school->id, 'name' => 'Other Cashier', 'email' => 'other@example.test',
+            'password' => 'not-real', 'role' => 'employee', 'pos_role' => 'pos_cashier', 'is_active' => true,
+        ]));
+        $this->actingAs($otherUser, 'fbrpos');
+        $this->expectHttpStatus(403, fn () => $controller->legacyShow($request, $id));
+        $this->assertSame(0, DB::table('school_fee_receipts')->count());
+        Http::assertNothingSent();
+    }
+
+    public function test_only_owner_can_read_unassigned_legacy_rows_separately_from_current_campus(): void
+    {
+        $this->legacySchema();
+        app()->bind('currentBranchId', fn () => 17);
+        $id = $this->legacyInvoice(['branch_id' => null]);
+        $controller = app(FbrPosSchoolFeeController::class);
+        $normal = Request::create('/fbr-pos/school-fees/legacy-retail', 'GET');
+        $unassigned = Request::create('/fbr-pos/school-fees/legacy-retail', 'GET', ['unassigned' => '1']);
+        $this->expectHttpStatus(404, fn () => $controller->legacyShow($normal, $id));
+        $this->expectHttpStatus(403, fn () => $controller->legacyShow($unassigned, $id));
+        $this->cashier->role = 'company_admin'; $this->cashier->pos_role = 'pos_admin';
+        $this->actingAs($this->cashier, 'fbrpos');
+        $this->assertStringContainsString('SYN-OLD-001', $controller->legacyShow($unassigned, $id)->getContent());
+        $this->expectHttpStatus(404, fn () => $controller->legacyShow($normal, $id));
+        Http::assertNothingSent();
     }
 
     public function test_non_cash_unknown_fee_and_invalid_amounts_are_rejected(): void
@@ -430,6 +590,7 @@ class FbrPosSchoolFeePilotTest extends TestCase
         $request = Request::create('/fbr-pos/day-close/close', 'POST', array_replace([
             'date' => today()->format('Y-m-d'), 'confirm' => '1',
             'expected_cash_paisa' => 125050, 'expected_receipt_count' => 1,
+            'expected_branch_key' => app('currentBranchId') ?? 0,
         ], $overrides), [], [], ['HTTP_ACCEPT' => 'application/json']);
         $request->setLaravelSession(app('session.store'));
         app()->instance('request', $request);

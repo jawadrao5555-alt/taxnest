@@ -399,6 +399,28 @@ $schoolMobileUser = $user($schoolMobile, 'Synthetic Mobile School Owner', 'schoo
 \App\Models\Subscription::create(['company_id' => $schoolMobile->id, 'active' => true,
     'override_type' => 'lifetime', 'start_date' => now(), 'end_date' => now()->addYear()]);
 
+// Read-only compatibility fixtures from the old retail ledger. These are
+// fictional stored values, never submitted or represented as real FBR acceptance.
+$schoolLegacyInvoices = [];
+foreach ([1366 => [$school, $schoolUser], 390 => [$schoolMobile, $schoolMobileUser]] as $width => [$legacySchool, $legacyOwner]) {
+    $legacyId = DB::table('fbr_pos_transactions')->insertGetId([
+        'company_id' => $legacySchool->id, 'branch_id' => null,
+        'invoice_number' => 'SYN-SCHOOL-LEGACY-'.$width, 'invoice_mode' => 'fbr',
+        'subtotal' => 1000, 'tax_amount' => 180, 'tax_rate' => 18, 'total_amount' => 1180,
+        'payment_method' => 'cash', 'status' => 'completed', 'fbr_status' => 'submitted',
+        'fbr_invoice_number' => 'SYNTHETIC-LEGACY-'.$width, 'created_by' => $legacyOwner->id,
+        'fbr_response' => json_encode(['secret' => 'SYN-LEGACY-PRIVATE-RESPONSE']),
+        'customer_ntn' => 'SYN-LEGACY-PRIVATE-ID',
+        'created_at' => $now->copy()->subMonth(), 'updated_at' => $now->copy()->subMonth(),
+    ]);
+    DB::table('fbr_pos_transaction_items')->insert([
+        'transaction_id' => $legacyId, 'item_name' => 'Synthetic legacy test item',
+        'quantity' => 1, 'unit_price' => 1000, 'subtotal' => 1000, 'tax_rate' => 18, 'tax_amount' => 180, 'total' => 1180,
+        'created_at' => $now, 'updated_at' => $now,
+    ]);
+    $schoolLegacyInvoices[$width] = $legacyId;
+}
+
 $fiscal = $company('Synthetic RC FBR Retail', 'fiscal-company@rc-browser.invalid', 'RCBROWSER003', 'fbrpos', [
     'business_category' => 'retail', 'pos_type' => 'retail', 'fbr_pos_enabled' => true,
     'pos_setup_completed' => true,
@@ -1067,7 +1089,7 @@ $fixture = [
     ], $categoryJourneys, $optionalArchiveJourneys),
     'transactionalJourneys' => [
         ['name'=>'school-fees','login'=>$schoolUser->email,'mobileLogin'=>$schoolMobileUser->email,'password'=>$password,'loginPath'=>'/fbr-pos/login',
-            'paths'=>['/fbr-pos/school-fees'],'markers'=>['School fee collection'],'schoolFee'=>true,'manualOnly'=>true],
+            'paths'=>['/fbr-pos/school-fees'],'markers'=>['School fee collection'],'schoolFee'=>true,'legacyInvoices'=>$schoolLegacyInvoices,'manualOnly'=>true],
         ['name'=>'restore-session-boundary','login'=>$admin->email,'password'=>$password,'loginPath'=>'/admin/login', 'paths'=>[], 'manualOnly'=>true, 'restoreSessionBoundary'=>true],
         ['name'=>'security-onboarding','login'=>$securityCases[1366]['incomplete'],'password'=>$password,
             'loginPath'=>'/login','paths'=>[], 'securityOnboarding'=>$securityCases],

@@ -129,12 +129,12 @@ function schoolFixture(string $suffix): array
 function schoolPayload(): array
 {
     return ['student_reference' => 'SYN-RACE-001', 'fee_head' => 'tuition', 'amount' => '1250.50',
-        'payment_method' => 'cash', 'cash_confirmed' => '1', 'request_key' => (string) Str::uuid()];
+        'payment_method' => 'cash', 'cash_confirmed' => '1', 'expected_branch_key' => 0, 'request_key' => (string) Str::uuid()];
 }
 function schoolClosePayload(array $fixture, int $count): array
 {
     return ['date' => substr($fixture['now'], 0, 10), 'confirm' => '1',
-        'expected_receipt_count' => $count, 'expected_cash_paisa' => $count * 125050];
+        'expected_receipt_count' => $count, 'expected_branch_key' => 0, 'expected_cash_paisa' => $count * 125050];
 }
 
 $fixture = schoolFixture(bin2hex(random_bytes(5)));

@@ -8,10 +8,12 @@
     <h2>{{ __('pos.school_collect_cash') }}</h2>
     @if($collectionClosed)<div role="alert" class="notice">{{ __('pos.school_closed_collection') }}</div>@endif
     @if($errors->any())<div role="alert" class="error"><ul>@foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul></div>@endif
+    <div id="school-recovery-notice" class="notice" role="alert" hidden></div>
     <form method="post" action="/fbr-pos/school-fees" id="school-collection" data-closed="{{ $collectionClosed ? '1' : '0' }}">
         @csrf
         <input type="hidden" name="request_key" value="{{ old('request_key', $requestKey) }}">
         <input type="hidden" name="payment_method" value="cash">
+        <input type="hidden" name="expected_branch_key" value="{{ $schoolCampusId ?? 0 }}">
         <div class="grid">
             <div><label for="student_reference">{{ __('pos.school_student_reference') }}</label><input id="student_reference" name="student_reference" value="{{ old('student_reference') }}" maxlength="100" required autocomplete="off"><div class="muted">{{ __('pos.school_reference_hint') }}</div></div>
             <div><label for="fee_head">{{ __('pos.school_fee_head') }}</label><select id="fee_head" name="fee_head" required>@foreach(['tuition','admission','exam'] as $head)<option value="{{ $head }}" @selected(old('fee_head', 'tuition') === $head)>{{ __('pos.school_head_'.$head) }}</option>@endforeach</select></div>
@@ -28,8 +30,65 @@
 @empty<tr><td colspan="5">{{ __('pos.school_no_receipts') }}</td></tr>@endforelse
 </tbody></table></div>{{ $receipts->links() }}</section>
 <script>
-const form = document.getElementById('school-collection');
-form.addEventListener('submit', () => { form.querySelector('button').disabled = true; });
-window.addEventListener('pageshow', () => { form.querySelector('button').disabled = form.dataset.closed === '1'; });
+(() => {
+    const form = document.getElementById('school-collection');
+    const button = form.querySelector('button');
+    const confirmation = form.querySelector('[name="cash_confirmed"]');
+    const key = form.querySelector('[name="request_key"]');
+    const notice = document.getElementById('school-recovery-notice');
+    const storageKey = @json('taxnest.school.pending.'.$company->id.'.'.($schoolCampusId ?? 0).'.'.auth('fbrpos')->id());
+    const recoveryMessage = @json(__('pos.school_pending_recovery'));
+    const storageMessage = @json(__('pos.school_pending_storage_unavailable'));
+    let pending = null;
+    let storageReady = true;
+    let submitting = false;
+    const show = message => { notice.textContent = message; notice.hidden = false; };
+    try {
+        pending = sessionStorage.getItem(storageKey);
+        if (pending) {
+            if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(pending)) throw new Error('Invalid recovery key');
+            key.value = pending;
+            show(recoveryMessage);
+        }
+    } catch (_) { storageReady = false; show(storageMessage); }
+    const updateControls = () => {
+        // A closed day blocks NEW cash, not an exact saved-request recovery.
+        const blocked = !storageReady || (form.dataset.closed === '1' && !pending);
+        button.disabled = blocked || submitting;
+        confirmation.disabled = blocked;
+    };
+    updateControls();
+    window.addEventListener('pageshow', updateControls);
+    form.addEventListener('submit', async event => {
+        event.preventDefault();
+        if (submitting || !storageReady || (form.dataset.closed === '1' && !pending)) return;
+        // Persist only a scoped UUID. Never retain student/payment details in
+        // localStorage or sessionStorage, and never automatically retry cash.
+        try {
+            sessionStorage.setItem(storageKey, key.value);
+            if (sessionStorage.getItem(storageKey) !== key.value) throw new Error('Recovery key not saved');
+            pending = key.value;
+        } catch (_) { storageReady = false; show(storageMessage); updateControls(); return; }
+        submitting = true;
+        updateControls();
+        const abort = new AbortController();
+        const timeout = setTimeout(() => abort.abort(), 30000);
+        try {
+            const response = await fetch(form.action, {
+                method: 'POST', credentials: 'same-origin', headers: { Accept: 'application/json' },
+                body: new FormData(form), signal: abort.signal,
+            });
+            const result = await response.json();
+            if (response.ok && result.success && /^\/fbr-pos\/school-fees\/\d+\/receipt$/.test(result.receipt_url)) {
+                // Only the matching saved receipt may clear this recovery key.
+                window.location.assign(result.receipt_url);
+                return;
+            }
+            const errors = Object.values(result.errors || {}).flat().join(' ');
+            show((errors || result.message || recoveryMessage) + ' ' + recoveryMessage);
+        } catch (_) { show(recoveryMessage); }
+        finally { clearTimeout(timeout); submitting = false; updateControls(); }
+    });
+})();
 </script>
 @endsection

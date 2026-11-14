@@ -114,7 +114,7 @@ class FbrPosSchoolFeePilotTest extends TestCase
     {
         return array_replace([
             'student_reference' => 'SYN-001', 'fee_head' => 'tuition',
-            'amount' => '1250.50', 'payment_method' => 'cash',
+            'amount' => '1250.50', 'payment_method' => 'cash', 'cash_confirmed' => '1',
             'request_key' => (string) Str::uuid(),
         ], $overrides);
     }
@@ -192,6 +192,127 @@ class FbrPosSchoolFeePilotTest extends TestCase
             $this->assertSame($originalReceipt, $controller->receipt($before['id'])->getContent());
         }
         Http::assertNothingSent();
+    }
+
+    public function test_new_cash_requires_explicit_confirmation_but_saved_retry_does_not(): void
+    {
+        foreach ([null, '0'] as $confirmation) {
+            try {
+                $this->collect($this->payload(['cash_confirmed' => $confirmation]));
+                $this->fail('New cash must require explicit confirmation.');
+            } catch (ValidationException $exception) {
+                $this->assertSame(422, $exception->status);
+                $this->assertArrayHasKey('cash_confirmed', $exception->errors());
+            }
+        }
+        $this->assertSame(0, DB::table('school_fee_receipts')->count());
+        $payload = $this->payload();
+        $id = $this->collect($payload)->getData(true)['receipt_id'];
+        unset($payload['cash_confirmed']);
+        $this->assertSame($id, $this->collect($payload)->getData(true)['receipt_id']);
+        $this->assertSame(1, DB::table('school_fee_receipts')->count());
+    }
+
+    public function test_school_dashboard_totals_and_close_status_follow_native_cash_ledger(): void
+    {
+        $controller = app(FbrPosSchoolFeeController::class);
+        $assertDashboard = function (int $count, int $paisa, string $status) use ($controller) {
+            $html = $controller->dashboard()->getContent();
+            $this->assertMatchesRegularExpression('/id="school-today-count"[^>]*>\s*'.$count.'\s*</', $html);
+            $this->assertMatchesRegularExpression('/id="school-today-cash"[^>]*data-paisa="'.$paisa.'"/', $html);
+            $this->assertMatchesRegularExpression('/id="school-today-status"[^>]*>\s*'.$status.'\s*</', $html);
+        };
+        $assertDashboard(0, 0, 'Open');
+        $this->collect($this->payload());
+        $assertDashboard(1, 125050, 'Open');
+        $this->school->forceFill(['pos_cashier_dayclose' => true])->saveQuietly();
+        $this->closeSchoolDay();
+        $assertDashboard(1, 125050, 'Closed');
+    }
+
+    public function test_campus_switcher_shows_only_multiple_authorized_active_campuses(): void
+    {
+        Schema::create('branches', function (Blueprint $table) {
+            $table->id(); $table->unsignedBigInteger('company_id'); $table->string('name');
+            $table->boolean('is_active')->default(true); $table->boolean('is_head_office')->default(false);
+            $table->timestamps();
+        });
+        Schema::create('branch_user', function (Blueprint $table) {
+            $table->unsignedBigInteger('branch_id'); $table->unsignedBigInteger('user_id');
+        });
+        foreach ([[17, $this->school->id, true], [18, $this->school->id, true],
+            [19, $this->school->id, false], [20, 999, true]] as [$id, $company, $active]) {
+            DB::table('branches')->insert(['id' => $id, 'company_id' => $company,
+                'name' => 'Campus '.$id, 'is_active' => $active]);
+        }
+        $this->cashier->pos_role = 'pos_manager';
+        $this->actingAs($this->cashier, 'fbrpos');
+        DB::table('branch_user')->insert(['branch_id' => 17, 'user_id' => $this->cashier->id]);
+        $controller = app(FbrPosSchoolFeeController::class);
+        $this->assertStringNotContainsString('id="school-campus-switcher"', $controller->index()->getContent());
+        $this->assertSame(17, app('currentBranchId'));
+        foreach ([18, 19, 20] as $id) DB::table('branch_user')->insert(['branch_id' => $id, 'user_id' => $this->cashier->id]);
+        $html = $controller->index()->getContent();
+        $this->assertStringContainsString('id="school-campus-switcher"', $html);
+        $this->assertStringContainsString('Campus 17', $html);
+        $this->assertStringContainsString('Campus 18', $html);
+        $this->assertStringNotContainsString('Campus 19', $html);
+        $this->assertStringNotContainsString('Campus 20', $html);
+        $switch = function ($id) use ($controller) {
+            $request = Request::create('/fbr-pos/school-fees/campus', 'POST', ['branch_id' => $id]);
+            $request->setLaravelSession(app('session.store'));
+            return $controller->switchCampus($request);
+        };
+        $this->assertSame('/fbr-pos/school-fees', $switch(18)->headers->get('Location'));
+        $this->assertSame(18, app('currentBranchId'));
+        foreach ([19, 20] as $id) $this->expectHttpStatus(403, fn () => $switch($id));
+        try {
+            $switch('all');
+            $this->fail('School cash must never switch to all campuses.');
+        } catch (ValidationException $exception) {
+            $this->assertSame(422, $exception->status);
+        }
+        $id = $this->collect($this->payload())->getData(true)['receipt_id'];
+        $this->assertSame(18, (int) DB::table('school_fee_receipts')->where('id', $id)->value('branch_id'));
+        // Owner-level ALL is a reporting scope elsewhere, never a valid
+        // school cash posting scope. Normalize it to one authorized campus.
+        $this->cashier->pos_role = 'pos_admin';
+        $this->cashier->role = 'company_admin';
+        $this->actingAs($this->cashier, 'fbrpos');
+        $branches = app(\App\Services\BranchContextService::class);
+        $branches->useGuard('fbrpos');
+        $this->assertTrue($branches->setActiveBranch('all'));
+        $this->assertNull(app('currentBranchId'));
+        $controller->index();
+        $this->assertContains(app('currentBranchId'), [17, 18]);
+        $this->assertNotSame('all', app('session.store')->get(\App\Services\BranchContextService::SESSION_KEY));
+    }
+
+    public function test_school_native_pages_never_render_retail_menu_links(): void
+    {
+        $controller = app(FbrPosSchoolFeeController::class);
+        $this->school->forceFill(['pos_cashier_dayclose' => true])->saveQuietly();
+        $request = Request::create('/fbr-pos/transactions', 'GET');
+        app()->instance('request', $request);
+        foreach ([$controller->dashboard(), $controller->index(), $controller->history($request), $controller->dayClose($request)] as $response) {
+            $html = $response->getContent();
+            foreach (['products', 'stock', 'deals', 'loyalty', 'tax-reports', 'fail-queue', 'services', 'pharmacy', 'tables', 'kitchen'] as $retail) {
+                $this->assertDoesNotMatchRegularExpression('~href=["\'][^"\']*/fbr-pos/'.$retail.'(?:[/?#"\'])~i', $html);
+            }
+            foreach (['Collect Fee', 'Receipts / Reprint', 'Cash Day Close'] as $label) {
+                $this->assertStringContainsString($label, $html);
+            }
+        }
+    }
+
+    public function test_negative_campus_sentinel_fails_closed(): void
+    {
+        app()->bind('currentBranchId', fn () => -1);
+        $controller = app(FbrPosSchoolFeeController::class);
+        $this->expectHttpStatus(403, fn () => $controller->index());
+        $this->expectHttpStatus(403, fn () => $controller->dashboard());
+        $this->expectHttpStatus(403, fn () => $this->collect($this->payload()));
+        $this->assertSame(0, DB::table('school_fee_receipts')->count());
     }
 
     public function test_non_cash_unknown_fee_and_invalid_amounts_are_rejected(): void

@@ -4,6 +4,20 @@
 // Purity locked by tests/Unit/LangPurityTest.php — no Roman Urdu / Urdu script here.
 
 return [
+    'school_nav_collect' => 'Collect Fee',
+    'school_nav_receipts' => 'Receipts / Reprint',
+    'school_nav_close' => 'Cash Day Close',
+    'school_campus' => 'Campus',
+    'school_switch_campus' => 'Switch campus',
+    'school_navigation' => 'School navigation',
+    'school_dashboard_title' => 'School Dashboard',
+    'school_today_collections' => 'Today’s Fee Collections',
+    'school_day_close_status' => 'Day Close Status',
+    'school_dashboard_scope' => 'Current campus · calendar-day cash collections only',
+    'school_confirm_cash' => 'I confirm that I have received this cash payment.',
+    'school_confirm_cash_error' => 'Confirm cash has been received before recording a new payment.',
+    'school_campus_required' => 'No authorized campus is available. Ask your school administrator to assign one.',
+
     'school_open' => 'Open',
     'school_closed' => 'Closed',
     'school_confirm_close' => 'Confirm day close',

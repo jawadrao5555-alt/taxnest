@@ -4,6 +4,20 @@
 // Purity locked by tests/Unit/LangPurityTest.php — no Arabic-script characters here.
 
 return [
+    'school_nav_collect' => 'Fee Jama Karein',
+    'school_nav_receipts' => 'Receipts / Reprint',
+    'school_nav_close' => 'Cash Day Close',
+    'school_campus' => 'Campus',
+    'school_switch_campus' => 'Campus badlein',
+    'school_navigation' => 'School navigation',
+    'school_dashboard_title' => 'School Dashboard',
+    'school_today_collections' => 'Aaj ki Fee Collection',
+    'school_day_close_status' => 'Day Close Status',
+    'school_dashboard_scope' => 'Maujooda campus · sirf calendar-date cash collections',
+    'school_confirm_cash' => 'Main tasdeeq karta/karti hoon ke yeh cash payment mil chuki hai.',
+    'school_confirm_cash_error' => 'Nayi payment record karne se pehle cash milne ki tasdeeq karein.',
+    'school_campus_required' => 'Koi authorized campus nahin. School administrator se campus assign karwaein.',
+
     'school_open' => 'Open',
     'school_closed' => 'Closed',
     'school_confirm_close' => 'Day close confirm karein',

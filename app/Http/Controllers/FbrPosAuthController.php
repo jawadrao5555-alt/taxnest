@@ -278,7 +278,8 @@ class FbrPosAuthController extends Controller
      */
     private function redirectToPortal(): \Illuminate\Http\RedirectResponse
     {
-        return redirect()->away(self::PORTAL);
+        $company = Auth::guard('fbrpos')->user()?->company;
+        return redirect()->away($company?->isSchoolFeePilot() ? '/fbr-pos/school-fees' : self::PORTAL);
     }
 
     /**

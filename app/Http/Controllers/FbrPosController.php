@@ -667,6 +667,9 @@ class FbrPosController extends Controller
 
     public function dashboard()
     {
+        if (Company::find(app('currentCompanyId'))?->isSchoolFeePilot()) {
+            return app(FbrPosSchoolFeeController::class)->dashboard();
+        }
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
         $branchSvc = app(\App\Services\BranchContextService::class);

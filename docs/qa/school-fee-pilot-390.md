@@ -50,3 +50,11 @@ Run the full PHPUnit suite and local Chrome/MariaDB collection/receipt/reprint s
 - Closing requires the existing day-close permission and explicit confirmation, and is denied in read-only impersonation. Each campus closes separately. Retail closing/overnight cutoff and fiscal Z-reports are not reused; other retail categories are unchanged. School fiscal submission remains disabled.
 
 - Native MariaDB CI probe `tests/native/rc_school_fee_concurrency.php` launches independent synchronized PHP processes for duplicate collection, duplicate close and collection-versus-close races. It asserts one receipt/snapshot, rejects stale close or late collection according to lock order, and verifies post-close retries preserve both. Consult latest-head native CI before claiming this probe passed.
+
+## School-only collection UX
+
+- Authenticated School/Education accounts land directly on Collect Fee. The existing `/fbr-pos/create` entry also redirects there. Retail login/signup remains on its existing sale screen.
+- School Dashboard renders only today's campus fee collections, receipt count and cash day-close status. Collect Fee, Receipts / Reprint and authorized Cash Day Close use the isolated school shell, without retail inventory, deals, loyalty, tax or fiscal actions.
+- The cash flow is student reference → fee head → amount → explicit confirmation that cash was received → immutable receipt. New payment cannot be stored without confirmation; an already-saved identical retry remains retrievable without reconfirming cash.
+- Campus selection uses only the existing FBR guard's authorized active campuses, is shown only when more than one is available, and rejects foreign/inactive/ALL targets. Branchless schools retain their null campus; schools with campuses use one concrete authorized campus rather than an ALL scope. No authorized campus means no collection access.
+- These changes apply only when the stored company category satisfies `isSchoolFeePilot()`. No existing retail tenant (including the unverified live Ali Garh account) is reclassified or migrated by this PR. No live settings, merge or deployment were changed. Full School ERP stays in #314.

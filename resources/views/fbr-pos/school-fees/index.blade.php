@@ -1,6 +1,7 @@
 @extends('fbr-pos.school-fees.layout')
 @section('content')
-<h1>{{ __('pos.school_fee_desk') }}</h1>
+<h1>{{ __('pos.school_nav_collect') }}</h1>
+<p class="muted">{{ __('pos.school_fee_desk') }}</p>
 <p class="muted">{{ __('pos.school_pilot_scope') }}</p>
 <div class="notice">{{ __('pos.fbr_missing_school_route') }} {{ __('pos.school_separate_ledger') }}</div>
 <section class="card">
@@ -16,6 +17,7 @@
             <div><label for="fee_head">{{ __('pos.school_fee_head') }}</label><select id="fee_head" name="fee_head" required>@foreach(['tuition','admission','exam'] as $head)<option value="{{ $head }}" @selected(old('fee_head', 'tuition') === $head)>{{ __('pos.school_head_'.$head) }}</option>@endforeach</select></div>
             <div><label for="amount">{{ __('pos.school_amount') }} (PKR)</label><input id="amount" name="amount" type="number" min="0.01" max="99999999.99" step="0.01" value="{{ old('amount') }}" required inputmode="decimal"></div>
         </div>
+        <label class="cash-confirm"><input type="checkbox" name="cash_confirmed" value="1" required @disabled($collectionClosed)> <span>{{ __('pos.school_confirm_cash') }}</span></label>
         <div class="actions"><button type="submit" @disabled($collectionClosed)>{{ __('pos.school_collect_cash') }}</button><span class="muted">{{ __('pos.school_cash_only') }}</span></div>
     </form>
 </section>

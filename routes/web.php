@@ -2605,6 +2605,7 @@ Route::prefix('fbr-pos')->middleware(['fbrpos.auth', 'company.approval'])->group
     Route::post('/suggestions', [\App\Http\Controllers\FeatureSuggestionController::class, 'fbrStore'])->name('fbrpos.suggestions.store')->middleware('throttle:10,1');
     Route::get('/school-fees', [\App\Http\Controllers\FbrPosSchoolFeeController::class, 'index'])->name('fbrpos.school-fees.index');
     Route::post('/school-fees', [\App\Http\Controllers\FbrPosSchoolFeeController::class, 'store'])->name('fbrpos.school-fees.store')->middleware('plan.limit:invoices');
+    Route::post('/school-fees/campus', [\App\Http\Controllers\FbrPosSchoolFeeController::class, 'switchCampus'])->name('fbrpos.school-fees.campus');
     Route::get('/school-fees/{id}/receipt', [\App\Http\Controllers\FbrPosSchoolFeeController::class, 'receipt'])->whereNumber('id')->name('fbrpos.school-fees.receipt');
     Route::get('/create', [FbrPosController::class, 'create'])->name('fbrpos.create');
     Route::post('/store', [FbrPosController::class, 'store'])->name('fbrpos.store')->middleware('plan.limit:invoices');

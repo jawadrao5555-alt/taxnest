@@ -1,6 +1,6 @@
 @extends('fbr-pos.school-fees.layout')
 @section('content')
-<h1>{{ __($dayClose ? 'pos.school_cash_summary' : 'pos.school_sales_history') }}</h1>
+<h1>{{ __($dayClose ? 'pos.school_nav_close' : 'pos.school_nav_receipts') }}</h1>
 <div class="notice">{{ __('pos.school_closing_policy') }} {{ __('pos.fbr_missing_school_route') }}</div>
 <section class="card">
 <form method="get" class="no-print"><label for="date">{{ __('pos.school_calendar_date') }}</label><input type="date" id="date" name="date" value="{{ $date }}" required><div class="actions"><button type="submit">{{ __('pos.school_view_report') }}</button></div></form>

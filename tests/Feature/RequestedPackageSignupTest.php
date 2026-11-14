@@ -204,7 +204,8 @@ class RequestedPackageSignupTest extends TestCase
             $payload['requested_plan'] = $requestedPlan;
         }
 
-        $this->post('/fbr-pos/register', $payload)->assertSessionHasNoErrors();
+        $this->post('/fbr-pos/register', $payload)->assertSessionHasNoErrors()
+            ->assertRedirect($posType === 'education' ? '/fbr-pos/school-fees' : '/fbr-pos/create');
 
         return Company::where('name', $company)->firstOrFail();
     }

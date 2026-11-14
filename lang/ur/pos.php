@@ -4,6 +4,20 @@
 // Purity locked by tests/Unit/LangPurityTest.php — Latin words only from the whitelist.
 
 return [
+    'school_nav_collect' => 'فیس جمع کریں',
+    'school_nav_receipts' => 'رسیدیں / دوبارہ پرنٹ',
+    'school_nav_close' => 'نقد ڈے کلوز',
+    'school_campus' => 'کیمپس',
+    'school_switch_campus' => 'کیمپس بدلیں',
+    'school_navigation' => 'اسکول نیویگیشن',
+    'school_dashboard_title' => 'اسکول ڈیش بورڈ',
+    'school_today_collections' => 'آج کی فیس وصولیاں',
+    'school_day_close_status' => 'ڈے کلوز کی حالت',
+    'school_dashboard_scope' => 'موجودہ کیمپس · صرف کیلنڈر دن کی نقد وصولیاں',
+    'school_confirm_cash' => 'میں تصدیق کرتا/کرتی ہوں کہ یہ نقد ادائیگی وصول ہو چکی ہے۔',
+    'school_confirm_cash_error' => 'نئی ادائیگی درج کرنے سے پہلے نقد وصول ہونے کی تصدیق کریں۔',
+    'school_campus_required' => 'کوئی مجاز کیمپس دستیاب نہیں۔ اسکول منتظم سے کیمپس مقرر کروائیں۔',
+
     'school_open' => 'کھلا',
     'school_closed' => 'بند',
     'school_confirm_close' => 'ڈے کلوز تصدیق کریں',

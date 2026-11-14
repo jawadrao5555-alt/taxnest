@@ -19,6 +19,22 @@ class FbrPosSchoolFeeController extends Controller
             || in_array($user->pos_role, ['pos_admin', 'pos_manager', 'pos_cashier'], true)), 403);
         $company = Company::findOrFail($user->company_id);
         abort_unless($company->isSchoolFeePilot(), 404);
+        $branches = app(\App\Services\BranchContextService::class);
+        $branches->useGuard('fbrpos');
+        $campuses = $branches->accessibleBranches();
+        // School cash always belongs to one campus, never an owner 'all'
+        // reporting scope. Preserve branchless legacy schools, but fail closed
+        // when campuses exist and none are authorized for this actor.
+        abort_if($this->branchId() !== null && $this->branchId() < 0, 403);
+        if (\Illuminate\Support\Facades\Schema::hasTable('branches')
+            && \App\Models\Branch::where('company_id', $company->id)->exists()) {
+            abort_if($campuses->isEmpty(), 403, __('pos.school_campus_required'));
+            if (!$campuses->contains('id', $this->branchId())) {
+                abort_unless($branches->setActiveBranch((int) $campuses->first()->id), 403);
+            }
+        }
+        view()->share('schoolCampuses', $campuses);
+        view()->share('schoolCampusId', $this->branchId());
         return $company;
     }
 
@@ -44,6 +60,29 @@ class FbrPosSchoolFeeController extends Controller
             'collectionClosed' => DB::table('school_fee_day_closes')->where('company_id', $company->id)
                 ->where('branch_key', $this->branchId() ?? 0)->where('report_date', today()->toDateString())->exists(),
         ])->withHeaders(['Cache-Control' => 'no-store']);
+    }
+
+    public function dashboard()
+    {
+        $company = $this->company();
+        $date = today()->toDateString();
+        $query = $this->receipts($company)->whereDate('collected_at', $date);
+        $cashAmountPaisa = (int) (clone $query)->sum('amount_paisa');
+        $receiptCount = (clone $query)->count();
+        $closedReport = DB::table('school_fee_day_closes')->where('company_id', $company->id)
+            ->where('branch_key', $this->branchId() ?? 0)->where('report_date', $date)->first();
+        return response()->view('fbr-pos.school-fees.dashboard', compact(
+            'company', 'date', 'cashAmountPaisa', 'receiptCount', 'closedReport'
+        ))->header('Cache-Control', 'private, no-store');
+    }
+
+    public function switchCampus(Request $request)
+    {
+        $this->company();
+        $data = $request->validate(['branch_id' => 'required|integer|min:1']);
+        $branches = app(\App\Services\BranchContextService::class);
+        abort_unless($branches->setActiveBranch((int) $data['branch_id']), 403);
+        return redirect()->away('/fbr-pos/school-fees');
     }
 
     public function history(Request $request)
@@ -138,9 +177,10 @@ class FbrPosSchoolFeeController extends Controller
             throw ValidationException::withMessages(['amount' => __('pos.school_invalid_collection')]);
         }
         $branchId = $this->branchId();
+        $cashConfirmed = $request->boolean('cash_confirmed');
         // Lock the tenant row to serialize concurrent requests; unique key is the
         // durable backstop. A lost response/repeated click cannot collect twice.
-        $id = DB::transaction(function () use ($company, $data, $amount, $branchId) {
+        $id = DB::transaction(function () use ($company, $data, $amount, $branchId, $cashConfirmed) {
             Company::whereKey($company->id)->lockForUpdate()->firstOrFail();
             $existing = DB::table('school_fee_receipts')->where('company_id', $company->id)
                 ->where('request_key', $data['request_key'])->first();
@@ -152,6 +192,11 @@ class FbrPosSchoolFeeController extends Controller
                     throw ValidationException::withMessages(['request_key' => __('pos.school_retry_conflict')]);
                 }
                 return $existing->id;
+            }
+            // The operator confirms actual cash only for a new payment.
+            // A lost-response replay remains retrievable without reconfirming.
+            if (!$cashConfirmed) {
+                throw ValidationException::withMessages(['cash_confirmed' => __('pos.school_confirm_cash_error')]);
             }
             $collectedAt = now();
             $closed = DB::table('school_fee_day_closes')->where('company_id', $company->id)

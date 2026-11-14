@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 // Called only by rc-browser-acceptance's guarded loopback/MariaDB fixture.
 // This checks an actual persisted local receipt, not an FBR acknowledgement.
 export async function schoolFeeWorkflow(page, t, v, { baseUrl, saveEvidenceScreenshot, pass }) {
+  if (new URL(page.url()).pathname !== '/fbr-pos/school-fees') throw new Error('School login did not land on Collect Fee');
   const browser = page.context().browser();
   const guest = await browser.newContext({ viewport: v });
   await guest.route('**/*', route => ['127.0.0.1', 'localhost', '::1', '[::1]'].includes(new URL(route.request().url()).hostname)
@@ -27,6 +28,23 @@ export async function schoolFeeWorkflow(page, t, v, { baseUrl, saveEvidenceScree
       paisa: Number(await page.locator('#school-cash-total').getAttribute('data-paisa')),
     };
   };
+  const dashboardTotals = async () => {
+    await page.goto(baseUrl + '/fbr-pos/dashboard', { waitUntil: 'domcontentloaded' });
+    await page.locator('#school-today-count').waitFor();
+    for (const label of ['Collect Fee', 'Receipts / Reprint', 'Cash Day Close']) {
+      if (!await page.getByRole('link', { name: label, exact: true }).count()) throw new Error('School navigation missing ' + label);
+    }
+    for (const retail of ['products', 'stock', 'deals', 'loyalty', 'tax-reports', 'fail-queue', 'services', 'pharmacy', 'tables', 'kitchen']) {
+      if (await page.locator(`a[href="/fbr-pos/${retail}"], a[href^="/fbr-pos/${retail}/"], a[href^="/fbr-pos/${retail}?"]`).count()) {
+        throw new Error('School navigation exposed retail menu: ' + retail);
+      }
+    }
+    if (await page.locator('#school-campus-switcher').count()) throw new Error('Single-campus school rendered unnecessary campus switcher');
+    return { count: Number(await page.locator('#school-today-count').innerText()),
+      paisa: Number(await page.locator('#school-today-cash').getAttribute('data-paisa')),
+      status: (await page.locator('#school-today-status').innerText()).trim() };
+  };
+  const dashboardBefore = await dashboardTotals();
   const reportPaths = ['/fbr-pos/transactions', '/fbr-pos/day-close'];
   const beforeReports = new Map();
   for (const path of reportPaths) beforeReports.set(path, await reportTotals(path));
@@ -39,6 +57,7 @@ export async function schoolFeeWorkflow(page, t, v, { baseUrl, saveEvidenceScree
   await form.locator('[name="student_reference"]').fill(reference);
   await form.locator('[name="fee_head"]').selectOption('tuition');
   await form.locator('[name="amount"]').fill('1250.50');
+  await form.locator('[name="cash_confirmed"]').check();
   const overflow = await page.evaluate(() => Math.max(document.documentElement.scrollWidth, document.body.scrollWidth));
   if (overflow > v.width + 2) throw new Error('School fee form overflows viewport');
   await saveEvidenceScreenshot(page, 'school-fee-cash-entry-' + v.width);
@@ -136,7 +155,7 @@ export async function schoolFeeWorkflow(page, t, v, { baseUrl, saveEvidenceScree
     headers: { Accept: 'application/json', 'X-CSRF-TOKEN': csrf }, form: { ...closeFields, confirm: '1' },
   });
   if (!repeatedClose.ok() || !(await repeatedClose.json()).success) throw new Error('Repeated final close failed');
-  for (const change of [{ request_key: randomUUID() }, { amount: '999.00' }, { fee_head: 'exam' }, { student_reference: reference + '-CHANGED' }]) {
+  for (const change of [{ request_key: randomUUID(), cash_confirmed: '1' }, { amount: '999.00' }, { fee_head: 'exam' }, { student_reference: reference + '-CHANGED' }]) {
     const blocked = await page.request.post(baseUrl + '/fbr-pos/school-fees', {
       headers: { Accept: 'application/json', 'X-CSRF-TOKEN': csrf },
       form: { request_key: key, student_reference: reference, fee_head: 'tuition', amount: '1250.50', payment_method: 'cash', ...change },
@@ -150,5 +169,8 @@ export async function schoolFeeWorkflow(page, t, v, { baseUrl, saveEvidenceScree
   }
   if (await (await page.request.get(baseUrl + receiptPath)).text() !== originalReceipt) throw new Error('Final close changed original receipt');
   await saveEvidenceScreenshot(page, 'school-fee-final-close-' + v.width);
+  const dashboardAfter = await dashboardTotals();
+  if (dashboardAfter.count !== dashboardBefore.count + 1 || dashboardAfter.paisa !== dashboardBefore.paisa + 125050
+      || dashboardBefore.status !== 'Open' || dashboardAfter.status !== 'Closed') throw new Error('School dashboard totals/status disagree with final cash close');
   pass('SCHOOL FEE PASS: ' + v.width + ': public category selection, real cash POST, persisted receipt/history, same-key retry, print CSS and reprint action; no fiscal submission and no physical printer claim');
 }

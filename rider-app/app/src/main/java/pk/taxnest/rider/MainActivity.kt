@@ -1,6 +1,9 @@
 package pk.taxnest.rider
 
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
@@ -63,6 +66,15 @@ class MainActivity : AppCompatActivity() {
     private lateinit var emptyDeliveriesText: TextView
 
     private val ui = Handler(Looper.getMainLooper())
+    // Main-thread state: a burst of push hints needs at most one follow-up /me.
+    private var screenResumed = false
+    private var refreshInFlight = false
+    private var refreshPending = false
+    private val deliveryUpdates = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            if (intent.action == PushService.ACTION_DELIVERIES_CHANGED) refreshMe()
+        }
+    }
 
     // ── GPS for proximity display on delivery cards (Task #1508) ─────────
     // We maintain a lightweight foreground-only listener here so the cards can
@@ -127,6 +139,7 @@ class MainActivity : AppCompatActivity() {
                 QueueDrain.drainAsync(this@MainActivity)
                 // Task #1508: drain delivery completion outbox on reconnect.
                 OutboxDrain.drainBlocking(this@MainActivity)
+                refreshMe()
             }
         }
     }
@@ -200,6 +213,12 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        if (isFinishing || Prefs.token(this) == null) return
+        ContextCompat.registerReceiver(
+            this, deliveryUpdates, IntentFilter(PushService.ACTION_DELIVERIES_CHANGED),
+            ContextCompat.RECEIVER_NOT_EXPORTED
+        )
+        screenResumed = true
         billPreviewSafety.resume()
         renderState()
         // Start both loops fresh (cancel any stale callbacks first).
@@ -254,6 +273,9 @@ class MainActivity : AppCompatActivity() {
 
     override fun onPause() {
         super.onPause()
+        if (screenResumed) unregisterReceiver(deliveryUpdates)
+        screenResumed = false
+        refreshPending = false
         billPreviewSafety.invalidateLifecycle()
         ui.removeCallbacks(localStateLoop)
         ui.removeCallbacks(meRefreshLoop)
@@ -574,15 +596,37 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun refreshMe() {
-        thread {
-            // Reconcile any pending duty-off before reading /me so the server
-            // state is consistent when we sync the duty flag below.
-            reconcilePendingDutyOff()
+        ui.post {
+            val token = Prefs.token(this) ?: return@post
+            if (!screenResumed || isFinishing) return@post
+            if (refreshInFlight) {
+                refreshPending = true
+                return@post
+            }
 
-            val (code, body) = ApiClient.get("/me", Prefs.token(this))
-            if (code == 401) { runOnUiThread { sessionExpired() }; return@thread }
-            if (code in 200..299 && body?.optBoolean("ok") == true) {
-                applyMePayload(body)
+            refreshInFlight = true
+            thread(name = "rider-me-refresh") {
+                try {
+                    // Reconcile a queued duty-off before reading the server state.
+                    reconcilePendingDutyOff()
+                    if (Prefs.token(this) != token) return@thread
+
+                    val (code, body) = ApiClient.get("/me", token)
+                    if (Prefs.token(this) != token) return@thread
+                    if (code == 401) {
+                        ui.post { if (Prefs.token(this) == token) sessionExpired() }
+                    } else if (code in 200..299 && body?.optBoolean("ok") == true) {
+                        applyMePayload(body)
+                    }
+                } finally {
+                    ui.post {
+                        refreshInFlight = false
+                        if (refreshPending) {
+                            refreshPending = false
+                            refreshMe()
+                        }
+                    }
+                }
             }
         }
     }

@@ -4,14 +4,20 @@
 // Purity locked by tests/Unit/LangPurityTest.php — no Roman Urdu / Urdu script here.
 
 return [
+    'school_open' => 'Open',
+    'school_closed' => 'Closed',
+    'school_confirm_close' => 'Confirm day close',
+    'school_closed_collection' => 'This campus calendar date is already closed. No new payment was recorded. Do not accept further cash until the next open date.',
+    'school_close_changed' => 'Cash totals changed after the preview. Refresh and confirm the updated total.',
+    'school_closing_policy' => 'Confirming close permanently saves this campus/date cash total. New payments for a closed date are blocked. Saved-payment retries and reprints remain available. Reopening is not supported.',
     'school_sales_history' => 'School Sales History',
-    'school_cash_summary' => 'School day-close cash preview',
-    'school_close_blocked' => 'School closing snapshots and close/reopen controls are not implemented. This preview is not a completed day close.',
+    'school_cash_summary' => 'School day close',
+    'school_close_blocked' => 'Bulk and automatic school closing are not supported. Close each campus/date explicitly.',
     'school_calendar_date' => 'Calendar date',
     'school_view_report' => 'View report',
     'school_receipt_count' => 'Receipt count',
     'school_cash_total' => 'Cash collected',
-    'school_calendar_preview' => 'Calendar-date totals for the current campus only. Each saved receipt is counted once. Retail business-day rollover and fiscal Z-close do not apply.',
+    'school_calendar_preview' => 'Calendar-date totals for the current campus only. Each saved receipt is counted once. A closed cash total is a permanent snapshot; retail business-day rollover and fiscal Z-close do not apply.',
 
     'auth_bt_school_education' => 'School / Education',
     'school_fee_desk' => 'School fee collection',

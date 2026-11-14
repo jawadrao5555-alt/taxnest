@@ -41,6 +41,8 @@ class FbrPosSchoolFeeController extends Controller
             'company' => $company,
             'receipts' => $this->receipts($company)->orderByDesc('id')->paginate(20),
             'requestKey' => (string) Str::uuid(),
+            'collectionClosed' => DB::table('school_fee_day_closes')->where('company_id', $company->id)
+                ->where('branch_key', $this->branchId() ?? 0)->where('report_date', today()->toDateString())->exists(),
         ])->withHeaders(['Cache-Control' => 'no-store']);
     }
 
@@ -67,10 +69,55 @@ class FbrPosSchoolFeeController extends Controller
         $query = $this->receipts($company)->whereDate('collected_at', $date);
         $cashAmountPaisa = (int) (clone $query)->sum('amount_paisa');
         $receiptCount = (clone $query)->count();
+        $closedReport = DB::table('school_fee_day_closes')->where('company_id', $company->id)
+            ->where('branch_key', $this->branchId() ?? 0)->where('report_date', $date)->first();
+        if ($dayClose && $closedReport) {
+            $cashAmountPaisa = (int) $closedReport->cash_amount_paisa;
+            $receiptCount = (int) $closedReport->receipt_count;
+        }
         $receipts = $query->orderByDesc('id')->paginate(20)->withQueryString();
         return response()->view('fbr-pos.school-fees.report', compact(
-            'company', 'date', 'dayClose', 'cashAmountPaisa', 'receiptCount', 'receipts'
+            'company', 'date', 'dayClose', 'cashAmountPaisa', 'receiptCount', 'receipts', 'closedReport'
         ))->header('Cache-Control', 'private, no-store');
+    }
+
+    public function close(Request $request)
+    {
+        $company = $this->company();
+        abort_unless(\App\Services\PosAccessService::dayCloseAllowed(Auth::guard('fbrpos')->user(), $company), 403);
+        abort_if((bool) $request->session()->get('impersonation.readonly'), 403);
+        $data = $request->validate([
+            'date' => 'required|date_format:Y-m-d|before_or_equal:today',
+            'confirm' => 'required|accepted',
+            'expected_cash_paisa' => 'required|integer|min:0',
+            'expected_receipt_count' => 'required|integer|min:0',
+        ]);
+        $branchKey = $this->branchId() ?? 0;
+        $report = DB::transaction(function () use ($company, $data, $branchKey) {
+            // Same tenant lock as collection: a close either includes a committed
+            // payment or precedes it and makes that new collection fail closed.
+            Company::whereKey($company->id)->lockForUpdate()->firstOrFail();
+            $reports = DB::table('school_fee_day_closes')->where('company_id', $company->id)
+                ->where('branch_key', $branchKey)->where('report_date', $data['date']);
+            if ($existing = (clone $reports)->first()) return $existing;
+            $query = $this->receipts($company)->whereDate('collected_at', $data['date']);
+            $cash = (int) (clone $query)->sum('amount_paisa');
+            $count = (clone $query)->count();
+            if ($cash !== (int) $data['expected_cash_paisa'] || $count !== (int) $data['expected_receipt_count']) {
+                throw ValidationException::withMessages(['date' => __('pos.school_close_changed')]);
+            }
+            $id = DB::table('school_fee_day_closes')->insertGetId([
+                'company_id' => $company->id, 'branch_key' => $branchKey, 'report_date' => $data['date'],
+                'cash_amount_paisa' => $cash, 'receipt_count' => $count,
+                'closed_by' => Auth::guard('fbrpos')->id(), 'closed_at' => now(),
+                'created_at' => now(), 'updated_at' => now(),
+            ]);
+            return DB::table('school_fee_day_closes')->find($id);
+        }, 3);
+        return $request->expectsJson() ? response()->json([
+            'success' => true, 'report_id' => $report->id,
+            'cash_amount_paisa' => (int) $report->cash_amount_paisa, 'receipt_count' => (int) $report->receipt_count,
+        ]) : redirect()->away('/fbr-pos/day-close?date='.$data['date']);
     }
 
     public function store(Request $request)
@@ -106,6 +153,12 @@ class FbrPosSchoolFeeController extends Controller
                 }
                 return $existing->id;
             }
+            $collectedAt = now();
+            $closed = DB::table('school_fee_day_closes')->where('company_id', $company->id)
+                ->where('branch_key', $branchId ?? 0)->where('report_date', $collectedAt->toDateString())->exists();
+            if ($closed) {
+                throw ValidationException::withMessages(['amount' => __('pos.school_closed_collection')]);
+            }
             // Recheck under the tenant lock: two tabs cannot overshoot the cap.
             $access = \App\Services\SubscriptionAccessService::hasAccess($company);
             abort_unless($access['allowed'] ?? false, 403, $access['reason'] ?? 'Collection access denied.');
@@ -117,7 +170,7 @@ class FbrPosSchoolFeeController extends Controller
                 'request_key' => $data['request_key'],
                 'student_reference' => $data['student_reference'],
                 'fee_head' => $data['fee_head'], 'amount_paisa' => $amount,
-                'collected_at' => now(), 'created_at' => now(), 'updated_at' => now(),
+                'collected_at' => $collectedAt, 'created_at' => $collectedAt, 'updated_at' => $collectedAt,
             ]);
         }, 3);
         $url = '/fbr-pos/school-fees/'.$id.'/receipt';

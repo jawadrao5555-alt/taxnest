@@ -29,6 +29,7 @@ class FbrPosSchoolFeePilotTest extends TestCase
         parent::setUp();
         Schema::dropAllTables();
         Http::fake();
+        app('view')->share('errors', new \Illuminate\Support\ViewErrorBag());
         Schema::create('companies', function (Blueprint $table) {
             $table->id();
             $table->string('name');
@@ -69,6 +70,18 @@ class FbrPosSchoolFeePilotTest extends TestCase
             $table->timestamp('collected_at');
             $table->timestamps();
             $table->unique(['company_id', 'request_key']);
+        });
+        Schema::create('school_fee_day_closes', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('company_id');
+            $table->unsignedBigInteger('branch_key')->default(0);
+            $table->date('report_date');
+            $table->unsignedBigInteger('cash_amount_paisa');
+            $table->unsignedInteger('receipt_count');
+            $table->unsignedBigInteger('closed_by');
+            $table->timestamp('closed_at');
+            $table->timestamps();
+            $table->unique(['company_id', 'branch_key', 'report_date']);
         });
         $this->school = Company::withoutEvents(fn () => Company::create([
             'name' => 'Synthetic School', 'product_type' => 'fbrpos',
@@ -291,6 +304,69 @@ class FbrPosSchoolFeePilotTest extends TestCase
         $this->assertSame(200, $controller->dayClose($request)->getStatusCode());
     }
 
+    private function closeSchoolDay(array $overrides = [])
+    {
+        $request = Request::create('/fbr-pos/day-close/close', 'POST', array_replace([
+            'date' => today()->format('Y-m-d'), 'confirm' => '1',
+            'expected_cash_paisa' => 125050, 'expected_receipt_count' => 1,
+        ], $overrides), [], [], ['HTTP_ACCEPT' => 'application/json']);
+        $request->setLaravelSession(app('session.store'));
+        app()->instance('request', $request);
+        return app(FbrPosSchoolFeeController::class)->close($request);
+    }
+
+    public function test_final_close_is_immutable_blocks_late_cash_but_preserves_saved_retry(): void
+    {
+        $this->school->forceFill(['pos_cashier_dayclose' => true])->saveQuietly();
+        $payload = $this->payload();
+        $id = $this->collect($payload)->getData(true)['receipt_id'];
+        $closed = $this->closeSchoolDay()->getData(true);
+        $snapshot = (array) DB::table('school_fee_day_closes')->first();
+        $this->assertTrue($closed['success']);
+        $this->assertSame(125050, (int) $snapshot['cash_amount_paisa']);
+        $this->assertSame(1, (int) $snapshot['receipt_count']);
+        $this->assertSame(0, (int) $snapshot['branch_key']);
+        $this->assertSame($this->cashier->id, (int) $snapshot['closed_by']);
+        $this->assertSame($closed['report_id'], $this->closeSchoolDay()->getData(true)['report_id']);
+        $this->assertSame($id, $this->collect($payload)->getData(true)['receipt_id']);
+        foreach ([$this->payload(), array_replace($payload, ['amount' => '9.00']),
+            array_replace($payload, ['fee_head' => 'exam']), array_replace($payload, ['student_reference' => 'CHANGED'])] as $rejected) {
+            try {
+                $this->collect($rejected);
+                $this->fail('Closed-day mutation must be rejected.');
+            } catch (ValidationException $exception) {
+                $this->assertSame(422, $exception->status);
+            }
+            $this->assertSame($snapshot, (array) DB::table('school_fee_day_closes')->first());
+            $this->assertSame(1, DB::table('school_fee_receipts')->count());
+            $this->assertSame(125050, (int) DB::table('school_fee_receipts')->sum('amount_paisa'));
+        }
+        app()->bind('currentBranchId', fn () => 27);
+        $this->collect($this->payload());
+        $campusClose = $this->closeSchoolDay()->getData(true);
+        $this->assertNotSame($closed['report_id'], $campusClose['report_id']);
+        $this->assertSame(2, DB::table('school_fee_day_closes')->count());
+        Http::assertNothingSent();
+    }
+
+    public function test_stale_close_summary_and_unapproved_cashier_or_readonly_close_are_rejected(): void
+    {
+        $this->collect($this->payload());
+        $this->expectHttpStatus(403, fn () => $this->closeSchoolDay());
+        $this->school->forceFill(['pos_cashier_dayclose' => true])->saveQuietly();
+        foreach ([['expected_cash_paisa' => 0], ['expected_receipt_count' => 0]] as $stale) {
+            try {
+                $this->closeSchoolDay($stale);
+                $this->fail('Stale close must be rejected.');
+            } catch (ValidationException $exception) {
+                $this->assertSame(422, $exception->status);
+            }
+        }
+        app('session.store')->put('impersonation', ['readonly' => true]);
+        $this->expectHttpStatus(403, fn () => $this->closeSchoolDay());
+        $this->assertSame(0, DB::table('school_fee_day_closes')->count());
+    }
+
     public function test_retail_company_cannot_use_school_collection_endpoint(): void
     {
         $this->school->forceFill(['pos_type' => 'retail', 'business_category' => 'retail'])->saveQuietly();
@@ -435,16 +511,16 @@ class FbrPosSchoolFeePilotTest extends TestCase
         $this->assertStringStartsWith('/fbr-pos/school-fees/', $receipt->headers->get('Location'));
     }
 
-    public function test_school_cannot_create_a_misleading_retail_day_close(): void
+    public function test_school_bulk_and_background_paths_cannot_create_retail_day_close(): void
     {
         $controller = app(\App\Http\Controllers\FbrPosController::class);
-        foreach (['closeDayReport', 'closeAllPriorDays'] as $method) {
+        foreach (['closeAllPriorDays'] as $method) {
             try {
                 $controller->$method(Request::create('/fbr-pos/day-close', 'POST'));
                 $this->fail('School retail closing must be rejected.');
             } catch (HttpExceptionInterface $error) {
                 $this->assertSame(422, $error->getStatusCode());
-                $this->assertStringContainsString('not implemented', $error->getMessage());
+                $this->assertNotEmpty($error->getMessage());
             }
         }
         $this->assertNull($controller->performDayClose($this->school->id, today()->toDateString(), $this->cashier->id));

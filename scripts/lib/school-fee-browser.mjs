@@ -115,5 +115,40 @@ export async function schoolFeeWorkflow(page, t, v, { baseUrl, saveEvidenceScree
     }
     await saveEvidenceScreenshot(page, 'school-fee-' + (path.endsWith('transactions') ? 'sales-history-' : 'cash-preview-') + v.width);
   }
+  const closeForm = page.locator('#school-close-form');
+  await closeForm.waitFor();
+  const closeUrl = new URL(await closeForm.getAttribute('action'), baseUrl).href;
+  const closeFields = await closeForm.locator('input').evaluateAll(inputs => Object.fromEntries(
+    inputs.filter(input => input.name).map(input => [input.name, input.value])));
+  await closeForm.locator('[name="confirm"]').check();
+  await Promise.all([
+    page.waitForResponse(response => response.url() === closeUrl && response.request().method() === 'POST'),
+    closeForm.getByRole('button', { name: 'Confirm day close', exact: true }).click(),
+  ]);
+  await page.locator('#school-close-status').filter({ hasText: 'Closed' }).waitFor();
+  const closedTotals = await reportTotals('/fbr-pos/day-close');
+  const postCloseRetry = await page.request.post(baseUrl + '/fbr-pos/school-fees', {
+    headers: { Accept: 'application/json', 'X-CSRF-TOKEN': csrf },
+    form: { request_key: key, student_reference: reference, fee_head: 'tuition', amount: '1250.50', payment_method: 'cash' },
+  });
+  if (!postCloseRetry.ok() || Number((await postCloseRetry.json()).receipt_id) !== receiptId) throw new Error('Saved retry failed after final close');
+  const repeatedClose = await page.request.post(closeUrl, {
+    headers: { Accept: 'application/json', 'X-CSRF-TOKEN': csrf }, form: { ...closeFields, confirm: '1' },
+  });
+  if (!repeatedClose.ok() || !(await repeatedClose.json()).success) throw new Error('Repeated final close failed');
+  for (const change of [{ request_key: randomUUID() }, { amount: '999.00' }, { fee_head: 'exam' }, { student_reference: reference + '-CHANGED' }]) {
+    const blocked = await page.request.post(baseUrl + '/fbr-pos/school-fees', {
+      headers: { Accept: 'application/json', 'X-CSRF-TOKEN': csrf },
+      form: { request_key: key, student_reference: reference, fee_head: 'tuition', amount: '1250.50', payment_method: 'cash', ...change },
+    });
+    if (blocked.status() !== 422) throw new Error('Closed school day accepted late or changed payment');
+  }
+  const finalTotals = await reportTotals('/fbr-pos/day-close');
+  if (finalTotals.count !== closedTotals.count || finalTotals.paisa !== closedTotals.paisa
+      || (await page.locator('#school-close-status').innerText()).trim() !== 'Closed') {
+    throw new Error('Final school close snapshot changed after retry');
+  }
+  if (await (await page.request.get(baseUrl + receiptPath)).text() !== originalReceipt) throw new Error('Final close changed original receipt');
+  await saveEvidenceScreenshot(page, 'school-fee-final-close-' + v.width);
   pass('SCHOOL FEE PASS: ' + v.width + ': public category selection, real cash POST, persisted receipt/history, same-key retry, print CSS and reprint action; no fiscal submission and no physical printer claim');
 }

@@ -4,14 +4,20 @@
 // Purity locked by tests/Unit/LangPurityTest.php — no Arabic-script characters here.
 
 return [
+    'school_open' => 'Open',
+    'school_closed' => 'Closed',
+    'school_confirm_close' => 'Day close confirm karein',
+    'school_closed_collection' => 'Is campus ki tareekh close hai. Nayi payment record nahin hui. Agli open tareekh tak mazeed cash na lein.',
+    'school_close_changed' => 'Preview ke baad cash total badal gaya. Refresh kar ke naya total confirm karein.',
+    'school_closing_policy' => 'Close confirm karne par campus/tareekh ka cash total permanent save hoga. Closed tareekh par nayi payment band hai. Purani payment retry aur reprint dastiyab hain. Reopen nahin ho sakta.',
     'school_sales_history' => 'School Sales History',
-    'school_cash_summary' => 'School day-close cash preview',
-    'school_close_blocked' => 'School close snapshots aur close/reopen controls abhi tayyar nahin. Yeh preview completed day close nahin.',
+    'school_cash_summary' => 'School day close',
+    'school_close_blocked' => 'Bulk aur automatic school closing dastiyab nahin. Har campus/tareekh alag close karein.',
     'school_calendar_date' => 'Calendar tareekh',
     'school_view_report' => 'Report dekhein',
     'school_receipt_count' => 'Receipt tadaad',
     'school_cash_total' => 'Cash jama',
-    'school_calendar_preview' => 'Sirf is campus ke calendar tareekh totals. Har saved receipt aik baar count hoti hai. Retail business-day rollover aur fiscal Z-close laagu nahin.',
+    'school_calendar_preview' => 'Is campus ke calendar-date totals. Har receipt aik baar count hoti hai. Closed cash total permanent snapshot hai; retail cutoff ya fiscal Z-close nahin.',
 
     'auth_bt_school_education' => 'School / Taleem',
     'school_fee_desk' => 'School fees wasooli',

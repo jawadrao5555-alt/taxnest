@@ -388,6 +388,17 @@ $schoolUser = $user($school, 'Synthetic School Owner', 'school-fees@rc-browser.i
 \App\Models\Subscription::create(['company_id' => $school->id, 'active' => true,
     'override_type' => 'lifetime', 'start_date' => now(), 'end_date' => now()->addYear()]);
 
+// Separate viewport tenant: final close is immutable and cannot be reopened
+// merely to repeat browser acceptance at another viewport.
+$schoolMobile = $company('Synthetic RC Mobile School', 'school-mobile-company@rc-browser.invalid', 'RCSCHOOL002', 'fbrpos', [
+    'business_category' => 'education', 'pos_type' => 'education', 'fbr_pos_enabled' => true,
+    'fbr_reporting_enabled' => false, 'fbr_pos_environment' => 'sandbox',
+    'pos_setup_completed' => true, 'feature_flags' => PosFeatureService::defaultsForCategory('education'),
+]);
+$schoolMobileUser = $user($schoolMobile, 'Synthetic Mobile School Owner', 'school-mobile-fees@rc-browser.invalid', 'company_admin', 'pos_admin');
+\App\Models\Subscription::create(['company_id' => $schoolMobile->id, 'active' => true,
+    'override_type' => 'lifetime', 'start_date' => now(), 'end_date' => now()->addYear()]);
+
 $fiscal = $company('Synthetic RC FBR Retail', 'fiscal-company@rc-browser.invalid', 'RCBROWSER003', 'fbrpos', [
     'business_category' => 'retail', 'pos_type' => 'retail', 'fbr_pos_enabled' => true,
     'pos_setup_completed' => true,
@@ -1055,7 +1066,7 @@ $fixture = [
         ['name' => 'service-work-orders-denied', 'login' => $serviceDenied->email, 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/work-orders', '/pos/work-orders/report.csv'], 'denied' => true],
     ], $categoryJourneys, $optionalArchiveJourneys),
     'transactionalJourneys' => [
-        ['name'=>'school-fees','login'=>$schoolUser->email,'password'=>$password,'loginPath'=>'/fbr-pos/login',
+        ['name'=>'school-fees','login'=>$schoolUser->email,'mobileLogin'=>$schoolMobileUser->email,'password'=>$password,'loginPath'=>'/fbr-pos/login',
             'paths'=>['/fbr-pos/school-fees'],'markers'=>['School fee collection'],'schoolFee'=>true,'manualOnly'=>true],
         ['name'=>'restore-session-boundary','login'=>$admin->email,'password'=>$password,'loginPath'=>'/admin/login', 'paths'=>[], 'manualOnly'=>true, 'restoreSessionBoundary'=>true],
         ['name'=>'security-onboarding','login'=>$securityCases[1366]['incomplete'],'password'=>$password,

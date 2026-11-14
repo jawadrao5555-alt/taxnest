@@ -287,6 +287,63 @@ class FbrPosSchoolFeePilotTest extends TestCase
         Http::assertNothingSent();
     }
 
+    public function test_school_agent_and_di_paths_fail_closed_with_stale_configuration(): void
+    {
+        $this->school->forceFill([
+            'fbr_reporting_enabled' => true, 'fbr_pos_enabled' => true,
+            'agent_enabled' => true, 'fbr_connection_mode' => 'fiscal_device',
+        ])->saveQuietly();
+        $school = $this->school->fresh();
+        $this->assertFalse($school->agentServesFbr());
+        $this->assertFalse($school->agentHandlesPra());
+        $result = app(FbrService::class)->submitPosDiPayload([], 'synthetic-unused', 'sandbox', $school->id);
+        $this->assertSame('blocked', $result['state']);
+        $this->assertNull($result['reference']);
+        Http::assertNothingSent();
+    }
+
+    public function test_manual_retry_and_scheduled_queue_do_not_dispatch_school_transactions(): void
+    {
+        Schema::create('fbr_pos_transactions', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('company_id');
+            $table->string('invoice_mode')->nullable();
+            $table->string('fbr_status')->nullable();
+            $table->string('fbr_invoice_number')->nullable();
+            $table->string('fbr_submission_hash')->nullable();
+            $table->unsignedInteger('fbr_auto_retry_count')->default(0);
+            $table->timestamps();
+        });
+        Schema::create('fbr_pos_transaction_items', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('transaction_id');
+        });
+        DB::table('companies')->where('id', $this->school->id)->update(['fbr_reporting_enabled' => true]);
+        $id = DB::table('fbr_pos_transactions')->insertGetId([
+            'company_id' => $this->school->id, 'invoice_mode' => 'fbr', 'fbr_status' => 'failed',
+            'fbr_auto_retry_count' => 2, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        (new \App\Jobs\RetryFbrPosSubmissionJob($id))->handle();
+        (new \App\Jobs\SyncFbrPosOfflineInvoicesJob())->handle();
+        $row = DB::table('fbr_pos_transactions')->find($id);
+        $this->assertSame('failed', $row->fbr_status);
+        $this->assertSame(2, (int) $row->fbr_auto_retry_count);
+        $this->assertNull($row->fbr_submission_hash);
+        $this->assertNull($row->fbr_invoice_number);
+        Http::assertNothingSent();
+    }
+
+    public function test_school_desk_redirect_and_browser_receipt_redirect_remain_relative(): void
+    {
+        $response = app(\App\Http\Controllers\FbrPosController::class)->create();
+        $this->assertSame('/fbr-pos/school-fees', $response->headers->get('Location'));
+        $request = Request::create('/fbr-pos/school-fees', 'POST', $this->payload());
+        $request->setLaravelSession(app('session.store'));
+        app()->instance('request', $request);
+        $receipt = app(FbrPosSchoolFeeController::class)->store($request);
+        $this->assertStringStartsWith('/fbr-pos/school-fees/', $receipt->headers->get('Location'));
+    }
+
     public function test_school_category_does_not_change_pra_education_or_retail_reporting(): void
     {
         $this->assertContains('education', PosFeatureService::categories('fbr'));

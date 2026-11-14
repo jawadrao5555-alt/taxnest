@@ -110,7 +110,10 @@ jobs:
       - name: Install locked PHP dependencies without application scripts
         run: composer install --no-interaction --prefer-dist --no-progress --no-ansi --no-scripts
       - name: Check school cash collection and existing retail regressions
-        run: bash scripts/rc-safe-run -- vendor/bin/phpunit tests/Feature/FbrPosSchoolFeePilotTest.php tests/Feature/RequestedPackageSignupTest.php tests/Feature/FbrPosStoreReplayGuardTest.php tests/Feature/FbrPosFiscalReceiptIdentityTest.php --testdox
+        run: |
+          for test in tests/Feature/FbrPosSchoolFeePilotTest.php tests/Feature/RequestedPackageSignupTest.php tests/Feature/FbrPosStoreReplayGuardTest.php tests/Feature/FbrPosFiscalReceiptIdentityTest.php; do
+            bash scripts/rc-safe-run -- vendor/bin/phpunit "$test" --testdox || exit $?
+          done
       - name: Check PRA DI sandbox and production environment isolation
         run: bash scripts/rc-safe-run -- vendor/bin/phpunit tests/Feature/PraDiSandboxTest.php tests/Feature/PosFederalAutomationTest.php tests/Feature/PraReceiptSerialWithFiscalTest.php --testdox
       - name: Check PRA staff approval and unchanged operations

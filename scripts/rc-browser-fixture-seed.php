@@ -44,7 +44,7 @@ if (DB::connection()->getDriverName() !== 'mysql'
     || config('database.connections.mysql.unix_socket') !== $socket) {
     $fail('connection is outside the browser-lab allowlist.');
 }
-foreach (['companies', 'users', 'admin_users', 'branches', 'hotel_rooms', 'pos_service_work_orders', 'health_patients', 'invoices', 'invoice_items'] as $table) {
+foreach (['companies', 'users', 'admin_users', 'branches', 'hotel_rooms', 'pos_service_work_orders', 'health_patients', 'invoices', 'invoice_items', 'school_fee_receipts'] as $table) {
     if (!Schema::hasTable($table)) {
         $fail("required migrated table is absent: {$table}");
     }
@@ -378,6 +378,16 @@ $serviceWorker = $user($service, 'Synthetic Event Workflow Admin', 'service-work
 $serviceManager = $user($service, 'Synthetic Event Workflow Manager', 'service-manager@rc-browser.invalid', 'staff', 'pos_manager', ['dashboard', 'service_jobs']);
 $serviceDenied = $user($service, 'Synthetic Event Workflow Denied Waiter', 'service-denied@rc-browser.invalid', 'staff', 'pos_waiter');
 
+// School fees are a separate non-fiscal cash ledger, with fictional identifiers only.
+$school = $company('Synthetic RC School', 'school-company@rc-browser.invalid', 'RCSCHOOL001', 'fbrpos', [
+    'business_category' => 'education', 'pos_type' => 'education', 'fbr_pos_enabled' => true,
+    'fbr_reporting_enabled' => false, 'fbr_pos_environment' => 'sandbox',
+    'pos_setup_completed' => true, 'feature_flags' => PosFeatureService::defaultsForCategory('education'),
+]);
+$schoolUser = $user($school, 'Synthetic School Owner', 'school-fees@rc-browser.invalid', 'company_admin', 'pos_admin');
+\App\Models\Subscription::create(['company_id' => $school->id, 'active' => true,
+    'override_type' => 'lifetime', 'start_date' => now(), 'end_date' => now()->addYear()]);
+
 $fiscal = $company('Synthetic RC FBR Retail', 'fiscal-company@rc-browser.invalid', 'RCBROWSER003', 'fbrpos', [
     'business_category' => 'retail', 'pos_type' => 'retail', 'fbr_pos_enabled' => true,
     'pos_setup_completed' => true,
@@ -527,6 +537,9 @@ $healthForeignPatient = DB::table('health_patients')->insertGetId([
 $categoryJourneys = [];
 foreach (['pra' => 'pos', 'fbr' => 'fbrpos'] as $panel => $product) {
     foreach (array_merge(PosFeatureService::categories($panel), ['general']) as $index => $category) {
+        // The dedicated school-fees journey verifies its native fee desk, not
+        // the generic retail billing/stock contract below.
+        if ($panel === 'fbr' && $category === 'education') continue;
         $profileCompany = new Company(['business_category' => $category, 'pos_type' => $category, 'product_type' => $product]);
         $profile = PosFeatureService::profile($profileCompany);
         $landing = $profile['landing'];
@@ -1031,6 +1044,8 @@ $fixture = [
         ['name' => 'service-work-orders-denied', 'login' => $serviceDenied->email, 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/work-orders', '/pos/work-orders/report.csv'], 'denied' => true],
     ], $categoryJourneys, $optionalArchiveJourneys),
     'transactionalJourneys' => [
+        ['name'=>'school-fees','login'=>$schoolUser->email,'password'=>$password,'loginPath'=>'/fbr-pos/login',
+            'paths'=>['/fbr-pos/school-fees'],'markers'=>['School fee collection'],'schoolFee'=>true,'manualOnly'=>true],
         ['name'=>'restore-session-boundary','login'=>$admin->email,'password'=>$password,'loginPath'=>'/admin/login', 'paths'=>[], 'manualOnly'=>true, 'restoreSessionBoundary'=>true],
         ['name'=>'security-onboarding','login'=>$securityCases[1366]['incomplete'],'password'=>$password,
             'loginPath'=>'/login','paths'=>[], 'securityOnboarding'=>$securityCases],

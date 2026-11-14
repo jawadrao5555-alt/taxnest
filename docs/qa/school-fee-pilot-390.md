@@ -32,3 +32,10 @@ vendor/bin/phpunit tests/Feature/FbrPosFiscalReceiptIdentityTest.php
 ```
 
 Run the full PHPUnit suite and local Chrome/MariaDB collection/receipt/reprint smoke as well. At initial publication the cloud workspace had no PHP or Composer; package installation was unavailable without system privileges. Local PHP/Blade execution and Chrome/MariaDB verification were **not run**. Hosted PR checks are the test execution source; consult the PR's current-head CI evidence. Do not interpret static review or test code as a passing test run, or mocked HTTP assertions as real FBR sandbox acceptance.
+
+## Follow-up verification and dependency patch
+
+- The full-suite Urdu-font sweep found the standalone school layout missing the shared font include. The layout now includes `partials.urdu-font`; no exemption or test suppression was added.
+- At owner request, Composer's targeted minimal update raised the Laravel constraint to `^12.71.0` and resolved `laravel/framework` from `v12.69.3` to `v12.72.0`. This is the only package version change. Composer 2.11 also refreshed package metadata. Local `composer validate` succeeds (existing unrelated unbounded php-imap warning), and `composer audit --locked` reports no advisories.
+- The explicit `school-fees` real-browser CI journey uses a disposable MariaDB fixture at desktop 1366×900 and mobile 390×844. It checks public category selection, authenticated cash collection, persisted receipt/history, duplicate-safe replay, print-media layout and saved receipt reprint action. Screenshots are uploaded as `school-fee-browser-<run id>`.
+- Browser registration checks the category binding, not a newly submitted/approved signup. Submitted signup is covered by PHPUnit. Print actions are intercepted to assert browser invocation; physical paper output is not claimed. CI results must be read for the latest exact commit before treating this new journey as verified.

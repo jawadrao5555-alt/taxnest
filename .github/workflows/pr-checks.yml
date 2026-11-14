@@ -296,6 +296,21 @@ jobs:
         run: |
           bash scripts/rc-browser-fixture.sh setup
           RC_BROWSER_ONLY=fbr-di-bulk bash scripts/rc-browser-fixture.sh run
+      - name: Verify school cash collection and reprint at desktop and 390px
+        id: school_fee_browser
+        env:
+          RC_MARIADB_PORT: '33117'
+          RC_BROWSER_PORT: '5911'
+          RC_BROWSER_STATE_ROOT: /tmp/taxnest-rc-browser-${{ github.run_id }}-${{ github.job }}
+        run: RC_BROWSER_ONLY=school-fees bash scripts/rc-browser-fixture.sh run
+      - name: Upload synthetic school fee browser screenshots
+        if: always() && steps.school_fee_browser.outcome != 'skipped'
+        uses: actions/upload-artifact@v4
+        with:
+          name: school-fee-browser-${{ github.run_id }}
+          path: .local/browser-evidence/school-fee-*.png
+          if-no-files-found: warn
+          retention-days: 14
       - name: Verify Tax Integrations at desktop and 390px mobile
         env:
           RC_MARIADB_PORT: '33117'

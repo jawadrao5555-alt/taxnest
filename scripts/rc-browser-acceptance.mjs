@@ -1,3 +1,4 @@
+import { schoolFeeWorkflow } from './lib/school-fee-browser.mjs';
 import { fbrDiBulkWorkflow } from './lib/fbr-di-bulk-browser.mjs';
 import { kotNoteVisibilityWorkflow } from './lib/kot-note-visibility-browser.mjs';
 import { taxIntegrationsWorkflow } from './lib/tax-integrations-browser.mjs';
@@ -1639,6 +1640,7 @@ async function workflow(page,t,v,diagnostics) {
   }
   if(t.b02Deal)return b02DealWorkflow(page,t,v,{baseUrl,waitForOperationalSurface,dismiss,saveEvidenceScreenshot,pass});
   if(t.staffDiscount)return staffDiscountWorkflow(page,t,v,{baseUrl,login,dismiss,waitForOperationalSurface,saveEvidenceScreenshot,pass,loopback});
+  if(t.schoolFee)return schoolFeeWorkflow(page,t,v,{baseUrl,saveEvidenceScreenshot,pass});
   if(t.fbrDiBulk)return fbrDiBulkWorkflow(page,t,v,{baseUrl,saveEvidenceScreenshot,pass,diagnostics});
   if(t.billingSelection)return billingSelectionWorkflow(page,t,v,{baseUrl,saveEvidenceScreenshot,pass});
   if(t.smartImport)return smartImportWorkflow(page,t,v);

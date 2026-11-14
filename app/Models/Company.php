@@ -9,6 +9,20 @@ class Company extends Model
 {
     use SoftDeletes;
 
+    /** School collection is NOT an IMS retail invoice or a DI zero-rated sale. */
+    public function isSchoolFeePilot(): bool
+    {
+        return $this->product_type === 'fbrpos'
+            && ($this->pos_type === 'education' || $this->business_category === 'education');
+    }
+
+    /** Fail closed even when a stale settings form or admin wrote the raw flag. */
+    public function getFbrReportingEnabledAttribute($value): bool
+    {
+        return !$this->isSchoolFeePilot() && (bool) $value;
+    }
+
+
     /**
      * Account code + business grouping (owner ruling, 5 Sep 2026).
      *
@@ -704,6 +718,7 @@ class Company extends Model
      */
     public function agentServesFbr(): bool
     {
+        if ($this->isSchoolFeePilot()) return false;
         return (bool) $this->fbr_pos_enabled
             && ($this->fbr_connection_mode ?? 'cloud') === 'fiscal_device';
     }
@@ -724,6 +739,7 @@ class Company extends Model
      */
     public function fbrPosIntegrationConfigured(): bool
     {
+        if ($this->isSchoolFeePilot()) return false;
         $posId = preg_replace('/[^0-9]/', '', (string) ($this->fbr_pos_id ?? ''));
         if ($posId === '' || (int) $posId === 0) {
             return false;
@@ -777,6 +793,7 @@ class Company extends Model
      */
     public function fbrIntegrationUndecided(): bool
     {
+        if ($this->isSchoolFeePilot()) return false;
         if (!\Illuminate\Support\Facades\Schema::hasColumn('companies', 'fbr_integration_decision')) {
             return false;
         }
@@ -815,6 +832,7 @@ class Company extends Model
      */
     public function fbrIntegrationMissing(): array
     {
+        if ($this->isSchoolFeePilot()) return ['school_route'];
         $missing = [];
         $posId = preg_replace('/[^0-9]/', '', (string) ($this->fbr_pos_id ?? ''));
         if ($posId === '' || (int) $posId === 0) {
@@ -1058,6 +1076,7 @@ class Company extends Model
      */
     public function agentHandlesPra(): bool
     {
+        if ($this->isSchoolFeePilot()) return false;
         if (($this->pra_connection_mode ?? 'cloud') === 'fiscal_device') {
             return true;
         }

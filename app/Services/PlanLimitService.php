@@ -294,7 +294,12 @@ class PlanLimitService
             return ['allowed' => true, 'internal' => true];
         }
 
-        $monthlyCount = function () use ($companyId): int {
+        $monthlyCount = function () use ($companyId, $company): int {
+            if ($company?->isSchoolFeePilot()) {
+                return \Illuminate\Support\Facades\DB::table('school_fee_receipts')
+                    ->where('company_id', $companyId)
+                    ->whereBetween('created_at', [now()->startOfMonth(), now()->endOfMonth()])->count();
+            }
             return \App\Models\FbrPosTransaction::where('company_id', $companyId)
                 ->where('status', 'completed')
                 ->where('transaction_type', 'sale')

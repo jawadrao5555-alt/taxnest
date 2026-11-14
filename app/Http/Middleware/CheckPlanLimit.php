@@ -39,6 +39,15 @@ class CheckPlanLimit
 
         // Step 1: Override + access gate — runs BEFORE per-resource limit check.
         $company = Company::find($companyId);
+        // A replay only retrieves a saved receipt. Let the controller compare
+        // its immutable payload even if the trial/access cap was just reached.
+        if ($resource === 'invoices' && $request->is('fbr-pos/school-fees') && $company?->isSchoolFeePilot()) {
+            $requestKey = (string) $request->input('request_key', '');
+            if ($requestKey !== '' && \Illuminate\Support\Facades\DB::table('school_fee_receipts')
+                ->where('company_id', $companyId)->where('request_key', $requestKey)->exists()) {
+                return $next($request);
+            }
+        }
         $subscription = null;
         if ($company) {
             $access = SubscriptionAccessService::hasAccess($company);
@@ -187,17 +196,21 @@ class CheckPlanLimit
                     break;
                 }
                 if ($productType === 'fbrpos') {
-                    // REPLAY GUARD BEFORE QUOTA (offline-first invariant): a retry
-                    // of an already-saved bill (same offline_uuid) must reach the
-                    // controller's replay guard and get the saved bill back — never
-                    // a quota error for a bill that already exists.
-                    $offlineUuid = trim((string) $request->input('offline_uuid', ''));
-                    if ($offlineUuid !== ''
-                        && self::fbrOfflineUuidColumnExists()
-                        && \App\Models\FbrPosTransaction::where('company_id', $companyId)->where('offline_uuid', $offlineUuid)->exists()) {
-                        break;
+                    if ($company?->isSchoolFeePilot()) {
+                        $check = PlanLimitService::canCreateFbrPosBill($companyId);
+                    } else {
+                        // REPLAY GUARD BEFORE QUOTA (offline-first invariant): a retry
+                        // of an already-saved bill (same offline_uuid) must reach the
+                        // controller's replay guard and get the saved bill back — never
+                        // a quota error for a bill that already exists.
+                        $offlineUuid = trim((string) $request->input('offline_uuid', ''));
+                        if ($offlineUuid !== ''
+                            && self::fbrOfflineUuidColumnExists()
+                            && \App\Models\FbrPosTransaction::where('company_id', $companyId)->where('offline_uuid', $offlineUuid)->exists()) {
+                            break;
+                        }
+                        $check = PlanLimitService::canCreateFbrPosBill($companyId);
                     }
-                    $check = PlanLimitService::canCreateFbrPosBill($companyId);
                 } elseif ($productType === 'pos') {
                     break; // PRA POS: in-controller quota only (provisional-aware)
                 } else {

@@ -165,8 +165,7 @@ class FbrPosAuthController extends Controller
             'email' => ['required', 'string', 'email', 'max:255', \App\Support\IdentityScope::uniqueEmail('fbrpos')],
             'phone' => 'nullable|string|max:20',
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
-            // FBR panel = goods businesses (see PosFeatureService::PANEL_CATEGORIES),
-            // plus the 'general' catch-all.
+            // Shared category catalogue, including the local-only School / Education pilot.
             'pos_type' => 'required|in:' . implode(',', array_merge(\App\Services\PosFeatureService::categories('fbr'), ['general'])),
             'distributor_reference_code' => 'nullable|string|max:30',
         ], \App\Services\LoginIdentifierResolver::cnicMessages('company_cnic'));
@@ -192,7 +191,7 @@ class FbrPosAuthController extends Controller
         // hasColumn-guarded: signup must never 500 on a deployment (or a minimal
         // test schema) where the column has not landed yet.
         $storeSlipDefault = \Illuminate\Support\Facades\Schema::hasColumn('companies', 'kitchen_printer_enabled')
-            ? ['kitchen_printer_enabled' => true]
+            ? ['kitchen_printer_enabled' => $posType !== 'education']
             : [];
 
         // Task 1484: the package the shop clicked on the landing table, carried
@@ -279,7 +278,8 @@ class FbrPosAuthController extends Controller
      */
     private function redirectToPortal(): \Illuminate\Http\RedirectResponse
     {
-        return redirect()->away(self::PORTAL);
+        $company = Auth::guard('fbrpos')->user()?->company;
+        return redirect()->away($company?->isSchoolFeePilot() ? '/fbr-pos/school-fees' : self::PORTAL);
     }
 
     /**

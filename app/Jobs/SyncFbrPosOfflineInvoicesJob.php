@@ -67,7 +67,7 @@ class SyncFbrPosOfflineInvoicesJob implements ShouldQueue
             // Skip if company missing, FBR reporting disabled, or no dedicated IMS POS token.
             // FBR IMS POS submits ONLY with fbr_pos_token (no DI-token fallback), so a company
             // without it can never succeed — skip to avoid indefinite retry/log churn every tick.
-            if (!$company) continue;
+            if (!$company || $company->isSchoolFeePilot()) continue;
             if (isset($company->fbr_reporting_enabled) && !$company->fbr_reporting_enabled) continue;
             if (empty($company->fbr_pos_token)) continue;
             // No POS Registration ID => the pre-submit POSID guard will fail every attempt.

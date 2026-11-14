@@ -38,6 +38,10 @@ class FbrService
 
     public function submitPosDiPayload(array $payload, string $token, string $environment, ?int $companyId, bool $automatic = false): array
     {
+        if ($companyId && \App\Models\Company::find($companyId)?->isSchoolFeePilot()) {
+            return ['state' => 'blocked', 'reference' => null, 'error_codes' => ['school_route_unverified']];
+        }
+
         \App\Support\PraDiSandboxGate::enforce($companyId, $environment);
         $profile = $companyId ? \App\Models\PosDiSandboxProfile::where('company_id', $companyId)->first() : null;
         $url = PosTaxIntegrationEndpoints::checked('di', $environment, $profile?->{$environment.'_url'});
@@ -2386,6 +2390,12 @@ class FbrService
 
     public function submitFbrPosTransaction(\App\Models\FbrPosTransaction $transaction): array
     {
+        // Covers manual submissions, queue retries and fiscal-device enqueue paths.
+        // No endpoint or school acknowledgement contract has been sandbox-verified.
+        if ($transaction->company?->isSchoolFeePilot()) {
+            return ['status' => 'blocked', 'errors' => [__('pos.fbr_missing_school_route')]];
+        }
+
         if (\App\Services\FbrPosAgentClaim::active($transaction) || $transaction->fbr_status === 'verification_pending') {
             return ['status' => 'blocked', 'errors' => ['An FBR POS agent already owns this dispatch; reconcile before retrying.']];
         }

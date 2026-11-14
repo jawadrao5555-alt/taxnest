@@ -103,7 +103,7 @@
                             <label class="relative cursor-pointer" @click="posType = @js($btKey)">
                                 <div class="flex flex-col items-center gap-1 py-2.5 px-1 rounded-xl text-center transition-all cat-card" :class="posType === @js($btKey) ? 'cat-active' : ''">
                                     <span class="text-xl">{{ \App\Services\PosFeatureService::presetMeta($btKey)['icon'] }}</span>
-                                    <span class="text-[10px] font-semibold text-gray-700 leading-tight">{{ __('pos.auth_bt_' . $btKey) }}</span>
+                                    <span class="text-[10px] font-semibold text-gray-700 leading-tight">{{ __($btKey === 'education' ? 'pos.auth_bt_school_education' : 'pos.auth_bt_' . $btKey) }}</span>
                                 </div>
                             </label>
                             @endforeach

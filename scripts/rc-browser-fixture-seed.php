@@ -44,7 +44,7 @@ if (DB::connection()->getDriverName() !== 'mysql'
     || config('database.connections.mysql.unix_socket') !== $socket) {
     $fail('connection is outside the browser-lab allowlist.');
 }
-foreach (['companies', 'users', 'admin_users', 'branches', 'hotel_rooms', 'pos_service_work_orders', 'health_patients', 'invoices', 'invoice_items'] as $table) {
+foreach (['companies', 'users', 'admin_users', 'branches', 'hotel_rooms', 'pos_service_work_orders', 'health_patients', 'invoices', 'invoice_items', 'school_fee_receipts'] as $table) {
     if (!Schema::hasTable($table)) {
         $fail("required migrated table is absent: {$table}");
     }
@@ -378,6 +378,49 @@ $serviceWorker = $user($service, 'Synthetic Event Workflow Admin', 'service-work
 $serviceManager = $user($service, 'Synthetic Event Workflow Manager', 'service-manager@rc-browser.invalid', 'staff', 'pos_manager', ['dashboard', 'service_jobs']);
 $serviceDenied = $user($service, 'Synthetic Event Workflow Denied Waiter', 'service-denied@rc-browser.invalid', 'staff', 'pos_waiter');
 
+// School fees are a separate non-fiscal cash ledger, with fictional identifiers only.
+$school = $company('Synthetic RC School', 'school-company@rc-browser.invalid', 'RCSCHOOL001', 'fbrpos', [
+    'business_category' => 'education', 'pos_type' => 'education', 'fbr_pos_enabled' => true,
+    'fbr_reporting_enabled' => false, 'fbr_pos_environment' => 'sandbox',
+    'pos_setup_completed' => true, 'feature_flags' => PosFeatureService::defaultsForCategory('education'),
+]);
+$schoolUser = $user($school, 'Synthetic School Owner', 'school-fees@rc-browser.invalid', 'company_admin', 'pos_admin');
+\App\Models\Subscription::create(['company_id' => $school->id, 'active' => true,
+    'override_type' => 'lifetime', 'start_date' => now(), 'end_date' => now()->addYear()]);
+
+// Separate viewport tenant: final close is immutable and cannot be reopened
+// merely to repeat browser acceptance at another viewport.
+$schoolMobile = $company('Synthetic RC Mobile School', 'school-mobile-company@rc-browser.invalid', 'RCSCHOOL002', 'fbrpos', [
+    'business_category' => 'education', 'pos_type' => 'education', 'fbr_pos_enabled' => true,
+    'fbr_reporting_enabled' => false, 'fbr_pos_environment' => 'sandbox',
+    'pos_setup_completed' => true, 'feature_flags' => PosFeatureService::defaultsForCategory('education'),
+]);
+$schoolMobileUser = $user($schoolMobile, 'Synthetic Mobile School Owner', 'school-mobile-fees@rc-browser.invalid', 'company_admin', 'pos_admin');
+\App\Models\Subscription::create(['company_id' => $schoolMobile->id, 'active' => true,
+    'override_type' => 'lifetime', 'start_date' => now(), 'end_date' => now()->addYear()]);
+
+// Read-only compatibility fixtures from the old retail ledger. These are
+// fictional stored values, never submitted or represented as real FBR acceptance.
+$schoolLegacyInvoices = [];
+foreach ([1366 => [$school, $schoolUser], 390 => [$schoolMobile, $schoolMobileUser]] as $width => [$legacySchool, $legacyOwner]) {
+    $legacyId = DB::table('fbr_pos_transactions')->insertGetId([
+        'company_id' => $legacySchool->id, 'branch_id' => null,
+        'invoice_number' => 'SYN-SCHOOL-LEGACY-'.$width, 'invoice_mode' => 'fbr',
+        'subtotal' => 1000, 'tax_amount' => 180, 'tax_rate' => 18, 'total_amount' => 1180,
+        'payment_method' => 'cash', 'status' => 'completed', 'fbr_status' => 'submitted',
+        'fbr_invoice_number' => 'SYNTHETIC-LEGACY-'.$width, 'created_by' => $legacyOwner->id,
+        'fbr_response' => json_encode(['secret' => 'SYN-LEGACY-PRIVATE-RESPONSE']),
+        'customer_ntn' => 'SYN-LEGACY-PRIVATE-ID',
+        'created_at' => $now->copy()->subMonth(), 'updated_at' => $now->copy()->subMonth(),
+    ]);
+    DB::table('fbr_pos_transaction_items')->insert([
+        'transaction_id' => $legacyId, 'item_name' => 'Synthetic legacy test item',
+        'quantity' => 1, 'unit_price' => 1000, 'subtotal' => 1000, 'tax_rate' => 18, 'tax_amount' => 180, 'total' => 1180,
+        'created_at' => $now, 'updated_at' => $now,
+    ]);
+    $schoolLegacyInvoices[$width] = $legacyId;
+}
+
 $fiscal = $company('Synthetic RC FBR Retail', 'fiscal-company@rc-browser.invalid', 'RCBROWSER003', 'fbrpos', [
     'business_category' => 'retail', 'pos_type' => 'retail', 'fbr_pos_enabled' => true,
     'pos_setup_completed' => true,
@@ -541,6 +584,20 @@ foreach (['pra' => 'pos', 'fbr' => 'fbrpos'] as $panel => $product) {
             'pos_integration_mode' => $panel === 'fbr' ? 'fbr' : 'pra',
         ]);
         $categoryUser = $user($companyCategory, "Synthetic {$category} owner", "category-user-{$panel}-{$category}@rc-browser.invalid", 'company_admin', 'pos_admin');
+        if ($panel === 'fbr' && $category === 'education') {
+            // Preserve the complete category actor matrix, but assert the native
+            // school desk rather than retail stock/service workflows. The
+            // dedicated school-fees journey performs cash and reprint mutations.
+            \App\Models\Subscription::create(['company_id' => $companyCategory->id, 'active' => true,
+                'override_type' => 'lifetime', 'start_date' => now(), 'end_date' => now()->addYear()]);
+            $categoryJourneys[] = [
+                'name' => "category-{$panel}-{$category}", 'login' => $categoryUser->email, 'password' => $password,
+                'loginPath' => '/fbr-pos/login', 'paths' => ['/fbr-pos/school-fees'],
+                'expectedPaths' => ['/fbr-pos/school-fees'], 'markers' => ['School fee collection'],
+                'mainMarkers' => ['School fee collection'],
+            ];
+            continue;
+        }
         if ($panel === 'pra' && $category === 'restaurant') {
             $inventoryOwner = $categoryUser;
         }
@@ -1031,6 +1088,8 @@ $fixture = [
         ['name' => 'service-work-orders-denied', 'login' => $serviceDenied->email, 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/work-orders', '/pos/work-orders/report.csv'], 'denied' => true],
     ], $categoryJourneys, $optionalArchiveJourneys),
     'transactionalJourneys' => [
+        ['name'=>'school-fees','login'=>$schoolUser->email,'mobileLogin'=>$schoolMobileUser->email,'password'=>$password,'loginPath'=>'/fbr-pos/login',
+            'paths'=>['/fbr-pos/school-fees'],'markers'=>['School fee collection'],'schoolFee'=>true,'legacyInvoices'=>$schoolLegacyInvoices,'manualOnly'=>true],
         ['name'=>'restore-session-boundary','login'=>$admin->email,'password'=>$password,'loginPath'=>'/admin/login', 'paths'=>[], 'manualOnly'=>true, 'restoreSessionBoundary'=>true],
         ['name'=>'security-onboarding','login'=>$securityCases[1366]['incomplete'],'password'=>$password,
             'loginPath'=>'/login','paths'=>[], 'securityOnboarding'=>$securityCases],

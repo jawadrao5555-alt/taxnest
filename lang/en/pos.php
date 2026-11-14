@@ -4,6 +4,15 @@
 // Purity locked by tests/Unit/LangPurityTest.php — no Roman Urdu / Urdu script here.
 
 return [
+    'school_sales_history' => 'School Sales History',
+    'school_cash_summary' => 'School day-close cash preview',
+    'school_close_blocked' => 'School closing snapshots and close/reopen controls are not implemented. This preview is not a completed day close.',
+    'school_calendar_date' => 'Calendar date',
+    'school_view_report' => 'View report',
+    'school_receipt_count' => 'Receipt count',
+    'school_cash_total' => 'Cash collected',
+    'school_calendar_preview' => 'Calendar-date totals for the current campus only. Each saved receipt is counted once. Retail business-day rollover and fiscal Z-close do not apply.',
+
     'auth_bt_school_education' => 'School / Education',
     'school_fee_desk' => 'School fee collection',
     'school_dashboard' => 'Dashboard',

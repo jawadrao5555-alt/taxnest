@@ -4,6 +4,15 @@
 // Purity locked by tests/Unit/LangPurityTest.php — Latin words only from the whitelist.
 
 return [
+    'school_sales_history' => 'اسکول وصولیوں کی تاریخ',
+    'school_cash_summary' => 'اسکول روزانہ نقد پیش منظر',
+    'school_close_blocked' => 'اسکول کلوزنگ اسنیپ شاٹ اور بند/دوبارہ کھولنے کے کنٹرول ابھی موجود نہیں۔ یہ پیش منظر مکمل ڈے کلوز نہیں۔',
+    'school_calendar_date' => 'کیلنڈر تاریخ',
+    'school_view_report' => 'رپورٹ دیکھیں',
+    'school_receipt_count' => 'رسیدوں کی تعداد',
+    'school_cash_total' => 'وصول شدہ نقد',
+    'school_calendar_preview' => 'صرف موجودہ کیمپس کی کیلنڈر تاریخ کے مجموعے۔ ہر محفوظ رسید ایک بار شمار ہوتی ہے۔ ریٹیل کاروباری دن اور مالی زیڈ کلوز لاگو نہیں۔',
+
     'auth_bt_school_education' => 'اسکول / تعلیم',
     'school_fee_desk' => 'اسکول فیس وصولی',
     'school_dashboard' => 'ڈیش بورڈ',

@@ -44,6 +44,35 @@ class FbrPosSchoolFeeController extends Controller
         ])->withHeaders(['Cache-Control' => 'no-store']);
     }
 
+    public function history(Request $request)
+    {
+        return $this->cashReport($request, false);
+    }
+
+    public function dayClose(Request $request)
+    {
+        return $this->cashReport($request, true);
+    }
+
+    private function cashReport(Request $request, bool $dayClose)
+    {
+        $company = $this->company();
+        if ($dayClose) {
+            abort_unless(\App\Services\PosAccessService::dayCloseAllowed(Auth::guard('fbrpos')->user(), $company), 403);
+        }
+        $data = $request->validate(['date' => 'nullable|date_format:Y-m-d']);
+        $date = $data['date'] ?? today()->format('Y-m-d');
+        // A calendar-day preview only. Do not silently adopt retail Z-close,
+        // tax totals or business-day rollover rules for school fee receipts.
+        $query = $this->receipts($company)->whereDate('collected_at', $date);
+        $cashAmountPaisa = (int) (clone $query)->sum('amount_paisa');
+        $receiptCount = (clone $query)->count();
+        $receipts = $query->orderByDesc('id')->paginate(20)->withQueryString();
+        return response()->view('fbr-pos.school-fees.report', compact(
+            'company', 'date', 'dayClose', 'cashAmountPaisa', 'receiptCount', 'receipts'
+        ))->header('Cache-Control', 'private, no-store');
+    }
+
     public function store(Request $request)
     {
         $company = $this->company();

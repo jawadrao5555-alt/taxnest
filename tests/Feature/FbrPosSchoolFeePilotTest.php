@@ -39,6 +39,7 @@ class FbrPosSchoolFeePilotTest extends TestCase
             $table->boolean('fbr_pos_enabled')->default(true);
             $table->boolean('agent_enabled')->default(false);
             $table->boolean('is_internal_account')->default(false);
+            $table->boolean('pos_cashier_dayclose')->default(false);
             $table->integer('invoice_limit_override')->nullable();
             $table->string('fbr_connection_mode')->nullable();
             $table->softDeletes();
@@ -161,14 +162,23 @@ class FbrPosSchoolFeePilotTest extends TestCase
     {
         $payload = $this->payload();
         $this->collect($payload);
-        try {
-            $this->collect(array_replace($payload, ['amount' => '999.00']));
-            $this->fail('A changed retry must be rejected.');
-        } catch (ValidationException $exception) {
-            $this->assertSame(422, $exception->status);
+        $before = (array) DB::table('school_fee_receipts')->first();
+        $controller = app(FbrPosSchoolFeeController::class);
+        $originalReceipt = $controller->receipt($before['id'])->getContent();
+        foreach ([['amount' => '999.00'], ['fee_head' => 'exam'], ['student_reference' => 'SYN-CHANGED']] as $change) {
+            try {
+                $this->collect(array_replace($payload, $change));
+                $this->fail('A changed retry must be rejected.');
+            } catch (ValidationException $exception) {
+                $this->assertSame(422, $exception->status);
+                $this->assertSame([__('pos.school_retry_conflict')], $exception->errors()['request_key']);
+            }
+            $this->assertSame(1, DB::table('school_fee_receipts')->count());
+            $this->assertSame(125050, (int) DB::table('school_fee_receipts')->sum('amount_paisa'));
+            $this->assertSame($before, (array) DB::table('school_fee_receipts')->first());
+            $this->assertSame($originalReceipt, $controller->receipt($before['id'])->getContent());
         }
-        $this->assertSame(1, DB::table('school_fee_receipts')->count());
-        $this->assertSame(125050, (int) DB::table('school_fee_receipts')->value('amount_paisa'));
+        Http::assertNothingSent();
     }
 
     public function test_non_cash_unknown_fee_and_invalid_amounts_are_rejected(): void
@@ -198,6 +208,87 @@ class FbrPosSchoolFeePilotTest extends TestCase
         $this->actingAs($this->cashier, 'fbrpos');
         app()->instance('currentCompanyId', $other->id);
         $this->expectHttpStatus(404, fn () => app(FbrPosSchoolFeeController::class)->receipt($id));
+    }
+
+    public function test_campus_cashier_can_reprint_own_saved_receipt_but_not_other_campus_or_tenant(): void
+    {
+        app()->bind('currentBranchId', fn () => 17);
+        $payload = $this->payload();
+        $id = $this->collect($payload)->getData(true)['receipt_id'];
+        $row = DB::table('school_fee_receipts')->find($id);
+        $this->assertSame(17, (int) $row->branch_id);
+        $controller = app(FbrPosSchoolFeeController::class);
+        $receipt = $controller->receipt($id)->getContent();
+        foreach (['Synthetic School', 'SF-'.$id, 'SYN-001', 'Tuition', 'Cash', 'PKR 1,250.50',
+            (string) $row->collected_at, 'LOCAL RECEIPT ONLY', 'Not submitted to FBR.'] as $field) {
+            $this->assertStringContainsString($field, $receipt);
+        }
+        // The save succeeded even if its response was lost. Reconstructing a
+        // fresh request with the same key must return the same immutable receipt.
+        $this->assertSame($id, $this->collect($payload)->getData(true)['receipt_id']);
+        $this->assertSame($receipt, $controller->receipt($id)->getContent());
+        app()->bind('currentBranchId', fn () => 18);
+        $this->expectHttpStatus(404, fn () => $controller->receipt($id));
+        app()->bind('currentBranchId', fn () => 17);
+        $other = Company::withoutEvents(fn () => Company::create([
+            'name' => 'Other Campus Tenant', 'product_type' => 'fbrpos', 'pos_type' => 'education',
+        ]));
+        $this->cashier->company_id = $other->id;
+        $this->cashier->saveQuietly();
+        $this->actingAs($this->cashier, 'fbrpos');
+        app()->instance('currentCompanyId', $other->id);
+        $this->expectHttpStatus(404, fn () => $controller->receipt($id));
+        $this->assertSame(1, DB::table('school_fee_receipts')->count());
+        $this->assertSame(125050, (int) DB::table('school_fee_receipts')->sum('amount_paisa'));
+    }
+
+    public function test_history_and_authorized_cash_preview_count_saved_payment_once_and_scope_campus_and_date(): void
+    {
+        app()->bind('currentBranchId', fn () => 17);
+        $this->school->forceFill(['pos_cashier_dayclose' => true])->saveQuietly();
+        $controller = app(FbrPosSchoolFeeController::class);
+        $assertReports = function (int $count, int $paisa) use ($controller) {
+            foreach (['history', 'dayClose'] as $action) {
+                $request = Request::create('/fbr-pos/'.($action === 'history' ? 'transactions' : 'day-close'), 'GET');
+                app()->instance('request', $request);
+                $html = $controller->$action($request)->getContent();
+                $this->assertStringContainsString('id="school-receipt-count">'.$count.'</dd>', $html);
+                $this->assertStringContainsString('data-paisa="'.$paisa.'"', $html);
+            }
+        };
+        $assertReports(0, 0);
+        $payload = $this->payload();
+        $first = $this->collect($payload)->getData(true);
+        $assertReports(1, 125050);
+        $this->assertSame($first['receipt_id'], $this->collect($payload)->getData(true)['receipt_id']);
+        foreach ([['amount' => '999.00'], ['fee_head' => 'exam'], ['student_reference' => 'CHANGED']] as $change) {
+            try {
+                $this->collect(array_replace($payload, $change));
+                $this->fail('Changed saved-payment retry must fail.');
+            } catch (ValidationException $exception) {
+                $this->assertSame(422, $exception->status);
+            }
+            $assertReports(1, 125050);
+        }
+        app()->bind('currentBranchId', fn () => 18);
+        $this->collect($this->payload(['amount' => '42.00']));
+        app()->bind('currentBranchId', fn () => 17);
+        $old = $this->collect($this->payload(['amount' => '8.00']))->getData(true);
+        DB::table('school_fee_receipts')->where('id', $old['receipt_id'])->update(['collected_at' => now()->subDay()]);
+        // Another campus and yesterday's collection must not inflate today's
+        // campus-specific cash preview or sales history.
+        $assertReports(1, 125050);
+        Http::assertNothingSent();
+    }
+
+    public function test_cashier_day_close_preview_is_denied_unless_configured(): void
+    {
+        $controller = app(FbrPosSchoolFeeController::class);
+        $request = Request::create('/fbr-pos/day-close', 'GET');
+        app()->instance('request', $request);
+        $this->expectHttpStatus(403, fn () => $controller->dayClose($request));
+        $this->school->forceFill(['pos_cashier_dayclose' => true])->saveQuietly();
+        $this->assertSame(200, $controller->dayClose($request)->getStatusCode());
     }
 
     public function test_retail_company_cannot_use_school_collection_endpoint(): void
@@ -342,6 +433,22 @@ class FbrPosSchoolFeePilotTest extends TestCase
         app()->instance('request', $request);
         $receipt = app(FbrPosSchoolFeeController::class)->store($request);
         $this->assertStringStartsWith('/fbr-pos/school-fees/', $receipt->headers->get('Location'));
+    }
+
+    public function test_school_cannot_create_a_misleading_retail_day_close(): void
+    {
+        $controller = app(\App\Http\Controllers\FbrPosController::class);
+        foreach (['closeDayReport', 'closeAllPriorDays'] as $method) {
+            try {
+                $controller->$method(Request::create('/fbr-pos/day-close', 'POST'));
+                $this->fail('School retail closing must be rejected.');
+            } catch (HttpExceptionInterface $error) {
+                $this->assertSame(422, $error->getStatusCode());
+                $this->assertStringContainsString('not implemented', $error->getMessage());
+            }
+        }
+        $this->assertNull($controller->performDayClose($this->school->id, today()->toDateString(), $this->cashier->id));
+        Http::assertNothingSent();
     }
 
     public function test_school_category_does_not_change_pra_education_or_retail_reporting(): void

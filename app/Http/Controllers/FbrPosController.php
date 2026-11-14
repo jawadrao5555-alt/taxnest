@@ -992,6 +992,8 @@ class FbrPosController extends Controller
      */
     public function performDayClose(int $companyId, string $date, ?int $userId, ?string $notes = null, ?array $cashRecon = null, bool $allowEmpty = false, ?array $actionOverride = null): ?FbrDayCloseReport
     {
+        // Never create a misleading retail zero-total Z-report for school cash.
+        if (Company::find($companyId)?->isSchoolFeePilot()) return null;
         // Fast-path: already closed → return without locking
         $existing = FbrDayCloseReport::where('company_id', $companyId)
             ->where('report_date', $date)->first();
@@ -3485,6 +3487,9 @@ class FbrPosController extends Controller
 
     public function transactions(Request $request)
     {
+        if (Company::find(app('currentCompanyId'))?->isSchoolFeePilot()) {
+            return app(FbrPosSchoolFeeController::class)->history($request);
+        }
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
         $tab = $request->get('tab', 'fbr');
@@ -7322,6 +7327,9 @@ class FbrPosController extends Controller
 
     public function dayCloseReport(Request $request)
     {
+        if (Company::find(app('currentCompanyId'))?->isSchoolFeePilot()) {
+            return app(FbrPosSchoolFeeController::class)->dayClose($request);
+        }
         // Owner rule (5 Aug 2026, mirrored from PRA): Day Close is admin/manager
         // work by DEFAULT. A cashier reaches it only when the company switch or
         // a Team Custom Access tick re-opens it — dayCloseAllowed = single
@@ -8012,6 +8020,7 @@ class FbrPosController extends Controller
 
     public function closeAllPriorDays(Request $request)
     {
+        abort_if(Company::find(app('currentCompanyId'))?->isSchoolFeePilot(), 422, __('pos.school_close_blocked'));
         // Same authority gate as the single close (owner rule 5 Aug 2026).
         $user = Auth::guard('fbrpos')->user();
         if ($user && !\App\Services\PosAccessService::dayCloseAllowed($user)) {
@@ -8139,6 +8148,7 @@ class FbrPosController extends Controller
 
     public function closeDayReport(Request $request)
     {
+        abort_if(Company::find(app('currentCompanyId'))?->isSchoolFeePilot(), 422, __('pos.school_close_blocked'));
         // Owner rule (5 Aug 2026, mirrored from PRA): cashier day-close only
         // via company switch / Custom Access tick.
         $dayCloseUser = Auth::guard('fbrpos')->user();

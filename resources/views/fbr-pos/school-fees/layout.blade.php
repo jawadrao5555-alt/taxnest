@@ -10,5 +10,6 @@
 </head>
 <body><main>
 <header><div><div class="brand">TaxNest</div><div>{{ $company->name }}</div></div><a href="/fbr-pos/dashboard">{{ __('pos.school_dashboard') }}</a></header>
+<nav class="actions no-print"><a href="/fbr-pos/school-fees">{{ __('pos.school_fee_desk') }}</a><a href="/fbr-pos/transactions">{{ __('pos.school_sales_history') }}</a>@if(\App\Services\PosAccessService::dayCloseAllowed(Auth::guard('fbrpos')->user(), $company))<a href="/fbr-pos/day-close">{{ __('pos.school_cash_summary') }}</a>@endif</nav>
 @yield('content')
 </main></body></html>

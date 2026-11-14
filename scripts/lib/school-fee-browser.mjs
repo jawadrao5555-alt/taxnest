@@ -18,6 +18,18 @@ export async function schoolFeeWorkflow(page, t, v, { baseUrl, saveEvidenceScree
     await saveEvidenceScreenshot(registration, 'school-fee-registration-' + v.width);
   } finally { await guest.close(); }
 
+  const reportTotals = async path => {
+    const response = await page.goto(baseUrl + path, { waitUntil: 'domcontentloaded' });
+    if (!response?.ok()) throw new Error('School cash report failed: ' + path);
+    await page.locator('#school-receipt-count').waitFor();
+    return {
+      count: Number(await page.locator('#school-receipt-count').innerText()),
+      paisa: Number(await page.locator('#school-cash-total').getAttribute('data-paisa')),
+    };
+  };
+  const reportPaths = ['/fbr-pos/transactions', '/fbr-pos/day-close'];
+  const beforeReports = new Map();
+  for (const path of reportPaths) beforeReports.set(path, await reportTotals(path));
   await page.goto(baseUrl + '/fbr-pos/create', { waitUntil: 'domcontentloaded' });
   await page.waitForURL('**/fbr-pos/school-fees');
   const form = page.locator('#school-collection');
@@ -68,6 +80,21 @@ export async function schoolFeeWorkflow(page, t, v, { baseUrl, saveEvidenceScree
   });
   const replayed = await replay.json();
   if (!replay.ok() || !replayed.success || Number(replayed.receipt_id) !== receiptId) throw new Error('Lost-response retry did not return the same persisted receipt');
+  // A saved-but-lost response may be retried, but changing its immutable
+  // payment details must return a clear 422 without changing the receipt.
+  const originalReceipt = await (await page.request.get(baseUrl + receiptPath)).text();
+  for (const change of [{ amount: '999.00' }, { fee_head: 'exam' }, { student_reference: reference + '-CHANGED' }]) {
+    const conflict = await page.request.post(baseUrl + '/fbr-pos/school-fees', {
+      headers: { Accept: 'application/json', 'X-CSRF-TOKEN': csrf },
+      form: { request_key: key, student_reference: reference, fee_head: 'tuition', amount: '1250.50', payment_method: 'cash', ...change },
+    });
+    const rejected = await conflict.json();
+    if (conflict.status() !== 422 || !rejected.errors?.request_key?.[0]?.includes('different details')) {
+      throw new Error('Changed saved-payment retry did not return clear 422 conflict');
+    }
+    const unchanged = await (await page.request.get(baseUrl + receiptPath)).text();
+    if (unchanged !== originalReceipt) throw new Error('Rejected retry changed the saved receipt');
+  }
   await page.reload({ waitUntil: 'domcontentloaded' });
   if (await page.getByRole('row').filter({ hasText: reference }).count() !== 1) throw new Error('Retry duplicated school cash collection');
   await page.getByRole('row').filter({ hasText: reference }).getByRole('link', { name: 'SF-' + receiptId, exact: true }).click();
@@ -77,5 +104,16 @@ export async function schoolFeeWorkflow(page, t, v, { baseUrl, saveEvidenceScree
   await page.getByRole('button', { name: 'Print / Reprint', exact: true }).click();
   if (await page.evaluate(() => window.__schoolPrintCount) !== 1) throw new Error('Saved receipt reprint action did not invoke browser print');
   await saveEvidenceScreenshot(page, 'school-fee-history-reprint-' + v.width);
+  for (const path of reportPaths) {
+    const after = await reportTotals(path);
+    const before = beforeReports.get(path);
+    if (after.count !== before.count + 1 || after.paisa !== before.paisa + 125050) {
+      throw new Error('School cash report did not count the immutable payment exactly once: ' + path);
+    }
+    if (await page.getByRole('row').filter({ hasText: reference }).count() !== 1) {
+      throw new Error('School cash report omitted or duplicated the new receipt: ' + path);
+    }
+    await saveEvidenceScreenshot(page, 'school-fee-' + (path.endsWith('transactions') ? 'sales-history-' : 'cash-preview-') + v.width);
+  }
   pass('SCHOOL FEE PASS: ' + v.width + ': public category selection, real cash POST, persisted receipt/history, same-key retry, print CSS and reprint action; no fiscal submission and no physical printer claim');
 }

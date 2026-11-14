@@ -4,6 +4,15 @@
 // Purity locked by tests/Unit/LangPurityTest.php — no Arabic-script characters here.
 
 return [
+    'school_sales_history' => 'School Sales History',
+    'school_cash_summary' => 'School day-close cash preview',
+    'school_close_blocked' => 'School close snapshots aur close/reopen controls abhi tayyar nahin. Yeh preview completed day close nahin.',
+    'school_calendar_date' => 'Calendar tareekh',
+    'school_view_report' => 'Report dekhein',
+    'school_receipt_count' => 'Receipt tadaad',
+    'school_cash_total' => 'Cash jama',
+    'school_calendar_preview' => 'Sirf is campus ke calendar tareekh totals. Har saved receipt aik baar count hoti hai. Retail business-day rollover aur fiscal Z-close laagu nahin.',
+
     'auth_bt_school_education' => 'School / Taleem',
     'school_fee_desk' => 'School fees wasooli',
     'school_dashboard' => 'Dashboard',

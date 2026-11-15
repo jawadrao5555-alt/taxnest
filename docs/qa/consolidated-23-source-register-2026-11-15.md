@@ -1,6 +1,6 @@
 # TaxNest 23-source reconciliation inventory
 
-## Canonical current register: inspected 27ced0d (15 November 2026)
+## Canonical current register: inspected a5831d9 (15 November 2026)
 
 **This section supersedes every historical missing-code/status statement below.**
 It records bounded implementation, not acceptance of all 23 source programmes.
@@ -95,7 +95,7 @@ unverified original scenarios remain separately open.
 The following distinction comes from current source, not the older diagnostic
 release notes:
 
-- `app/Services/Reporting/DiagnosticSourceEvidence.php` registry version 13
+- `app/Services/Reporting/DiagnosticSourceEvidence.php` registry version 15
   **already includes** `pos.backup_evidence`, `di.backup_evidence`,
   `fbrpos.backup_evidence` and `health.backup_evidence`, backed by
   `tenant_backup_evidence`. It also includes School accounts/receipts/closings
@@ -110,13 +110,16 @@ release notes:
   adapter now follows those retained IDs with matching tenant/invoice/item and
   movement checks. Registry v13 adds `di.stock_postings`; bill evidence v6
   includes stock. Inconsistent links fail closed in reads and collection. No amount/time/name matching or historical reconstruction is allowed.
-- Other currently declared unimplemented bill links are DI `payments` and
-  `print_events`; FBR POS `payments` and `offline_agent_events`; Healthcare ERP
-  `lab_orders` and `print_events`; PRA unuploaded/unattributed offline events.
-  This pass did not establish safe retained contracts for those missing links.
-  `PosPayment` belongs to PRA `PosTransaction`, not FBR POS: do not reuse its
-  numeric transaction IDs across products. Existing FBR print jobs and print
-  evidence **are** already associated and must not be called absent.
+- Current bill evidence is version 8. DI retained invoice-payment events and
+  FBR POS allocated-payment events now follow explicit tenant-bound contracts;
+  no cross-product numeric ID inference is used. Exact registered FBR refund
+  events additionally follow byte-exact schema/command, tenant/branch, mapping,
+  original sale and return identities. See `fbr-projected-refund-diagnostics-393.md`.
+  This does not establish general offline-event completeness. Unlinked/corrupt
+  evidence remains explicit rather than invented.
+- Remaining unsupported links include DI print events, Healthcare lab orders
+  and print events, and unuploaded/unattributed offline events. Existing FBR
+  print jobs/evidence are associated and must not be called absent.
 - Healthcare has no lab route family. A lab fixture role opening the patient
   register or a clinical PDF attachment is not a lab-order/result/refund source.
   This remains outside the bounded #377 fixture delivery, not an instruction
@@ -129,6 +132,20 @@ release notes:
   backup bytes, restore success or RPO/RTO. Source enrollment and real elapsed
   collection are external/operator actions, not reasons to claim the adapter
   absent or to silently activate collection.
+
+
+### Frozen acceptance checkpoint, 15 November 2026
+
+Owner retained the agreed consolidated scope in #393; no separate release or
+new feature scope is authorized. Exact published dc5b5d3230b5501466fe49d8379f20dafd59254b
+native run43724449534/job132843238249 passed all phases: old-snapshot pilot
+same-payment recovery, changed-data rejection, immutable closing, quota,
+callback/receiving stock overlap, upgrade preservation and actual registered
+refund projection. This evidence applies to that head, not later fixes.
+Browser on that head passed desktop expense detail capture but rejected mobile
+column overflow; scoped table-grid correction and a reversed-trial-boundary
+validator fix require a new final-head run. No assertion was weakened.
+Final full/native/browser/supplemental and visual review remain pending.
 
 ## Historical checkpoints (not the current missing-code/status register)
 

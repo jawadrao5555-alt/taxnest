@@ -23,7 +23,7 @@ $connection=Illuminate\Support\Facades\DB::connection();
 if ($connection->getDatabaseName() !== 'taxnest_erp_demo' || $connection->getConfig('unix_socket') !== $socket
     || !str_contains((string)$connection->selectOne('select version() as v')->v, 'MariaDB')) $fail('exact disposable MariaDB required');
 if ($connection->select('SHOW TABLES')) $fail('database must be completely empty before migrations; no reset supported');
-Illuminate\Support\Facades\Artisan::call('migrate', ['--force'=>true]);
+if (Illuminate\Support\Facades\Artisan::call('migrate', ['--force'=>true]) !== 0) $fail('fresh-schema migration failed');
 // Legacy migrations insert sample tenants. Only this proven fresh schema may
 // clear those generated rows; a nonempty input schema was refused above.
 Illuminate\Support\Facades\Schema::disableForeignKeyConstraints();

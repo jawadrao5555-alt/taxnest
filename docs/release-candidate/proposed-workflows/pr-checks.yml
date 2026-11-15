@@ -253,6 +253,10 @@ jobs:
           RC_BROWSER_STATE_ROOT=/tmp/taxnest-rc-browser-${{ github.run_id }}-${{ github.job }} \
             bash scripts/rc-playwright-install.sh
           node scripts/tests/local-browser-discovery-check.mjs
+      - name: Verify dedicated Hospital ERP demo role access at desktop and 390px
+        env:
+          RC_BROWSER_STATE_ROOT: /tmp/taxnest-rc-browser-${{ github.run_id }}-${{ github.job }}
+        run: bash scripts/check-erp-demo-browser.sh "$RC_BROWSER_STATE_ROOT/playwright-cache"
       - name: Seed and exercise isolated browser fixture
         env:
           RC_MARIADB_PORT: '33117'

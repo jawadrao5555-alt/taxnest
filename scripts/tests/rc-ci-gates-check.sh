@@ -77,6 +77,10 @@ function contract(doc,label){
   if((jobs.browserdesktopmobile.steps||[]).filter(s=>s.name==='Upload verified synthetic screenshots for visual review').length!==1)throw Error(`${label}: one guarded synthetic pixel upload required`);
   const native=jobs['native-mariadb-di'];
   const browser=jobs.browserdesktopmobile;
+  const erp=(browser.steps||[]).find(s=>s.name==='Verify dedicated Hospital ERP demo role access at desktop and 390px');
+  if(!erp || erp.if || erp['continue-on-error'] || erp.run!=='bash scripts/check-erp-demo-browser.sh "$RC_BROWSER_STATE_ROOT/playwright-cache"'
+    || erp.env?.RC_BROWSER_STATE_ROOT!=='/tmp/taxnest-rc-browser-${{ github.run_id }}-${{ github.job }}')throw Error(`${label}: dedicated ERP role acceptance must remain mandatory and isolated`);
+
   for (const [mode, prefix] of [['upgrade', 'upgrade_'], ['reviewed-callback', 'callback_']]) {
     const steps=native.steps||[];
     const index=steps.findIndex(s=>String(s.run||'').endsWith(`rc-mariadb-migration-lab.sh --${mode}`));

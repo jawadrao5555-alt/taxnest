@@ -49,3 +49,8 @@ test('PRA read evidence permits only three bounded synthetic intents',()=>{
  for(const intent of ['closing','recipe','campus-unknown'])for(const width of [1366,390])assert.equal(pixelName(`madadgar-pra-${intent}-${width}`),`madadgar-pra-${intent}-${width}.png`);
  for(const name of ['madadgar-pra-arbitrary-390','madadgar-pra-closing-1280','madadgar-pra-recipe-390.png','../madadgar-pra-campus-unknown-390'])assert.throws(()=>pixelName(name));
 });
+
+test('platform expense evidence is one exact reconciled synthetic view',()=>{
+ for(const width of [1366,390])assert.equal(pixelName(`platform-expense-reconciled-${width}`),`platform-expense-reconciled-${width}.png`);
+ for(const name of ['platform-expense-arbitrary-390','platform-expense-reconciled-1280','platform-expense-reconciled-390.png','../platform-expense-reconciled-390'])assert.throws(()=>pixelName(name));
+});

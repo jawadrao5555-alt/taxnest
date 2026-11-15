@@ -106,6 +106,8 @@ concurrency(){
     clean_php php "$ROOT/tests/native/rc_school_fee_concurrency.php" | tee "$EVIDENCE_DIR/school-fee-concurrency.log"
     clean_php php "$ROOT/tests/native/rc_greetings_concurrency.php" | tee "$EVIDENCE_DIR/greetings-concurrency.log"
     clean_php php "$ROOT/tests/native/rc_madadgar_budget.php" | tee "$EVIDENCE_DIR/madadgar-budget.log"
+    clean_php php "$ROOT/tests/native/rc_platform_expense_concurrency.php" | tee "$EVIDENCE_DIR/platform-expense-concurrency.log"
+    grep -Fqx "PASS: native platform expense duplicate request and reversal preserve one immutable original and offset with audit; changed data, current demotion and tenant guards denied; competing admin reversal bounded; no payment executed" "$EVIDENCE_DIR/platform-expense-concurrency.log" || fail platform-expense-missing-concurrency-proof
     clean_php php "$ROOT/tests/native/rc_madadgar_escalation.php" | tee "$EVIDENCE_DIR/madadgar-escalation.log"
     grep -Fqx "PASS: native escalation same-ID atomic retry, one confirmation, daily cap race, original reference recovered, no external sends" "$EVIDENCE_DIR/madadgar-escalation.log" || fail madadgar-escalation-missing-proof
     grep -Fqx "PASS: native AI budget current-read concurrent cap unknown-cost retention and no provider calls" "$EVIDENCE_DIR/madadgar-budget.log" || fail madadgar-budget-missing-proof

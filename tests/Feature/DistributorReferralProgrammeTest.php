@@ -29,7 +29,8 @@ class DistributorReferralProgrammeTest extends TestCase
     public function test_di_valid_distributor_code_attributes_and_blank_is_direct(): void
     {
         $agent = Agent::create(['name'=>'Distributor','email'=>'d@example.test','status'=>'active','is_active'=>true]);
-        $base = ['name'=>'Owner','password'=>'password','password_confirmation'=>'password'];
+        $plan = PricingPlan::create(['name'=>'Business','product_type'=>'di','price'=>1000,'invoice_limit'=>100,'is_trial'=>false]);
+        $base = ['requested_plan'=>$plan->name,'name'=>'Owner','password'=>'password','password_confirmation'=>'password'];
         $this->post('/register', $base + ['email'=>'a@example.test','company_name'=>'A','company_ntn'=>'10001','distributor_reference_code'=>$agent->referral_code])
             ->assertRedirect('/login');
         $this->assertSame($agent->id, (int) Company::where('ntn','10001')->value('agent_id'));
@@ -40,7 +41,8 @@ class DistributorReferralProgrammeTest extends TestCase
 
     public function test_invalid_or_inactive_distributor_code_is_never_direct(): void
     {
-        $payload=['name'=>'Owner','email'=>'bad@example.test','password'=>'password','password_confirmation'=>'password','company_name'=>'Bad','company_ntn'=>'10003','distributor_reference_code'=>'AG-NOTACTIVE'];
+        $plan = PricingPlan::create(['name'=>'Business','product_type'=>'di','price'=>1000,'invoice_limit'=>100,'is_trial'=>false]);
+        $payload=['requested_plan'=>$plan->name,'name'=>'Owner','email'=>'bad@example.test','password'=>'password','password_confirmation'=>'password','company_name'=>'Bad','company_ntn'=>'10003','distributor_reference_code'=>'AG-NOTACTIVE'];
         $this->from('/register')->post('/register',$payload)->assertSessionHasErrors('distributor_reference_code');
         $this->assertDatabaseMissing('companies',['ntn'=>'10003']);
     }
@@ -74,8 +76,10 @@ class DistributorReferralProgrammeTest extends TestCase
 
     public function test_fbr_registration_posts_apply_valid_codes_and_leave_blank_codes_direct(): void
     {
+        $plan = PricingPlan::create(['name'=>'Starter','product_type'=>'fbrpos','price'=>1000,'invoice_limit'=>100,'is_trial'=>false]);
         $agent = Agent::create(['name'=>'FBR Distributor','email'=>'fbr-d@example.test','status'=>'active','is_active'=>true]);
         $payload = fn (string $suffix, string $ntn) => [
+            'requested_plan' => $plan->name,
             'company_name' => 'FBR '.$suffix, 'company_ntn' => $ntn,
             'name' => 'Owner '.$suffix, 'email' => "fbr-{$suffix}@example.test",
             'password' => 'password', 'password_confirmation' => 'password', 'pos_type' => 'restaurant',

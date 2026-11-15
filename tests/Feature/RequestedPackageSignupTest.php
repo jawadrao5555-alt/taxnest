@@ -431,7 +431,8 @@ class RequestedPackageSignupTest extends TestCase
     {
         $this->get('/register?plan=Business&cycle=quarterly')
             ->assertOk()
-            ->assertSee('name="requested_plan" value="Business"', false)
+            ->assertSee('name="requested_plan" required', false)
+            ->assertSee('value="Business" selected', false)
             ->assertSee('name="requested_billing_cycle" value="quarterly"', false);
 
         $this->get('/fbr-pos/register?plan=Business')
@@ -446,12 +447,12 @@ class RequestedPackageSignupTest extends TestCase
             ->assertDontSee('value="Pro"', false)
             ->assertSee('name="requested_plan"', false);
 
-        // Nothing picked → no hidden fields at all.
-        $this->get('/register')->assertOk()->assertDontSee('name="requested_plan"', false);
-        $this->get('/fbr-pos/register')->assertOk()->assertSee('name="requested_plan"', false)->assertSee(__('school_workspace.trial_choice'));
+        // Nothing picked still requires an explicit compatible package; no selection is invented.
+        $this->get('/register')->assertOk()->assertSee('name="requested_plan" required', false)->assertSee(__('billing_policy.choose_plan'));
+        $this->get('/fbr-pos/register')->assertOk()->assertSee('name="requested_plan"', false)->assertSee(__('billing_policy.choose_plan'));
 
         // A trial / wrong-product name in the link is not echoed back either.
-        $this->get('/register?plan=DI+Trial')->assertOk()->assertDontSee('name="requested_plan"', false);
+        $this->get('/register?plan=DI+Trial')->assertOk()->assertSee('name="requested_plan" required', false)->assertDontSee('value="DI Trial"', false);
         $this->get('/fbr-pos/register?plan=Starter')->assertOk()->assertDontSee('value="Starter"', false)->assertSee('name="requested_plan"', false);
     }
 

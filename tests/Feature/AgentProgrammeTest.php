@@ -29,7 +29,9 @@ class AgentProgrammeTest extends TestCase
 
     private function signup(string $email, string $ntn)
     {
+        $plan = \App\Models\PricingPlan::firstOrCreate(['name'=>'Business','product_type'=>'di','is_trial'=>false], ['price'=>1000,'invoice_limit'=>100]);
         return $this->post('/register', [
+            'requested_plan' => $plan->name,
             'name' => 'Owner',
             'email' => $email,
             'password' => 'password',

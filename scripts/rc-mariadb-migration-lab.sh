@@ -11,6 +11,7 @@ for arg in "$@"; do
         --full) MODE=full ;;
         --upgrade) MODE=upgrade ;;
         --concurrency) MODE=concurrency ;;
+        --reviewed-callback) MODE=reviewed_callback ;;
         --di) MODE=di ;;
         --keep-running) KEEP=1 ;;
         *) printf 'rc-mariadb-migration-lab: unknown option %s\n' "$arg" >&2; exit 1 ;;
@@ -91,6 +92,12 @@ upgrade(){
     clean_php php "$ROOT/tests/native/rc_mariadb_schema.php"
     clean_php php artisan migrate --force --no-interaction | grep -q 'Nothing to migrate' || fail non-idempotent-upgrade-migration
 }
+reviewed_callback(){
+    export DB_DATABASE="$FULL_DB"
+    clean_php php "$ROOT/tests/native/rc_reviewed_device_proof.php" | tee "$EVIDENCE_DIR/reviewed-device-proof.log"
+    grep -Fqx "PASS: native reviewed proof exact collation scope default HOLD stale authority and concurrent append-only revocation" "$EVIDENCE_DIR/reviewed-device-proof.log" || fail reviewed-device-proof-missing-success-proof
+    grep -Fqx "PASS: native standalone duplicate reviewed callbacks preserve one fiscal identity and frozen environment refuses dispatch" "$EVIDENCE_DIR/reviewed-device-proof.log" || fail reviewed-device-proof-callback-missing-success-proof
+}
 concurrency(){
     export DB_DATABASE="$FULL_DB"
     clean_php php "$ROOT/tests/native/rc_mariadb_concurrency.php"
@@ -100,9 +107,7 @@ concurrency(){
     clean_php php "$ROOT/tests/native/rc_greetings_concurrency.php" | tee "$EVIDENCE_DIR/greetings-concurrency.log"
     clean_php php "$ROOT/tests/native/rc_delivery_credit_concurrency.php" | tee "$EVIDENCE_DIR/delivery-credit-concurrency.log"
     clean_php php "$ROOT/tests/native/rc_hospital_collection_concurrency.php" | tee "$EVIDENCE_DIR/hospital-collection-concurrency.log"
-    clean_php php "$ROOT/tests/native/rc_reviewed_device_proof.php" | tee "$EVIDENCE_DIR/reviewed-device-proof.log"
-    grep -Fqx "PASS: native reviewed proof exact collation scope default HOLD stale authority and concurrent append-only revocation" "$EVIDENCE_DIR/reviewed-device-proof.log" || fail reviewed-device-proof-missing-success-proof
-    grep -Fqx "PASS: native standalone duplicate reviewed callbacks preserve one fiscal identity and frozen environment refuses dispatch" "$EVIDENCE_DIR/reviewed-device-proof.log" || fail reviewed-device-proof-callback-missing-success-proof
+    reviewed_callback
     clean_php php "$ROOT/tests/native/rc_cashier_online_policy.php" | tee "$EVIDENCE_DIR/cashier-online-policy.log"
     grep -Fqx "PASS: native cashier policy schema default OFF owner-only settings current-session enforcement and tenant isolation" "$EVIDENCE_DIR/cashier-online-policy.log" || fail cashier-policy-missing-proof
     clean_php php "$ROOT/tests/native/rc_local_collection_lifecycle.php" | tee "$EVIDENCE_DIR/local-collection-lifecycle.log"
@@ -190,6 +195,7 @@ case "$MODE" in
     full) full ;;
     upgrade) upgrade ;;
     concurrency) full; concurrency ;;
+    reviewed_callback) full; reviewed_callback ;;
     di) di ;;
 esac
 printf 'PASS: MariaDB RC lab mode=%s completed; raw evidence=%s\n' "$MODE" "$EVIDENCE_DIR"

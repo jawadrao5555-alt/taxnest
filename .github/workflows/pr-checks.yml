@@ -218,6 +218,18 @@ jobs:
         env:
           RC_MARIADB_PORT: '33116'
         run: bash scripts/rc-safe-run -- bash scripts/rc-mariadb-migration-lab.sh --all
+      - name: Independently verify native upgrade preservation
+        if: always()
+        env:
+          RC_MARIADB_PORT: '33116'
+          RC_MARIADB_RUN_ID: upgrade_${{ github.run_id }}_${{ github.run_attempt }}
+        run: bash scripts/rc-safe-run -- bash scripts/rc-mariadb-migration-lab.sh --upgrade
+      - name: Independently verify native reviewed callback race
+        if: always()
+        env:
+          RC_MARIADB_PORT: '33116'
+          RC_MARIADB_RUN_ID: callback_${{ github.run_id }}_${{ github.run_attempt }}
+        run: bash scripts/rc-safe-run -- bash scripts/rc-mariadb-migration-lab.sh --reviewed-callback
       - name: Run required MariaDB-only supplemental probes
         env:
           RC_MARIADB_PORT: '33116'

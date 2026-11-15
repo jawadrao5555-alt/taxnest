@@ -57,6 +57,17 @@ function contract(doc,label){
   }
   const native=jobs['native-mariadb-di'];
   const browser=jobs.browserdesktopmobile;
+  for (const [mode, prefix] of [['upgrade', 'upgrade_'], ['reviewed-callback', 'callback_']]) {
+    const steps=native.steps||[];
+    const index=steps.findIndex(s=>String(s.run||'').endsWith(`rc-mariadb-migration-lab.sh --${mode}`));
+    const step=steps[index];
+    const allIndex=steps.findIndex(s=>String(s.run||'').endsWith('rc-mariadb-migration-lab.sh --all'));
+    if(!step || step.if!=='always()' || step['continue-on-error'] || index<=allIndex
+      || step.env?.RC_MARIADB_RUN_ID!==prefix+'${{ github.run_id }}_${{ github.run_attempt }}') {
+      throw Error(`${label}: native ${mode} must run independently, mandatorily, after --all with its own disposable run ID`);
+    }
+  }
+
   for(const [name,job] of [['native-mariadb-di',native],['browserdesktopmobile',browser]]){
     const image=job.container?.image||'';
     if(!/^mariadb:10\.6\.23-jammy@sha256:[0-9a-f]{64}$/.test(image))throw Error(`${label}: ${name} must pin MariaDB 10.6.23 jammy by digest`);
@@ -82,6 +93,22 @@ const activeDoc=yaml.load(activeBytes.toString('utf8'));
 const proposalDoc=yaml.load(proposalBytes.toString('utf8'));
 const activeContract=contract(activeDoc,'active');
 const proposalContract=contract(proposalDoc,'proposed');
+for (const mode of ['upgrade','reviewed-callback']) {
+  for (const change of ['remove','optional','conditional','shared-root']) {
+    const mutated=structuredClone(activeDoc);
+    const steps=mutated.jobs['native-mariadb-di'].steps;
+    const index=steps.findIndex(s=>String(s.run||'').endsWith(`rc-mariadb-migration-lab.sh --${mode}`));
+    if(change==='remove')steps.splice(index,1);
+    if(change==='optional')steps[index]['continue-on-error']=true;
+    if(change==='conditional')steps[index].if='success()';
+    if(change==='shared-root')delete steps[index].env.RC_MARIADB_RUN_ID;
+    let rejected=false;
+    try { contract(mutated, `negative-${mode}-${change}`); } catch { rejected=true; }
+    if(!rejected)throw Error(`Validator accepted unsafe native ${mode} ${change}`);
+  }
+}
+console.log('PASS: eight negative native preservation/callback gate mutations rejected');
+
 if(JSON.stringify(activeContract)!==JSON.stringify(proposalContract))throw Error('active and proposed PR workflows must have equivalent mandatory DAG/container contracts');
 const sha256=b=>crypto.createHash('sha256').update(b).digest('hex');
 console.log(`PASS: active/proposed workflows have equivalent runnable fail-closed contracts; active_sha256=${sha256(activeBytes)} proposed_sha256=${sha256(proposalBytes)} build_agent_sha256=${sha256(buildActiveBytes)}`);

@@ -12,4 +12,12 @@ final class DiReadPresentationTest extends TestCase
  public function test_missing_or_non_numeric_values_are_unknown_not_zero():void {
   $this->assertSame([],DiReadPresentation::rows([]));$r=DiReadPresentation::rows(['values'=>['net_tax'=>'<script>','net_billing'=>null]]);$this->assertNull($r[0]['value']);$this->assertNull($r[1]['value']);
  }
+ public function test_english_urdu_and_roman_urdu_cover_all_semantic_labels():void {
+  $root=dirname(__DIR__,2);$en=require $root.'/lang/en/madadgar_di.php';
+  foreach(['ur','rur'] as $locale){$labels=require $root.'/lang/'.$locale.'/madadgar_di.php';
+   $this->assertSame([],array_diff(array_keys($en),array_keys($labels)),$locale.' missing labels');
+   foreach($en as $key=>$value)$this->assertNotSame('',trim($labels[$key]),$locale.'.'.$key);
+   foreach(['unknown_value','unavailable','source','date','range','read_at','sales_total','net_item_tax'] as $key)$this->assertNotSame($en[$key],$labels[$key],$locale.'.'.$key.' should be translated');
+  }
+ }
 }

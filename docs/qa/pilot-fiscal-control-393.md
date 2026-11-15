@@ -23,6 +23,9 @@ acknowledgement-only fiscal number/QR handling and preservation of existing ACKs
 Hospital installments must not become separate fiscal invoices by inference.
 No current or historical local bill may be automatically promoted by a later ON.
 
-Keep the PR draft until required exact-head checks and official integration
-requirements are resolved. No live submission, merge or deployment is authorized
-by this control implementation.
+The owner has separated real fiscal activation from #393. This PR delivers local
+billing with fiscal OFF; missing official integration evidence is a follow-up hold,
+not a release blocker for this local-only scope. Keep the PR draft until its
+remaining agreed requirements, exact-head checks and actual visual acceptance
+are complete. No live submission, owner approval, relay, merge or deployment is
+authorized by this control implementation.

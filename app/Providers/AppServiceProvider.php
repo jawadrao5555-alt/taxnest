@@ -117,7 +117,7 @@ class AppServiceProvider extends ServiceProvider
                     'generation' => (string) $event->user->getAttribute('session_generation'),
                 ]);
             }
-            SecurityLogService::log('login', $event->user->id);
+            SecurityLogService::login($event);
 
             // Last-login stamp for company users (web/pos/fbrpos guards).
             // SKIP when a SaaS admin session is active in the same browser —

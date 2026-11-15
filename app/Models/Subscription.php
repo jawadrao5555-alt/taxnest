@@ -24,6 +24,7 @@ class Subscription extends Model
         'override_by',
         'distributor_quote_snapshot',
         'purchase_snapshot',
+        'lifecycle_snapshot',
     ];
 
     protected $casts = [
@@ -37,6 +38,7 @@ class Subscription extends Model
         'free_invoice_limit' => 'integer',
         'distributor_quote_snapshot' => 'array',
         'purchase_snapshot' => 'array',
+        'lifecycle_snapshot' => 'array',
     ];
 
     protected static function booted(): void
@@ -44,7 +46,7 @@ class Subscription extends Model
         static::updating(function (self $subscription) {
             // Assignment owns creation. Historical rows remain unknown; a
             // later update must not mint or replace their purchase evidence.
-            if ($subscription->isDirty('purchase_snapshot')) {
+            if ($subscription->isDirty('purchase_snapshot') || $subscription->isDirty('lifecycle_snapshot')) {
                 throw new \LogicException('Subscription purchase evidence cannot be changed after creation.');
             }
         });
@@ -75,6 +77,7 @@ class Subscription extends Model
 
     public function isTrialActive(): bool
     {
+        if ($policy = \App\Services\ProspectiveSubscriptionPolicy::display($this)) return $policy['phase'] === 'trial';
         return $this->trial_ends_at && $this->trial_ends_at->isFuture();
     }
 
@@ -83,6 +86,7 @@ class Subscription extends Model
         if ($this->hasActiveOverride()) {
             return false;
         }
+        if ($policy = \App\Services\ProspectiveSubscriptionPolicy::display($this)) return $policy['phase'] === 'expired' && !$policy['paid_starts_at'];
         return $this->trial_ends_at && $this->trial_ends_at->isPast();
     }
 
@@ -91,6 +95,7 @@ class Subscription extends Model
         if ($this->hasActiveOverride()) {
             return false;
         }
+        if ($policy = \App\Services\ProspectiveSubscriptionPolicy::display($this)) return $policy['phase'] === 'expired';
         return $this->end_date && \Carbon\Carbon::parse($this->end_date)->isPast();
     }
 
@@ -103,10 +108,10 @@ class Subscription extends Model
     public function entitlementPlan(): ?PricingPlan
     {
         $plan = $this->pricingPlan;
-        $snapshot = $this->purchase_snapshot;
+        $snapshot = \App\Services\ProspectiveSubscriptionPolicy::effectivePurchase($this) ?? $this->purchase_snapshot;
         if (!is_array($snapshot) || ($snapshot['version'] ?? null) !== 1
             || (int) ($snapshot['company_id'] ?? 0) !== (int) $this->company_id
-            || (int) ($snapshot['plan']['id'] ?? 0) !== (int) $this->pricing_plan_id
+            || ((int) ($snapshot['plan']['id'] ?? 0) !== (int) $this->pricing_plan_id && !\App\Services\ProspectiveSubscriptionPolicy::effectivePurchase($this))
             || !is_array($snapshot['plan'] ?? null)) {
             return $plan;
         }

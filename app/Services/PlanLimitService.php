@@ -33,7 +33,7 @@ class PlanLimitService
 
         $plan = $subscription->entitlementPlan();
 
-        return !$plan || (bool) $plan->is_trial;
+        return !ProspectiveSubscriptionPolicy::snapshot($subscription) && (!$plan || (bool) $plan->is_trial);
     }
 
     /**

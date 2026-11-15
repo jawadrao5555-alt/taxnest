@@ -201,6 +201,7 @@ class HealthAuthController extends Controller
 
         return view('health.auth.register', [
             'pickedPlanName' => $picked?->name,
+            'registrationPlans' => \App\Services\ProspectiveSubscriptionPolicy::registrationPlans(HealthPanel::PRODUCT_TYPE),
             'orgTypes' => HealthPanel::ORG_TYPES,
         ]);
     }
@@ -246,9 +247,9 @@ class HealthAuthController extends Controller
 
         $orgType = HealthPanel::normalizeOrgType($request->input('org_type'));
 
-        $requestedPackage = RequestedPackageService::companyAttributes(
-            RequestedPackageService::resolvePlan($request->input('requested_plan'), HealthPanel::PRODUCT_TYPE)
-        );
+        $selectedPlan=\App\Services\ProspectiveSubscriptionPolicy::resolveRegistrationSelection($request,HealthPanel::PRODUCT_TYPE);
+        \App\Services\ProspectiveSubscriptionPolicy::requireSelection($selectedPlan);
+        $requestedPackage = RequestedPackageService::companyAttributes($selectedPlan);
 
         // hasColumn guards: a deploy-before-migrate window must never 500 a signup.
         $healthDefaults = [];
@@ -266,6 +267,7 @@ class HealthAuthController extends Controller
             $healthDefaults[NestErps::VERTICAL_COLUMN] = NestErps::HEALTH;
         }
 
+        $user = \Illuminate\Support\Facades\DB::transaction(function () use ($request,$healthDefaults,$requestedPackage,$selectedPlan) {
         $company = Company::create([
             'name' => $request->company_name,
             'ntn' => $request->company_ntn,
@@ -304,7 +306,11 @@ class HealthAuthController extends Controller
             'ntn' => $request->company_ntn,
         ], $company->id, HealthPanel::PRODUCT_TYPE);
 
-        HealthPlatformService::ensureTrial($company->id);
+        if (\App\Services\ProspectiveSubscriptionPolicy::available()) \App\Services\TrialSubscriptionService::ensureSelectedTrial($company->id,HealthPanel::PRODUCT_TYPE,$selectedPlan->id);
+        else HealthPlatformService::ensureTrial($company->id);
+
+        return $user;
+        });
 
         Auth::guard(HealthPanel::GUARD)->login($user);
 

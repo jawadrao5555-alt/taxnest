@@ -136,6 +136,11 @@ class SubscriptionAccessService
             return ['allowed' => false, 'reason' => 'Your subscription is inactive. Contact admin.', 'override' => null];
         }
 
+        if ($subscription->lifecycle_snapshot !== null && !ProspectiveSubscriptionPolicy::snapshot($subscription)) return ['allowed'=>false,'reason'=>'Subscription policy evidence requires review.','override'=>null];
+        if ($policy=ProspectiveSubscriptionPolicy::display($subscription)) {
+            return ['allowed'=>$policy['phase']!=='expired','reason'=>$policy['phase']==='expired'?'Your plan has expired. New billing is locked; history and receipts remain available.':'Prospective '.$policy['phase'].' access.','override'=>null];
+        }
+
         if ($subscription->end_date && Carbon::parse($subscription->end_date)->isPast()) {
             return ['allowed' => false, 'reason' => 'Your plan has expired. Contact admin.', 'override' => null];
         }

@@ -36,6 +36,7 @@ class RegisteredUserController extends Controller
 
         return view('auth.register', [
             'pickedPlanName' => $picked?->name,
+            'registrationPlans' => \App\Services\ProspectiveSubscriptionPolicy::registrationPlans('di'),
             'pickedCycle' => $cycle,
             'pickedCycleLabel' => $cycle ? Subscription::getCycleLabel($cycle) : null,
         ]);
@@ -105,8 +106,10 @@ class RegisteredUserController extends Controller
         // so a tampered, unknown, trial or wrong-product name is ignored rather
         // than stored — a signup with no package behind it stores nothing at all
         // — and an unrecognised cycle falls back to monthly.
+        $selectedPlan=\App\Services\ProspectiveSubscriptionPolicy::resolveRegistrationSelection($request,'di');
+        \App\Services\ProspectiveSubscriptionPolicy::requireSelection($selectedPlan);
         $requestedPackage = RequestedPackageService::companyAttributes(
-            RequestedPackageService::resolvePlan($request->input('requested_plan'), 'di'),
+            $selectedPlan,
             $request->input('requested_billing_cycle')
         );
 
@@ -116,7 +119,7 @@ class RegisteredUserController extends Controller
         $agent = \App\Services\AgentReferralService::agentFromSignup($request);
         $agentAttrs = $agent ? ['agent_id' => $agent->id] : [];
 
-        $user = DB::transaction(function () use ($request, $referralAttrs, $requestedPackage, $agentAttrs) {
+        $user = DB::transaction(function () use ($request, $referralAttrs, $requestedPackage, $agentAttrs, $selectedPlan) {
             $company = Company::create(array_merge([
                 'name' => $request->company_name,
                 'ntn' => $request->company_ntn,
@@ -128,7 +131,8 @@ class RegisteredUserController extends Controller
 
             // Always attaches a trial subscription (even if the trial plan
             // seed row is missing) — no signup may leave a company bare.
-            \App\Services\TrialSubscriptionService::ensureTrial($company->id, 'di');
+            if (\App\Services\ProspectiveSubscriptionPolicy::available()) \App\Services\TrialSubscriptionService::ensureSelectedTrial($company->id,'di',$selectedPlan->id);
+            else \App\Services\TrialSubscriptionService::ensureTrial($company->id, 'di');
 
             $user = User::create([
                 'name' => $request->name,

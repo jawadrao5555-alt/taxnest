@@ -216,11 +216,12 @@ class FbrPosAuthController extends Controller
             }
             $selectedPlan ??= $legacyPlan;
         }
+        \App\Services\ProspectiveSubscriptionPolicy::requireSelection($selectedPlan);
         $requestedPackage = \App\Services\RequestedPackageService::companyAttributes($selectedPlan, $request->input('billing_cycle'));
 
         // Company, owner, credential ledger and zero-price trial are one unit.
         // Never sign in or consume the referral session after a partial signup.
-        $user = \Illuminate\Support\Facades\DB::transaction(function () use ($request, $posType, $distributor, $storeSlipDefault, $requestedPackage) {
+        $user = \Illuminate\Support\Facades\DB::transaction(function () use ($request, $posType, $distributor, $storeSlipDefault, $requestedPackage, $selectedPlan) {
             $company = Company::create([
                 'name' => $request->company_name,
                 'ntn' => $request->company_ntn,
@@ -272,7 +273,8 @@ class FbrPosAuthController extends Controller
                 'ntn' => $request->company_ntn,
             ], $company->id, 'fbrpos');
 
-            $this->startTrial($company->id, 'fbrpos');
+            if (\App\Services\ProspectiveSubscriptionPolicy::available()) \App\Services\TrialSubscriptionService::ensureSelectedTrial($company->id,'fbrpos',$selectedPlan->id);
+            else $this->startTrial($company->id, 'fbrpos');
 
             return $user;
         });

@@ -206,7 +206,8 @@ class AdminPaymentProofController extends Controller
                 $plan->id,
                 $enforcedCycle,
                 paidRenewal: true,
-                approvedQuote: $discountSnapshot
+                approvedQuote: $discountSnapshot,
+                verifiedReceived: $netReceived
             );
 
             $proofAttrs = [

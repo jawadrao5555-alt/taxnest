@@ -303,7 +303,7 @@ class PosAuthController extends Controller
 
         // Company, owner, credential ledger and zero-price trial are one unit.
         // Never sign in or consume the referral session after a partial signup.
-        $user = \Illuminate\Support\Facades\DB::transaction(function () use ($request, $companyData) {
+        $user = \Illuminate\Support\Facades\DB::transaction(function () use ($request, $companyData, $selectedPlan) {
             $company = Company::create($companyData);
 
             $userData = [
@@ -331,7 +331,8 @@ class PosAuthController extends Controller
                 'ntn' => $request->company_ntn,
             ], $company->id, 'pos');
 
-            $this->startTrial($company->id, 'pos');
+            if (\App\Services\ProspectiveSubscriptionPolicy::available()) \App\Services\TrialSubscriptionService::ensureSelectedTrial($company->id,'pos',$selectedPlan->id);
+            else $this->startTrial($company->id, 'pos');
 
             return $user;
         });

@@ -140,9 +140,9 @@ class SubscriptionAssignmentService
     /**
      * @param  string  $billingCycle  monthly | quarterly | semi_annual | annual (legacy 'yearly' ok)
      */
-    public static function assign(int $companyId, int $pricingPlanId, string $billingCycle = 'annual', bool $reuseCurrentPlan = false, bool $paidRenewal = false, ?array $approvedQuote = null): Subscription
+    public static function assign(int $companyId, int $pricingPlanId, string $billingCycle = 'annual', bool $reuseCurrentPlan = false, bool $paidRenewal = false, ?array $approvedQuote = null, ?float $verifiedReceived = null): Subscription
     {
-        return DB::transaction(function () use ($companyId, $pricingPlanId, $billingCycle, $reuseCurrentPlan, $paidRenewal, $approvedQuote) {
+        return DB::transaction(function () use ($companyId, $pricingPlanId, $billingCycle, $reuseCurrentPlan, $paidRenewal, $approvedQuote, $verifiedReceived) {
             // This is the subscription-replacement mutex. Add-on approval takes
             // the same company lock, so it can never attach a paid feature to a
             // package renewal that is being replaced at the same moment.
@@ -215,6 +215,8 @@ class SubscriptionAssignmentService
                 && $previous->end_date?->greaterThan(now()->startOfDay())) {
                 $endDate = $previous->end_date->copy()->addMonthsNoOverflow($months);
             }
+            $lifecycle = $previous ? ProspectiveSubscriptionPolicy::paid($previous,$months,$pricingPlanId,$paidRenewal,$verifiedReceived,(float)$priced['final_price']) : null;
+            if($lifecycle)$endDate=\Carbon\Carbon::parse($lifecycle['paid_ends_at'])->setTimezone(config('app.timezone'));
             Subscription::where('company_id', $companyId)
                 ->where('active', true)
                 ->update(['active' => false]);
@@ -222,13 +224,14 @@ class SubscriptionAssignmentService
             $attributes = [
                 'company_id' => $companyId,
                 'pricing_plan_id' => $pricingPlanId,
-                'start_date' => now()->toDateString(),
+                'start_date' => $lifecycle ? \Carbon\Carbon::parse($lifecycle['paid_starts_at'])->setTimezone(config('app.timezone'))->toDateString() : now()->toDateString(),
                 'end_date' => $endDate->toDateString(),
                 'active' => true,
                 'billing_cycle' => $cycle,
                 'discount_percent' => $priced['discount_percent'],
                 'final_price' => $priced['final_price'],
             ];
+            if($lifecycle)$attributes['lifecycle_snapshot']=$lifecycle;
             // Additive schema rollout: older installations retain their
             // existing assignment path until the migration is applied.
             if (\Illuminate\Support\Facades\Schema::hasColumn('subscriptions', 'purchase_snapshot')) {

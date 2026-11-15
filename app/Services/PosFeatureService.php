@@ -1255,7 +1255,7 @@ class PosFeatureService
             if ($sub->entitlementPlan() && !empty($sub->entitlementPlan()->pharmacy_enabled)) {
                 return $sub->hasActiveOverride() ? 'override' : 'plan';
             }
-            if ($sub->isTrialActive()) {
+            if ($sub->isTrialActive() && !ProspectiveSubscriptionPolicy::snapshot($sub)) {
                 return 'trial';
             }
         }
@@ -1318,7 +1318,7 @@ class PosFeatureService
             if ($sub->hasActiveOverride()) {
                 return null;
             }
-            if ($sub->isTrialActive()) {
+            if ($sub->isTrialActive() && !ProspectiveSubscriptionPolicy::snapshot($sub)) {
                 // Owner decision (Jul 2026): active-trial companies get the
                 // Restaurant module so they can evaluate it before buying.
                 // When the trial expires the mask returns automatically —
@@ -1342,7 +1342,7 @@ class PosFeatureService
     {
         $plan = $sub->entitlementPlan();
 
-        return !$plan || (bool) $plan->is_trial;
+        return !ProspectiveSubscriptionPolicy::snapshot($sub) && (!$plan || (bool) $plan->is_trial);
     }
 
     /** Is this gate sold ONLY as a paid add-on, i.e. in no package at all? */
@@ -1434,7 +1434,7 @@ class PosFeatureService
                             $allowed = true;
                         }
                     }
-                    if (!$allowed && $sub->isTrialActive()) {
+                    if (!$allowed && $sub->isTrialActive() && !ProspectiveSubscriptionPolicy::snapshot($sub)) {
                         $allowed = true; // trial companies evaluate everything
                     }
                 }

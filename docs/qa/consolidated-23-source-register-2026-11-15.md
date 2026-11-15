@@ -1,6 +1,6 @@
 # TaxNest 23-source reconciliation inventory
 
-## Canonical current register: inspected 9de740b (15 November 2026)
+## Canonical current register: inspected 27ced0d (15 November 2026)
 
 **This section supersedes every historical missing-code/status statement below.**
 It records bounded implementation, not acceptance of all 23 source programmes.
@@ -31,7 +31,7 @@ job results and visual review before changing A; no CI result is inferred here.
 | #320 | Two-step/reset/revocation/impersonation/deletion controls and synthetic restore quarantine | A: integrated checks; E: real backup freshness, restoration, physical erasure and RPO/RTO. Quarantine is not restore proof. |
 | #319 | Retained diagnostic registry, School/Hospital local sources and authenticated tenant backup metadata | DI retained stock association/source now implemented (see evidence note below); A: final source/privacy/native tests; E: producer enrollment, elapsed collection and actual restoration. Missing telemetry stays unknown. |
 | #318 | Existing integrity/return/pharmacy slices and reviewed acknowledgment integration | A: final regression/native proof; E: regulator/device acceptance. |
-| #316 | Frozen billing documents/lifecycle tests; atomic paid approval and commission rollback; `shared-billing-cycles-393.md` | A: native concurrent approval and rendered checkout; I/A: owner chose prospective selected-package72h/unlimited-count/paid-after-trial/paid-expiry7daygrace policy; implementation and boundary tests in progress. See b01-source-policy-reconciliation-393.md; legacy contracts unchanged. |
+| #316 | Frozen billing documents/lifecycle tests; atomic paid approval and commission rollback; `shared-billing-cycles-393.md` | A: native concurrent approval and rendered checkout; A: owner-approved prospective selected-package 72-hour unlimited-bill-count trial, paid-after-trial term and paid-expiry seven-day grace are implemented; exact-head boundary, concurrent approval and quota admission acceptance remain required. See b01-source-policy-reconciliation-393.md; legacy contracts unchanged. |
 | #314 | Shared-platform/local School pilot integration only | F: full School ERP and future industries. Preserve original Q1–Q6/E1–E9 scope. |
 | #313 | DI packing/cycles/proof preservation plus inventory integration | A: final import/returns/native/browser proof; E: statutory acceptance. |
 | #301 | Original master preserved; implementation distributed across child sources | I/A/E: original 47 outcomes remain preserved; owner-resolved prospective billing implementation and scenario acceptance are explicitly mapped, not closed by aggregate CI. |
@@ -39,6 +39,31 @@ job results and visual review before changing A; no CI result is inferred here.
 | #264 | Configured DI periods and immutable quotes | A: final price/date/renewal/document/isolation evidence. |
 | #237 | Optional default-OFF cashier policy with live server/session/offline enforcement | A: browser/regressions; E: any owner-authorized activation. Old compulsory policy is not adopted. |
 | #228 | Offline row-locator/release-parser evidence tooling | E: actual authorized workbook and owner batch review remain HOLD; historical source CI is not final-head evidence. |
+
+### Prospective billing and quota evidence boundary
+
+The selected-package policy is prospective only. Existing customers retain legacy
+terms, caps and grants. Unlimited trial means bill count only, not unpurchased
+features, users, branches, add-ons or fiscal permission. First paid activation
+retains the trial remainder; late activation is not backdated. Paid renewals
+preserve remaining time, and history/reprint remain available after grace.
+
+Minimal immutable PRA/FBR deletion facts prevent deleted bills freeing paid
+capacity. PRA report reconciliation retains the original business date separately
+from its original-created-time quota basis; DI retains its existing submitted-time
+counting basis. Neither reconstructs historical bills or retroactively charges
+trial-created PRA bills when promoted. Unknown retained evidence holds, rather
+than inventing an allowance. SQL NULL remains legacy; stored JSON null is invalid
+policy evidence, not an implicit legacy exemption.
+
+Current-read admission guards now serialize new-policy PRA, DI, FBR and local
+School/Hospital capacity under the company lock. DI ambiguous production claims
+reserve capacity without being treated as accepted fiscal submissions. Dedicated
+native probes cover old repeatable-read snapshots, distinct last-slot requests,
+same-key replay, changed-data rejection, partial balance and immutable day-close
+races. These are **test implementations, not yet final-head native PASS evidence**.
+The coordinator must integrate all follow-up fixes and verify the actual hosted
+results, including reservation/callback lock ordering and restaurant replay.
 
 ### Concrete internal boundaries, not generic missing-feature claims
 

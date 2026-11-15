@@ -76,3 +76,8 @@ test('pilot fiscal controls allow only two named synthetic OFF screens',()=>{
  for(const category of ['school','hospital'])for(const width of [1366,390])assert.equal(pixelName(`pilot-fiscal-control-${category}-${width}`),`pilot-fiscal-control-${category}-${width}.png`);
  for(const name of ['pilot-fiscal-control-custom-390','pilot-fiscal-control-school-1280','pilot-fiscal-control-hospital-390.png','../pilot-fiscal-control-school-390'])assert.throws(()=>pixelName(name));
 });
+
+test('scrolled pilot fiscal controls permit only exact category controls',()=>{
+ for(const category of ['school','hospital'])for(const width of [1366,390])assert.equal(pixelName(`pilot-fiscal-control-${category}-controls-${width}`),`pilot-fiscal-control-${category}-controls-${width}.png`);
+ for(const name of ['pilot-fiscal-control-custom-controls-390','pilot-fiscal-control-school-controls-1280','pilot-fiscal-control-hospital-controls-390.png','../pilot-fiscal-control-school-controls-390'])assert.throws(()=>pixelName(name));
+});

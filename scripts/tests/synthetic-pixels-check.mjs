@@ -66,3 +66,8 @@ test('owner limits and expense columns have only exact reviewed captures',()=>{
  for(const prefix of ['ai-usage-owner-limits-pos','ai-usage-owner-limits-fbr','platform-expense-history-amount','platform-expense-history-audit','platform-expense-history-correction'])for(const width of [1366,390])assert.equal(pixelName(`${prefix}-${width}`),`${prefix}-${width}.png`);
  for(const name of ['platform-expense-history-arbitrary-390','ai-usage-owner-limits-pos-1280','platform-expense-history-audit-390.png','../ai-usage-owner-limits-fbr-390'])assert.throws(()=>pixelName(name));
 });
+
+test('PRA answer-start captures remain exact bounded intent names',()=>{
+ for(const intent of ['closing','recipe','campus-unknown'])for(const width of [1366,390])assert.equal(pixelName(`madadgar-pra-${intent}-answer-${width}`),`madadgar-pra-${intent}-answer-${width}.png`);
+ for(const name of ['madadgar-pra-custom-answer-390','madadgar-pra-closing-answer-1280','madadgar-pra-recipe-answer-390.png','../madadgar-pra-closing-answer-390'])assert.throws(()=>pixelName(name));
+});

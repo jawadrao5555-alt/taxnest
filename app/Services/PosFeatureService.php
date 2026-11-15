@@ -1255,7 +1255,7 @@ class PosFeatureService
             if ($sub->entitlementPlan() && !empty($sub->entitlementPlan()->pharmacy_enabled)) {
                 return $sub->hasActiveOverride() ? 'override' : 'plan';
             }
-            if ($sub->isTrialActive() && !ProspectiveSubscriptionPolicy::snapshot($sub)) {
+            if ($sub->isTrialActive() && ($sub->lifecycle_snapshot === null)) {
                 return 'trial';
             }
         }
@@ -1318,7 +1318,7 @@ class PosFeatureService
             if ($sub->hasActiveOverride()) {
                 return null;
             }
-            if ($sub->isTrialActive() && !ProspectiveSubscriptionPolicy::snapshot($sub)) {
+            if ($sub->isTrialActive() && ($sub->lifecycle_snapshot === null)) {
                 // Owner decision (Jul 2026): active-trial companies get the
                 // Restaurant module so they can evaluate it before buying.
                 // When the trial expires the mask returns automatically —
@@ -1342,7 +1342,7 @@ class PosFeatureService
     {
         $plan = $sub->entitlementPlan();
 
-        return !ProspectiveSubscriptionPolicy::snapshot($sub) && (!$plan || (bool) $plan->is_trial);
+        return ($sub->lifecycle_snapshot === null) && (!$plan || (bool) $plan->is_trial);
     }
 
     /** Is this gate sold ONLY as a paid add-on, i.e. in no package at all? */
@@ -1424,7 +1424,7 @@ class PosFeatureService
                         $allowed = self::overrideGrantsEverything($sub)
                             // (null product_type = a legacy PRA row; FBR/DI
                             // companies always carry their own type)
-                            || (($company->product_type ?? 'pos') === 'pos' && self::isAddonOnlyGate($planColumn))
+                            || ($sub->lifecycle_snapshot === null && ($company->product_type ?? 'pos') === 'pos' && self::isAddonOnlyGate($planColumn))
                             || !\Illuminate\Support\Facades\Schema::hasColumn('pricing_plans', $planColumn)
                             || !empty($sub->entitlementPlan()->{$planColumn});
                     } elseif ($sub->entitlementPlan()) {
@@ -1434,7 +1434,7 @@ class PosFeatureService
                             $allowed = true;
                         }
                     }
-                    if (!$allowed && $sub->isTrialActive() && !ProspectiveSubscriptionPolicy::snapshot($sub)) {
+                    if (!$allowed && $sub->isTrialActive() && ($sub->lifecycle_snapshot === null)) {
                         $allowed = true; // trial companies evaluate everything
                     }
                 }

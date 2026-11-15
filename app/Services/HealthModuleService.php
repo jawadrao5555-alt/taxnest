@@ -250,7 +250,7 @@ class HealthModuleService
             }
 
             // A trial evaluates the whole product.
-            if ((bool) ($plan->is_trial ?? false) && !ProspectiveSubscriptionPolicy::snapshot($subscription)) {
+            if ((bool) ($plan->is_trial ?? false) && ($subscription->lifecycle_snapshot === null)) {
                 return self::MODULES;
             }
 

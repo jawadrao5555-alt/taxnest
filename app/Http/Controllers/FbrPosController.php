@@ -9098,10 +9098,10 @@ class FbrPosController extends Controller
         if (!$sub || !$sub->entitlementPlan()) {
             return true;
         }
-        if ($sub->hasActiveOverride() && !\App\Services\ProspectiveSubscriptionPolicy::snapshot($sub)) {
+        if ($sub->hasActiveOverride() && ($sub->lifecycle_snapshot === null)) {
             return true;
         }
-        return (bool) $sub->entitlementPlan()->inventory_enabled || ((bool) $sub->entitlementPlan()->is_trial && !\App\Services\ProspectiveSubscriptionPolicy::snapshot($sub));
+        return (bool) $sub->entitlementPlan()->inventory_enabled || ((bool) $sub->entitlementPlan()->is_trial && ($sub->lifecycle_snapshot === null));
     }
 
     /**

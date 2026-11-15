@@ -86,7 +86,40 @@ final class ProspectiveSubscriptionPolicy
             return null;
         }
 
+        $trial = $s['trial_purchase_snapshot'] ?? null;
+        if (!self::validPurchase($trial, $sub->company_id, (int) ($s['selected_plan_id'] ?? 0))
+            || ($trial['source'] ?? null) !== 'selected_package_trial'
+            || ($trial['plan']['is_trial'] ?? null) !== true
+            || ($trial['plan']['invoice_limit'] ?? null) !== -1) return null;
+        if (!self::validPurchase($sub->purchase_snapshot, $sub->company_id, $sub->pricing_plan_id)) return null;
+        $priorEnd = null;
+        foreach ($s['prior_entitlement_periods'] ?? [] as $period) {
+            try {
+                $start = CarbonImmutable::parse($period['starts_at']);
+                $end = CarbonImmutable::parse($period['ends_at']);
+                if (!$end->greaterThan($start) || $start->lessThan(CarbonImmutable::parse($s['trial_ends_at']))
+                    || empty($s['paid_starts_at']) || $end->greaterThan(CarbonImmutable::parse($s['paid_starts_at']))
+                    || ($priorEnd && $start->lessThan($priorEnd))
+                    || !self::validPurchase($period['purchase_snapshot'] ?? null, $sub->company_id)) return null;
+                $priorEnd = $end;
+            } catch (\Throwable) { return null; }
+        }
         return $s;
+    }
+
+    private static function validPurchase(mixed $purchase, int $companyId, ?int $planId = null): bool
+    {
+        if (!is_array($purchase) || ($purchase['version'] ?? null) !== 1
+            || (int) ($purchase['company_id'] ?? 0) !== $companyId
+            || !is_array($purchase['plan'] ?? null) || (int) ($purchase['plan']['id'] ?? 0) <= 0
+            || ($planId !== null && (int) $purchase['plan']['id'] !== $planId)) return false;
+        foreach (['id','name','product_type','is_trial','invoice_limit','user_limit','branch_limit'] as $field) {
+            if (!array_key_exists($field, $purchase['plan'])) return false;
+        }
+        try {
+            return !empty($purchase['period']['start']) && !empty($purchase['period']['end'])
+                && CarbonImmutable::parse($purchase['period']['end'])->greaterThanOrEqualTo(CarbonImmutable::parse($purchase['period']['start']));
+        } catch (\Throwable) { return false; }
     }
 
     public static function trial(Company $company, PricingPlan $plan): array
@@ -134,8 +167,17 @@ final class ProspectiveSubscriptionPolicy
                 $start = $paidEnd;
             }
         }
-        if (! empty($s['paid_starts_at'])) {
-            $s['prior_entitlement_periods'][] = ['starts_at' => $s['paid_starts_at'], 'ends_at' => $s['paid_ends_at'], 'purchase_snapshot' => $previous->purchase_snapshot];
+        // Preserve only periods before the new effective term. A paid plan change
+        // starts now, so it must not keep the old package's future entitlements.
+        $periods = $s['prior_entitlement_periods'] ?? [];
+        if (!empty($s['paid_starts_at'])) $periods[] = ['starts_at' => $s['paid_starts_at'], 'ends_at' => $s['paid_ends_at'], 'purchase_snapshot' => $previous->purchase_snapshot];
+        $s['prior_entitlement_periods'] = [];
+        foreach ($periods as $period) {
+            $periodEnd = CarbonImmutable::parse($period['ends_at'])->min($start);
+            if ($periodEnd->greaterThan(CarbonImmutable::parse($period['starts_at']))) {
+                $period['ends_at'] = $periodEnd->toIso8601String();
+                $s['prior_entitlement_periods'][] = $period;
+            }
         }
         $end = $start->addMonthsNoOverflow($months);
 

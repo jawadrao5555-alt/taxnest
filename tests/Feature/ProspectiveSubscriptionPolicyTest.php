@@ -37,7 +37,7 @@ class ProspectiveSubscriptionPolicyTest extends TestCase
     private function fixture(string $product = 'di'): array
     {
         $c = Company::create(['name' => 'Synthetic prospective buyer', 'ntn' => 'PROSPECTIVE-'.uniqid(), 'product_type' => $product, 'status' => 'approved', 'company_status' => 'active']);
-        $p = PricingPlan::create(['name' => 'Business', 'product_type' => $product, 'price' => 1000, 'is_trial' => false, 'invoice_limit' => 2, 'user_limit' => 3, 'branch_limit' => 1, 'inventory_enabled' => false, 'reports_enabled' => false, 'ai_page_limit' => 4]);
+        $p = PricingPlan::create(['name' => 'Business', 'product_type' => $product, 'price' => 1000, 'is_trial' => false, 'invoice_limit' => 2, 'user_limit' => 3, 'branch_limit' => 1, 'inventory_enabled' => false, 'reports_enabled' => false, 'caller_id_enabled' => false, 'rider_tracking_enabled' => false, 'ai_page_limit' => 4]);
 
         return [$c, $p, TrialSubscriptionService::ensureSelectedTrial($c->id, $product, $p->id)];
     }
@@ -173,6 +173,44 @@ class ProspectiveSubscriptionPolicyTest extends TestCase
         self::assertSame(99, $renew->fresh()->entitlementPlan()->invoice_limit);
     }
 
+    public function test_paid_plan_change_starts_new_features_without_old_period_overlap(): void
+    {
+        [$c,$p,$s] = $this->fixture();
+        $this->travelTo(Carbon::parse(Policy::display($s)['trial_ends_at']));
+        $q = SubscriptionAssignmentService::computePrice($p, 'annual', $c);
+        SubscriptionAssignmentService::assign($c->id, $p->id, 'annual', paidRenewal: true, verifiedReceived: $q['final_price']);
+        $this->travel(1)->days();
+        $new = PricingPlan::create(['name'=>'Business Plus','product_type'=>'di','price'=>2000,'is_trial'=>false,'invoice_limit'=>99,'inventory_enabled'=>true]);
+        $quote = SubscriptionAssignmentService::computePrice($new, 'annual', $c);
+        $changed = SubscriptionAssignmentService::assign($c->id, $new->id, 'annual', paidRenewal:true, verifiedReceived:$quote['final_price']);
+        self::assertSame(now('UTC')->toIso8601String(), Policy::display($changed)['paid_starts_at']);
+        self::assertSame(99, $changed->entitlementPlan()->invoice_limit);
+        self::assertTrue((bool)$changed->entitlementPlan()->inventory_enabled);
+    }
+
+    public function test_access_grant_does_not_unlock_unpurchased_prospective_addons(): void
+    {
+        [$c,$p,$s] = $this->fixture('pos');
+        $s->update(['override_type'=>'temporary','override_until'=>now()->addDay()]);
+        PosFeatureService::flushGateCaches();
+        self::assertFalse(PosFeatureService::planAllows($c, 'caller_id_enabled'));
+        self::assertFalse(PosFeatureService::planAllows($c, 'rider_tracking_enabled'));
+    }
+
+    public function test_nested_cross_company_trial_purchase_evidence_is_not_catalogue_fallback(): void
+    {
+        [$c,$p,$s] = $this->fixture();
+        $bad = $s->lifecycle_snapshot;
+        $bad['trial_purchase_snapshot']['company_id'] = $c->id + 100;
+        \Illuminate\Support\Facades\DB::table('subscriptions')->where('id',$s->id)->update(['lifecycle_snapshot'=>json_encode($bad)]);
+        $fresh = $s->fresh();
+        self::assertNull(Policy::snapshot($fresh));
+        self::assertNull($fresh->entitlementPlan());
+        self::assertFalse($fresh->isTrialActive());
+        self::assertTrue($fresh->isExpired());
+        self::assertFalse(SubscriptionAccessService::hasAccess($c)['allowed']);
+    }
+
     public function test_policy_snapshot_is_immutable_and_malformed_evidence_fails_closed(): void
     {
         [$c,$p,$s] = $this->fixture();
@@ -184,5 +222,9 @@ class ProspectiveSubscriptionPolicyTest extends TestCase
         }
         \Illuminate\Support\Facades\DB::table('subscriptions')->where('id', $s->id)->update(['lifecycle_snapshot' => json_encode(['version' => Policy::VERSION])]);
         self::assertFalse(SubscriptionAccessService::hasAccess($c)['allowed']);
+        foreach (['lifetime', 'usage_free', 'temporary', 'grace'] as $type) {
+            \Illuminate\Support\Facades\DB::table('subscriptions')->where('id',$s->id)->update(['override_type'=>$type,'override_until'=>now()->addDay()]);
+            self::assertFalse(SubscriptionAccessService::hasAccess($c)['allowed'], $type);
+        }
     }
 }

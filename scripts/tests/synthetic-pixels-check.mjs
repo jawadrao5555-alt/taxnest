@@ -39,3 +39,8 @@ test('escalation proof permits only the two exact retry states',()=>{
  for(const state of ['pending','recovered'])for(const width of [1366,390])assert.equal(pixelName(`madadgar-retry-${state}-${width}`),`madadgar-retry-${state}-${width}.png`);
  for(const name of ['madadgar-retry-arbitrary-390','madadgar-retry-pending-1280','madadgar-retry-recovered-390.png','../madadgar-retry-pending-390'])assert.throws(()=>pixelName(name));
 });
+
+test('DI bounded read evidence allows only two reviewed names at existing viewports',()=>{
+ for(const prefix of ['di-read-billing','di-read-payments-unknown'])for(const width of [1366,390])assert.equal(pixelName(`${prefix}-${width}`),`${prefix}-${width}.png`);
+ for(const name of ['di-read-custom-390','di-read-billing-1280','di-read-payments-unknown-390.png','../di-read-billing-390'])assert.throws(()=>pixelName(name));
+});

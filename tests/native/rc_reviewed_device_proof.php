@@ -26,8 +26,9 @@ if(($argv[1]??'')==='callback-worker') {
  file_put_contents($barrier.'.ready'.$index,'ready');$until=microtime(true)+20;
  while(!is_file($barrier)){if(microtime(true)>$until)throw new RuntimeException('Callback barrier timeout');usleep(10000);}
  $result=fiscalCallback((int)$company,(int)$bill,$claim);
- proof($result['status']===200&&($result['body']['ok']??false)===true,'Callback not acknowledged');
- file_put_contents($barrier.'.result'.$index,json_encode($result,JSON_THROW_ON_ERROR));echo '200';exit;
+ file_put_contents($barrier.'.result'.$index,json_encode($result,JSON_THROW_ON_ERROR));
+ proof($result['status']===200&&($result['body']['ok']??false)===true,'Callback not acknowledged; HTTP '.(string)$result['status'].'; error='.preg_replace('/[^A-Za-z0-9 _:-]/','',mb_substr((string)($result['body']['error']??'none'),0,160)));
+ echo '200';exit;
 }
 if(($argv[1]??'')==='worker'){
     [$company,$actor,$id,$barrier,$index]=array_slice($argv,2);
@@ -73,7 +74,7 @@ try {
  foreach($workers as $i=>$p){$p->wait();proof($p->isSuccessful(),'Native callback race failed: '.proofWorkerDiagnostic($p));
   proof(is_file($barrier.'.result'.$i),'Native callback omitted result: '.proofWorkerDiagnostic($p));
   $result=json_decode(file_get_contents($barrier.'.result'.$i),true,512,JSON_THROW_ON_ERROR);
-  proof(($result['status']??null)===200&&($result['body']['ok']??false)===true,'Native callback semantic acknowledgement failed: '.proofWorkerDiagnostic($p));
+  proof(($result['status']??null)===200&&($result['body']['ok']??false)===true,'Native callback semantic acknowledgement failed: HTTP '.(string)($result['status']??'missing').'; error='.preg_replace('/[^A-Za-z0-9 _:-]/','',mb_substr((string)($result['body']['error']??'none'),0,160)).'; '.proofWorkerDiagnostic($p));
  }
  $bill->refresh();proof($bill->fbr_invoice_number==='654321ABC20260001'&&$bill->fbr_response_code==='NUMBER_ONLY_REVIEWED','Duplicate callback changed acceptance');
  $evidence=DB::table('fbr_pos_submission_evidence')->where('transaction_id',$billId)->first();proof($evidence->response_code===null&&$evidence->central_verification_state==='unknown','Invented Code100 or central verification');

@@ -176,7 +176,7 @@ class PosAuthController extends Controller
         // disagree with what approval actually charges.
         $planPrices = [];
         foreach ($plans as $plan) {
-            foreach (\App\Services\RequestedPackageService::POS_CYCLES as $cycle) {
+            foreach (\App\Services\SubscriptionAssignmentService::cyclesForPlan($plan) as $cycle) {
                 $planPrices[$plan->id][$cycle] = (float) \App\Services\SubscriptionAssignmentService::computePrice($plan, $cycle)['final_price'];
             }
         }
@@ -186,10 +186,11 @@ class PosAuthController extends Controller
             'preselectedPlanId' => $preselected?->id,
             'requestedAddonQuote' => $requestedAddonQuote,
             'planPrices' => $planPrices,
-            'cycleOptions' => [
-                'annual' => __('pos.cycle_annual'),
-            ],
+            'cycleOptions' => collect($planPrices)->flatMap(fn ($prices) => array_keys($prices))->unique()->mapWithKeys(fn ($cycle) => [$cycle => __('pos.cycle_'.$cycle)])->all(),
             'cyclePerLabels' => [
+                'monthly' => __('pos.cycle_monthly'),
+                'quarterly' => __('pos.cycle_quarterly'),
+                'semi_annual' => __('pos.cycle_semi_annual'),
                 'annual' => __('pos.auth_per_year'),
             ],
         ]);

@@ -158,6 +158,7 @@ class FbrPosAuthController extends Controller
             'product_type' => 'nullable|string|in:fbrpos',
             'business_category' => 'nullable|string|same:pos_type',
             'requested_plan' => 'nullable|string|max:255',
+            'billing_cycle' => 'nullable|string|in:monthly,quarterly,semi_annual,annual',
             // Older forms send an ID; validate it within this product, never as an entitlement.
             'pricing_plan_id' => ['nullable', 'integer', \Illuminate\Validation\Rule::exists('pricing_plans', 'id')->where('product_type', 'fbrpos')->where('is_trial', 0)],
             'company_name' => 'required|string|max:255',
@@ -215,7 +216,7 @@ class FbrPosAuthController extends Controller
             }
             $selectedPlan ??= $legacyPlan;
         }
-        $requestedPackage = \App\Services\RequestedPackageService::companyAttributes($selectedPlan);
+        $requestedPackage = \App\Services\RequestedPackageService::companyAttributes($selectedPlan, $request->input('billing_cycle'));
 
         // Company, owner, credential ledger and zero-price trial are one unit.
         // Never sign in or consume the referral session after a partial signup.

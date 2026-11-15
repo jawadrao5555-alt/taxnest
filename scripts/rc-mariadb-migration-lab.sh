@@ -107,6 +107,12 @@ concurrency(){
     clean_php php "$ROOT/tests/native/rc_greetings_concurrency.php" | tee "$EVIDENCE_DIR/greetings-concurrency.log"
     clean_php php "$ROOT/tests/native/rc_delivery_credit_concurrency.php" | tee "$EVIDENCE_DIR/delivery-credit-concurrency.log"
     clean_php php "$ROOT/tests/native/rc_hospital_collection_concurrency.php" | tee "$EVIDENCE_DIR/hospital-collection-concurrency.log"
+    grep -Fqx "PASS synthetic greeting concurrent claim exactly one delivery" "$EVIDENCE_DIR/greetings-concurrency.log" || fail greeting-single-delivery-missing-proof
+    grep -Fqx "PASS synthetic greeting ambiguous HOLD no resend" "$EVIDENCE_DIR/greetings-concurrency.log" || fail greeting-unknown-hold-missing-proof
+    grep -Fqx "PASS: native retained delivery credit duplicate recovery is single and concurrent overcollection rejected" "$EVIDENCE_DIR/delivery-credit-concurrency.log" || fail delivery-credit-missing-proof
+    grep -Fqx "PASS: native hospital duplicate recovery, concurrent overpayment exclusion, immutable close and payment-close race" "$EVIDENCE_DIR/hospital-collection-concurrency.log" || fail hospital-core-missing-proof
+    grep -Fqx "PASS: native multi-service bank/card duplicate recovery, reference tamper rejection and immutable noncash closing" "$EVIDENCE_DIR/hospital-collection-concurrency.log" || fail hospital-multi-service-missing-proof
+    grep -Fqx "PASS: native School multi-head card duplicate recovery, concurrent bank overpayment exclusion, cash-only close and immutable partial-payment replay" "$EVIDENCE_DIR/school-fee-concurrency.log" || fail school-multi-head-missing-proof
     reviewed_callback
     clean_php php "$ROOT/tests/native/rc_cashier_online_policy.php" | tee "$EVIDENCE_DIR/cashier-online-policy.log"
     grep -Fqx "PASS: native cashier policy schema default OFF owner-only settings current-session enforcement and tenant isolation" "$EVIDENCE_DIR/cashier-online-policy.log" || fail cashier-policy-missing-proof

@@ -100,6 +100,9 @@ class DistributorPaymentApprovalLifecycleTest extends TestCase
         $this->assertDatabaseCount('subscription_invoices',1);
         $this->assertDatabaseCount('subscription_payments',1);
         $this->assertDatabaseCount('agent_commissions',1);
+        foreach (['pos_transactions','fbr_pos_transactions','school_fee_receipts','hospital_collection_invoices'] as $table) {
+            if (\Illuminate\Support\Facades\Schema::hasTable($table)) $this->assertDatabaseCount($table,0);
+        }
         $this->assertSame(1,Subscription::where('company_id',$company->id)->count());
     }
 

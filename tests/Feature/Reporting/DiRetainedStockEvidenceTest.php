@@ -97,7 +97,9 @@ class DiRetainedStockEvidenceTest extends TestCase
             $t->integer('registry_version');$t->timestamp('collected_at');$t->string('status');$t->integer('retained_rows')->nullable();
             $t->timestamp('first_source_at')->nullable();$t->timestamp('last_source_at')->nullable();
         });
-        $this->travelTo(now()->setDate(2026,11,15));
+        // Freeze an explicit UTC instant: now()->setDate() inherits PHP's timezone,
+        // which can put this UTC business date in the future after Karachi midnight.
+        $this->travelTo(\Illuminate\Support\Carbon::parse('2026-11-15 12:00:00', 'UTC'));
         $service=app(\App\Services\Reporting\DiagnosticSourceCollection::class);
         $this->assertSame('OBSERVED',$service->capture(1,'di.stock_postings','2026-11-15',(string)\Illuminate\Support\Str::uuid()));
         DB::table('di_invoice_inventory_postings')->where('id',1)->update(['movement_id'=>104]);

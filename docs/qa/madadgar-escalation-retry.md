@@ -1,0 +1,9 @@
+# Explicit Madadgar escalation retry safety
+
+Confirmation remains exclusively the authenticated user confirmation POST. Provider tool cards and page reload never submit themselves. New cards carry a UUID retained in tab session storage scoped by product/company/user and chat session; after a lost response the user can confirm that same pending card again. Dismiss/new chat intentionally clears the pending card. No cross-customer or approximate-content deduplication exists.
+
+The server serializes confirmations with the persisted user lock, revalidates active membership, and writes suggestion, assistant confirmation, and scoped request result in one transaction. Identical identity/content recovers the same reference before the daily cap check; changed content returns 409 without altering the first record. Old clients omitting an ID remain accepted with atomic writes and cap enforcement, but cannot claim retry deduplication without a stable ID.
+
+The identity migration is additive and forward-only. Operational rollback retains identities; reapplying it is safe. Confirmed company hard purge explicitly deletes only that company's request identities with its suggestions/messages, inside the existing approved purge transaction. Soft deletion/ordinary rollback do not remove retry evidence. Stored response contains only the existing standard confirmation text and reference, not request details; fingerprint is not exported to the customer.
+
+Synthetic PHPUnit covers lost response/repeat, changed payload, cap, old client, tenant/session isolation, disabled/moved membership, atomic rollback and migration retention. Native MariaDB runner covers simultaneous same-ID requests and competing requests for the last daily slot. Browser acceptance is separately coordinated; neither native nor browser is claimed passed until its exact run completes. No live records or actual support messages are created by these checks.

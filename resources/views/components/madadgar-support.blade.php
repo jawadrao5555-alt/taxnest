@@ -11,6 +11,8 @@
     $mIsFbr = ($product ?? 'pos') === 'fbrpos';
     $mBase = $mIsFbr ? '/fbr-pos/madadgar' : '/pos/madadgar';
     $mStoreKey = $mIsFbr ? 'tn_madadgar_session_fbr' : 'tn_madadgar_session';
+    $mActor = auth($product)->user();
+    $mStoreKey .= ':'.($mActor?->company_id ?? 'guest').':'.($mActor?->id ?? 'guest');
     $mWaNumber = preg_replace('/\D/', '', (string) \App\Models\SystemSetting::get('support_whatsapp_number', ''));
     $mAiEnabled = \App\Services\MadadgarService::enabled();
     $mc = $mIsFbr ? [
@@ -188,6 +190,22 @@ function tnMadadgar(aiEnabled, waNumber, base, storeKey) {
                 this.sid = localStorage.getItem(this.storeKey) || null;
             } catch (e) { this.sid = null; }
             if (!this.sid) this.resetSid();
+            try {
+                const saved = JSON.parse(sessionStorage.getItem(this.storeKey + ':pending') || 'null');
+                if (saved && saved.sid === this.sid && saved.pending?.request_id) this.pending = saved.pending;
+            } catch (e) {}
+        },
+        savePending() {
+            try {
+                if (this.pending) sessionStorage.setItem(this.storeKey + ':pending', JSON.stringify({ sid: this.sid, pending: this.pending }));
+                else sessionStorage.removeItem(this.storeKey + ':pending');
+            } catch (e) {}
+        },
+        requestId() {
+            return (window.crypto && crypto.randomUUID) ? crypto.randomUUID() :
+                'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+                    const r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 3 | 8)).toString(16);
+                });
         },
         resetSid() {
             this.sid = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() :
@@ -227,7 +245,7 @@ function tnMadadgar(aiEnabled, waNumber, base, storeKey) {
             const q = this.draft.trim();
             if (!q || this.busy) return;
             this.draft = '';
-            this.pending = null;
+            this.pending = null; this.savePending();
             this.messages.push({ role: 'user', content: q });
             this.busy = true;
             this.scrollDown();
@@ -243,7 +261,8 @@ function tnMadadgar(aiEnabled, waNumber, base, storeKey) {
                 })
                 .then(d => {
                     this.messages.push({ role: 'assistant', content: d.reply, provenance: d.provenance || null });
-                    this.pending = d.escalation || null;
+                    this.pending = d.escalation ? { ...d.escalation, request_id: this.requestId() } : null;
+                    this.savePending();
                     this.remaining = d.remaining;
                 })
                 .catch(e => this.messages.push({ role: 'assistant', content: e.message || @js(__('pos.madadgar_err_generic')), error: true }))
@@ -253,29 +272,31 @@ function tnMadadgar(aiEnabled, waNumber, base, storeKey) {
             if (!this.pending || this.busy) return;
             this.busy = true;
             const p = this.pending;
+            p.request_id = p.request_id || this.requestId();
+            this.savePending();
             fetch(this.base + '/escalate', {
                 method: 'POST',
                 headers: this.headers(true),
-                body: JSON.stringify({ title: p.title, summary: p.summary, kind: p.kind, session_id: this.sid })
+                body: JSON.stringify({ title: p.title, summary: p.summary, kind: p.kind, session_id: this.sid, request_id: p.request_id })
             })
                 .then(async r => {
                     const d = await r.json().catch(() => ({}));
                     if (!r.ok) throw new Error(d.error || @js(__('pos.madadgar_err_send')));
                     return d;
                 })
-                .then(d => { this.pending = null; this.messages.push({ role: 'assistant', content: d.reply, escalated: true }); })
+                .then(d => { this.pending = null; this.savePending(); this.messages.push({ role: 'assistant', content: d.reply, escalated: true }); })
                 .catch(e => this.messages.push({ role: 'assistant', content: e.message, error: true }))
                 .finally(() => { this.busy = false; this.scrollDown(); });
         },
         rejectEscalation() {
-            this.pending = null;
+            this.pending = null; this.savePending();
             this.messages.push({ role: 'assistant', content: @js(__('pos.madadgar_not_sent')) });
             this.scrollDown();
         },
         newChat() {
             this.resetSid();
             this.messages = [];
-            this.pending = null;
+            this.pending = null; this.savePending();
             this.greet();
             this.$nextTick(() => this.$refs.minput && this.$refs.minput.focus());
         },

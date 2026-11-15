@@ -149,7 +149,7 @@ class MadadgarController extends Controller
             $todayEsc = FeatureSuggestion::where('user_id', $user->id)
                 ->where('source', 'madadgar')
                 ->whereDate('created_at', now()->toDateString())
-                ->count();
+                ->lockForUpdate()->get(['id'])->count();
             if ($todayEsc >= self::DAILY_ESCALATION_CAP) {
                 $result['escalation'] = null;
                 $result['text'] = rtrim($result['text'])
@@ -191,36 +191,65 @@ class MadadgarController extends Controller
         ]);
         $sessionId = $this->sessionId($request);
 
-        $todayEsc = FeatureSuggestion::where('user_id', $user->id)
-            ->where('source', 'madadgar')
-            ->whereDate('created_at', now()->toDateString())
-            ->count();
-        if ($todayEsc >= self::DAILY_ESCALATION_CAP) {
-            return response()->json(['error' => 'Aaj admin ko bhejne ki limit poori ho gayi — kal dobara, ya WhatsApp par rabta karein.'], 429);
-        }
+        $request->validate(['request_id' => 'nullable|uuid']);
+        $requestId = $request->filled('request_id') ? strtolower($request->string('request_id')->toString()) : null;
+        $scope = ['company_id' => $user->company_id, 'user_id' => $user->id, 'session_id' => $sessionId, 'product' => $product];
+        $fingerprint = hash('sha256', json_encode([
+            trim($request->title), trim((string) $request->summary), $request->kind,
+        ], JSON_THROW_ON_ERROR));
+        // A persisted actor lock serializes both the cap and all confirmation writes.
+        // No network/model calls or automatic escalation occur in this transaction.
+        return \Illuminate\Support\Facades\DB::transaction(function () use ($request, $user, $product, $sessionId, $requestId, $scope, $fingerprint) {
+            \App\Models\User::whereKey($user->id)->lockForUpdate()->firstOrFail();
+            $current = $this->currentActor($request);
+            abort_unless((int) $current->company_id === (int) $scope['company_id'], 403);
+            if ($requestId !== null) {
+                $prior = \Illuminate\Support\Facades\DB::table('madadgar_escalation_requests')->where($scope)->where('request_id', $requestId)->lockForUpdate()->first();
+                if ($prior) {
+                    if (!hash_equals($prior->fingerprint, $fingerprint)) {
+                        return response()->json(['error' => 'This request ID was already used with different details. Original reference is unchanged.'], 409);
+                    }
+                    return response()->json(json_decode($prior->response, true, 512, JSON_THROW_ON_ERROR));
+                }
+            }
+            $todayEsc = FeatureSuggestion::where('user_id', $user->id)
+                ->where('source', 'madadgar')
+                ->whereDate('created_at', now()->toDateString())
+                ->lockForUpdate()->get(['id'])->count();
+            if ($todayEsc >= self::DAILY_ESCALATION_CAP) {
+                return response()->json(['error' => 'Aaj admin ko bhejne ki limit poori ho gayi — kal dobara, ya WhatsApp par rabta karein.'], 429);
+            }
 
-        $kindLabel = $request->kind === 'feature_request' ? 'Feature Request' : 'Masla / Problem';
-        $suggestion = FeatureSuggestion::create([
-            'company_id' => $user->company_id,
-            'user_id' => $user->id,
-            'product' => $product,
-            'title' => mb_substr(trim($request->title), 0, 150),
-            'details' => '['.$kindLabel.'] '.trim((string) $request->summary),
-            'status' => 'pending',
-            'source' => 'madadgar',
-        ]);
+            $kindLabel = $request->kind === 'feature_request' ? 'Feature Request' : 'Masla / Problem';
+            $suggestion = FeatureSuggestion::create([
+                'company_id' => $user->company_id,
+                'user_id' => $user->id,
+                'product' => $product,
+                'title' => mb_substr(trim($request->title), 0, 150),
+                'details' => '['.$kindLabel.'] '.trim((string) $request->summary),
+                'status' => 'pending',
+                'source' => 'madadgar',
+            ]);
 
-        $confirmText = 'Aap ki baat admin team ko bhej di gayi hai (Ref #'.$suggestion->id.'). Jaise hi is par kaam hoga, status update ho jayega. Shukriya!';
-        MadadgarMessage::create([
-            'company_id' => $user->company_id,
-            'user_id' => $user->id,
-            'session_id' => $sessionId,
-            'role' => 'assistant',
-            'content' => $confirmText,
-            'escalation_id' => $suggestion->id,
-        ]);
+            $confirmText = 'Aap ki baat admin team ko bhej di gayi hai (Ref #'.$suggestion->id.'). Jaise hi is par kaam hoga, status update ho jayega. Shukriya!';
+            MadadgarMessage::create([
+                'company_id' => $user->company_id,
+                'user_id' => $user->id,
+                'session_id' => $sessionId,
+                'role' => 'assistant',
+                'content' => $confirmText,
+                'escalation_id' => $suggestion->id,
+            ]);
 
-        return response()->json(['reply' => $confirmText, 'ref' => $suggestion->id]);
+            $result = ['reply' => $confirmText, 'ref' => $suggestion->id];
+            if ($requestId !== null) {
+                \Illuminate\Support\Facades\DB::table('madadgar_escalation_requests')->insert($scope + [
+                    'request_id' => $requestId, 'fingerprint' => $fingerprint,
+                    'response' => json_encode($result, JSON_THROW_ON_ERROR), 'created_at' => now(),
+                ]);
+            }
+            return response()->json($result);
+        }, 3);
     }
 
     // ============ ADMIN SIDE (admin.auth group) ============

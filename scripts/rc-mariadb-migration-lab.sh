@@ -106,6 +106,7 @@ concurrency(){
     clean_php php "$ROOT/tests/native/rc_school_fee_concurrency.php" | tee "$EVIDENCE_DIR/school-fee-concurrency.log"
     clean_php php "$ROOT/tests/native/rc_greetings_concurrency.php" | tee "$EVIDENCE_DIR/greetings-concurrency.log"
     clean_php php "$ROOT/tests/native/rc_madadgar_budget.php" | tee "$EVIDENCE_DIR/madadgar-budget.log"
+    clean_php php "$ROOT/tests/native/rc_madadgar_escalation.php" | tee "$EVIDENCE_DIR/madadgar-escalation.log"
     grep -Fqx "PASS: native AI budget current-read concurrent cap unknown-cost retention and no provider calls" "$EVIDENCE_DIR/madadgar-budget.log" || fail madadgar-budget-missing-proof
     clean_php php "$ROOT/tests/native/rc_delivery_credit_concurrency.php" | tee "$EVIDENCE_DIR/delivery-credit-concurrency.log"
     clean_php php "$ROOT/tests/native/rc_hospital_collection_concurrency.php" | tee "$EVIDENCE_DIR/hospital-collection-concurrency.log"

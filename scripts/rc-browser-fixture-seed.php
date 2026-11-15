@@ -1089,14 +1089,14 @@ foreach([1366,390] as $width){
  $expenseCases[$width]=['login'=>$reviewer->email,'support'=>$support->email];
 }
 $pilotFiscalCases=[];
-foreach([1366,390] as $width){
- $admin=AdminUser::create(['name'=>'Synthetic Fiscal Reviewer '.$width,'email'=>'pilot-fiscal-admin-'.$width.'@rc-browser.invalid','password'=>$password,'role'=>'super_admin']);
- $support=AdminUser::create(['name'=>'Synthetic Fiscal Support '.$width,'email'=>'pilot-fiscal-support-'.$width.'@rc-browser.invalid','password'=>$password,'role'=>'support']);
- $pilotFiscalCases[$width]=['login'=>$admin->email,'support'=>$support->email,'companies'=>[]];
- foreach(['education'=>'school','clinic'=>'hospital'] as $category=>$label){
-  $c=$company('Synthetic fiscal '.$label.' '.$width,'pilot-fiscal-'.$label.'-'.$width.'@rc-browser.invalid','RCPFC'.$label.$width,'fbrpos',['pos_type'=>$category,'business_category'=>$category,'pos_setup_completed'=>true,'fbr_pos_enabled'=>true,'fbr_reporting_enabled'=>false,'pra_reporting_enabled'=>false]);
-  $owner=$user($c,'Synthetic fiscal tenant','pilot-fiscal-owner-'.$label.'-'.$width.'@rc-browser.invalid','company_admin','pos_admin');
-  $pilotFiscalCases[$width]['companies'][]=['id'=>$c->id,'category'=>$label,'owner'=>$owner->email];
+foreach([1366,390] as $fiscalWidth){
+ $fiscalAdmin=AdminUser::create(['name'=>'Synthetic Fiscal Reviewer '.$fiscalWidth,'email'=>'pilot-fiscal-admin-'.$fiscalWidth.'@rc-browser.invalid','password'=>$password,'role'=>'super_admin']);
+ $fiscalSupport=AdminUser::create(['name'=>'Synthetic Fiscal Support '.$fiscalWidth,'email'=>'pilot-fiscal-support-'.$fiscalWidth.'@rc-browser.invalid','password'=>$password,'role'=>'support']);
+ $pilotFiscalCases[$fiscalWidth]=['login'=>$fiscalAdmin->email,'support'=>$fiscalSupport->email,'companies'=>[]];
+ foreach(['education'=>'school','clinic'=>'hospital'] as $fiscalCategory=>$fiscalLabel){
+  $fiscalCompany=$company('Synthetic fiscal '.$fiscalLabel.' '.$fiscalWidth,'pilot-fiscal-'.$fiscalLabel.'-'.$fiscalWidth.'@rc-browser.invalid','RCPFC'.$fiscalLabel.$fiscalWidth,'fbrpos',['pos_type'=>$fiscalCategory,'business_category'=>$fiscalCategory,'pos_setup_completed'=>true,'fbr_pos_enabled'=>true,'fbr_reporting_enabled'=>false,'pra_reporting_enabled'=>false]);
+  $fiscalOwner=$user($fiscalCompany,'Synthetic fiscal tenant','pilot-fiscal-owner-'.$fiscalLabel.'-'.$fiscalWidth.'@rc-browser.invalid','company_admin','pos_admin');
+  $pilotFiscalCases[$fiscalWidth]['companies'][]=['id'=>$fiscalCompany->id,'category'=>$fiscalLabel,'owner'=>$fiscalOwner->email];
  }
 }
 $aiUsageCases=[];

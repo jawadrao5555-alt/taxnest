@@ -7,7 +7,12 @@ if [[ "${1:-}" != --guarded ]]; then
   exec bash scripts/rc-safe-run -- bash "$0" --guarded "${1:-}"
 fi
 [[ "${RC_SAFE_RUN:-}" == 1 && -r "${LD_PRELOAD:-}" ]] || { echo 'ERP demo requires egress guard' >&2; exit 2; }
-[[ -z "$(git status --porcelain --untracked-files=normal)" ]] || { echo 'Commit source before exact-SHA demo evidence' >&2; exit 2; }
+if [[ -n "$(git status --porcelain --untracked-files=normal)" ]]; then
+  echo 'Commit source before exact-SHA demo evidence' >&2
+  # Filenames/status only, bounded and Git-quoted; never emit diffs or file contents.
+  git -c core.quotePath=true status --short --untracked-files=normal | awk 'NR<=40 {print substr($0,1,512)} END {if(NR>40) print "[additional changed paths omitted]"}' >&2
+  exit 2
+fi
 if [[ -n "${2:-}" ]]; then
   [[ "$2" == /* && -d "$2" && ! -L "$2" && "$(realpath "$2")" == "$2" ]] || { echo 'Canonical Playwright cache required' >&2; exit 2; }
   export PLAYWRIGHT_BROWSERS_PATH="$2"

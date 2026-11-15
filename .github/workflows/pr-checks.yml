@@ -308,6 +308,7 @@ jobs:
           # older committed Vite bundle. Keep the responsive assertions strict.
           npm run build
           node scripts/tests/landing-asset-contract.mjs
+          node --test scripts/tests/source-only-tailwind.test.mjs
           RC_BROWSER_STATE_ROOT=/tmp/taxnest-rc-browser-${{ github.run_id }}-${{ github.job }} \
             bash scripts/rc-playwright-install.sh
           node scripts/tests/local-browser-discovery-check.mjs

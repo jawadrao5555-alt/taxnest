@@ -72,7 +72,8 @@ final class ProspectiveSubscriptionPolicy
             }
         }
         try {
-            if (CarbonImmutable::parse($s['trial_ends_at'])->diffInSeconds(CarbonImmutable::parse($s['trial_starts_at']), true) !== 259200.0) {
+            if (!CarbonImmutable::parse($s['trial_ends_at'])->greaterThan(CarbonImmutable::parse($s['trial_starts_at']))
+                || CarbonImmutable::parse($s['trial_ends_at'])->diffInSeconds(CarbonImmutable::parse($s['trial_starts_at']), true) !== 259200.0) {
                 return null;
             }
             $paid = array_filter(array_intersect_key($s, array_flip(['paid_starts_at', 'paid_ends_at', 'grace_ends_at'])));

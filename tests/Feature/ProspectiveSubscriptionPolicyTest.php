@@ -245,4 +245,14 @@ class ProspectiveSubscriptionPolicyTest extends TestCase
             self::assertFalse(SubscriptionAccessService::hasAccess($c)['allowed'], $type);
         }
     }
+    public function test_review_reversed_trial_boundaries_fail_closed(): void
+    {
+        [$c,$p,$trial]=$this->fixture();
+        $snapshot=$trial->lifecycle_snapshot;
+        $snapshot['trial_starts_at']=Carbon::parse($snapshot['trial_ends_at'])->addHours(72)->toIso8601String();
+        \Illuminate\Support\Facades\DB::table('subscriptions')->where('id',$trial->id)->update(['lifecycle_snapshot'=>json_encode($snapshot)]);
+        self::assertNull(Policy::snapshot($trial->fresh()));
+        self::assertFalse(SubscriptionAccessService::hasAccess($c)['allowed']);
+    }
+
 }

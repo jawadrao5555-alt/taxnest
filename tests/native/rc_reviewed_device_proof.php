@@ -6,17 +6,28 @@ require dirname(__DIR__,2).'/vendor/autoload.php';$app=require dirname(__DIR__,2
 use App\Models\{AdminUser,Company};use App\Services\ReviewedDeviceProof;use Illuminate\Support\Facades\{DB,Http};use Symfony\Component\Process\Process;
 Http::preventStrayRequests();
 function proof(bool $ok,string $why):void{if(!$ok)throw new RuntimeException($why);}
+function proofWorkerDiagnostic(Process $process): string {
+    $output=$process->getOutput()."\n".$process->getErrorOutput();
+    $output=preg_replace('/\x1b\[[0-9;]*m/','',$output);
+    $output=preg_replace('/[a-f0-9]{64}/i','[hash-or-claim-redacted]',$output);
+    $output=preg_replace('/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i','[email-redacted]',$output);
+    $output=preg_replace('/[0-9]{6}[A-Z]{3,6}[0-9]{4,}/','[fiscal-number-redacted]',$output);
+    return 'exit='.(string)$process->getExitCode().' '.mb_substr(trim($output),0,1800);
+}
 function fiscalCallback(int $company,int $bill,string $claim): array {
  $r=\Illuminate\Http\Request::create('/api/agent/submit-result','POST',['transaction_id'=>$bill,'success'=>false,'outcome_unknown'=>true,'device_uid'=>'Device-A','submission_claim'=>$claim,'pra_invoice_number'=>'654321ABC20260001','response'=>['FBRInvoiceNumber'=>'654321ABC20260001'],'ims_diagnostic'=>'response_received','ims_response_fields'=>['FBRInvoiceNumber:string']]);
  $r->attributes->set('agent_company',Company::findOrFail($company));
- return app(\App\Http\Controllers\AgentController::class)->submitResult($r)->getData(true);
+ $response=app(\App\Http\Controllers\AgentController::class)->submitResult($r);
+ return ['status'=>$response->getStatusCode(),'body'=>$response->getData(true)];
 }
 if(($argv[1]??'')==='callback-worker') {
  [$company,$bill,$claim,$barrier,$index]=array_slice($argv,2);
  proof(str_starts_with($barrier,dirname($socket).'/proof-')&&ctype_digit($index),'Unsafe callback barrier');
  file_put_contents($barrier.'.ready'.$index,'ready');$until=microtime(true)+20;
  while(!is_file($barrier)){if(microtime(true)>$until)throw new RuntimeException('Callback barrier timeout');usleep(10000);}
- proof((fiscalCallback((int)$company,(int)$bill,$claim)['ok']??false)===true,'Callback not acknowledged');echo '200';exit;
+ $result=fiscalCallback((int)$company,(int)$bill,$claim);
+ proof($result['status']===200&&($result['body']['ok']??false)===true,'Callback not acknowledged');
+ file_put_contents($barrier.'.result'.$index,json_encode($result,JSON_THROW_ON_ERROR));echo '200';exit;
 }
 if(($argv[1]??'')==='worker'){
     [$company,$actor,$id,$barrier,$index]=array_slice($argv,2);
@@ -38,7 +49,7 @@ $barrier=dirname($socket).'/proof-'.bin2hex(random_bytes(8));$workers=[];
 try{
     foreach([0,1] as $i){$p=new Process([PHP_BINARY,__FILE__,'worker',(string)$company->id,(string)$admin->id,(string)$id,$barrier,(string)$i]);$p->setTimeout(30);$p->start();$workers[]=$p;}
     $until=microtime(true)+20;while(!is_file($barrier.'.ready0')||!is_file($barrier.'.ready1')){if(microtime(true)>$until)throw new RuntimeException('Proof worker startup timeout');usleep(10000);}file_put_contents($barrier,'go');
-    $statuses=[];foreach($workers as $p){$p->wait();proof($p->isSuccessful(),'Native proof worker failed: '.$p->getErrorOutput());$statuses[]=trim($p->getOutput());}sort($statuses);
+    $statuses=[];foreach($workers as $p){$p->wait();proof($p->isSuccessful(),'Native proof worker failed: '.proofWorkerDiagnostic($p));$statuses[]=trim($p->getOutput());}sort($statuses);
     proof($statuses===['200','409'],'Concurrent revocation did not serialize');
     proof(ReviewedDeviceProof::reviewedProof($company->id,'Device-A','POS-A','sandbox')===null,'Revoked proof still active');
     proof((array)DB::table('reviewed_device_proofs')->find($id)===$original,'Original review mutated');
@@ -59,7 +70,11 @@ $barrier=dirname($socket).'/proof-callback-'.bin2hex(random_bytes(8));$workers=[
 try {
  foreach([0,1] as $i){$p=new Process([PHP_BINARY,__FILE__,'callback-worker',(string)$company->id,(string)$billId,$claim,$barrier,(string)$i]);$p->setTimeout(30);$p->start();$workers[]=$p;}
  $until=microtime(true)+20;while(!is_file($barrier.'.ready0')||!is_file($barrier.'.ready1')){if(microtime(true)>$until)throw new RuntimeException('Callback startup timeout');usleep(10000);}file_put_contents($barrier,'go');
- foreach($workers as $p){$p->wait();proof($p->isSuccessful()&&trim($p->getOutput())==='200','Native callback race failed: '.$p->getErrorOutput());}
+ foreach($workers as $i=>$p){$p->wait();proof($p->isSuccessful(),'Native callback race failed: '.proofWorkerDiagnostic($p));
+  proof(is_file($barrier.'.result'.$i),'Native callback omitted result: '.proofWorkerDiagnostic($p));
+  $result=json_decode(file_get_contents($barrier.'.result'.$i),true,512,JSON_THROW_ON_ERROR);
+  proof(($result['status']??null)===200&&($result['body']['ok']??false)===true,'Native callback semantic acknowledgement failed: '.proofWorkerDiagnostic($p));
+ }
  $bill->refresh();proof($bill->fbr_invoice_number==='654321ABC20260001'&&$bill->fbr_response_code==='NUMBER_ONLY_REVIEWED','Duplicate callback changed acceptance');
  $evidence=DB::table('fbr_pos_submission_evidence')->where('transaction_id',$billId)->first();proof($evidence->response_code===null&&$evidence->central_verification_state==='unknown','Invented Code100 or central verification');
  $heldId=DB::table('fbr_pos_transactions')->insertGetId(['company_id'=>$company->id,'invoice_number'=>'SYNTHETIC-FROZEN-'.bin2hex(random_bytes(4)),'invoice_mode'=>'fbr','fbr_status'=>'pending','fbr_requested_environment_snapshot'=>'sandbox','total_amount'=>100,'created_at'=>now(),'updated_at'=>now()]);

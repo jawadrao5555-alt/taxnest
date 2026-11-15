@@ -238,18 +238,9 @@ class PosImsReportingService
         $result=self::result($response,true);
         // The live IMS component can acknowledge with only FBRInvoiceNumber.
         // Bind that reply shape to this claimed POS and keep central verification separate.
-        if ($result['state'] === 'verification_required'
-            && $r->environment === 'production'
-            && $diagnostic === 'response_received'
-            && $responseFields === ['FBRInvoiceNumber:string']
-            && is_array($response)
-            && in_array(array_keys($response), [['InvoiceNumber'], ['FBRInvoiceNumber']], true)) {
-            $number = FbrPosFiscalResult::fromResponse($response);
-            $posId = str_pad((string) $r->payload['POSID'], 6, '0', STR_PAD_LEFT);
-            if ($number && strlen($posId) === 6 && str_starts_with($number, $posId)
-                && preg_match('/[0-9]/', substr($number, 6))) {
-                $result = ['state'=>'local_accepted','reference'=>$number,'error_codes'=>[]];
-            }
+        if ($result['state'] === 'verification_required' && $r->environment === 'production'
+            && ($number = ImsNumberOnlyAcknowledgement::number($response, (string)$r->payload['POSID'], $diagnostic, $responseFields))) {
+            $result = ['state'=>'local_accepted','reference'=>$number,'error_codes'=>[]];
         }
 
         $centralStatus = is_array($response) ? ($response['CentralStatus'] ?? null) : null;

@@ -36,7 +36,7 @@ try{
   $until=microtime(true)+25;while(count(glob($barrier.'.ready-*'))!==2){if(microtime(true)>$until)throw new RuntimeException('Admission startup timeout');usleep(10000);}file_put_contents($barrier,'go');
   foreach($round as$worker){$worker->wait();quotaProof($worker->isSuccessful(),'Admission worker failed: '.$worker->getErrorOutput());}
   $results=array_map(fn($file)=>json_decode(file_get_contents($file),true,512,JSON_THROW_ON_ERROR),glob($barrier.'.result-*'));$statuses=array_column($results,'status');sort($statuses);quotaProof($statuses===($scenario==='same'?[200,200]:[200,422]),'Incorrect admission race outcomes');
-  $bill=FbrPosTransaction::where('company_id',$c->id)->sole();quotaProof(PlanLimitService::canCreateFbrPosBill($c->id)['remaining']===0,'Last slot not consumed exactly once');$before=$bill->getAttributes();$replay=admission($c->id,$owner->id,$bill->offline_uuid);quotaProof($replay['transaction_id']===$bill->id&&($replay['replayed']??false)&&$bill->fresh()->getAttributes()===$before,'Full quota replay changed bill');
+  $bill=FbrPosTransaction::where('company_id',$c->id)->sole();quotaProof(PlanLimitService::canCreateFbrPosBill($c->id)['allowed']===false,'Last slot not consumed exactly once');$before=$bill->getAttributes();$replay=admission($c->id,$owner->id,$bill->offline_uuid);quotaProof($replay['transaction_id']===$bill->id&&($replay['replayed']??false)&&$bill->fresh()->getAttributes()===$before,'Full quota replay changed bill');
   if($scenario==='same')quotaProof(count(array_unique(array_column($results,'id')))===1,'Same UUID produced distinct bills');
   quotaProof($bill->fbr_status==='local'&&$bill->invoice_mode==='local'&&!$bill->fbr_invoice_number,'Synthetic admission attempted fiscal output');
  }

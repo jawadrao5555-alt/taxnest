@@ -32,7 +32,7 @@ try{
   $until=microtime(true)+25;while(count(glob($barrier.'.ready-*'))!==2){if(microtime(true)>$until)throw new RuntimeException('Quota admission startup timeout');usleep(10000);}file_put_contents($barrier,'go');foreach($round as$worker){$worker->wait();quotaProof($worker->isSuccessful(),'Quota admission worker failed: '.$worker->getErrorOutput());}
   $results=array_map(fn($file)=>json_decode(file_get_contents($file),true,512,JSON_THROW_ON_ERROR),glob($barrier.'.result-*'));$statuses=array_column($results,'status');sort($statuses);quotaProof($statuses===[200,422],'More than one last-slot admission or unexpected denial');
   if($product==='pos'){
-   quotaProof(PosTransaction::where('company_id',$c->id)->count()===1&&PlanLimitService::canCreatePosBill($c->id)['remaining']===0,'PRA guarded-write quota not retained');
+   quotaProof(PosTransaction::where('company_id',$c->id)->count()===1&&PlanLimitService::canCreatePosBill($c->id)['allowed']===false,'PRA guarded-write quota not retained');
    continue;
   }
   $winner=Invoice::withoutGlobalScopes()->where('company_id',$c->id)->where('is_fbr_processing',true)->sole();$loser=Invoice::withoutGlobalScopes()->where('company_id',$c->id)->where('id','!=',$winner->id)->sole();

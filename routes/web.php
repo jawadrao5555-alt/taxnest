@@ -427,6 +427,8 @@ Route::middleware(['auth', 'company', 'rate_limit_company', 'company.approval'])
     Route::post('/notifications/{id}/dismiss', [DashboardController::class, 'dismissNotification'])->name('notifications.dismiss');
     Route::post('/notifications/dismiss-all', [DashboardController::class, 'dismissAllNotifications'])->name('notifications.dismiss-all');
 
+    Route::get('/billing/checkout', [\App\Http\Controllers\PackageCheckoutController::class, 'index'])->name('billing.package-checkout');
+    Route::post('/billing/checkout', [\App\Http\Controllers\PackageCheckoutController::class, 'select'])->name('billing.package-checkout.select');
     Route::get('/billing/plans', [BillingController::class, 'plans'])->name('billing.plans');
     Route::get('/billing/documents/invoices/{invoice}', [\App\Http\Controllers\SubscriptionDocumentController::class, 'companyInvoice'])->whereNumber('invoice')->name('billing.documents.invoice');
     Route::get('/billing/documents/receipts/{payment}', [\App\Http\Controllers\SubscriptionDocumentController::class, 'companyReceipt'])->whereNumber('payment')->name('billing.documents.receipt');
@@ -951,6 +953,8 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     Route::post('/suggestions', [\App\Http\Controllers\FeatureSuggestionController::class, 'store'])->name('pos.suggestions.store')->middleware('throttle:10,1');
     Route::post('/payment-proof', [\App\Http\Controllers\PaymentProofController::class, 'store'])
         ->name('pos.payment-proof.store')->middleware('throttle:6,1');
+    Route::get('/billing/checkout', [\App\Http\Controllers\PackageCheckoutController::class, 'index'])->name('pos.package-checkout');
+    Route::post('/billing/checkout', [\App\Http\Controllers\PackageCheckoutController::class, 'select'])->name('pos.package-checkout.select');
     Route::post('/settings/theme', [PosController::class, 'updateTheme'])->name('pos.settings.theme');
     // Dark mode (owner video, 25 Aug 2026): per-USER preference, like the
     // language pick above — the Ctrl+K palette used to flip the class in the
@@ -1988,6 +1992,9 @@ Route::post('/health/logout', [HealthAuthController::class, 'logout'])->name('he
 Route::post('/health/guest-language', [HealthController::class, 'guestLanguage'])->name('health.guest-language');
 
 Route::prefix('health')->middleware(['health.auth', 'company.approval'])->group(function () {
+    Route::get('/package-checkout', [\App\Http\Controllers\PackageCheckoutController::class, 'index'])->name('health.package-checkout');
+    Route::post('/package-checkout', [\App\Http\Controllers\PackageCheckoutController::class, 'select'])->name('health.package-checkout.select');
+    Route::post('/package-payment-proof', [\App\Http\Controllers\PaymentProofController::class, 'store'])->name('health.payment-proof.store')->middleware('throttle:6,1');
     Route::post('/survey/{id}/respond', [\App\Http\Controllers\PosSurveyController::class, 'respond'])->defaults('survey_guard', 'health')->name('health.survey.respond');
     Route::post('/survey/{id}/dismiss', [\App\Http\Controllers\PosSurveyController::class, 'dismiss'])->defaults('survey_guard', 'health')->name('health.survey.dismiss');
     Route::get('/', fn () => redirect()->route('health.dashboard'));
@@ -2606,6 +2613,8 @@ Route::prefix('fbr-pos')->middleware(['fbrpos.auth', 'company.approval', \App\Ht
     Route::post('/whats-new/seen', [\App\Http\Controllers\AppUpdateController::class, 'markSeen'])->name('fbrpos.whats-new.seen');
     Route::post('/payment-proof', [\App\Http\Controllers\PaymentProofController::class, 'store'])
         ->name('fbrpos.payment-proof.store')->middleware('throttle:6,1');
+    Route::get('/billing/checkout', [\App\Http\Controllers\PackageCheckoutController::class, 'index'])->name('fbrpos.package-checkout');
+    Route::post('/billing/checkout', [\App\Http\Controllers\PackageCheckoutController::class, 'select'])->name('fbrpos.package-checkout.select');
     // Feature suggestion box (Task 1275) — admin/manager-only (in-controller
     // gate), 10/day cap; rows land product='fbrpos' in the shared admin view.
     Route::get('/suggestions', [\App\Http\Controllers\FeatureSuggestionController::class, 'fbrIndex'])->name('fbrpos.suggestions');

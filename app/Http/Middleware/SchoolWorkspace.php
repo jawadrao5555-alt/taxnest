@@ -28,7 +28,7 @@ class SchoolWorkspace
             return redirect()->away($root.'/settings')->header('Cache-Control', 'private, no-store');
         }
         $allowed = ($path === ltrim($root, '/') || str_starts_with($path, ltrim($root, '/').'/'))
-            || in_array($suffix, ['dashboard', 'transactions', 'day-close', 'set-language', 'set-dark-mode', 'billing', 'my-profile', 'suggestions', 'tutorials', 'team', 'logout'], true)
+            || in_array($suffix, ['dashboard', 'transactions', 'day-close', 'set-language', 'set-dark-mode', 'billing', 'billing/checkout', 'payment-proof', 'my-profile', 'suggestions', 'tutorials', 'team', 'logout'], true)
             || $request->is('fbr-pos/team/*', 'fbr-pos/billing/documents/*')
             // Read-only freshness probes remain available; integration decisions may rewrite legacy invoices.
             || in_array($suffix, ['api/boot-check', 'api/boot-diagnostics'], true);

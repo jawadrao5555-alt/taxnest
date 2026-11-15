@@ -25,6 +25,7 @@ try {
       await page.locator('[name=password]').fill(fixture.password);
       await Promise.all([page.waitForURL(u=>u.pathname!=='/health/login'),page.locator('form[action$="/health/login"] button[type=submit]').click()]);
       const response=await page.goto(baseUrl+allowed);assert.equal(response.status(),200,`${role} allowed route`);
+      assert.equal(page.url(),baseUrl+allowed,`${role} must render its actual allowed route, not a redirect destination`);
       assert(!/SQLSTATE|Whoops|Stack trace|Internal Server Error/.test(await page.locator('body').innerText()));
       // This is acceptance of access + rendering, not a completed clinical journey.
       assert.equal(await captureSyntheticPixels(page,`erp-demo-${role}-${width}`),true);

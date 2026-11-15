@@ -29,4 +29,16 @@ class ErpDemoLaneGuardTest extends TestCase
         $this->assertStringContainsString("url('/health/login')", $template);
     }
 
+    public function test_browser_proof_rejects_redirected_allowed_pages(): void
+    {
+        $source=file_get_contents(base_path('scripts/erp-demo-browser.mjs'));
+        $this->assertStringContainsString('assert.equal(page.url(),baseUrl+allowed', $source);
+    }
+    public function test_native_fixture_explicitly_checks_linked_clinician(): void
+    {
+        $source=file_get_contents(base_path('scripts/erp-demo-fixture.php'));
+        $this->assertStringContainsString('$clinician->user_id !== $doctorLogin->id', $source);
+        $this->assertStringContainsString("active clinician must link to demo doctor login", $source);
+    }
+
 }

@@ -36,6 +36,9 @@ foreach ($roles as $alias=>$role) {
     $user=App\Models\User::where('email','erp.'.$alias.'@example.test')->sole();
     if ($user->company_id !== $company->id || $user->health_role !== $role) $fail('role fixture mismatch');
 }
+$clinician=App\Models\HealthDoctor::withoutGlobalScopes()->where('company_id',$company->id)->sole();
+$doctorLogin=App\Models\User::where('email','erp.doctor@example.test')->sole();
+if ($clinician->user_id !== $doctorLogin->id || !$clinician->is_active) $fail('active clinician must link to demo doctor login');
 if ($company->fbr_reporting_enabled || $company->fbr_universal_enabled || $company->fbr_pos_enabled) $fail('fiscal flags must remain off');
 $fixture=['version'=>1,'fixture_kind'=>'hospital-erp-demo','socket'=>$socket,'database'=>'taxnest_erp_demo','synthetic'=>true,
     'pixel_proof_nonce'=>bin2hex(random_bytes(32)), 'password'=>$password,'roles'=>array_keys($roles),

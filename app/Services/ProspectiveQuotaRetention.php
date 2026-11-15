@@ -61,7 +61,11 @@ final class ProspectiveQuotaRetention
                 if (! $bill->created_at) {
                     self::hold();
                 }
-                $values = ['sold_at' => $bill->created_at->format('Y-m-d H:i:s'), 'quota_counted' => (int) ($bill->status === 'completed' && $bill->invoice_mode !== 'local' && ($bill->transaction_type ?? 'sale') !== 'return'),
+                if (!Schema::hasColumn('prospective_pos_quota_retention','business_date')) self::hold();
+                // Match the existing day-close predicate while the original row exists.
+                $businessDate = $bill->business_date ?: $bill->created_at->toDateString();
+                if (!preg_match('/^\d{4}-\d{2}-\d{2}$/',(string)$businessDate)) self::hold();
+                $values = ['business_date'=>$businessDate, 'sold_at' => $bill->created_at->format('Y-m-d H:i:s'), 'quota_counted' => (int) ($bill->status === 'completed' && $bill->invoice_mode !== 'local' && ($bill->transaction_type ?? 'sale') !== 'return'),
                     'aggregate_final' => (int) ! ($bill->invoice_mode === 'local' && $bill->pra_status === 'local'), 'source' => $source, 'source_id' => $sourceId];
                 $existing = DB::table('prospective_pos_quota_retention')->where('company_id', $companyId)->where('transaction_id', $bill->id)->lockForUpdate()->first();
                 if ($existing) {
@@ -87,11 +91,16 @@ final class ProspectiveQuotaRetention
         // A new-policy company cannot acquire unexplained older-style deletion totals.
         foreach (['day-close' => 'pos_day_close_reports', 'archive-clear' => 'pos_local_series_resets'] as $source => $table) {
             if (! Schema::hasTable($table)) {
-                continue;
+                self::hold();
             }
             $reports = DB::table($table)->where('company_id', $companyId)->where('deleted_final_count', '>', 0)->get();
             foreach ($reports as $report) {
                 $q = DB::table('prospective_pos_quota_retention')->where('company_id', $companyId)->where('source', $source)->where('source_id', $report->id)->where('aggregate_final', true);
+                if ($source === 'day-close') {
+                    if (!Schema::hasColumn('prospective_pos_quota_retention','business_date')) self::hold();
+                    $month = CarbonImmutable::parse($report->report_date)->startOfMonth();
+                    $q->where('business_date','>=',$month->toDateString())->where('business_date','<',$month->addMonth()->toDateString());
+                }
                 if ($source === 'archive-clear') {
                     $month = CarbonImmutable::parse($report->reset_date)->startOfMonth();
                     $q->where('sold_at', '>=', $month)->where('sold_at', '<', $month->addMonth());
@@ -101,7 +110,8 @@ final class ProspectiveQuotaRetention
                 }
             }
         }
-        if (Schema::hasTable('pos_bill_deletions') && DB::table('pos_bill_deletions as d')->where('d.company_id', $companyId)->whereNotExists(fn ($q) => $q->selectRaw('1')->from('prospective_pos_quota_retention as q')->whereColumn('q.company_id', 'd.company_id')->whereColumn('q.transaction_id', 'd.transaction_id'))->exists()) {
+        if (!Schema::hasTable('pos_bill_deletions')) self::hold();
+        if (DB::table('pos_bill_deletions as d')->where('d.company_id', $companyId)->whereNotExists(fn ($q) => $q->selectRaw('1')->from('prospective_pos_quota_retention as q')->whereColumn('q.company_id', 'd.company_id')->whereColumn('q.transaction_id', 'd.transaction_id'))->exists()) {
             self::hold();
         }
 

@@ -31,7 +31,9 @@ class ProspectiveQuotaRetentionTest extends TestCase
 
     private function bill(Company $c, array $extra = []): PosTransaction
     {
-        return PosTransaction::create($extra + ['company_id' => $c->id, 'invoice_number' => 'Q-'.uniqid(), 'status' => 'completed', 'invoice_mode' => 'pra', 'transaction_type' => 'sale', 'created_at' => now(), 'updated_at' => now()]);
+        $bill = new PosTransaction();
+        $bill->forceFill($extra + ['company_id' => $c->id, 'invoice_number' => 'Q-'.uniqid(), 'status' => 'completed', 'invoice_mode' => 'pra', 'transaction_type' => 'sale', 'created_at' => now(), 'updated_at' => now()])->save();
+        return $bill->fresh();
     }
 
     private function pay($c, $p)
@@ -128,6 +130,28 @@ class ProspectiveQuotaRetentionTest extends TestCase
         });
         self::assertSame(1,Retention::deletedCount($c->id));
         self::assertSame(1,PlanLimitService::canCreatePosBill($c->id)['remaining']);
+    }
+
+    public function test_day_close_scope_uses_frozen_business_date_not_created_at_and_excludes_backlog(): void
+    {
+        [$c,$p,$s]=$this->buyer();$paid=$this->pay($c,$p);
+        $this->travelTo(Carbon::parse('2028-05-01 00:30:00',config('app.timezone')));
+        $backlog=$this->bill($c,['created_at'=>Carbon::parse('2028-03-31 12:00:00',config('app.timezone')),'business_date'=>'2028-03-31']);
+        $april=$this->bill($c,['created_at'=>Carbon::parse('2028-04-20 12:00:00',config('app.timezone')),'business_date'=>'2028-04-20']);
+        // Created in May, but belongs to April's report month under the existing cutoff.
+        $midnight=$this->bill($c,['business_date'=>'2028-04-30']);
+        $may=$this->bill($c,['business_date'=>'2028-05-01']);
+        DB::transaction(function()use($c,$backlog,$april,$midnight,$may){
+            $id=DB::table('pos_day_close_reports')->insertGetId(['company_id'=>$c->id,'report_date'=>'2028-04-30','report_number'=>'SYNTHETIC-APRIL','deleted_final_count'=>2,'created_at'=>now(),'updated_at'=>now()]);
+            $rows=collect([$backlog,$april,$midnight,$may]);
+            Retention::capture($rows,'day-close',$id);
+            foreach($rows as $row)$row->delete();
+        });
+        // Quota retains its independent creation-time calendar definition.
+        self::assertSame(2,Retention::deletedCount($c->id));
+        self::assertDatabaseHas('prospective_pos_quota_retention',['transaction_id'=>$midnight->id,'business_date'=>'2028-04-30','sold_at'=>'2028-05-01 00:30:00']);
+        $this->travelTo(Carbon::parse('2028-04-30 23:00:00',config('app.timezone')));
+        self::assertSame(1,Retention::deletedCount($c->id));
     }
 
     public function test_unknown_aggregate_requires_review_instead_of_zero_or_inferred_allowance(): void

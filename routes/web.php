@@ -1619,6 +1619,10 @@ Route::post('/admin/login', [AdminAuthController::class, 'login']);
 Route::post('/admin/logout', [AdminAuthController::class, 'logout'])->name('admin.logout');
 
 Route::prefix('admin')->middleware(['admin.auth'])->group(function () {
+    Route::get('/companies/{companyId}/device-proofs', [\App\Http\Controllers\SaasAdmin\ReviewedDeviceProofController::class, 'index'])->whereNumber('companyId')->name('saas.admin.device-proofs.index');
+    Route::post('/companies/{companyId}/device-proofs', [\App\Http\Controllers\SaasAdmin\ReviewedDeviceProofController::class, 'store'])->whereNumber('companyId')->name('saas.admin.device-proofs.store');
+    Route::post('/companies/{companyId}/device-proofs/{id}/revoke', [\App\Http\Controllers\SaasAdmin\ReviewedDeviceProofController::class, 'revoke'])->whereNumber(['companyId','id'])->name('saas.admin.device-proofs.revoke');
+
     Route::get('/companies/{companyId}/local-bill-records', [\App\Http\Controllers\SaasAdmin\AdminLocalBillRecordController::class, 'index'])->whereNumber('companyId')->name('saas.admin.local-bill-records');
     Route::put('/companies/{companyId}/local-bill-records', [\App\Http\Controllers\SaasAdmin\AdminLocalBillRecordController::class, 'update'])->whereNumber('companyId')->name('saas.admin.local-bill-records.update');
     Route::get('/companies/{companyId}/local-bill-records/{id}/download', [\App\Http\Controllers\SaasAdmin\AdminLocalBillRecordController::class, 'download'])->whereNumber(['companyId', 'id'])->middleware('throttle:20,1')->name('saas.admin.local-bill-records.download');

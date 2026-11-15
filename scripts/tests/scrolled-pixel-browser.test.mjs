@@ -21,7 +21,8 @@ test('mobile support offsets apply only to floating widgets, never the inline us
   const p=await browser.newPage({viewport});
   await p.setContent(`<style>body{margin:0}.summary{height:450px}.inline{position:relative;height:56px}.floating{position:fixed;bottom:20px;left:20px;width:56px;height:56px}${mobileCss}</style><body class="tn-premium-shell"><section class="summary">Synthetic summary</section><div class="inline" x-data="tnMadadgar()" data-madadgar-placement="inline">Support</div><div class="floating" x-data="tnMadadgar()" data-madadgar-placement="floating">Floating</div></body>`);
   const geometry=await p.evaluate(()=>{const i=document.querySelector('.inline'),f=document.querySelector('.floating'),s=document.querySelector('.summary');return {inlineBottom:getComputedStyle(i).bottom,inlineLeft:getComputedStyle(i).left,inlineTop:i.getBoundingClientRect().top,summaryBottom:s.getBoundingClientRect().bottom,floatingBottom:parseFloat(getComputedStyle(f).bottom),floatingPosition:getComputedStyle(f).position};});
-  assert.equal(geometry.inlineBottom,'auto');assert.equal(geometry.inlineLeft,'auto');assert.ok(geometry.inlineTop>=geometry.summaryBottom);
+  // Chromium resolves relative auto offsets to zero pixels. Both mean no displacement.
+  assert.ok(['auto','0px'].includes(geometry.inlineBottom));assert.ok(['auto','0px'].includes(geometry.inlineLeft));assert.ok(geometry.inlineTop>=geometry.summaryBottom);
   assert.equal(geometry.floatingPosition,'fixed');assert.equal(geometry.floatingBottom,viewport.width===390?68:20);
   await p.close();
  }}finally{await browser.close();}

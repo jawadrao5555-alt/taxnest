@@ -46,7 +46,11 @@ class MadadgarExpandedReadTest extends MadadgarCompanyReadToolsTest
         $this->assertStringContainsString("header('Cache-Control','private, no-store')",$controllerSource);
         $html=file_get_contents(resource_path('views/madadgar/di-read.blade.php'));
         $this->assertStringContainsString('name="question"',$html);
-        $this->assertStringContainsString("{{ $"."answer['text'] }}",$html);
+        $this->assertStringContainsString("{{ explode(\"\\n\", $"."answer['text'])[0] }}",$html);
+        $this->assertStringContainsString('data-di-read-metrics',$html);
+        $this->assertStringContainsString("{{ $"."row['money'] ? 'PKR ' : '' }}{{ $"."row['value'] }}",$html);
+        $this->assertStringNotContainsString('<pre',$html);
+        $this->assertStringNotContainsString('{!!',$html);
         $this->assertStringNotContainsString('x-html',$html);
         $route=app('router')->getRoutes()->getByName('di.madadgar.read');
         $this->assertContains('auth',$route->gatherMiddleware());$this->assertContains('company',$route->gatherMiddleware());

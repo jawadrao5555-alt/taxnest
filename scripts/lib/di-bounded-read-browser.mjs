@@ -1,3 +1,4 @@
+import {scrolledPixelDetail} from './scrolled-pixel-detail.mjs';
 export async function diBoundedReadWorkflow(page,t,v,{baseUrl,login,loopback,saveEvidenceScreenshot,pass}) {
  const f=t.diReadCases[v.width],path='/madadgar/di-read';
  const check=(ok,message)=>{if(!ok)throw Error(message);};
@@ -16,11 +17,12 @@ export async function diBoundedReadWorkflow(page,t,v,{baseUrl,login,loopback,sav
   return panel.locator('[data-di-read-result]').innerText();
  };
  const result=await read('today billing');
- check(result.includes('Billed sales PKR: '+f.total)&&result.includes('Completed documents: 1'),'DI read did not isolate locked invoice');
- check(!result.includes('999.00')&&!result.includes('Billed sales PKR: '+f.foreignTotal)&&!result.includes('SYNTHETIC-PRIVATE-BUYER'),'Draft/foreign invoice or buyer detail leaked');
+ const metric=key=>panel.locator(`[data-di-metric="${key}"] dd`).innerText();
+ check((await metric('sales_total')).replace(/,/g,'')==='PKR '+f.total&&(await metric('completed_documents'))==='1','DI semantic read did not isolate locked invoice');
+ check(await panel.locator('[data-di-read-result] pre,[data-di-read-result] code').count()===0,'DI report regressed to masked raw payload');
+ check(!result.includes('999.00')&&!result.includes('PKR '+f.foreignTotal)&&!result.includes('SYNTHETIC-PRIVATE-BUYER'),'Draft/foreign invoice or buyer detail leaked');
  check(result.includes('invoices'),'Read provenance source omitted');
- await panel.locator('[data-di-read-result]').scrollIntoViewIfNeeded();
- await saveEvidenceScreenshot(page,'di-read-billing-'+v.width);
+ await scrolledPixelDetail(page,['[data-di-metric="completed_documents"]','[data-di-metric="sales_total"]'],'di-read-billing-'+v.width,saveEvidenceScreenshot);
  const payment=await read('today payments');
  check(payment.includes('Actual collected total unknown')&&!payment.includes('Recorded tendered cash PKR: 0'),'Missing DI payments presented as zero');
  await saveEvidenceScreenshot(page,'di-read-payments-unknown-'+v.width);
@@ -29,7 +31,7 @@ export async function diBoundedReadWorkflow(page,t,v,{baseUrl,login,loopback,sav
  check(invalid.status()===422,'Arbitrary DI query accepted');
  const forged=await page.context().request.post(baseUrl+path,{form:{_token:token,question:'today billing',company_id:f.foreignCompany},headers:{Accept:'text/html'},maxRedirects:0});
  const forgedHtml=await forged.text();
- check(forged.ok()&&forgedHtml.includes('Billed sales PKR: '+f.total)&&!forgedHtml.includes('Billed sales PKR: '+f.foreignTotal),'Client company selector broadened read');
+ check(forged.ok()&&forgedHtml.includes('PKR '+f.total)&&!forgedHtml.includes('PKR '+f.foreignTotal),'Client company selector broadened read');
  const context=await page.context().browser().newContext({viewport:v,serviceWorkers:'block'});
  await context.route('**/*',r=>loopback(new URL(r.request().url()).hostname)?r.continue():r.abort('blockedbyclient'));
  try {

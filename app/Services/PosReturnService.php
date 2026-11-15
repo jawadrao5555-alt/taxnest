@@ -137,6 +137,7 @@ class PosReturnService
         $expiryHours = isset($opts['expiry_hours']) ? (int) $opts['expiry_hours'] : null;
 
         return DB::transaction(function () use ($companyId, $originalId, $items, $refundMethod, $userId, $wastage, $expiryHours, $hotelCredit) {
+            \App\Services\ProspectiveQuotaGuard::lockCompanyForInvoiceWork($companyId);
             // Re-fetch UNDER LOCK — concurrent returns of the same bill must
             // serialize here or both see the same remaining quantities and
             // double-refund/double-restock.

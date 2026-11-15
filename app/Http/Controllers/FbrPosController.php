@@ -339,7 +339,8 @@ class FbrPosController extends Controller
         if (!$bill) {
             return response()->json(['success' => false, 'message' => __('pos.provisional_bill_not_found')], 404);
         }
-        $prospectiveQuota = \App\Services\PlanLimitService::getActiveSubscription($companyId)?->hasLifecycleSnapshot() ?? false;
+        $prospectiveQuota = \App\Services\ProspectiveSubscriptionPolicy::available()
+            && (\App\Services\PlanLimitService::getActiveSubscription($companyId)?->hasLifecycleSnapshot() ?? false);
         try {
             \DB::transaction(function () use ($bill, $companyId, $prospectiveQuota) {
                 if ($prospectiveQuota) Company::whereKey($companyId)->lockForUpdate()->firstOrFail();
@@ -1125,7 +1126,8 @@ class FbrPosController extends Controller
                 $localSummary['provisional']['rider_guarded'] = $this->lastWashGuarded;
             }
             if ($ids->isNotEmpty()) {
-                $prospectiveQuota = \App\Services\PlanLimitService::getActiveSubscription($companyId)?->hasLifecycleSnapshot() ?? false;
+                $prospectiveQuota = \App\Services\ProspectiveSubscriptionPolicy::available()
+                    && (\App\Services\PlanLimitService::getActiveSubscription($companyId)?->hasLifecycleSnapshot() ?? false);
                 \DB::transaction(function () use ($ids, $companyId, $prospectiveQuota) {
                     if ($prospectiveQuota) Company::whereKey($companyId)->lockForUpdate()->firstOrFail();
                     $deleteRows = FbrPosTransaction::where('company_id', $companyId)
@@ -2169,7 +2171,8 @@ class FbrPosController extends Controller
             }
         }
 
-        $prospectiveQuota = \App\Services\PlanLimitService::getActiveSubscription($companyId)?->hasLifecycleSnapshot() ?? false;
+        $prospectiveQuota = \App\Services\ProspectiveSubscriptionPolicy::available()
+            && (\App\Services\PlanLimitService::getActiveSubscription($companyId)?->hasLifecycleSnapshot() ?? false);
         try {
             $transaction = DB::transaction(function () use ($request, $companyId, $company, $invoiceMode, $initialFbrStatus, $offlineUuid, $offlineUuidColumnExists, $offlineQueuedAt, $offlineQueuedBy, $offlineBranchId, $draftId, $prospectiveQuota) {
                 // New-policy paid limits serialize with the company before any
@@ -8623,6 +8626,7 @@ class FbrPosController extends Controller
 
         $supplierId = null;
         $product = DB::transaction(function () use ($request, $createFbrData, $companyId, $inventoryAllowed, $existingSupplier, &$supplierId) {
+            \App\Services\ProspectiveQuotaGuard::lockCompanyForInvoiceWork($companyId);
             $product = Product::create($createFbrData);
             $supplier = $this->quickAddSupplierIfRequested($request, $companyId, $inventoryAllowed) ?? $existingSupplier;
             $supplierId = $supplier?->id;
@@ -8727,6 +8731,7 @@ class FbrPosController extends Controller
 
         $supplierId = null;
         $created = DB::transaction(function () use ($request, $filled, $companyId, $taxType, $taxRate, $isThird, $hasThirdCol, $inventoryAllowed, $existingSupplier, &$supplierId) {
+            \App\Services\ProspectiveQuotaGuard::lockCompanyForInvoiceWork($companyId);
             $supplier = $this->quickAddSupplierIfRequested($request, $companyId, $inventoryAllowed) ?? $existingSupplier;
             $supplierId = $supplier?->id;
 
@@ -8912,6 +8917,7 @@ class FbrPosController extends Controller
         // ONE transaction for the whole edit: field save + min-stock/opening
         // + stock adjustment commit together or not at all.
         DB::transaction(function () use ($request, $product, $updateFbrData, $editStockSupplier, $inventoryAllowedUpd) {
+            \App\Services\ProspectiveQuotaGuard::lockCompanyForInvoiceWork((int) $product->company_id);
             $product->update($updateFbrData);
 
             // Retail Core (Aug 2026): optional opening stock + low-stock threshold.
@@ -9039,6 +9045,7 @@ class FbrPosController extends Controller
         $reason = trim((string) ($request->qty_reason ?? ''));
         $note = 'Stock correction (product edit form)' . ($reason !== '' ? ' — ' . $reason : '');
         DB::transaction(function () use ($companyId, $product, $newQty, $note, $userId, $branchId) {
+            \App\Services\ProspectiveQuotaGuard::lockCompanyForInvoiceWork($companyId);
             $stock = \App\Services\BranchStockService::stockRow($companyId, (int) $product->id, $branchId);
             $delta = round($newQty - (float) $stock->quantity, 3);
             if (abs($delta) < 0.0005) {
@@ -9191,6 +9198,7 @@ class FbrPosController extends Controller
         $branchId = $branchId ?? $this->panelStockBranchId($companyId);
 
         return DB::transaction(function () use ($companyId, $supplier, $lines, $branchId) {
+            \App\Services\ProspectiveQuotaGuard::lockCompanyForInvoiceWork($companyId);
             $total = 0;
             foreach ($lines as $l) {
                 $total += round((float) $l['quantity'] * (float) $l['unit_price'], 2);

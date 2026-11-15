@@ -1131,6 +1131,7 @@ class FbrPosPhase2Controller extends Controller
         }
 
         return DB::transaction(function () use ($r, $id) {
+            \App\Services\ProspectiveQuotaGuard::lockCompanyForInvoiceWork($this->companyId());
             // Re-fetch UNDER LOCK — concurrent returns of the same bill must
             // serialize here or both see the same remaining quantities and
             // double-refund/double-restock.

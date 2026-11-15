@@ -211,6 +211,7 @@ final class AgentCoreLedgerRefundProjector
         }
 
         return DB::transaction(function () use ($company, $event, $actor, $branchId, $parentId, $method, $rows, $sale, $data) {
+            \App\Services\ProspectiveQuotaGuard::lockCompanyForInvoiceWork((int) $company->id);
             $invoice = $this->returnInvoice($event);
             $existing = FbrPosTransaction::where('company_id', $company->id)
                 ->where('invoice_number', $invoice)->where('transaction_type', 'return')->first();
@@ -327,6 +328,7 @@ final class AgentCoreLedgerRefundProjector
         $returnId = $this->positiveId($stockData['return_transaction_id'] ?? null, 'payload.data.stock.return_transaction_id');
 
         return DB::transaction(function () use ($company, $event, $actor, $branchId, $returnId) {
+            \App\Services\ProspectiveQuotaGuard::lockCompanyForInvoiceWork((int) $company->id);
             $return = FbrPosTransaction::where('company_id', $company->id)
                 ->where('branch_id', $branchId)->where('transaction_type', 'return')
                 ->lockForUpdate()->find($returnId);

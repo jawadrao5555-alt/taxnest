@@ -83,6 +83,8 @@ class MadadgarService
     {
         if ($company?->exists) $company=$company->fresh();
         $actor=MadadgarAnswerScope::actor($actor,$company);
+        // Prior chat may contain private read-tool results. Never send those to a provider.
+        if ($company && $actor) $history=[['role'=>'user','content'=>$question]];
         $result=MadadgarAnswerScope::answer($question,$product,$company,$actor)
             ?? self::respondWithinScope(MadadgarAnswerScope::history($history),$question,$product,$company);
         $result['provenance']=MadadgarAnswerScope::metadata($result,$product,$company,$actor);

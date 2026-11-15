@@ -65,6 +65,8 @@
             </button>
         </div>
 
+        <p x-show="view === 'chat'" class="px-4 py-2 text-xs text-gray-600 border-b border-gray-200">{{ __('madadgar_scope.read_commands') }}</p>
+
         {{-- MENU VIEW: two options --}}
         <div x-show="view === 'menu'" class="p-4 space-y-3">
             <template x-if="ai">
@@ -106,7 +108,8 @@
                             <span class="whitespace-pre-wrap" x-text="m.content"></span>
                             <template x-if="m.role === 'assistant' && m.provenance">
                                 <div class="mt-2 pt-2 border-t border-gray-200 text-xs text-gray-600" data-madadgar-provenance>
-                                    <p>{{ __('madadgar_scope.guide_only') }}</p>
+                                    <p x-show="m.provenance.answer_source !== 'company_read'">{{ __('madadgar_scope.guide_only') }}</p>
+                                    <p x-show="m.provenance.answer_source === 'company_read'">{{ __('madadgar_scope.company_read') }} <span x-text="m.provenance.source_reference"></span></p>
                                     <p>{{ __('madadgar_scope.review_unknown') }}</p>
                                     <p>{{ __('madadgar_scope.answered') }} <time x-text="new Date(m.provenance.answered_at).toLocaleString()"></time></p>
                                 </div>

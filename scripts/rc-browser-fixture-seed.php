@@ -1089,7 +1089,7 @@ foreach ([1366,390] as $width) {
     $aiUsageCases[$width]=['admin'=>$reviewer->email,'support'=>$support->email,'panels'=>[]];
     foreach (['pos','fbrpos'] as $product) {
         $category=$product==='pos'?'retail':'education';
-        $c=$company('Synthetic AI usage '.$product.' '.$width,'ai-company-'.$product.'-'.$width.'@rc-browser.invalid','RCAI'.$product.$width,$product,['pos_type'=>$category,'business_category'=>$category,'pos_setup_completed'=>true,'pra_reporting_enabled'=>false,'fbr_reporting_enabled'=>false]);
+        $c=$company('Synthetic AI usage '.$product.' '.$width,'ai-company-'.$product.'-'.$width.'@rc-browser.invalid','RCAI'.$product.$width,$product,['pos_type'=>$category,'business_category'=>$category,'pos_setup_completed'=>true,'fbr_pos_enabled'=>$product==='fbrpos','pra_reporting_enabled'=>false,'fbr_reporting_enabled'=>false]);
         $owner=$user($c,'Synthetic usage owner','ai-owner-'.$product.'-'.$width.'@rc-browser.invalid','company_admin','pos_admin');
         $cashier=$user($c,'Synthetic usage cashier','ai-cashier-'.$product.'-'.$width.'@rc-browser.invalid','employee','pos_cashier');
         DB::table('madadgar_budget_policies')->insert(['company_id'=>$c->id,'model'=>'gpt-4o-mini','currency'=>'USD','input_per_million'=>'1.000000','output_per_million'=>'1.000000','monthly_budget'=>'0.001000','configured_by'=>$reviewer->id,'created_at'=>now(),'updated_at'=>now()]);

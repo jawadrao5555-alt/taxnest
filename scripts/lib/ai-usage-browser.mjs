@@ -39,9 +39,14 @@ export async function aiUsageWorkflow(page,t,v,{baseUrl,login,loopback,saveEvide
     const ctx=await context();
     try {
       const owner=await ctx.newPage();
-      await login(owner,{...t,login:c.login,loginPath:c.prefix+'/login'});
+      await login(owner,{...t,name:t.name+' '+c.prefix+' owner',login:c.login,loginPath:c.prefix+'/login'});
       await owner.goto(baseUrl+c.prefix+'/madadgar/usage',{waitUntil:'domcontentloaded'});
       await verify(owner,c);
+      if(c.prefix==='/fbr-pos') {
+        const fiscal=owner.locator('#school-fiscal-status');
+        await fiscal.waitFor();
+        check(/off|disabled|blocked/i.test(await fiscal.innerText()),'School portal access must not enable fiscal submission');
+      }
       check(await owner.locator('#monthly_budget').count()===0,'Company owner received platform rate editor');
       const foreign=f.panels.find(x=>x.companyId!==c.companyId);
       await owner.goto(baseUrl+c.prefix+'/madadgar/usage?company_id='+foreign.companyId,{waitUntil:'domcontentloaded'});
@@ -52,14 +57,14 @@ export async function aiUsageWorkflow(page,t,v,{baseUrl,login,loopback,saveEvide
     const cashierCtx=await context();
     try {
       const cashier=await cashierCtx.newPage();
-      await login(cashier,{...t,login:c.cashier,loginPath:c.prefix+'/login'});
+      await login(cashier,{...t,name:t.name+' '+c.prefix+' cashier',login:c.cashier,loginPath:c.prefix+'/login'});
       const denied=await cashierCtx.request.get(baseUrl+c.prefix+'/madadgar/usage',{headers:{Accept:'application/json'},maxRedirects:0});
       check(denied.status()===403,'Cashier read owner usage');
     } finally { await cashierCtx.close(); }
   }
   const ctx=await context();
   try {
-    const support=await ctx.newPage();await login(support,{...t,login:f.support});
+    const support=await ctx.newPage();await login(support,{...t,name:t.name+' platform support',login:f.support});
     const denied=await ctx.request.get(baseUrl+'/admin/companies/'+f.panels[0].companyId+'/ai-usage',{headers:{Accept:'application/json'},maxRedirects:0});
     check(denied.status()===403,'Support role read sensitive configuration usage');
   } finally { await ctx.close(); }

@@ -500,6 +500,32 @@ foreach ([1366, 390] as $width) {
     $bulkRiderCases[$width] = ['riderId' => $riderId, 'ids' => $ids];
 }
 
+// Independent synthetic delivery-credit tenants keep viewport recovery ledgers separate.
+$deliveryCreditCases = [];
+foreach ([1366, 390] as $width) {
+    $creditShop = $company('Synthetic Credit Shop '.$width, 'credit-shop-'.$width.'@rc-browser.invalid', 'RCCREDIT'.$width, 'pos', [
+        'business_category'=>'restaurant','pos_type'=>'restaurant','pos_setup_completed'=>true,
+        'feature_flags'=>array_merge(PosFeatureService::defaultsForCategory('restaurant'), ['delivery'=>true]),
+        'inventory_enabled'=>false,
+    ]);
+    $creditOwner = $user($creditShop, 'Synthetic Credit Owner '.$width, 'credit-owner-'.$width.'@rc-browser.invalid', 'company_admin', 'pos_admin');
+    $creditRiderUser = $user($creditShop, 'Synthetic Credit Rider '.$width, 'credit-rider-'.$width.'@rc-browser.invalid', 'staff', 'pos_rider');
+    $creditRider = \App\Models\PosRider::create(['company_id'=>$creditShop->id,'user_id'=>$creditRiderUser->id,'name'=>'Synthetic Credit Rider '.$width,'is_active'=>true]);
+    $creditIds=[];
+    foreach (['received','credit'] as $mode) {
+        $bill=DB::table('pos_transactions')->insertGetId([
+            'company_id'=>$creditShop->id,'created_by'=>$creditOwner->id,'invoice_number'=>'SYN-CREDIT-PRIVATE-'.$width.'-'.$mode,
+            'business_date'=>\App\Services\PosBusinessDay::current($creditShop->id),'status'=>'completed','invoice_mode'=>'local','pra_status'=>'local',
+            'customer_name'=>'Synthetic '.$mode.' customer '.$width,'customer_phone'=>'00000000000','payment_method'=>'cash','order_type'=>'delivery',
+            'subtotal'=>100,'tax_rate'=>0,'tax_amount'=>0,'total_amount'=>100,'rider_collection_amount'=>100,
+            'rider_id'=>$creditRider->id,'delivery_status'=>'dispatched','created_at'=>$now,'updated_at'=>$now,
+        ]);
+        DB::table('pos_transaction_items')->insert(['transaction_id'=>$bill,'item_name'=>'Synthetic private invoice item','quantity'=>1,'unit_price'=>100,'subtotal'=>100,'tax_amount'=>0,'created_at'=>$now,'updated_at'=>$now]);
+        $creditIds[$mode]=$bill;
+    }
+    $deliveryCreditCases[$width]=['login'=>$creditOwner->email,'riderLogin'=>$creditRiderUser->email,'ids'=>$creditIds];
+}
+
 $topSellingCompany = $company('Synthetic Top Selling', 'top-selling-company@rc-browser.invalid', 'RCTOPSELL001', 'pos', [
     'business_category' => 'restaurant', 'pos_type' => 'restaurant', 'restaurant_mode' => true,
     'feature_flags' => PosFeatureService::defaultsForCategory('restaurant'), 'pos_setup_completed' => true,
@@ -952,6 +978,19 @@ foreach([1366,390] as $width){
         'portal'=>['id'=>$portalRecord->id,'usin'=>$portalPayload['USIN'],'date'=>substr($portalPayload['DateTime'],0,10),
             'reference'=>'SYN-PORTAL-'.$width]];
 }
+$cashierPolicyCases=[];
+foreach ([1366,390] as $policyWidth) {
+    $policyCompany=$company('Synthetic Cashier Policy '.$policyWidth,'policy-company-'.$policyWidth.'@rc-browser.invalid','RCPOLICY'.$policyWidth,'pos',[
+        'pos_integration_mode'=>'pra','pra_reporting_enabled'=>false,'pos_setup_completed'=>true,'pos_tax_rate_cash'=>16,'pos_tax_rate_card'=>5]);
+    $policyPlan=\App\Models\PricingPlan::create(['name'=>'Synthetic cashier policy '.$policyWidth,'product_type'=>'pos','price'=>100,'invoice_limit'=>100]);
+    \App\Models\Subscription::create(['company_id'=>$policyCompany->id,'pricing_plan_id'=>$policyPlan->id,'active'=>true,'start_date'=>now()->subDay()->toDateString(),'end_date'=>now()->addDays(30)->toDateString()]);
+    $policyOwner=$user($policyCompany,'Synthetic Policy Owner','policy-owner-'.$policyWidth.'@rc-browser.invalid','company_admin','pos_admin');
+    $policyCashier=$user($policyCompany,'Synthetic Policy Cashier','policy-cashier-'.$policyWidth.'@rc-browser.invalid','user','pos_cashier');
+    $policyAdmin=$user($policyCompany,'Synthetic Policy Admin','policy-admin-'.$policyWidth.'@rc-browser.invalid','user','pos_admin');
+    $cashierPolicyCases[$policyWidth]=['owner'=>$policyOwner->email,'cashier'=>$policyCashier->email,'admin'=>$policyAdmin->email,'cashierId'=>$policyCashier->id];
+}
+$cashierPolicyCases[1366]['foreignId']=$cashierPolicyCases[390]['cashierId'];
+$cashierPolicyCases[390]['foreignId']=$cashierPolicyCases[1366]['cashierId'];
 $staffCases=[];
 foreach ([1366,390] as $staffWidth) {
     $staffCompany=$company('Synthetic Staff Approval '.$staffWidth,'staff-company-'.$staffWidth.'@rc-browser.invalid','RCSTAFF'.$staffWidth,'pos',[
@@ -1102,6 +1141,7 @@ $fixture = [
         ['name' => 'service-work-orders-denied', 'login' => $serviceDenied->email, 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/work-orders', '/pos/work-orders/report.csv'], 'denied' => true],
     ], $categoryJourneys, $optionalArchiveJourneys),
     'transactionalJourneys' => [
+        ['name'=>'delivery-credit','login'=>$deliveryCreditCases[1366]['login'],'password'=>$password,'loginPath'=>'/pos/login','paths'=>['/pos/delivery-accounts'],'markers'=>['Synthetic credit customer'],'deliveryCredit'=>$deliveryCreditCases,'manualOnly'=>true],
         ['name'=>'hospital-collections','login'=>$hospitalCases[1366],'mobileLogin'=>$hospitalCases[390],'password'=>$password,'loginPath'=>'/fbr-pos/login',
             'paths'=>['/fbr-pos/hospital'],'markers'=>['Hospital'],'hospitalCollection'=>true,'manualOnly'=>true],
         ['name'=>'school-fees','login'=>$schoolUser->email,'mobileLogin'=>$schoolMobileUser->email,'password'=>$password,'loginPath'=>'/fbr-pos/login',
@@ -1114,6 +1154,7 @@ $fixture = [
         ['name'=>'billing-package-selection','login'=>$billingSelectionCases[1366]['login'],'password'=>$password,'loginPath'=>'/login',
             'paths'=>[], 'billingSelection'=>$billingSelectionCases],
         ['name'=>'kot-note-visibility','login'=>$kotNoteOwner->email,'password'=>$password,'loginPath'=>'/pos/login','paths'=>['/pos/invoice/create'],'markers'=>['Current Order'],'kotNoteVisibility'=>['orderId'=>$kotNoteOrder->id]],
+        ['name'=>'cashier-online-payment-policy','manualOnly'=>true,'login'=>$cashierPolicyCases[1366]['cashier'],'password'=>$password,'loginPath'=>'/pos/login','paths'=>['/pos/invoice/create'],'markers'=>[],'cashierPolicy'=>$cashierPolicyCases],
         ['name'=>'staff-discount-approval','login'=>$staffCases[1366]['cashier'],'password'=>$password,'loginPath'=>'/pos/login','paths'=>['/pos/staff-discounts'],'markers'=>['Staff / family discount requests'],'staffDiscount'=>$staffCases],
         ...$surveyJourneys,
         ['name'=>'b01-company-account','login'=>$admin->email,'password'=>$password,'loginPath'=>'/admin/login',

@@ -38,6 +38,10 @@ export async function greetingTutorialWorkflow(page,t,v,{baseUrl,saveEvidenceScr
   const video=page.locator('video[aria-label="Synthetic searchable guide"]');
   await video.waitFor();
   check(await video.locator('track[kind="captions"][srclang="en"]').count()===1,'Supplied caption metadata missing');
+  for(const path of ['/storage/rc-browser-tutorials/rc-onboarding-synthetic.mp4','/storage/rc-browser-tutorials/rc-onboarding-synthetic.vtt']){
+    const asset=await page.context().request.get(baseUrl+path);check(asset.ok(),'Isolated synthetic tutorial asset is not browser-readable');
+    check((await asset.text()).includes(path.endsWith('.vtt')?'Synthetic caption fixture':'synthetic file placeholder'),'Synthetic tutorial asset ownership/content mismatch');
+  }
   const details=page.locator('details').filter({hasText:'Synthetic transcript only'});
   await details.locator('summary').focus();await page.keyboard.press('Enter');
   check(await details.getAttribute('open')!==null,'Transcript is not keyboard expandable');

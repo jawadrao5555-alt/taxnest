@@ -1151,10 +1151,11 @@ foreach ([1366, 390] as $width) {
     $greetOwner = $user($greetCompany, 'Synthetic greeting owner', 'greeting-owner-'.$width.'@rc-browser.invalid', 'company_admin');
     $greetingCases[$width] = ['login'=>$greetOwner->email];
 }
-File::ensureDirectoryExists(public_path('videos'));
-File::put(public_path('videos/rc-onboarding-synthetic.mp4'), 'synthetic file placeholder; never played');
-File::put(public_path('videos/rc-onboarding-synthetic.vtt'), "WEBVTT\n\n00:00.000 --> 00:01.000\nSynthetic caption fixture\n");
-\App\Models\TutorialVideo::create(['slug'=>'rc-onboarding-synthetic','product'=>'di','title'=>'Synthetic searchable guide','description'=>'Synthetic accessibility acceptance only','video_url'=>'/videos/rc-onboarding-synthetic.mp4','category'=>'shuruat','is_published'=>true,'show_public'=>true,'controls_applied'=>true,'caption_path'=>'/videos/rc-onboarding-synthetic.vtt','caption_language'=>'en','transcript'=>'Synthetic transcript only','release_version'=>'synthetic-build','reviewed_on'=>'2026-01-01']);
+// Keep synthetic media in existing disposable storage, never mutate committed public/videos.
+File::ensureDirectoryExists(storage_path('app/public/rc-browser-tutorials'));
+File::put(storage_path('app/public/rc-browser-tutorials/rc-onboarding-synthetic.mp4'), 'synthetic file placeholder; never played');
+File::put(storage_path('app/public/rc-browser-tutorials/rc-onboarding-synthetic.vtt'), "WEBVTT\n\n00:00.000 --> 00:01.000\nSynthetic caption fixture\n");
+\App\Models\TutorialVideo::create(['slug'=>'rc-onboarding-synthetic','product'=>'di','title'=>'Synthetic searchable guide','description'=>'Synthetic accessibility acceptance only','video_url'=>'/storage/rc-browser-tutorials/rc-onboarding-synthetic.mp4','category'=>'shuruat','is_published'=>true,'show_public'=>true,'controls_applied'=>true,'caption_path'=>'/storage/rc-browser-tutorials/rc-onboarding-synthetic.vtt','caption_language'=>'en','transcript'=>'Synthetic transcript only','release_version'=>'synthetic-build','reviewed_on'=>'2026-01-01']);
 // Synthetic state fixtures only: no fiscal transport is invoked or configured.
 $diInventoryCases=[];
 foreach ([1366,390] as $width) {

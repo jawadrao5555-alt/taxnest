@@ -139,6 +139,8 @@ concurrency(){
     grep -Fqx "PASS: native FBR actual store old-snapshot distinct UUID last-slot race admits one; identical UUID race and full-quota replay return same bill without fiscal calls" "$EVIDENCE_DIR/fbr-quota-admission.log" || fail fbr-quota-missing-admission-proof
     clean_php php "$ROOT/tests/native/rc_di_pra_quota_admission.php" | tee "$EVIDENCE_DIR/di-pra-quota-admission.log"
     grep -Fqx "PASS: native DI PRA old-snapshot distinct bill last-slot admission permits one; DI same-claim retry unknown hold definite rejection and frozen production expiry preserved without provider calls" "$EVIDENCE_DIR/di-pra-quota-admission.log" || fail di-pra-quota-missing-admission-proof
+    clean_php php "$ROOT/tests/native/rc_local_pilot_quota_concurrency.php" | tee "$EVIDENCE_DIR/local-pilot-quota-concurrency.log"
+    grep -Fqx "PASS: native School Hospital paid last-slot serialized under old RR snapshot; same payment recovers same receipt changed data rejected cash unchanged no fiscal calls" "$EVIDENCE_DIR/local-pilot-quota-concurrency.log" || fail local-pilot-quota-missing-native-proof
     clean_php php "$ROOT/tests/native/rc_paid_renewal.php" | tee "$EVIDENCE_DIR/paid-renewal.log"
     clean_php php "$ROOT/tests/native/rc_trial_signup.php" | tee "$EVIDENCE_DIR/trial-signup.log"
     clean_php php "$ROOT/tests/native/rc_subscription_financial_adjustments.php" | tee "$EVIDENCE_DIR/subscription-financial-adjustments.log"

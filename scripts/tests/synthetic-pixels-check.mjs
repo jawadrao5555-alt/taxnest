@@ -34,3 +34,8 @@ test('AI rate controls permit only explicit product names and fixed viewports',(
  for(const product of ['pos','fbr'])for(const width of [1366,390])assert.equal(pixelName(`ai-usage-controls-${product}-${width}`),`ai-usage-controls-${product}-${width}.png`);
  for(const name of ['ai-usage-controls-erp-390','ai-usage-controls-pos-1280','ai-usage-controls-fbr-390.png','ai-usage-controls-../secret-390'])assert.throws(()=>pixelName(name));
 });
+
+test('escalation proof permits only the two exact retry states',()=>{
+ for(const state of ['pending','recovered'])for(const width of [1366,390])assert.equal(pixelName(`madadgar-retry-${state}-${width}`),`madadgar-retry-${state}-${width}.png`);
+ for(const name of ['madadgar-retry-arbitrary-390','madadgar-retry-pending-1280','madadgar-retry-recovered-390.png','../madadgar-retry-pending-390'])assert.throws(()=>pixelName(name));
+});

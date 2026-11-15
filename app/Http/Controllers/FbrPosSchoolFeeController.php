@@ -264,7 +264,7 @@ class FbrPosSchoolFeeController extends Controller
             Company::whereKey($company->id)->lockForUpdate()->firstOrFail();
             $quotaContext = \App\Services\ProspectiveQuotaGuard::context((int)$company->id, false);
             $existing = DB::table('school_fee_receipts')->where('company_id', $company->id)
-                ->where('request_key', $data['request_key'])->first();
+                ->where('request_key', $data['request_key'])->lockForUpdate()->first();
             if ($existing) {
                 if ($existing->student_reference !== $data['student_reference']
                     || $existing->fee_head !== $data['fee_head']

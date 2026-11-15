@@ -150,7 +150,9 @@ foreach(['school','hospital']as$kind) {
     pilotProof($before===$rows()->orderBy('id')->get()->toJson(),'Replay changed original receipt or cash');
     // Same payment identity must recover the winner even with the pre-commit snapshot.
     $same=pilotFixture($kind);$payload=pilotPayload($kind);$r=pilotRace($same,[$payload,$payload]);
-    pilotProof($r[0]['status']===200&&$r[1]['status']===200&&$r[0]['data']['receipt_id']===$r[1]['data']['receipt_id'],'Old snapshot duplicate retry did not recover same receipt');
+    $duplicateDiagnostic=['kind'=>$kind,'stage'=>'same_identity_old_snapshot','results'=>array_map(fn($item)=>['status'=>$item['status'],'receipt_id'=>$item['data']['receipt_id']??null,'receipt_id_type'=>get_debug_type($item['data']['receipt_id']??null),'validation_keys'=>$item['keys']??[]],$r),
+        'persisted_receipts'=>DB::table(pilotTable($kind))->where('company_id',$same['company'])->count()];
+    pilotProof($r[0]['status']===200&&$r[1]['status']===200&&$r[0]['data']['receipt_id']===$r[1]['data']['receipt_id'],'Old snapshot duplicate retry did not recover same receipt: '.json_encode($duplicateDiagnostic,JSON_THROW_ON_ERROR));
     pilotProof(DB::table(pilotTable($kind))->where('company_id',$same['company'])->count()===1,'Same identity inserted twice');
     pilotProof(!Company::findOrFail($same['company'])->fbr_reporting_enabled,'Pilot fiscal flag changed');
     $tamper=pilotFixture($kind);$first=pilotPayload($kind);$second=array_replace($first,['amount'=>'99.00']);

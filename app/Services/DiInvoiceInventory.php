@@ -50,7 +50,7 @@ final class DiInvoiceInventory {
   foreach($groups as $id=>$lines) {
    $source=DB::table('di_invoice_inventory_postings')->where('company_id',$companyId)->where('invoice_item_id',$id)->where('direction','sale')->lockForUpdate()->first();
    if(!$source)self::reject('Original stock deduction is unavailable.');
-   $used=InvoiceItem::where('inventory_snapshot->source_invoice_item_id',(int)$id)->whereHas('invoice',fn($q)=>$q->withoutGlobalScopes()->where('company_id',$companyId)->where('document_type','Credit Note')->where(fn($q)=>$q->whereNull('inventory_environment_snapshot')->orWhere('inventory_environment_snapshot','!=','sandbox'))->when($editingId,fn($q)=>$q->where('id','!=',$editingId)))->get()->reduce(fn($sum,$item)=>$sum->plus(self::decimal($item->inventory_snapshot['base_quantity'])),BigDecimal::zero());
+   $used=InvoiceItem::where('inventory_snapshot->source_invoice_item_id',(int)$id)->whereHas('invoice',fn($q)=>$q->withoutGlobalScopes()->where('company_id',$companyId)->where('document_type','Credit Note')->where(fn($q)=>$q->whereNull('inventory_environment_snapshot')->orWhere('inventory_environment_snapshot','!=','sandbox'))->when($editingId,fn($q)=>$q->where('id','!=',$editingId)))->orderBy('id')->lockForUpdate()->get()->reduce(fn($sum,$item)=>$sum->plus(self::decimal($item->inventory_snapshot['base_quantity'])),BigDecimal::zero());
    foreach($lines as $line)$used=$used->plus(self::decimal($line['inventory_snapshot']['base_quantity']));
    if($used->isGreaterThan($source->base_quantity))self::reject('Return exceeds original stock quantity after earlier saved credit notes.');
   }
@@ -77,19 +77,25 @@ final class DiInvoiceInventory {
   self::reserveReturns($invoice);
  }
  /** Durable reservation committed with the fiscal lease, never a database lock held over network. */
+ /** Read committed rows after the source mutex, not an earlier REPEATABLE READ snapshot. */
+ private static function currentQuantity(\Illuminate\Database\Query\Builder $query): string {
+  $total=self::decimal('0');
+  foreach($query->orderBy('id')->lockForUpdate()->get(['base_quantity']) as $row)$total=$total->plus(self::decimal($row->base_quantity));
+  return (string)$total;
+ }
  public static function reserveReturns(Invoice $invoice): void {
   if($invoice->inventory_enabled_snapshot!==true || $invoice->document_type!=='Credit Note')return;
   foreach($invoice->items()->get()->sortBy(fn($i)=>(int)($i->inventory_snapshot['source_invoice_item_id']??0)) as $item) {
    $s=$item->inventory_snapshot;if(!$s)continue;
    $source=DB::table('di_invoice_inventory_postings')->where('company_id',$invoice->company_id)->where('invoice_item_id',$s['source_invoice_item_id']??0)->where('direction','sale')->lockForUpdate()->first();
    if(!$source || (int)$source->product_id!==(int)$s['product_id'] || (int)($source->branch_id??0)!==(int)($s['branch_id']??0))self::reject('Original stock posting scope is unavailable for return reservation.');
-   $existing=DB::table('di_inventory_return_reservations')->where('invoice_item_id',$item->id)->first();
+   $existing=DB::table('di_inventory_return_reservations')->where('invoice_item_id',$item->id)->lockForUpdate()->first();
    if($existing && in_array($existing->state,['reserved','consumed'],true)) {
     if((int)$existing->source_posting_id!==(int)$source->id || !self::decimal($existing->base_quantity)->isEqualTo(self::decimal($s['base_quantity'])))self::reject('Frozen return reservation no longer matches invoice line.');
     continue;
    }
-   $posted=DB::table('di_invoice_inventory_postings')->where('source_posting_id',$source->id)->sum('base_quantity');
-   $reserved=DB::table('di_inventory_return_reservations')->where('source_posting_id',$source->id)->where('state','reserved')->sum('base_quantity');
+   $posted=self::currentQuantity(DB::table('di_invoice_inventory_postings')->where('source_posting_id',$source->id));
+   $reserved=self::currentQuantity(DB::table('di_inventory_return_reservations')->where('source_posting_id',$source->id)->where('state','reserved'));
    $qty=self::decimal($s['base_quantity']);
    if(self::decimal((string)$posted)->plus(self::decimal((string)$reserved))->plus($qty)->isGreaterThan($source->base_quantity))self::reject('Original returnable stock is already posted or reserved by another invoice.');
    $values=['company_id'=>$invoice->company_id,'invoice_id'=>$invoice->id,'invoice_item_id'=>$item->id,'source_posting_id'=>$source->id,'base_quantity'=>(string)$qty,'state'=>'reserved','updated_at'=>now()];
@@ -165,7 +171,7 @@ final class DiInvoiceInventory {
    if($return) {
     $source=DB::table('di_invoice_inventory_postings')->where('company_id',$company->id)->where('invoice_item_id',$s['source_invoice_item_id']??0)->where('direction','sale')->lockForUpdate()->first();
     if(!$source || (int)$source->product_id!==(int)$s['product_id'] || (int)($source->branch_id??0)!==(int)($s['branch_id']??0))self::reject('Original stock deduction is unavailable.');
-    $used=DB::table('di_invoice_inventory_postings')->where('source_posting_id',$source->id)->sum('base_quantity');
+    $used=self::currentQuantity(DB::table('di_invoice_inventory_postings')->where('source_posting_id',$source->id));
     if(self::decimal((string)$used)->plus($qty)->isGreaterThan($source->base_quantity))self::reject('Return exceeds original posted quantity remaining.');
    } elseif($invoice->document_type!=='Sale Invoice')self::reject('Unsupported inventory document type.');
    $query=DB::table('inventory_stocks')->where('company_id',$company->id)->where('product_id',$s['product_id'])->where('branch_id',$s['branch_id']);

@@ -34,3 +34,20 @@ A recoverable stock statement/validation error rolls back its savepoint and pers
 Manual confirmation is an owner-provided assertion, not a regulator call. If its transaction fails fatally, the invoice remains pending verification; the owner must repeat the explicit confirmation. There is no automatic confirmation, automatic regulator retry or invented durable manual-acknowledgement journal.
 
 Generic DI receiving, deductions and purchase reversals share the same Product-row lock before stock-row lookup/creation. This also serializes receiving against the first invoice at an unassigned branch. The protocol applies only to explicitly classified DI companies; PRA/FBR-POS product-ID semantics are untouched. DI quantity and movement balance writes use exact four-decimal arithmetic even when the pre-existing model exposes float values. The native probe includes an independent receive-versus-first-post race; local regression covers a 999,999,999.1234 balance with fractional additions/deductions/reversal.
+
+### Native repeatable-read return reservation correction
+
+Run 43700422539 passed independent migration preservation and reviewed callback
+proofs but failed the DI over-return reservation race. Under InnoDB REPEATABLE
+READ, a transaction may already hold a consistent snapshot before waiting for
+the original posting mutex. Plain SUM/first queries after that wait can miss
+another transaction's committed reservation. The correction uses locking current
+reads after that mutex for existing reservations, posted returns, active reserved
+quantities, and saved-credit validation, summing exact decimal strings without
+float conversion. It does not change global isolation or permit excess returns.
+
+The native probe now explicitly establishes both workers' consistent snapshots
+before releasing the barrier, requires exactly one 200 and one 422, and requires
+one active reservation before synthetic acceptance. Unexpected worker exceptions
+exit nonzero, unexpected stdout fails, and status pairs are logged. Local SQLite
+coverage is not proof of InnoDB concurrency; hosted native rerun is required.

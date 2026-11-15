@@ -28,6 +28,10 @@ async function signupFormsWorkflow(existingPage,t,v,{baseUrl,saveEvidenceScreens
       const page=await context.newPage();
       await page.goto(baseUrl+path,{waitUntil:'domcontentloaded'});
       const form=page.locator('form[method="POST"]').filter({has:page.locator('input[name="company_name"]')});
+      if(product==='fbrpos'){
+        if(await form.locator('#requested-plan').inputValue()!=='')throw Error('Unselected FBR signup must remain trial');
+        if(!await form.locator('button[type="submit"]').isEnabled())throw Error('FBR trial signup button incorrectly disabled');
+      }
       if(product==='pos')await form.getByText('Starter',{exact:true}).click();
       for(const [name,value] of Object.entries({company_name:'Fictional signup '+product+' '+v.width,
         company_ntn:'910'+String(v.width).padStart(4,'0'),name:'Fictional signup owner',

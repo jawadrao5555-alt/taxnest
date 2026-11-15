@@ -164,7 +164,21 @@ class FbrPosSchoolFeePilotTest extends TestCase
         $this->assertStringContainsString('SYN-001', $reprint);
         $this->assertStringContainsString('1,250.50', $reprint);
         $this->assertStringNotContainsString('fbr_invoice_number', $reprint);
-        $this->assertStringNotContainsString('<svg', $reprint);
+        // Icons are not fiscal evidence. Reject the actual retail fiscal receipt markers.
+        foreach (['alt="FBR QR Code"', 'class="fbr-number"', 'Tax Asaan', 'invoice.fbr.gov.pk', 'data-fiscal-qr', 'data-fbr-invoice-number'] as $marker) {
+            $this->assertStringNotContainsString($marker, $reprint);
+        }
+        $this->assertStringContainsString(__('pos.school_local_receipt'), $reprint);
+        $this->assertStringContainsString('FBR OFF', $reprint);
+        $this->assertFalse($this->school->fresh()->fbr_reporting_enabled);
+        // Even stray fiscal-shaped properties must never become a school identifier or QR.
+        $canary = clone $row;
+        $canary->fbr_invoice_number = 'SYNTHETIC-FISCAL-CANARY-DO-NOT-RENDER';
+        $canary->fbr_status = 'submitted';
+        $canary->qr_code = 'SYNTHETIC-FISCAL-QR-DO-NOT-RENDER';
+        $canaryHtml = view('fbr-pos.school-fees.receipt', ['company' => $this->school, 'receipt' => $canary])->render();
+        $this->assertStringNotContainsString($canary->fbr_invoice_number, $canaryHtml);
+        $this->assertStringNotContainsString($canary->qr_code, $canaryHtml);
         $this->assertStringNotContainsString('tnMadadgar(', $reprint);
         Http::assertNothingSent();
     }

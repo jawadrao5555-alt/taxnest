@@ -153,7 +153,9 @@ class FbrPosHospitalCollectionTest extends TestCase
         $this->assertSame(100000,(int)DB::table('hospital_payments')->sum('amount_paisa'));
         $html=app(FbrPosHospitalController::class)->receipt($id)->getContent();
         $this->assertStringNotContainsString('tnMadadgar(', $html);
-        $this->assertStringNotContainsString('<svg', $html);
+        $this->assertStringNotContainsString('alt="FBR QR Code"', $html);
+        $this->assertStringNotContainsString('class="fbr-number"', $html);
+        $this->assertStringNotContainsString('data-fiscal-qr', $html);
         foreach(['SYN-P-001','Consultation','400.00','600.00','Synthetic Cashier','Synthetic Hospital','LOCAL COLLECTION ONLY'] as $v)$this->assertStringContainsString($v,$html);
         Http::assertNothingSent();
     }

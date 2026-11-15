@@ -95,7 +95,9 @@ class HospitalReceiptPrintingTest extends TestCase
         $this->assertStringContainsString('SAMPLE PREVIEW',$html);
         $this->assertStringNotContainsString('tnMadadgar(', $html);
         $this->assertStringNotContainsString('/fbr-pos/madadgar', str_replace('\\/', '/', $html));
-        $this->assertStringNotContainsString('<svg', $html);
+        $this->assertStringNotContainsString('alt="FBR QR Code"', $html);
+        $this->assertStringNotContainsString('class="fbr-number"', $html);
+        $this->assertStringNotContainsString('data-fiscal-qr', $html);
         $this->assertStringContainsString('HP-PREVIEW',$html);
         $this->assertStringContainsString('Bank (recorded)',$html);
         $this->assertStringContainsString('PKR 500.00',$html);
@@ -111,6 +113,8 @@ class HospitalReceiptPrintingTest extends TestCase
         $this->assertStringNotContainsString('CERTIFIED',$html);
         $this->assertStringNotContainsString('tnMadadgar(', $html);
         $this->assertStringNotContainsString('/fbr-pos/madadgar', str_replace('\\/', '/', $html));
-        $this->assertStringNotContainsString('<svg', $html);
+        $this->assertStringNotContainsString('alt="FBR QR Code"', $html);
+        $this->assertStringNotContainsString('class="fbr-number"', $html);
+        $this->assertStringNotContainsString('data-fiscal-qr', $html);
     }
 }

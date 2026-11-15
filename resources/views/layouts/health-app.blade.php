@@ -254,6 +254,7 @@
 
         {{-- ══════════════ Page ══════════════ --}}
         <main class="flex-1 min-w-0">
+            <x-prospective-policy-reminder guard="health" />
             {{-- Flash + validation are rendered centrally, exactly once. A page
                  that renders its own would double every message. --}}
             @if(session('success') || session('error') || session('warning') || $errors->any())

@@ -33,3 +33,11 @@ School/Hospital admission also reloads current policy/count rows under the tenan
 Prospective quota admission, DI acknowledgement/local inventory repair, and stock receiving acquire the company row before invoice, product, stock, or movement rows. This also prevents the implicit company foreign-key shared lock on a movement/posting INSERT from reversing the company-first quota order. The helper is ordering-only: expired access never prevents recording an already accepted fiscal acknowledgement or receiving stock. Legacy SQL-NULL policy rows retain their prior behavior. Outer stock mutation callers must acquire the same company lock before subordinate locks; a nested service lock cannot repair an already reversed order.
 
 Focused local verification: 43 tests / 209 assertions passed, including expired-access accepted acknowledgement and receiving without any HTTP request. Native overlap acceptance is a separate required hosted probe, not inferred from SQLite results.
+
+### Prospective reminders, without new delivery authority
+
+The existing trial email selector now recognizes frozen selected-package trials instead of mistaking their paid catalogue carrier for a paid subscription. Existing recipient resolution, two-day window, notification deduplication and mail settings are unchanged. Confirmed early payment suppresses a redundant payment demand during the remaining trial. No new grace emails, channels or provider settings are introduced.
+
+Read-only in-app notices derive trial, confirmed future paid start, paid end and grace end from validated frozen policy timestamps. Grace repeats on later page visits (the shared banner's existing daily dismissal key remains); after grace the access/lock flow owns the message. School/Hospital and Healthcare notices use their explicit panel guard. Legacy SQL-NULL reminders remain unchanged; malformed policy never invents dates. Early-paid trial days use frozen trial end even when the replacement paid row has no legacy trial_ends_at.
+
+This is bounded #301 workstream 3 reminder integration, not acceptance of all original 47 requirements. Synthetic mail/notification tests do not prove actual email delivery; final-head CI and rendered desktop/mobile review remain separate.

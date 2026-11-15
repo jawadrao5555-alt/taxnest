@@ -31,6 +31,7 @@
 @endif
 <a href="/fbr-pos/my-profile">{{ __('school_workspace.my_profile') }}</a><a href="/fbr-pos/suggestions">{{ __('school_workspace.help') }}</a>
 </nav><form method="post" action="/fbr-pos/set-language">@csrf<label for="school-language">{{ __('school_workspace.language') }}</label><select id="school-language" name="language"><option value="en" @selected(app()->getLocale()==='en')>English</option><option value="rur" @selected(app()->getLocale()==='rur')>Roman Urdu</option><option value="ur" @selected(app()->getLocale()==='ur')>اردو</option></select><button type="submit">{{ __('school_workspace.save_language') }}</button></form></details>
+<x-prospective-policy-reminder guard="fbrpos" />
 @if(isset($slot))<section class="school-shared-page">{{ $slot }}</section>@else @yield('content') @endif
 <script>
 // A bfcache page can predate a category cutover or deploy. Reload only a restored

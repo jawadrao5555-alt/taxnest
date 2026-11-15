@@ -21,6 +21,7 @@
 <a href="/fbr-pos/my-profile">{{ __('hospital_workspace.my_profile') }}</a><a href="/fbr-pos/suggestions">{{ __('hospital_workspace.help') }}</a>
 </nav><form method="post" action="/fbr-pos/set-language">@csrf<label for="hospital-language">{{ __('hospital_workspace.language') }}</label><select id="hospital-language" name="language"><option value="en" @selected(app()->getLocale()==='en')>English</option><option value="rur" @selected(app()->getLocale()==='rur')>Roman Urdu</option><option value="ur" @selected(app()->getLocale()==='ur')>اردو</option></select><button>{{ __('hospital_workspace.save_language') }}</button></form></details>
 @if(isset($hospitalCampuses) && $hospitalCampuses->count()===1)<p class="muted">{{ __('hospital.campus') }}: {{ $hospitalCampuses->first()->name }}</p>@endif
+<x-prospective-policy-reminder guard="fbrpos" />
 @if(isset($slot))<section class="hospital-shared-page">{{ $slot }}</section>@else @yield('content') @endif
 <script>window.addEventListener('pageshow',function(event){if(event.persisted)window.location.reload();});</script>
 </main>@if($showInteractiveSupport ?? true)<footer class="no-print collection-support-dock"><x-madadgar-support product="fbrpos" placement="inline" /></footer>@endif</body></html>

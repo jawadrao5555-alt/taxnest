@@ -216,11 +216,17 @@ class SubscriptionAccessService
         }
 
         $daysLeft = null;
-        if ($subscription->trial_ends_at) {
+        $trialUntil = $subscription->trial_ends_at;
+        if ($subscription->hasLifecycleSnapshot()) {
+            $policyView = ProspectiveSubscriptionPolicy::display($subscription);
+            $trialUntil = ($policyView['phase'] ?? null) === 'trial'
+                ? Carbon::parse($policyView['trial_ends_at'])->setTimezone(config('app.timezone')) : null;
+        }
+        if ($trialUntil) {
             // Calendar-day diff (same formula as paidEndingReminder):
             // expiring later TODAY = 0 days left → banner says "ends today".
-            $daysLeft = $subscription->trial_ends_at->isFuture()
-                ? (int) now()->startOfDay()->diffInDays($subscription->trial_ends_at->copy()->startOfDay())
+            $daysLeft = $trialUntil->isFuture()
+                ? (int) now()->startOfDay()->diffInDays($trialUntil->copy()->startOfDay())
                 : 0;
         }
 

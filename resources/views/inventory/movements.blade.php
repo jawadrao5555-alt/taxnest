@@ -73,11 +73,11 @@
                                     </td>
                                     <td class="px-4 py-3 text-xs text-gray-600 dark:text-gray-400">{{ $mv->branch->name ?? 'Main' }}</td>
                                     <td class="px-4 py-3 text-right font-bold {{ $isIn ? 'text-green-600' : 'text-red-600' }}">
-                                        {{ $isIn ? '+' : '-' }}{{ number_format($mv->quantity, $mv->quantity == intval($mv->quantity) ? 0 : 2) }}
+                                        {{ $isIn ? '+' : '-' }}{{ number_format($mv->quantity, $mv->quantity == intval($mv->quantity) ? 0 : 4) }}
                                     </td>
                                     <td class="px-4 py-3 text-right text-gray-600 dark:text-gray-400">Rs {{ number_format($mv->unit_price, 2) }}</td>
                                     <td class="px-4 py-3 text-right text-gray-700 dark:text-gray-300">Rs {{ number_format($mv->total_price, 0) }}</td>
-                                    <td class="px-4 py-3 text-right font-medium text-gray-900 dark:text-gray-100">{{ number_format($mv->balance_after, $mv->balance_after == intval($mv->balance_after) ? 0 : 2) }}</td>
+                                    <td class="px-4 py-3 text-right font-medium text-gray-900 dark:text-gray-100">{{ number_format($mv->balance_after, $mv->balance_after == intval($mv->balance_after) ? 0 : 4) }}</td>
                                     <td class="px-4 py-3 text-xs text-gray-500 dark:text-gray-400">{{ $mv->reference_number ?: ($mv->notes ? \Illuminate\Support\Str::limit($mv->notes, 30) : '-') }}</td>
                                     <td class="px-4 py-3 text-xs text-gray-500 dark:text-gray-400">{{ $mv->creator->name ?? '-' }}</td>
                                 </tr>

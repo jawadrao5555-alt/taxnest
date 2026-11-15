@@ -17,7 +17,7 @@
             @if($stock)
             <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
                 <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-4 text-center">
-                    <p class="text-2xl font-bold {{ $stock->quantity <= 0 ? 'text-red-600' : ($stock->isLowStock() ? 'text-amber-600' : 'text-emerald-600') }}">{{ number_format($stock->quantity, $stock->quantity == intval($stock->quantity) ? 0 : 2) }}</p>
+                    <p class="text-2xl font-bold {{ $stock->quantity <= 0 ? 'text-red-600' : ($stock->isLowStock() ? 'text-amber-600' : 'text-emerald-600') }}">{{ number_format($stock->quantity, $stock->quantity == intval($stock->quantity) ? 0 : 4) }}</p>
                     <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Current Stock</p>
                 </div>
                 <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-4 text-center">
@@ -65,10 +65,10 @@
                                     </td>
                                     <td class="px-4 py-3 text-xs text-gray-600 dark:text-gray-400">{{ $mv->branch->name ?? 'Main' }}</td>
                                     <td class="px-4 py-3 text-right font-bold {{ $isIn ? 'text-green-600' : 'text-red-600' }}">
-                                        {{ $isIn ? '+' : '-' }}{{ number_format($mv->quantity, 0) }}
+                                        {{ $isIn ? '+' : '-' }}{{ number_format($mv->quantity, $mv->quantity == intval($mv->quantity) ? 0 : 4) }}
                                     </td>
                                     <td class="px-4 py-3 text-right text-gray-600 dark:text-gray-400">Rs {{ number_format($mv->unit_price, 2) }}</td>
-                                    <td class="px-4 py-3 text-right font-medium text-gray-900 dark:text-gray-100">{{ number_format($mv->balance_after, 0) }}</td>
+                                    <td class="px-4 py-3 text-right font-medium text-gray-900 dark:text-gray-100">{{ number_format($mv->balance_after, $mv->balance_after == intval($mv->balance_after) ? 0 : 4) }}</td>
                                     <td class="px-4 py-3 text-xs text-gray-500 dark:text-gray-400">{{ $mv->reference_number ?: '-' }}</td>
                                     <td class="px-4 py-3 text-xs text-gray-500 dark:text-gray-400 max-w-[150px] truncate">{{ $mv->notes ?: '-' }}</td>
                                     <td class="px-4 py-3 text-xs text-gray-500 dark:text-gray-400">{{ $mv->creator->name ?? '-' }}</td>

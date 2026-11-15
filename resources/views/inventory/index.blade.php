@@ -89,7 +89,7 @@
                                     <td class="px-4 py-3 font-mono text-xs text-gray-600 dark:text-gray-400">{{ $stock->product->hs_code ?? '-' }}</td>
                                     <td class="px-4 py-3 text-gray-600 dark:text-gray-400 text-xs">{{ $stock->branch->name ?? 'Main' }}</td>
                                     <td class="px-4 py-3 text-right font-bold {{ $stock->quantity <= 0 ? 'text-red-600' : ($stock->isLowStock() ? 'text-amber-600' : 'text-gray-900 dark:text-gray-100') }}">
-                                        {{ number_format($stock->quantity, $stock->quantity == intval($stock->quantity) ? 0 : 2) }}
+                                        {{ number_format($stock->quantity, $stock->quantity == intval($stock->quantity) ? 0 : 4) }}
                                     </td>
                                     <td class="px-4 py-3 text-right text-gray-500 dark:text-gray-400 text-xs">{{ $stock->min_stock_level > 0 ? number_format($stock->min_stock_level, 0) : '-' }}</td>
                                     <td class="px-4 py-3 text-right text-gray-600 dark:text-gray-400">Rs {{ number_format($stock->avg_purchase_price, 2) }}</td>

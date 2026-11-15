@@ -58,6 +58,7 @@ class DiFiscalSubmissionState
                 return null;
             }
 
+            DiInvoiceInventory::preflight($invoice, $environment);
             $invoice->is_fbr_processing = true;
             $invoice->submitted_at = now();
             $invoice->submission_mode = $mode;

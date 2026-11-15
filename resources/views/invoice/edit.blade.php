@@ -21,6 +21,10 @@
             </div>
         </div>
     </x-slot>
+    @if(($company->inventory_enabled ?? false) && ($company->product_type ?? 'di') === 'di')
+      <p class="max-w-7xl mx-auto px-4 pt-4 text-sm text-gray-600 dark:text-gray-300">Inventory is enabled. Selected products use their frozen base quantity only after production invoice finalization. Drafts and sandbox invoices do not change physical stock.</p>
+    @endif
+
 
     <div class="py-8 pb-36">
         <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -549,8 +553,8 @@
                     $taxRate = $i->tax_rate ?? (($i->price * $i->quantity) > 0 ? round(($i->tax / ($i->price * $i->quantity)) * 100, 2) : $defaultRate);
                     $rules = \App\Services\ScheduleEngine::resolveValidationRules($scheduleType, $taxRate, $defaultRate);
                     return [
-                        'product_id' => '',
-                        'selling_packing_id' => '', 'price_includes_tax' => false, 'source_invoice_item_id' => '', 'packings' => [], 'base_price' => $i->price, 'base_mrp' => $i->mrp,
+                        'product_id' => $i->inventory_snapshot['product_id'] ?? $i->selling_snapshot['product_id'] ?? '',
+                        'selling_packing_id' => '', 'price_includes_tax' => false, 'source_invoice_item_id' => $i->inventory_snapshot['source_invoice_item_id'] ?? $i->selling_snapshot['source_invoice_item_id'] ?? '', 'packings' => [], 'base_price' => $i->price, 'base_mrp' => $i->mrp,
                         'invoice_item_id' => $i->id,
                         'packing_history' => $i->selling_snapshot,
                         'hs_code' => $i->hs_code,

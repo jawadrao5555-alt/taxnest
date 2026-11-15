@@ -477,6 +477,7 @@ Route::middleware(['auth', 'company', 'rate_limit_company', 'company.approval'])
         Route::post('/invoice/{invoice}/validate', [InvoiceController::class, 'validateInvoice']);
         Route::post('/invoice/{invoice}/validate-fbr', [InvoiceController::class, 'validateFbrPayload']);
         Route::post('/invoice/{invoice}/confirm-fbr', [InvoiceController::class, 'confirmFbrStatus']);
+        Route::post('/invoice/{invoice}/retry-inventory', [\App\Http\Controllers\InvoiceInventoryController::class, 'retry'])->name('invoice.retry-inventory');
         Route::post('/invoice/{invoice}/update-fbr-number', [InvoiceController::class, 'updateFbrNumber']);
         Route::post('/invoice/{invoice}/duplicate', [InvoiceController::class, 'duplicate'])->name('invoice.duplicate');
         Route::delete('/invoice/{invoice}', [InvoiceController::class, 'destroy'])->name('invoice.destroy');

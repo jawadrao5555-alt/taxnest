@@ -236,8 +236,10 @@ final class DiSellingPacking
         }
         foreach ($returnLines->groupBy('selling_snapshot.source_invoice_item_id') as $id => $lines) {
             $original = InvoiceItem::whereKey($id)->whereIn('invoice_id', $sourceIds)->firstOrFail();
+            $physical = $lines->contains(fn($line)=>!empty($line['inventory_snapshot']));
             $used = InvoiceItem::where('selling_snapshot->source_invoice_item_id', (int) $id)
                 ->whereHas('invoice', fn ($q) => $q->where('company_id', $companyId)->where('document_type', 'Credit Note')
+                    ->when($physical,fn($q)=>$q->where(fn($q)=>$q->whereNull('inventory_environment_snapshot')->orWhere('inventory_environment_snapshot','!=','sandbox')))
                     ->when($editingId, fn ($q) => $q->where('id', '!=', $editingId)))->sum('quantity');
             $requested = BigDecimal::of((string) $used);
             foreach ($lines as $line) {

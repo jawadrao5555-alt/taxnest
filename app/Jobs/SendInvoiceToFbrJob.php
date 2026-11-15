@@ -137,7 +137,7 @@ class SendInvoiceToFbrJob implements ShouldQueue
             ]);
             $invoice->qr_data = $qrData;
             $invoice->fbr_invoice_id = $fbrNum;
-            $invoice->save();
+            \App\Services\DiInvoiceInventory::saveAccepted($invoice);
 
             InvoiceActivityService::log(
                 $invoice->id,

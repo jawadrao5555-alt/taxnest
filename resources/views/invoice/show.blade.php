@@ -534,6 +534,19 @@
             </div>
         </div>
     </x-slot>
+    @if($invoice->inventory_posting_state === 'sandbox_no_stock')
+      <div id="di-inventory-sandbox" class="max-w-7xl mx-auto my-4 p-4 border rounded">Sandbox / test invoice: physical inventory was not changed.</div>
+    @endif
+    @if($invoice->inventory_posting_state === 'reconciliation_hold')
+      <div id="di-inventory-hold" role="alert" class="max-w-7xl mx-auto my-4 p-4 border border-amber-400 rounded bg-amber-50 text-gray-900">
+        <strong>Fiscal acceptance saved. Stock requires reconciliation.</strong>
+        <p>No duplicate fiscal submission is needed. Correct the local stock issue, then retry only the stock projection.</p>
+        @if(!session('impersonation.readonly') && in_array(auth()->user()?->role, ['company_admin','super_admin'], true) && (int)auth()->user()?->company_id === (int)$invoice->company_id)
+          <form method="POST" action="{{ route('invoice.retry-inventory', $invoice) }}">@csrf<button class="mt-2 underline" type="submit">Retry local stock posting only</button></form>
+        @endif
+      </div>
+    @endif
+
 
     <div class="py-8">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

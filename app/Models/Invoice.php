@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class Invoice extends Model
 {
     protected $fillable = [
+        'inventory_enabled_snapshot', 'inventory_environment_snapshot', 'inventory_posting_state', 'inventory_posting_error',
         'di_api_request_hash',
         'company_id',
         'invoice_number',
@@ -58,6 +59,7 @@ class Invoice extends Model
     ];
 
     protected $casts = [
+        'inventory_enabled_snapshot' => 'boolean',
         'fbr_submission_date' => 'datetime',
         'is_fbr_processing' => 'boolean',
         'wht_locked' => 'boolean',

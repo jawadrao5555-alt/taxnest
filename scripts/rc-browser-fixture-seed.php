@@ -1103,6 +1103,25 @@ foreach ([1366,390] as $width) {
         $aiUsageCases[$width]['panels'][]=['companyId'=>$c->id,'companyName'=>$c->name,'login'=>$owner->email,'cashier'=>$cashier->email,'prefix'=>$product==='pos'?'/pos':'/fbr-pos'];
     }
 }
+// Synthetic frozen-close and recipe evidence; never dispatches PRA or an AI provider.
+$praReadCases=[];
+foreach([1366,390] as $width){
+ $flags=PosFeatureService::defaultsForCategory('restaurant');foreach(['inventory','recipes','kitchen','kot'] as $flag)$flags[$flag]=true;
+ $c=$company('Synthetic PRA reads '.$width,'pra-read-'.$width.'@rc-browser.invalid','RCPRAREAD'.$width,'pos',['business_category'=>'restaurant','pos_type'=>'restaurant','restaurant_mode'=>true,'pos_setup_completed'=>true,'pra_reporting_enabled'=>false,'feature_flags'=>$flags]);
+ $o=$user($c,'Synthetic read owner','pra-read-owner-'.$width.'@rc-browser.invalid','company_admin','pos_admin');
+ $cashier=$user($c,'Synthetic read cashier','pra-read-cashier-'.$width.'@rc-browser.invalid','user','pos_cashier');
+ $branches=[];foreach(['A','B'] as $label)$branches[$label]=DB::table('branches')->insertGetId(['company_id'=>$c->id,'name'=>'Synthetic Recipe '.$label,'is_active'=>true,'is_head_office'=>$label==='A','created_at'=>$now,'updated_at'=>$now]);
+ $o->forceFill(['default_branch_id'=>$branches['A']])->save();$cashier->forceFill(['default_branch_id'=>$branches['A']])->save();
+ DB::table('branch_user')->insert(['user_id'=>$cashier->id,'branch_id'=>$branches['A'],'access_level'=>'full','created_at'=>$now,'updated_at'=>$now]);
+ $product=\App\Models\PosProduct::forceCreate(['company_id'=>$c->id,'name'=>'SYNTHETIC-PRIVATE-RECIPE-'.$width,'price'=>100,'is_active'=>true,'is_tax_exempt'=>false]);
+ $ingredient=DB::table('ingredients')->insertGetId(['company_id'=>$c->id,'name'=>'SYNTHETIC-PRIVATE-INGREDIENT','unit'=>'kg','base_unit'=>'kg','cost_per_unit'=>10,'current_stock'=>11,'is_active'=>true,'created_at'=>$now,'updated_at'=>$now]);
+ DB::table('product_recipes')->insert(['company_id'=>$c->id,'product_id'=>$product->id,'ingredient_id'=>$ingredient,'quantity_needed'=>2,'waste_percent'=>10,'is_active'=>true,'created_at'=>$now,'updated_at'=>$now]);
+ DB::table('ingredient_stocks')->insert(['company_id'=>$c->id,'ingredient_id'=>$ingredient,'branch_id'=>$branches['A'],'quantity'=>4.4,'created_at'=>$now,'updated_at'=>$now]);
+ DB::table('pos_day_close_reports')->insert(['company_id'=>$c->id,'branch_id'=>$branches['A'],'report_date'=>$now->toDateString(),'report_number'=>'SYN-READ-'.$width,'cash_amount'=>123,'expected_cash'=>123,'counted_cash'=>120,'cash_variance'=>-3,'closed_by'=>$o->id,'created_at'=>$now,'updated_at'=>$now]);
+ $praReadCases[$width]=['login'=>$o->email,'cashier'=>$cashier->email,'company'=>$c->id,'campus'=>$branches['A'],'otherCampus'=>$branches['B'],'product'=>$product->id];
+}
+foreach([1366=>390,390=>1366] as $width=>$other){$praReadCases[$width]['foreignCompany']=$praReadCases[$other]['company'];$praReadCases[$width]['foreignCampus']=$praReadCases[$other]['campus'];}
+
 $diReadCases=[];
 foreach([1366,390] as $width){
     $readCompany=$company('Synthetic DI read '.$width,'di-read-company-'.$width.'@rc-browser.invalid','RCDIREAD'.$width,'di');
@@ -1253,6 +1272,7 @@ $fixture = [
     'transactionalJourneys' => [
         ['name'=>'madadgar-company-reads','manualOnly'=>true,'login'=>$madadgarReadCases[1366]['login'],'password'=>$password,'loginPath'=>'/fbr-pos/login','paths'=>[],'madadgarReadCases'=>$madadgarReadCases],
         ['name'=>'ai-usage-budget','manualOnly'=>true,'login'=>$aiUsageCases[1366]['admin'],'password'=>$password,'loginPath'=>'/admin/login','paths'=>[],'aiUsageCases'=>$aiUsageCases],
+        ['name'=>'pra-bounded-reads','manualOnly'=>true,'login'=>$praReadCases[1366]['login'],'password'=>$password,'loginPath'=>'/pos/login','paths'=>[],'praReadCases'=>$praReadCases],
         ['name'=>'di-bounded-reads','manualOnly'=>true,'login'=>$diReadCases[1366]['login'],'password'=>$password,'loginPath'=>'/login','paths'=>[],'diReadCases'=>$diReadCases],
         ['name'=>'private-profile-fields','manualOnly'=>true,'login'=>$privateProfileCases[1366]['login'],'password'=>$password,'loginPath'=>'/login','paths'=>[],'privateProfileCases'=>$privateProfileCases],
         ['name'=>'opt-in-greetings-tutorials','manualOnly'=>true,'login'=>$greetingCases[1366]['login'],'password'=>$password,'loginPath'=>'/login','paths'=>[],'greetingCases'=>$greetingCases],

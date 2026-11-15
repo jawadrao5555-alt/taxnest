@@ -6,7 +6,7 @@
      branch on it; the PRA rendering stays byte-identical.
      @keydown.stop on root: sale-screen F-key/Escape document listeners must
      never fire while typing in the chat (architect-mandated). --}}
-@props(['product' => 'pos'])
+@props(['product' => 'pos', 'placement' => 'floating'])
 @php
     $mIsFbr = ($product ?? 'pos') === 'fbrpos';
     $mBase = $mIsFbr ? '/fbr-pos/madadgar' : '/pos/madadgar';
@@ -41,7 +41,8 @@
 @if($mAiEnabled || $mWaNumber)
 <div x-data="tnMadadgar({{ $mAiEnabled ? 'true' : 'false' }}, @js($mWaNumber), @js($mBase), @js($mStoreKey))"
      @keydown.stop @keydown.escape.prevent="open = false"
-     class="fixed z-[60] bottom-5 left-5"
+     data-madadgar-placement="{{ $placement === 'inline' ? 'inline' : 'floating' }}"
+     class="{{ $placement === 'inline' ? 'relative' : 'fixed z-[60] bottom-5 left-5' }}"
      style="padding-bottom: env(safe-area-inset-bottom, 0px);">
 
     {{-- Panel --}}

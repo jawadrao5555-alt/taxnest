@@ -1,4 +1,5 @@
 import {scrolledPixelDetail} from './scrolled-pixel-detail.mjs';
+import { collectionControlChecks } from './collection-controls-browser.mjs';
 import { collectionSharedWorkspaceChecks } from './collection-shared-workspace-browser.mjs';
 import { privateCollectionCacheCheck } from './collection-private-cache-browser.mjs';
 import { randomUUID } from 'node:crypto';
@@ -67,6 +68,7 @@ export async function hospitalWorkflow(page, t, v, { baseUrl, saveEvidenceScreen
   await create.locator('[name="payment_method"]').selectOption('cash');
   await create.locator('[name="payment_confirmed"]').check();
   if (await page.evaluate(() => Math.max(document.documentElement.scrollWidth, document.body.scrollWidth)) > v.width + 2) throw new Error('Hospital form overflows viewport');
+  await collectionControlChecks(page, '#hospital-collection');
   await saveEvidenceScreenshot(page, 'hospital-cash-entry-' + v.width);
   const lostInitialId = await loseResponseAndRefresh(create, baseUrl + '/fbr-pos/hospital', initialPayload);
   await Promise.all([page.waitForURL(/\/fbr-pos\/hospital\/receipts\/\d+$/), create.locator('button[type="submit"]').click()]);

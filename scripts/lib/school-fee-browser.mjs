@@ -1,4 +1,5 @@
 import {scrolledPixelDetail} from './scrolled-pixel-detail.mjs';
+import { collectionControlChecks } from './collection-controls-browser.mjs';
 import { collectionSharedWorkspaceChecks } from './collection-shared-workspace-browser.mjs';
 import { privateCollectionCacheCheck } from './collection-private-cache-browser.mjs';
 import { randomUUID } from 'node:crypto';
@@ -135,6 +136,7 @@ export async function schoolFeeWorkflow(page, t, v, { baseUrl, saveEvidenceScree
   await form.locator('[name="cash_confirmed"]').check();
   const overflow = await page.evaluate(() => Math.max(document.documentElement.scrollWidth, document.body.scrollWidth));
   if (overflow > v.width + 2) throw new Error('School fee form overflows viewport');
+  await collectionControlChecks(page, '#school-collection');
   await saveEvidenceScreenshot(page, 'school-fee-cash-entry-' + v.width);
   // Commit the real server request, then deliberately lose its response.
   // The cashier must refresh and explicitly recover, never send a new key.

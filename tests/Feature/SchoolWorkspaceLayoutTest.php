@@ -24,6 +24,9 @@ class SchoolWorkspaceLayoutTest extends TestCase
     {
         $html = $this->renderWorkspace();
         $this->assertStringContainsString('tnMadadgar(', $html);
+        $this->assertStringContainsString('data-madadgar-placement="inline"', $html);
+        $this->assertStringContainsString('collection-support-dock', $html);
+        $this->assertStringContainsString('min-width:44px;min-height:44px', $html);
         foreach (['school-fiscal-status', 'FBR OFF', '/fbr-pos/team', '/fbr-pos/school-fees/printing',
             '/fbr-pos/billing', '/fbr-pos/school-fees/legacy-retail', 'Shared page', 'school-language'] as $text) {
             $this->assertStringContainsString($text, $html);
@@ -73,6 +76,14 @@ class SchoolWorkspaceLayoutTest extends TestCase
             $this->assertStringNotContainsString('/fbr-pos/products', $html);
             $this->assertStringNotContainsString('FBR ON', $html);
         }
+    }
+
+    public function test_other_pos_panels_keep_default_floating_support(): void
+    {
+        $this->renderWorkspace();
+        $html = \Illuminate\Support\Facades\Blade::render('<x-madadgar-support product="fbrpos" />');
+        $this->assertStringContainsString('data-madadgar-placement="floating"', $html);
+        $this->assertStringContainsString('fixed z-[60] bottom-5 left-5', $html);
     }
 
 }

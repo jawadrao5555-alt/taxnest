@@ -24,6 +24,9 @@ class HospitalWorkspaceLayoutTest extends TestCase
     {
         $html = $this->renderWorkspace();
         $this->assertStringContainsString('tnMadadgar(', $html);
+        $this->assertStringContainsString('data-madadgar-placement="inline"', $html);
+        $this->assertStringContainsString('collection-support-dock', $html);
+        $this->assertStringContainsString('min-width:44px;min-height:44px', $html);
         foreach (['hospital-fiscal-status', 'FBR OFF', '/fbr-pos/team', '/fbr-pos/hospital/printing',
             '/fbr-pos/billing', '/fbr-pos/hospital/settings', 'Shared page', 'hospital-language'] as $text) {
             $this->assertStringContainsString($text, $html);

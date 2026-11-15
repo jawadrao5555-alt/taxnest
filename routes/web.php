@@ -1391,6 +1391,8 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
             Route::post('/inventory/stock-in/{id}/cancel', [PosStockInController::class, 'cancel'])->whereNumber('id')->name('pos.inventory.stock-in.cancel');
         });
         Route::get('/team', [PosController::class, 'posTeam'])->name('pos.team');
+        Route::get('/team/online-payment-policy', [\App\Http\Controllers\PosOnlinePaymentPolicyController::class, 'index'])->name('pos.team.online-payment-policy');
+        Route::put('/team/online-payment-policy/{id}', [\App\Http\Controllers\PosOnlinePaymentPolicyController::class, 'update'])->whereNumber('id')->name('pos.team.online-payment-policy.update');
         Route::post('/team/cashier', [PosController::class, 'storeCashier'])->name('pos.team.store-cashier');
         Route::put('/team/cashier/{id}', [PosController::class, 'updateCashier'])->name('pos.team.update-cashier');
         Route::post('/team/cashier/{id}/toggle', [PosController::class, 'toggleCashier'])->name('pos.team.toggle-cashier');

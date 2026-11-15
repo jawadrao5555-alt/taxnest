@@ -449,6 +449,10 @@ final class AgentCoreRestaurantProjector
             if (!$order || !in_array($order->status, self::OPEN, true)) {
                 return $this->reject($event, 'already_closed', 'Order was already settled or cancelled.');
             }
+            $actor = \App\Models\User::where('company_id', $company->id)->find($this->scopeUser($company, $scope));
+            if ((!empty($data['online_payment_confirmed']) || in_array($sale['payment_method'] ?? $data['payment_method'] ?? null, ['qr_payment', 'online'], true)) && PosOnlinePaymentPolicy::requiresApproval($actor, (int) $company->id)) {
+                return $this->reject($event, 'online_payment_admin_approval_required', __('online_payment_policy.denied'));
+            }
             if ($order->awaitingOnlinePayment() && empty($data['online_payment_confirmed'])) {
                 return $this->reject($event, 'online_payment_awaited', 'Online payment must be confirmed before settlement.');
             }
@@ -486,6 +490,9 @@ final class AgentCoreRestaurantProjector
                 ->where('company_id', $company->id)->lockForUpdate()->find($transactionId);
             if (!$txn || !$this->transactionInScope($txn, $scope)) {
                 return $this->reject($event, 'transaction_scope', 'Transaction does not exist in this branch scope.');
+            }
+            if (in_array($txn->payment_method, ['qr_payment', 'online'], true) && PosOnlinePaymentPolicy::requiresApproval($actor, (int) $company->id)) {
+                return $this->reject($event, 'online_payment_admin_approval_required', __('online_payment_policy.denied'));
             }
             if (RestaurantOrder::where('company_id', $company->id)->where('pos_transaction_id', $txn->id)
                 ->where('id', '!=', $order->id)->exists()) {

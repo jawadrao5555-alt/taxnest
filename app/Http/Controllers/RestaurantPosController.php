@@ -1261,6 +1261,8 @@ class RestaurantPosController extends Controller
         // rides the answer on the retry; any caller that skips the question —
         // a stale tab, the table board, a crafted POST — is refused here, so
         // an unpaid table can never be closed by accident.
+        \App\Services\PosOnlinePaymentPolicy::assertAllowed(auth('pos')->user(), (int) $companyId, $request->input('payment_method'), $request->boolean('online_payment_confirmed'));
+
         if ($order->awaitingOnlinePayment() && !$request->boolean('online_payment_confirmed')) {
             $onlineQuote = RestaurantOrderPaymentCalculator::calculate($order, $company, 'qr_payment');
             return response()->json([

@@ -3483,6 +3483,8 @@ class PosController extends Controller
             }
         }
 
+        \App\Services\PosOnlinePaymentPolicy::assertAllowed(auth('pos')->user(), (int) $companyId, $request->input('payment_method'), $request->boolean('online_payment_confirmed'));
+
         // Normalize 'card' alias → 'debit_card' (front-end Universal POS sends 'card';
         // PosTaxRule + PRA mapping use 'debit_card'). Without this, downstream tax
         // lookup/PRA payment-mode mapping miss the rule and fall back to defaults.
@@ -4418,6 +4420,8 @@ class PosController extends Controller
             return redirect()->route('pos.transaction.show', $id)
                 ->with('error', __('pos.return_bill_immutable'));
         }
+
+        \App\Services\PosOnlinePaymentPolicy::assertAllowed(auth('pos')->user(), (int) $companyId, $request->input('payment_method'), $transaction->payment_method === 'qr_payment');
 
         // Snapshot the OLD line items before they are replaced, so the edit can
         // reconcile inventory (restore old qty, deduct new qty) when the owner

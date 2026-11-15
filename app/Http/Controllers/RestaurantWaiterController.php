@@ -1478,6 +1478,8 @@ class RestaurantWaiterController extends Controller
         if (!$user) {
             return false;
         }
+        \App\Services\PosOnlinePaymentPolicy::assertAllowed($user, $companyId, $txn->payment_method, $onlineConfirmed);
+
         // Atomic claim — double-click / two cashiers can't settle the same order twice.
         $claimQuery = RestaurantOrder::where('company_id', $companyId)
             ->where('id', $orderId)

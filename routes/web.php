@@ -1630,6 +1630,8 @@ Route::post('/admin/login', [AdminAuthController::class, 'login']);
 Route::post('/admin/logout', [AdminAuthController::class, 'logout'])->name('admin.logout');
 
 Route::prefix('admin')->middleware(['admin.auth'])->group(function () {
+    Route::get('/companies/{companyId}/pilot-fiscal-control', [\App\Http\Controllers\SaasAdmin\PilotFiscalControlController::class, 'show'])->whereNumber('companyId')->name('saas.admin.pilot-fiscal-control');
+    Route::post('/companies/{companyId}/pilot-fiscal-control', [\App\Http\Controllers\SaasAdmin\PilotFiscalControlController::class, 'update'])->whereNumber('companyId')->name('saas.admin.pilot-fiscal-control.update');
     Route::get('/platform-expenses', [\App\Http\Controllers\SaasAdmin\PlatformExpenseController::class, 'index'])->name('saas.admin.platform-expenses');
     Route::post('/platform-expenses', [\App\Http\Controllers\SaasAdmin\PlatformExpenseController::class, 'store'])->name('saas.admin.platform-expenses.store');
     Route::post('/platform-expenses/{id}/reverse', [\App\Http\Controllers\SaasAdmin\PlatformExpenseController::class, 'reverse'])->whereNumber('id')->name('saas.admin.platform-expenses.reverse');

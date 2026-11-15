@@ -48,7 +48,7 @@ class FbrPosHospitalController extends Controller
     private function error(string $field,string $message): never { throw ValidationException::withMessages([$field=>__('hospital.'.$message)]); }
     private function money(string $s): int { [$w,$f]=array_pad(explode('.',$s,2),2,''); return (int)$w*100+(int)str_pad($f,2,'0'); }
     private function amountRule(): array { return ['required','regex:/^\d{1,8}(?:\.\d{1,2})?$/']; }
-    private function closed(Company $c,string $date): bool { return DB::table('hospital_day_closes')->where('company_id',$c->id)->where('branch_key',$this->branch()??0)->where('report_date',$date)->exists(); }
+    private function closed(Company $c,string $date): bool { return DB::table('hospital_day_closes')->where('company_id',$c->id)->where('branch_key',$this->branch()??0)->where('report_date',$date)->when(DB::transactionLevel()>0,fn($q)=>$q->lockForUpdate())->first()!==null; }
     private function response(Request $r,int $id) { $url='/fbr-pos/hospital/receipts/'.$id.($this->unassigned?'?unassigned=1':''); return $r->expectsJson()?response()->json(['success'=>true,'receipt_id'=>$id,'receipt_url'=>$url]):redirect()->away($url); }
     public function index() {
         $company=$this->company(); $requestKey=(string)Str::uuid(); $closed=$this->closed($company,today()->toDateString());
@@ -85,12 +85,13 @@ class FbrPosHospitalController extends Controller
         if ($invoiceId===null && (count(array_unique(array_column($lineInputs,'service_head')))!==count($lineInputs) || min(array_column($lineInputs,'amount_paisa'))<=0 || array_sum(array_column($lineInputs,'amount_paisa'))!==$total)) throw ValidationException::withMessages(['service_lines'=>__('hospital_ledger.lines_invalid')]);
         $id=DB::transaction(function()use($r,$company,$d,$amount,$total,$invoiceId,$lineInputs) {
             Company::whereKey($company->id)->lockForUpdate()->firstOrFail();
-            $saved=DB::table('hospital_payments')->where('company_id',$company->id)->where('request_key',$d['request_key'])->first();
+            $quotaContext=\App\Services\ProspectiveQuotaGuard::context((int)$company->id,false);
+            $saved=DB::table('hospital_payments')->where('company_id',$company->id)->where('request_key',$d['request_key'])->lockForUpdate()->first();
             if ($saved) {
                 if (($saved->branch_id===null?null:(int)$saved->branch_id)!==$this->branch()
                     || ($saved->payment_reference??'')!==$d['payment_reference']
                     || (int)$saved->amount_paisa!==$amount || $saved->payment_method!==$d['payment_method']) $this->error('request_key','retry_conflict');
-                $invoice=$this->rows('hospital_invoices',$company)->where('id',$saved->invoice_id)->first();
+                $invoice=$this->rows('hospital_invoices',$company)->where('id',$saved->invoice_id)->lockForUpdate()->first();
                 abort_unless($invoice,404);
                 if ($invoiceId!==null ? (int)$saved->invoice_id!==$invoiceId :
                     ($invoice->request_key!==$d['request_key'] || $invoice->patient_reference!==$d['patient_reference']
@@ -101,7 +102,7 @@ class FbrPosHospitalController extends Controller
             }
             if (!$r->boolean('payment_confirmed')) $this->error('payment_confirmed','confirm_required');
             $at=now(); if ($this->closed($company,$at->toDateString())) $this->error('amount','closed');
-            $access=\App\Services\SubscriptionAccessService::hasAccess($company, $invoiceId !== null);
+            $access=\App\Services\SubscriptionAccessService::hasAccess($company, $invoiceId !== null, $quotaContext['subscription'] ?? null);
             abort_unless($access['allowed']??false,403,$access['reason']??'Collection access denied.');
             if ($invoiceId===null) {
                 if ($amount>$total) $this->error('amount','overpayment');
@@ -111,16 +112,18 @@ class FbrPosHospitalController extends Controller
                     else { $service=DB::table('hospital_services')->where('company_id',$company->id)->where('code',$line['service_head'])->where('active',true)->first(); if(!$service) throw ValidationException::withMessages(['service_lines'=>__('hospital_ledger.service_unavailable')]); $label=$service->label; }
                     $serviceLines[]=$line+['label'=>$label];
                 }
+                if($quotaContext){\App\Services\ProspectiveQuotaGuard::assertLocalCollection((int)$company->id,$quotaContext);}else{
                 $limit=\App\Services\PlanLimitService::canCreateFbrPosBill($company->id);
                 abort_unless($limit['allowed']??false,403,$limit['reason']??'Invoice limit reached.');
+                }
                 $invoiceId=DB::table('hospital_invoices')->insertGetId(['company_id'=>$company->id,'branch_id'=>$this->branch(),
                     'request_key'=>$d['request_key'],'patient_reference'=>$d['patient_reference'],'patient_name'=>$d['patient_name']?:null,'service_lines'=>json_encode($serviceLines),'service_head'=>$d['service_head'],
                     'total_paisa'=>$total,'created_by'=>Auth::guard('fbrpos')->id(),'campus_name'=>$this->campus($company),'created_at'=>$at,'updated_at'=>$at]);
                 $paid=0;
             } else {
-                $invoice=$this->rows('hospital_invoices',$company)->where('id',$invoiceId)->first(); abort_unless($invoice,404);
+                $invoice=$this->rows('hospital_invoices',$company)->where('id',$invoiceId)->lockForUpdate()->first(); abort_unless($invoice,404);
                 $total=(int)$invoice->total_paisa;
-                $paid=(int)$this->rows('hospital_payments',$company)->where('invoice_id',$invoiceId)->sum('amount_paisa');
+                $paid=(int)$this->rows('hospital_payments',$company)->where('invoice_id',$invoiceId)->orderBy('id')->lockForUpdate()->get(['id','amount_paisa'])->sum('amount_paisa');
                 if ($amount>$total-$paid) $this->error('amount','overpayment');
             }
             return DB::table('hospital_payments')->insertGetId(['company_id'=>$company->id,'branch_id'=>$this->branch(),'invoice_id'=>$invoiceId,
@@ -165,6 +168,7 @@ class FbrPosHospitalController extends Controller
     }
     private function totals(Company $c,string $date): array {
         $q=$this->rows('hospital_payments',$c)->whereDate('collected_at',$date);
+        if(DB::transactionLevel()>0){$rows=$q->orderBy('id')->lockForUpdate()->get(['id','payment_method','amount_paisa']);return ['receipt_count'=>$rows->count(),'cash_paisa'=>(int)$rows->where('payment_method','cash')->sum('amount_paisa'),'card_paisa'=>(int)$rows->where('payment_method','card')->sum('amount_paisa'),'bank_paisa'=>(int)$rows->where('payment_method','bank')->sum('amount_paisa')];}
         return ['receipt_count'=>(clone $q)->count(),'cash_paisa'=>(int)(clone $q)->where('payment_method','cash')->sum('amount_paisa'),
             'card_paisa'=>(int)(clone $q)->where('payment_method','card')->sum('amount_paisa'),'bank_paisa'=>(int)(clone $q)->where('payment_method','bank')->sum('amount_paisa')];
     }
@@ -184,7 +188,7 @@ class FbrPosHospitalController extends Controller
         $snapshot=DB::transaction(function()use($company,$d,$counted){
             Company::whereKey($company->id)->lockForUpdate()->firstOrFail();
             $q=DB::table('hospital_day_closes')->where('company_id',$company->id)->where('branch_key',$this->branch()??0)->where('report_date',$d['date']);
-            if($saved=$q->first()) {if((int)$saved->counted_cash_paisa!==$counted || (string)$saved->variance_note!==trim($d['variance_note']??''))$this->error('counted_cash','close_conflict');return $saved;}
+            if($saved=$q->lockForUpdate()->first()) {if((int)$saved->counted_cash_paisa!==$counted || (string)$saved->variance_note!==trim($d['variance_note']??''))$this->error('counted_cash','close_conflict');return $saved;}
             $totals=$this->totals($company,$d['date']); foreach($totals as $key=>$value) if((int)$d['expected_'.$key]!==$value)$this->error('date','close_changed');
             $variance=$counted-$totals['cash_paisa']; $note=trim($d['variance_note']??''); if($variance!==0 && $note==='')$this->error('variance_note','variance_required');
             $id=DB::table('hospital_day_closes')->insertGetId($totals+['company_id'=>$company->id,'branch_key'=>$this->branch()??0,'report_date'=>$d['date'],

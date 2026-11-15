@@ -82,7 +82,7 @@ final class ProspectiveQuotaRetention
         }
     }
 
-    public static function deletedCount(int $companyId): int
+    public static function deletedCount(int $companyId, bool $currentRead = false, ?\Carbon\CarbonInterface $from = null): int
     {
         $s = self::policy($companyId);
         if (! $s) {
@@ -93,7 +93,7 @@ final class ProspectiveQuotaRetention
             if (! Schema::hasTable($table)) {
                 self::hold();
             }
-            $reports = DB::table($table)->where('company_id', $companyId)->where('deleted_final_count', '>', 0)->get();
+            $reports = DB::table($table)->where('company_id', $companyId)->where('deleted_final_count', '>', 0)->when($currentRead,fn($q)=>$q->lockForUpdate())->get();
             foreach ($reports as $report) {
                 $q = DB::table('prospective_pos_quota_retention')->where('company_id', $companyId)->where('source', $source)->where('source_id', $report->id)->where('aggregate_final', true);
                 if ($source === 'day-close') {
@@ -105,20 +105,27 @@ final class ProspectiveQuotaRetention
                     $month = CarbonImmutable::parse($report->reset_date)->startOfMonth();
                     $q->where('sold_at', '>=', $month)->where('sold_at', '<', $month->addMonth());
                 }
-                if ($q->count() !== (int) $report->deleted_final_count) {
+                if (($currentRead ? $q->lockForUpdate()->get(['id'])->count() : $q->count()) !== (int) $report->deleted_final_count) {
                     self::hold();
                 }
             }
         }
         if (!Schema::hasTable('pos_bill_deletions')) self::hold();
-        if (DB::table('pos_bill_deletions as d')->where('d.company_id', $companyId)->whereNotExists(fn ($q) => $q->selectRaw('1')->from('prospective_pos_quota_retention as q')->whereColumn('q.company_id', 'd.company_id')->whereColumn('q.transaction_id', 'd.transaction_id'))->exists()) {
-            self::hold();
-        }
+        if ($currentRead) {
+            $known = DB::table('prospective_pos_quota_retention')->where('company_id',$companyId)->orderBy('id')->lockForUpdate()->pluck('transaction_id')->all();
+            $audit = DB::table('pos_bill_deletions')->where('company_id',$companyId)->orderBy('id')->lockForUpdate()->pluck('transaction_id')->all();
+            if (array_diff($audit,$known)) self::hold();
+        } elseif (DB::table('pos_bill_deletions as d')->where('d.company_id',$companyId)->whereNotExists(fn($q)=>$q->selectRaw('1')->from('prospective_pos_quota_retention as q')->whereColumn('q.company_id','d.company_id')->whereColumn('q.transaction_id','d.transaction_id'))->exists()) self::hold();
 
         // Anti-join prevents a capture followed by a rolled-back/unexecuted delete
         // from counting both live and retained copies, even under synthetic repair.
-        return DB::table('prospective_pos_quota_retention as q')->where('q.company_id', $companyId)->where('q.quota_counted', true)
-            ->whereBetween('q.sold_at', [self::monthStart($companyId), now()->endOfMonth()])
-            ->whereNotExists(fn ($q) => $q->selectRaw('1')->from('pos_transactions as p')->whereColumn('p.company_id', 'q.company_id')->whereColumn('p.id','q.transaction_id'))->count();
+        $retained = DB::table('prospective_pos_quota_retention as q')->where('q.company_id', $companyId)->where('q.quota_counted', true)
+            ->whereBetween('q.sold_at', [$from ?? self::monthStart($companyId), now()->endOfMonth()]);
+        if ($currentRead) {
+            $live = DB::table('pos_transactions')->where('company_id',$companyId)->orderBy('id')->lockForUpdate()->pluck('id')->all();
+            return $retained->whereNotIn('q.transaction_id',$live)->orderBy('q.id')->lockForUpdate()->get(['q.id'])->count();
+        }
+        $retained->whereNotExists(fn ($q) => $q->selectRaw('1')->from('pos_transactions as p')->whereColumn('p.company_id', 'q.company_id')->whereColumn('p.id','q.transaction_id'));
+        return $currentRead ? $retained->orderBy('q.id')->lockForUpdate()->get(['q.id'])->count() : $retained->count();
     }
 }

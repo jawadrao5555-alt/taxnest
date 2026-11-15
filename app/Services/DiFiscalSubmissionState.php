@@ -38,18 +38,21 @@ class DiFiscalSubmissionState
     public static function reserve(int $invoiceId, string $mode, ?string $environment = null, ?int $batchId = null): ?Invoice
     {
         return DB::transaction(function () use ($invoiceId, $mode, $environment, $batchId) {
+            $companyId = Invoice::withoutGlobalScopes()->whereKey($invoiceId)->value('company_id');
+            $quotaContext = $companyId ? ProspectiveQuotaGuard::context((int)$companyId, false) : null;
             $invoice = Invoice::withoutGlobalScopes()->whereKey($invoiceId)->lockForUpdate()->first();
             if ($invoice && $invoice->is_fbr_processing && self::expiredLease($invoice)) {
                 // A dead worker after claiming but before callback has an
                 // unknown send boundary. Expiry never unlocks it for replay.
                 self::verificationRequired(
                     $invoice,
-                    $environment ?: ($invoice->fiscal_submission_environment ?? 'sandbox'),
+                    $quotaContext ? ($invoice->fiscal_submission_environment ?: $environment) : ($environment ?: ($invoice->fiscal_submission_environment ?? 'sandbox')),
                     'expired_submission_lease'
                 );
                 $invoice->save();
                 return null;
             }
+            if ($quotaContext && $invoice && in_array($invoice->fiscal_submission_state, [self::SUBMITTING,self::VERIFICATION_REQUIRED,self::ACCEPTED],true)) return null;
             if (!$invoice
                 || !in_array($invoice->status, ['draft', 'failed'], true)
                 || $invoice->is_fbr_processing
@@ -58,6 +61,7 @@ class DiFiscalSubmissionState
                 return null;
             }
 
+            ProspectiveQuotaGuard::assertDi($invoice, $environment, $quotaContext);
             DiInvoiceInventory::preflight($invoice, $environment);
             $invoice->is_fbr_processing = true;
             $invoice->submitted_at = now();

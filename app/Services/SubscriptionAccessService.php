@@ -54,9 +54,9 @@ class SubscriptionAccessService
         };
     }
 
-    public static function hasAccess(Company $company, bool $existingHospitalBill = false): array
+    public static function hasAccess(Company $company, bool $existingHospitalBill = false, ?Subscription $lockedSubscription = null): array
     {
-        $subscription = Subscription::where('company_id', $company->id)
+        $subscription = $lockedSubscription ?? Subscription::where('company_id', $company->id)
             ->where('active', true)
             ->orderByDesc('id')
             ->first();

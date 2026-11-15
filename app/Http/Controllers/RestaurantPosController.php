@@ -1419,6 +1419,7 @@ class RestaurantPosController extends Controller
                     'message' => 'This order was already settled or cancelled on another terminal — refresh the table board.',
                 ], 409);
             }
+            if (!$request->boolean('save_as_provisional')) \App\Services\ProspectiveQuotaGuard::assertPra((int)$companyId);
             // ONLINE-PAYMENT GATE, RE-CHECKED UNDER THE LOCK. The pre-txn check
             // above read a STALE row: another terminal (or the table board) can
             // stamp "paisay online aa rahay hain" in the window between that read

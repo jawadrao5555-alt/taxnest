@@ -3883,6 +3883,12 @@ class PosController extends Controller
         DB::beginTransaction();
         try {
             $lockedPromotionCompany = Company::whereKey($companyId)->lockForUpdate()->firstOrFail();
+            $quotaContext = \App\Services\ProspectiveQuotaGuard::context((int)$companyId, false);
+            if ($quotaContext && $offlineUuidColumnExists) {
+                $saved = PosTransaction::withoutGlobalScope('hide_archived')->where('company_id',$companyId)->where('offline_uuid',$offlineUuid)->lockForUpdate()->first();
+                if ($saved) { DB::commit(); return $this->offlineReplayResponse($request, $saved); }
+            }
+            if ($quotaContext && !$saveAsProvisional) \App\Services\ProspectiveQuotaGuard::assertPra((int)$companyId,$quotaContext);
             \App\Services\PosStaffDiscount::claim($staffApproval, (int) $companyId);
             \App\Services\PosStaffDiscount::assertOrderAvailable((int) $companyId, (int) $settleOrderIdIn, $staffApproval['row']->id ?? null);
             if (!$agentCoreInventorySale && !$request->filled('offline_queued_at')) \App\Services\PosPromotions::assertRowsCurrent($companyItems, $lockedPromotionCompany);
@@ -4802,6 +4808,7 @@ class PosController extends Controller
 
         DB::beginTransaction();
         try {
+            \App\Services\ProspectiveQuotaGuard::context((int)$companyId, false);
             // Re-read under a row lock: a raced / replayed DELETE must not
             // restock twice or bank a second quota ledger row for one bill.
             // (sqlite ignores FOR UPDATE — MySQL is where the race lives.)
@@ -4957,6 +4964,7 @@ class PosController extends Controller
     {
         try {
             DB::transaction(function () use ($transaction, $companyId, $newPraStatus) {
+                $quotaContext = \App\Services\ProspectiveQuotaGuard::context((int)$companyId, false);
                 $locked = PosTransaction::withoutGlobalScope('hide_archived')
                     ->where('company_id', $companyId)
                     ->where('id', $transaction->id)
@@ -4967,6 +4975,7 @@ class PosController extends Controller
                     throw new \RuntimeException('NOT_PROVISIONAL');
                 }
 
+                if ($quotaContext) \App\Services\ProspectiveQuotaGuard::assertPra((int)$companyId,$quotaContext);
                 $locked->update([
                     // Serial split (owner rule Jul 2026): the L-series number changes
                     // to a real POS fiscal serial ONLY when the bill actually goes to
@@ -6001,6 +6010,7 @@ class PosController extends Controller
         $newNumber = null;
         $newTotal  = null;
         DB::transaction(function () use ($companyId, $company, $id, $method, $reportingOn, &$newNumber, &$newTotal) {
+                $quotaContext = \App\Services\ProspectiveQuotaGuard::context((int)$companyId, false);
                 // Race-safe: lock the row and re-verify it is still a genuine provisional.
                 // The F10 modal fires promote on Enter, so double-Enter is a real
                 // double-promote path — the lock + re-check closes it.
@@ -6034,6 +6044,7 @@ class PosController extends Controller
                     throw new \RuntimeException('MONTH_CLOSED');
                 }
 
+                if ($quotaContext) \App\Services\ProspectiveQuotaGuard::assertPra((int)$companyId,$quotaContext);
                 $payMethod = $method ?? $tx->payment_method;
 
                 // Recompute tax from the STORED bill for the chosen method — mirrors

@@ -173,7 +173,7 @@ class FbrPosSchoolFeeController extends Controller
             Company::whereKey($company->id)->lockForUpdate()->firstOrFail();
             $reports = DB::table('school_fee_day_closes')->where('company_id', $company->id)
                 ->where('branch_key', $branchKey)->where('report_date', $data['date']);
-            if ($existing = (clone $reports)->first()) {
+            if ($existing = (clone $reports)->lockForUpdate()->first()) {
                 if (isset($data['counted_cash']) && $existing->counted_cash_paisa !== null
                     && $this->paisa($data['counted_cash']) !== (int) $existing->counted_cash_paisa) {
                     throw ValidationException::withMessages(['counted_cash' => __('school.closed_count_conflict')]);
@@ -188,8 +188,9 @@ class FbrPosSchoolFeeController extends Controller
             $query = DB::table('school_fee_receipts')->where('company_id', $company->id)
                 ->where('branch_id', $unassigned ? null : $this->branchId())
                 ->whereDate('collected_at', $data['date']);
-            $cash = (int) (clone $query)->where('payment_method', 'cash')->sum('amount_paisa');
-            $count = (clone $query)->count();
+            $closingRows = $query->orderBy('id')->lockForUpdate()->get(['id','payment_method','amount_paisa']);
+            $cash = (int) $closingRows->where('payment_method','cash')->sum('amount_paisa');
+            $count = $closingRows->count();
             if ($cash !== (int) $data['expected_cash_paisa'] || $count !== (int) $data['expected_receipt_count']) {
                 throw ValidationException::withMessages(['date' => __('pos.school_close_changed')]);
             }
@@ -217,7 +218,7 @@ class FbrPosSchoolFeeController extends Controller
         $company = $this->company();
         $data = $request->validate(['request_key' => 'required|uuid', 'expected_branch_key' => 'required|integer|min:0']);
         abort_unless((int) $data['expected_branch_key'] === ($this->branchId() ?? 0), 409);
-        $receipt = $this->receipts($company)->where('request_key', $data['request_key'])->first();
+        $receipt = $this->receipts($company)->where('request_key', $data['request_key'])->lockForUpdate()->first();
         abort_unless($receipt, 404);
         return response()->json(['success' => true, 'receipt_id' => $receipt->id, 'receipt_url' => '/fbr-pos/school-fees/'.$receipt->id.'/receipt'])->header('Cache-Control', 'private, no-store');
     }
@@ -261,6 +262,7 @@ class FbrPosSchoolFeeController extends Controller
         // durable backstop. A lost response/repeated click cannot collect twice.
         $id = DB::transaction(function () use ($company, $data, $amount, $branchId, $cashConfirmed, $lineInputs) {
             Company::whereKey($company->id)->lockForUpdate()->firstOrFail();
+            $quotaContext = \App\Services\ProspectiveQuotaGuard::context((int)$company->id, false);
             $existing = DB::table('school_fee_receipts')->where('company_id', $company->id)
                 ->where('request_key', $data['request_key'])->first();
             if ($existing) {
@@ -280,7 +282,7 @@ class FbrPosSchoolFeeController extends Controller
             if (!isset($data['fee_period'])) throw ValidationException::withMessages(['fee_period' => __('school.period_required')]);
             $account = null;
             if (!empty($data['account_id'])) {
-                $account = DB::table('school_fee_accounts')->where('company_id', $company->id)->where('branch_id', $branchId)->where('id', $data['account_id'])->first();
+                $account = DB::table('school_fee_accounts')->where('company_id', $company->id)->where('branch_id', $branchId)->where('id', $data['account_id'])->lockForUpdate()->first();
                 abort_unless($account, 404);
                 $savedLines = json_decode($account->fee_lines, true);
                 if ($account->student_reference !== $data['student_reference'] || ($account->student_name ?? '') !== $data['student_name'] || $account->fee_period !== $data['fee_period'] || array_map(fn ($line) => ['fee_head' => $line['fee_head'], 'amount_paisa' => $line['amount_paisa']], $savedLines) !== $lineInputs) throw ValidationException::withMessages(['account_id' => __('pos.school_retry_conflict')]);
@@ -302,15 +304,17 @@ class FbrPosSchoolFeeController extends Controller
             }
             $collectedAt = now();
             $closed = DB::table('school_fee_day_closes')->where('company_id', $company->id)
-                ->where('branch_key', $branchId ?? 0)->where('report_date', $collectedAt->toDateString())->exists();
+                ->where('branch_key', $branchId ?? 0)->where('report_date', $collectedAt->toDateString())->lockForUpdate()->first() !== null;
             if ($closed) {
                 throw ValidationException::withMessages(['amount' => __('pos.school_closed_collection')]);
             }
             // Recheck under the tenant lock: two tabs cannot overshoot the cap.
-            $access = \App\Services\SubscriptionAccessService::hasAccess($company);
+            $access = \App\Services\SubscriptionAccessService::hasAccess($company, false, $quotaContext['subscription'] ?? null);
             abort_unless($access['allowed'] ?? false, 403, $access['reason'] ?? 'Collection access denied.');
+            if ($quotaContext) { \App\Services\ProspectiveQuotaGuard::assertLocalCollection((int)$company->id,$quotaContext); } else {
             $limit = \App\Services\PlanLimitService::canCreateFbrPosBill($company->id);
             abort_unless($limit['allowed'] ?? false, 403, $limit['reason'] ?? 'Collection limit reached.');
+            }
             if (!$account) {
                 $accountId = DB::table('school_fee_accounts')->insertGetId([
                     'company_id' => $company->id, 'branch_id' => $branchId, 'student_reference' => $data['student_reference'],

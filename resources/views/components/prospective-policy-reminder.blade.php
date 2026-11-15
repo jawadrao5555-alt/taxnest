@@ -1,7 +1,7 @@
 @props(['guard' => 'web'])
 @php
     $policyNotice = null;
-    foreach ([$guard] as $policyGuard) {
+    foreach (\App\Services\ProspectiveSubscriptionPolicy::available() ? [$guard] : [] as $policyGuard) {
         if (auth($policyGuard)->check()) {
             $policyCompany = \App\Models\Company::find(auth($policyGuard)->user()->company_id);
             if ($policyCompany) $policyNotice = \App\Services\ProspectiveReminderView::forCompany($policyCompany);

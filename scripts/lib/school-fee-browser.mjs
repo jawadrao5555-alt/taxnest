@@ -25,7 +25,12 @@ export async function schoolFeeWorkflow(page, t, v, { baseUrl, saveEvidenceScree
   const legacyId = t.legacyInvoices?.[v.width];
   if (!legacyId) throw new Error('Missing synthetic historical retail invoice fixture');
   const otherLegacyId = t.legacyInvoices?.[v.width === 390 ? 1366 : 390];
-  if (![403,404].includes((await page.request.get(baseUrl + '/fbr-pos/school-fees/legacy-retail/' + otherLegacyId)).status())) throw new Error('Other-company legacy receipt exposed through direct URL');
+  const otherLegacy = await page.request.get(baseUrl + '/fbr-pos/school-fees/legacy-retail/' + otherLegacyId, { headers: { Accept: 'application/json' }, maxRedirects: 0 });
+  const otherLegacyBody = await otherLegacy.text();
+  if (![403,404].includes(otherLegacy.status()) || otherLegacyBody.includes('SYN-SCHOOL-LEGACY-') || otherLegacyBody.includes('SYNTHETIC-LEGACY-') || otherLegacyBody.includes('Synthetic legacy test item')) throw new Error('Other-company legacy receipt exposed through direct URL');
+  await assertPrivateReceiptHtmlRedirect(page,baseUrl,'/fbr-pos/school-fees/legacy-retail/'+otherLegacyId);
+  const deniedHtml = await page.request.get(baseUrl + '/fbr-pos/school-fees/legacy-retail/' + otherLegacyId, { headers: { Accept: 'text/html' }, maxRedirects: 0 });
+  if (deniedHtml.status() !== 302 || new URL(deniedHtml.headers().location, baseUrl).pathname !== '/fbr-pos/dashboard' || (await deniedHtml.text()).includes('SYN-SCHOOL-LEGACY-')) throw new Error('Denied legacy HTML did not safely return to own panel');
   await page.goto(baseUrl + '/fbr-pos/school-fees/legacy-retail', { waitUntil: 'domcontentloaded' });
   await page.getByRole('link', { name: 'SYN-SCHOOL-LEGACY-' + v.width, exact: true }).click();
   await page.waitForURL('**/fbr-pos/school-fees/legacy-retail/' + legacyId);
@@ -376,7 +381,10 @@ async function schoolPrintingChecks(page, v, { baseUrl, saveEvidenceScreenshot }
 async function schoolLedgerChecks(page, v, { baseUrl, saveEvidenceScreenshot }, {campusName, receiptPath, feePeriod}) {
   await page.goto(baseUrl+'/fbr-pos/school-fees', {waitUntil:'domcontentloaded'});
   await Promise.all([page.waitForNavigation({waitUntil:'domcontentloaded'}), page.locator('#school-campus-switcher select').selectOption({label:campusName+' Annex'})]);
-  if ((await page.request.get(baseUrl+receiptPath)).status() !== 404) throw new Error('Other-campus receipt opened through direct URL');
+  const otherCampus = await page.request.get(baseUrl+receiptPath, {headers:{Accept:'application/json'},maxRedirects:0});
+  const otherCampusBody = await otherCampus.text();
+  if (otherCampus.status() !== 404 || otherCampusBody.includes('student_reference') || otherCampusBody.includes('SF-') || otherCampusBody.includes(campusName)) throw new Error('Other-campus receipt opened through direct URL');
+  await assertPrivateReceiptHtmlRedirect(page,baseUrl,receiptPath);
   const form=page.locator('#school-collection');
   const ref='SYN-MULTI-'+v.width;
   await form.locator('[name="student_reference"]').fill(ref);
@@ -440,4 +448,13 @@ async function schoolLedgerChecks(page, v, { baseUrl, saveEvidenceScreenshot }, 
   await page.goto(baseUrl+'/fbr-pos/day-close',{waitUntil:'domcontentloaded'});
   if(Number(await page.locator('#school-cash-total').getAttribute('data-paisa'))!==0) throw new Error('Recorded bank/card payments contaminated cash close total');
   await saveEvidenceScreenshot(page,'school-noncash-cash-total-'+v.width);
+}
+
+
+async function assertPrivateReceiptHtmlRedirect(page,baseUrl,path) {
+  // HTML not-found is intentionally a safe same-panel redirect; do not mistake
+  // its followed dashboard200 for authorization to read a private receipt.
+  const response=await page.request.get(baseUrl+path,{headers:{Accept:'text/html'},maxRedirects:0});
+  const location=response.headers().location;
+  if(response.status()!==302 || !location || new URL(location,baseUrl).origin!==new URL(baseUrl).origin || new URL(location,baseUrl).pathname!=='/fbr-pos/dashboard') throw new Error('Denied receipt HTML did not redirect safely within its own panel');
 }

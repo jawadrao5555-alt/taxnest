@@ -10,7 +10,7 @@ use Illuminate\Validation\ValidationException;
 /** Registered, SELECT-only source metadata. Never returns stored payloads or unrestricted columns. */
 final class DiagnosticSourceEvidence
 {
-    public const REGISTRY_VERSION = 14;
+    public const REGISTRY_VERSION = 15;
 
     public const FIELD_CONTRACT_VERSION = 1;
 
@@ -27,6 +27,7 @@ final class DiagnosticSourceEvidence
         'di.fiscal' => ['di', 'fbr_logs', 'created_at'],
         'di.stock_postings' => ['di', 'di_invoice_inventory_postings', 'created_at'],
         'di.payment_events' => ['di', 'customer_ledgers', 'created_at'],
+        'fbrpos.projected_refund_events' => ['fbrpos', 'agent_core_events', 'created_at'],
         'fbrpos.payment_allocations' => ['fbrpos', 'fbr_khata_settlements', 'created_at'],
         'di.sales' => ['di', 'invoices', 'created_at'],
         'fbrpos.fiscal' => ['fbrpos', 'fbr_pos_logs', 'created_at'],
@@ -156,6 +157,11 @@ final class DiagnosticSourceEvidence
                 'Rows contain IDs/timestamps and only source-specific allow-listed operational identifiers. Regulatory payloads, patient data, customer details and credentials are excluded.',
                 'Branch filtering is applied only through an exact retained branch key; sources without one return BRANCH_SCOPE_UNAVAILABLE.',
                 'Pages use immutable IDs, not a database snapshot; re-read for late arrivals. DI logs whose source invoice was deleted cannot be attributed.']];
+        if ($v['source'] === FbrRetainedRefundEventEvidence::SOURCE) {
+            return FbrRetainedRefundEventEvidence::source((int)$company->id, $branchId,
+                $from->copy()->setTimezone(config('app.timezone'))->format('Y-m-d H:i:s'), $to->copy()->setTimezone(config('app.timezone'))->format('Y-m-d H:i:s'),
+                (int)($v['after_id']??0), (int)($v['limit']??25), $meta);
+        }
         if (in_array($v['source'], RetainedPaymentEvidence::SOURCES, true)) {
             return RetainedPaymentEvidence::source($v['source'], (int)$company->id, $branchId,
                 $from->copy()->setTimezone(config('app.timezone'))->format('Y-m-d H:i:s'), $to->copy()->setTimezone(config('app.timezone'))->format('Y-m-d H:i:s'),

@@ -43,6 +43,13 @@ final class DiagnosticSourceCollection
 
                 return $result['status'];
             }
+            if ($source === FbrRetainedRefundEventEvidence::SOURCE) {
+                $result = array_replace($result, FbrRetainedRefundEventEvidence::observation($companyId,
+                    $from->copy()->setTimezone(config('app.timezone'))->format('Y-m-d H:i:s'),
+                    $from->copy()->endOfDay()->setTimezone(config('app.timezone'))->format('Y-m-d H:i:s')));
+                DB::table('diagnostic_source_observations')->insertOrIgnore($identity+$result);
+                return $result['status'];
+            }
             if (in_array($source, RetainedPaymentEvidence::SOURCES, true)) {
                 $result = array_replace($result, RetainedPaymentEvidence::observation($source,$companyId,
                     $from->copy()->setTimezone(config('app.timezone'))->format('Y-m-d H:i:s'),

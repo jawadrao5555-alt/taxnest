@@ -37,7 +37,7 @@ final class DiagnosticBillEvidence
             'pos' => 'pos_transactions', 'di' => 'invoices', 'fbrpos' => 'fbr_pos_transactions', 'erps' => 'health_bills',
             default => null,
         };
-        $base = ['version' => 7, 'company' => ['id' => (int) $company->id, 'name' => $company->name, 'product' => $product],
+        $base = ['version' => 8, 'company' => ['id' => (int) $company->id, 'name' => $company->name, 'product' => $product],
             'bill_id' => (int) $v['bill_id'], 'complete' => false, 'physical_print' => 'unknown', 'fiscal_acceptance' => 'not_assessed',
             'notes' => ['Only explicit stored foreign-key/reference links are included. Matching numbers, amounts or timestamps are never treated as associations.',
                 'Each source has its own immutable ID cursor and may have late arrivals. Missing/deleted/uncollected evidence remains unknown.',
@@ -225,13 +225,15 @@ final class DiagnosticBillEvidence
             }
         }
 
+        if ($product === 'fbrpos') $sources['projected_refund_events'] = FbrRetainedRefundEventEvidence::bill((int)$company->id,(int)$v['bill_id'],(int)($v['after_id']??0),(int)($v['limit']??25));
+
         if ($product === 'fbrpos') $sources['payment_allocations'] = RetainedPaymentEvidence::bill((int)$company->id,(int)$v['bill_id'],(int)($v['after_id']??0),(int)($v['limit']??25));
 
         return $base + ['status' => 'PARTIAL', 'sources' => $sources,
             'unimplemented_links' => match ($product) {
                 'pos' => ['unuploaded_or_unattributed_offline_events'],
                 'di' => ['payments', 'print_events'],
-                'fbrpos' => ['unallocated_or_unretained_payments', 'offline_agent_events'],
+                'fbrpos' => ['unallocated_or_unretained_payments', 'general_or_unretained_offline_agent_events'],
                 'erps' => ['lab_orders', 'print_events'],
             }];
     }

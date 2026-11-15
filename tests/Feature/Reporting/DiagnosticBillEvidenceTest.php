@@ -274,7 +274,7 @@ class DiagnosticBillEvidenceTest extends TestCase
             $this->assertSame([['id' => 100]], $report['sources'][$key]['rows'], $key);
             $this->assertSame('PARTIAL', $report['sources'][$key]['status']);
             $this->assertStringNotContainsString('PRIVATE', json_encode($report));
-            $this->assertSame(7, $report['version']);
+            $this->assertSame(8, $report['version']);
             $this->assertSame($sourceBefore, DB::table($table)->orderBy('id')->get()->toJson());
             $this->assertSame($chargesBefore, DB::table('health_charges')->orderBy('id')->get()->toJson());
         }
@@ -295,7 +295,7 @@ class DiagnosticBillEvidenceTest extends TestCase
         $report = app(DiagnosticBillEvidence::class)->read(['company_name' => 'Synthetic Health', 'bill_id' => 10], [4]);
         $this->assertSame([['id' => 200]], $report['sources']['pharmacy_stock']['rows']);
         $this->assertSame('PARTIAL', $report['sources']['pharmacy_stock']['status']);
-        $this->assertSame(7, $report['version']);
+        $this->assertSame(8, $report['version']);
         $this->assertStringNotContainsString('PRIVATE', json_encode($report));
         $this->assertSame($movementsBefore, DB::table('health_batch_movements')->orderBy('id')->get()->toJson());
         $report = app(DiagnosticBillEvidence::class)->read([

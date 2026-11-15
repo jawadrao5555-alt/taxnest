@@ -1,6 +1,6 @@
 # TaxNest 23-source reconciliation inventory
 
-## Canonical current register: inspected 80ddc5e (15 November 2026)
+## Canonical current register: inspected 9de740b (15 November 2026)
 
 **This section supersedes every historical missing-code/status statement below.**
 It records bounded implementation, not acceptance of all 23 source programmes.
@@ -27,7 +27,7 @@ job results and visual review before changing A; no CI result is inferred here.
 | #338 | Umbrella tracking reused DI/fiscal slices | A/I/E: child outcomes remain individually open, including HOLD228; no separate blanket completion. |
 | #337 | Umbrella tracking billing/diagnostics/security foundations | A/I/E: child outcomes, not metadata or green CI alone, govern closure. |
 | #328 | Full-received/full-credit decisions, retained receivable, retry-safe collection and returns; `udhaar-full-credit-393.md` | A: native/browser/Android results; E: installed-device verification. Historical partial amounts preserved. |
-| #321 | Private profiles, default-OFF opt-in greetings, tutorial accessibility metadata, bounded company reads, usage controls and atomic explicit escalation retry | A: native/browser/final pixels; I: remaining bounded read adapters and full accessibility/programme coverage, described below. |
+| #321 | Private profiles, default-OFF opt-in greetings, tutorial accessibility metadata, bounded company reads, usage controls and atomic explicit escalation retry | A: native/browser/final pixels; A: new DI/retail-close/recipe adapters and six-theme matrix; I: full scenario-level accessibility/programme reconciliation, described below. |
 | #320 | Two-step/reset/revocation/impersonation/deletion controls and synthetic restore quarantine | A: integrated checks; E: real backup freshness, restoration, physical erasure and RPO/RTO. Quarantine is not restore proof. |
 | #319 | Retained diagnostic registry, School/Hospital local sources and authenticated tenant backup metadata | DI retained stock association/source now implemented (see evidence note below); A: final source/privacy/native tests; E: producer enrollment, elapsed collection and actual restoration. Missing telemetry stays unknown. |
 | #318 | Existing integrity/return/pharmacy slices and reviewed acknowledgment integration | A: final regression/native proof; E: regulator/device acceptance. |
@@ -42,15 +42,28 @@ job results and visual review before changing A; no CI result is inferred here.
 
 ### Concrete internal boundaries, not generic missing-feature claims
 
-`MadadgarCompanyReadTools` at this inspected head deliberately refuses DI/other
-panel guards, cashier/manager reads, retail closing, and recipe cost/capacity
-questions. These are bounded adapter omissions, not permission to widen roles
-or invent figures. Assigned follow-up must preserve persisted-role, company and
-campus restrictions, source/time provenance and audited read-only behavior.
-Retry-safe explicit escalation does not itself complete the original diagnostic
-retrieval → reproduction → focused PR → approval → release programme.
-All-six-theme and screen-reader acceptance is still a coverage requirement;
-absence of its evidence is not proof that all corresponding runtime is absent.
+`MadadgarCompanyReadTools` now includes a translated, discoverable DI owner-only
+read page using the existing web guard, frozen retail closing reads and bounded
+per-product recipe cost/recorded-stock servings. Current owner/tenant/campus
+checks, no arbitrary query inputs, source/time provenance and audited read-only
+behavior remain. Recipe estimates are independent per product, not simultaneous
+menu capacity or physical availability. Unsupported cashier/manager access is
+not silently enabled; those users retain their authorized existing reports.
+Focused integrated read/usage/retry/diagnostic tests pass60/357; final native,
+actual DI/PRA browser navigation and fresh pixel acceptance are still required.
+
+Existing company-account browser coverage checks all six palettes in both light
+and dark modes; the touched AI usage pages now have the same contrast and usable
+control matrix. Newly added matrix execution and actual rendered results remain
+pending. This is bounded tested accessibility, not certification of every screen
+or assistive device.
+
+The original diagnostic retrieval → reproduction → tested focused PR workflow
+is a developer process with owner-controlled release approval, not authority for
+a prompt-driven production coding/merge agent. Retry-safe explicit intake and
+existing support links are implementation pieces; this PR and its synthetic
+checks provide reproducible development evidence. Release/live acceptance and
+unverified original scenarios remain separately open.
 
 ### Exact diagnostic source/association reconciliation
 

@@ -15,3 +15,9 @@ Existing stock restoration, cash totals, report data, receipt access, fiscal eli
 ## Verification
 
 `FbrProspectiveQuotaRetentionTest` exercises the actual authorized manual-delete route, actual day-close wash, duplicate deletion response, anti-join, transactional rollback, immutable conflict, trial/old-month exclusion, early renewal, official-row rejection, legacy behavior, missing schema and tenant-scoped purge. Synthetic data only; HTTP fake asserts no fiscal calls. Native MariaDB concurrency acceptance is separately required and must not be claimed from SQLite results.
+
+## New-policy concurrent admission
+
+The retail FBR store transaction takes the company lock before its current UUID replay lookup, current subscription context and capacity check. A winner that appears while a second submit waits is returned before capacity rejection or any new draft/stock/fiscal work. New-policy delete/wash takes the same company-before-bill lock order. Current paid counts materialize locked row IDs, including retained deletion rows; a locking outer query is not assumed to make a nested anti-join current under REPEATABLE READ. Legacy admission is unchanged.
+
+SQLite acceptance includes direct controller admission at a full limit (independent of middleware), ordinary UUID recovery, and an injected winner becoming visible at the company lock. This last case proves ordering, not native concurrent scheduling. The native two-process last-slot/replay acceptance remains required.

@@ -155,6 +155,45 @@ class FbrProspectiveQuotaRetentionTest extends TestCase
         Http::assertNothingSent();
     }
 
+    public function test_actual_store_rechecks_quota_inside_transaction_and_replay_remains_available(): void
+    {
+        [$c]=$this->buyer();
+        $payload=['items'=>[['item_name'=>'Synthetic item','quantity'=>1,'unit_price'=>100]],'payment_method'=>'cash','cash_received'=>200,'save_as_provisional'=>true,'offline_uuid'=>'synthetic-current-lock'];
+        $controller=app(\App\Http\Controllers\FbrPosController::class);
+        $request=\Illuminate\Http\Request::create('/fbr-pos/store','POST',$payload);
+        $request->headers->set('Accept','application/json');
+        $response=$controller->store($request);
+        self::assertSame(200,$response->getStatusCode());
+        $id=$response->getData(true)['transaction_id'];
+        $this->bill($c);
+        $response=$controller->store($request);
+        self::assertSame(200,$response->getStatusCode());self::assertSame($id,$response->getData(true)['transaction_id']);
+        $request=\Illuminate\Http\Request::create('/fbr-pos/store','POST',array_replace($payload,['offline_uuid'=>'synthetic-extra']));
+        $request->headers->set('Accept','application/json');
+        try { $controller->store($request); $this->fail('Paid capacity exceeded'); } catch (\Illuminate\Validation\ValidationException $e) { self::assertArrayHasKey('subscription',$e->errors()); }
+        self::assertSame(2,FbrPosTransaction::where('company_id',$c->id)->count());Http::assertNothingSent();
+    }
+
+    public function test_winner_visible_after_company_lock_is_replayed_before_full_quota(): void
+    {
+        [$c]=$this->buyer();$this->bill($c);$inserted=false;$winnerId=null;
+        DB::listen(function ($query) use ($c, &$inserted, &$winnerId) {
+            if (!$inserted && DB::transactionLevel()>0 && str_starts_with(strtolower($query->sql),'select') && str_contains($query->sql,'companies')) {
+                $inserted=true;
+                $winnerId=$this->bill($c,['offline_uuid'=>'synthetic-lock-winner'])->id;
+            }
+        });
+        $request=\Illuminate\Http\Request::create('/fbr-pos/store','POST',[
+            'items'=>[['item_name'=>'Synthetic item','quantity'=>1,'unit_price'=>100]],
+            'payment_method'=>'cash','cash_received'=>200,'save_as_provisional'=>true,'offline_uuid'=>'synthetic-lock-winner',
+        ]);
+        $request->headers->set('Accept','application/json');
+        $response=app(\App\Http\Controllers\FbrPosController::class)->store($request);
+        self::assertTrue($inserted);self::assertSame(200,$response->getStatusCode());
+        self::assertTrue($response->getData(true)['replayed']);self::assertSame($winnerId,$response->getData(true)['transaction_id']);
+        self::assertSame(2,FbrPosTransaction::where('company_id',$c->id)->count());Http::assertNothingSent();
+    }
+
     public function test_forward_retention_and_authorized_purge_are_tenant_scoped(): void
     {
         [$c] = $this->buyer();

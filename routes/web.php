@@ -840,6 +840,7 @@ Route::post('/api/pos-app/fcm-token/clear', [\App\Http\Controllers\PosAppPushCon
     ->middleware('throttle:30,1')->withoutMiddleware($statelessMachine)->name('pos.app.fcm-clear');
 
 Route::middleware(['pos.auth'])->prefix('pos/madadgar')->group(function () {
+    Route::get('/usage', [\App\Http\Controllers\MadadgarUsageController::class, 'show'])->name('pos.madadgar.usage');
     Route::get('/history', [\App\Http\Controllers\MadadgarController::class, 'history'])->name('pos.madadgar.history');
     Route::post('/message', [\App\Http\Controllers\MadadgarController::class, 'message'])->name('pos.madadgar.message')->middleware('throttle:20,1');
     Route::post('/escalate', [\App\Http\Controllers\MadadgarController::class, 'escalate'])->name('pos.madadgar.escalate')->middleware('throttle:10,1');
@@ -861,6 +862,7 @@ Route::post('/api/fbr-pos-app/fcm-token/clear', [\App\Http\Controllers\PosAppPus
 // Madadgar for the FBR panel — fbrpos.auth ONLY, NO company.approval (pending
 // companies may chat), ALL roles. Same throttles as the PRA group.
 Route::middleware(['fbrpos.auth'])->prefix('fbr-pos/madadgar')->group(function () {
+    Route::get('/usage', [\App\Http\Controllers\MadadgarUsageController::class, 'show'])->name('fbrpos.madadgar.usage');
     Route::get('/history', [\App\Http\Controllers\MadadgarController::class, 'history'])->name('fbrpos.madadgar.history');
     Route::post('/message', [\App\Http\Controllers\MadadgarController::class, 'message'])->name('fbrpos.madadgar.message')->middleware('throttle:20,1');
     Route::post('/escalate', [\App\Http\Controllers\MadadgarController::class, 'escalate'])->name('fbrpos.madadgar.escalate')->middleware('throttle:10,1');
@@ -1745,6 +1747,8 @@ Route::prefix('admin')->middleware(['admin.auth'])->group(function () {
     Route::delete('/surveys/{id}', [\App\Http\Controllers\PosSurveyController::class, 'adminDestroy'])->name('admin.surveys.destroy');
 
     // Madadgar AI bot — chat logs + settings (owner request 22 Jul 2026)
+    Route::get('/companies/{companyId}/ai-usage', [\App\Http\Controllers\MadadgarUsageController::class, 'show'])->name('admin.company-ai-usage');
+    Route::post('/companies/{companyId}/ai-usage', [\App\Http\Controllers\MadadgarUsageController::class, 'configure'])->name('admin.company-ai-budget');
     Route::get('/madadgar-chats', [\App\Http\Controllers\MadadgarController::class, 'adminChats'])->name('admin.madadgar-chats');
     Route::post('/madadgar-settings', [\App\Http\Controllers\MadadgarController::class, 'adminSettings'])->name('admin.madadgar-settings');
 

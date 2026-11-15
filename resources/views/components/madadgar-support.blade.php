@@ -57,6 +57,7 @@
                 </div>
                 <div class="min-w-0">
                     <div class="text-white font-bold text-sm leading-tight">Madadgar</div>
+                    @if(auth($product ?? 'pos')->user()?->role==='company_admin' && in_array(auth($product ?? 'pos')->user()?->pos_role,[null,'','pos_admin'],true))<a class="text-xs text-white underline" href="{{ route(($product ?? 'pos').'.madadgar.usage') }}">AI istemal / budget</a>@endif
                     <div class="{{ $mc['sub'] }} text-xs leading-tight" x-text="view === 'chat' ? @js(__($mSubChatKey)) : @js(__('pos.madadgar_sub_menu'))"></div>
                 </div>
             </div>

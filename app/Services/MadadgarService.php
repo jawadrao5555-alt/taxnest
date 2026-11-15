@@ -85,8 +85,10 @@ class MadadgarService
         $actor=MadadgarAnswerScope::actor($actor,$company);
         // Prior chat may contain private read-tool results. Never send those to a provider.
         if ($company && $actor) $history=[['role'=>'user','content'=>$question]];
+        $usageStarted=microtime(true);
         $result=MadadgarAnswerScope::answer($question,$product,$company,$actor)
             ?? self::respondWithinScope(MadadgarAnswerScope::history($history),$question,$product,$company);
+        if (($result['source']??null)!=='openai') MadadgarUsage::local($company,(string)($result['source']??'scoped'),(int)round((microtime(true)-$usageStarted)*1000));
         $result['provenance']=MadadgarAnswerScope::metadata($result,$product,$company,$actor);
         return $result;
     }
@@ -232,25 +234,38 @@ PROMPT;
             $history
         );
 
-        $resp = Http::timeout(30)->connectTimeout(10)
-            ->withToken($key)
-            ->post('https://api.openai.com/v1/chat/completions', [
-                'model' => 'gpt-4o-mini',
-                'messages' => $messages,
-                'tools' => self::tools(),
-                'tool_choice' => 'auto',
-                'temperature' => 0.3,
-                'max_tokens' => 600,
-            ]);
-
-        if (!$resp->successful()) {
-            Log::warning('Madadgar OpenAI call failed', ['status' => $resp->status()]);
-            throw new \RuntimeException('Madadgar API error status '.$resp->status());
-        }
-
-        $choice = $resp->json('choices.0.message');
-        if (!is_array($choice)) {
-            throw new \RuntimeException('Madadgar API malformed response');
+        $payload = [
+            'model' => MadadgarUsage::MODEL,
+            'messages' => $messages,
+            'tools' => self::tools(),
+            'tool_choice' => 'auto',
+            'temperature' => 0.3,
+            'max_tokens' => 600,
+        ];
+        // UTF-8 bytes bound text tokens conservatively; include tools/system and
+        // a generous framing allowance for this fixed one-tool, bounded chat shape.
+        $inputBound=strlen(json_encode($payload,JSON_THROW_ON_ERROR))+4096;
+        if(count($messages)>32 || $inputBound>100000)throw new \RuntimeException('Madadgar request exceeds bounded usage envelope');
+        $event=MadadgarUsage::begin($company,$inputBound,600);
+        $started=microtime(true);$usage=null;$failure=null;
+        try {
+            $resp = Http::timeout(30)->connectTimeout(10)->withToken($key)
+                ->post('https://api.openai.com/v1/chat/completions',$payload);
+            $rawUsage=$resp->json('usage');$usage=is_array($rawUsage)?$rawUsage:null;
+            if (!$resp->successful()) {
+                $failure='provider_http_error';
+                throw new \RuntimeException('Madadgar API error status '.$resp->status());
+            }
+            $choice = $resp->json('choices.0.message');
+            if (!is_array($choice)) {
+                $failure='provider_malformed';
+                throw new \RuntimeException('Madadgar API malformed response');
+            }
+        } catch (\Throwable $e) {
+            $failure??='provider_transport_error';
+            throw $e;
+        } finally {
+            MadadgarUsage::finish($event,(int)round((microtime(true)-$started)*1000),$usage,$failure);
         }
 
         // Tool call => pending escalation card (row NOT created here).

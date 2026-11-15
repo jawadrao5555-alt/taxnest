@@ -24,6 +24,7 @@
                     <tr class="hover:bg-gray-800/50 {{ $loop->even ? 'bg-gray-800/20' : '' }}">
                         <td class="px-4 py-3 text-white font-medium">
                             <a href="{{ route('saas.admin.companies.show', $stat->company_id) }}" class="hover:text-indigo-400 transition">{{ $stat->company->name ?? 'Unknown' }}</a>
+                            @if(auth('admin')->user()?->canManageSensitiveConfiguration())<a class="block text-xs text-indigo-400" href="{{ route('admin.company-ai-usage',$stat->company_id) }}">AI usage / budget</a>@endif
                             <span class="block text-xs text-gray-500">{{ \App\Support\ProductCatalog::label($stat->company->product_type) }}</span>
                         </td>
                         <td class="px-4 py-3 text-right text-gray-300 font-medium">{{ $stat->total_pos_transactions === null ? '—' : number_format($stat->total_pos_transactions) }}</td>

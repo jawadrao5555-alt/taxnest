@@ -110,7 +110,27 @@ function persist(string $path, array $value): string
     return hash('sha256', $json);
 }
 
+function inventoryDecimalSchema(PDO $pdo): array
+{
+    $result = [];
+    foreach (['inventory_stocks' => ['quantity'], 'inventory_movements' => ['quantity', 'balance_after']] as $table => $fields) {
+        foreach ($fields as $field) {
+            $q = $pdo->prepare('SELECT data_type,numeric_precision,numeric_scale FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name=? AND column_name=?');
+            $q->execute([$table, $field]);
+            $result[$table.'.'.$field] = $q->fetch(PDO::FETCH_ASSOC);
+        }
+    }
+    return $result;
+}
+
 if ($mode === 'seed') {
+    $schema = inventoryDecimalSchema($pdo);
+    persist($evidenceDir.'/upgrade-decimal-schema-before.json', $schema);
+    foreach ($schema as $field => $column) {
+        if (!$column || $column['data_type'] !== 'decimal' || (int) $column['numeric_precision'] !== 15 || (int) $column['numeric_scale'] !== 2) {
+            failUpgrade("unexpected baseline decimal schema for {$field}");
+        }
+    }
     $companyIds = [];
     $branchIds = [];
     $productIds = [];
@@ -231,14 +251,11 @@ if ($beforeComparable !== $afterComparable) {
     failUpgrade('data-bearing upgrade changed a preservation invariant');
 }
 // Value preservation alone is insufficient: prove the intended storage precision.
-foreach (['inventory_stocks' => ['quantity'], 'inventory_movements' => ['quantity', 'balance_after']] as $table => $fields) {
-    foreach ($fields as $field) {
-        $q = $pdo->prepare('SELECT data_type,numeric_precision,numeric_scale FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name=? AND column_name=?');
-        $q->execute([$table, $field]);
-        $column = $q->fetch(PDO::FETCH_ASSOC);
-        if (!$column || $column['data_type'] !== 'decimal' || (int) $column['numeric_precision'] !== 18 || (int) $column['numeric_scale'] !== 4) {
-            failUpgrade("incorrect widened decimal schema for {$table}.{$field}");
-        }
+$schema = inventoryDecimalSchema($pdo);
+persist($evidenceDir.'/upgrade-decimal-schema-after.json', $schema);
+foreach ($schema as $field => $column) {
+    if (!$column || $column['data_type'] !== 'decimal' || (int) $column['numeric_precision'] !== 18 || (int) $column['numeric_scale'] !== 4) {
+        failUpgrade("incorrect widened decimal schema for {$field}");
     }
 }
 $legacy = $pdo->query("SELECT p.name,s.active,s.start_date,s.end_date FROM subscriptions s JOIN companies c ON c.id=s.company_id JOIN pricing_plans p ON p.id=s.pricing_plan_id WHERE c.ntn='RC-UPGRADE-A'")->fetch(PDO::FETCH_ASSOC);

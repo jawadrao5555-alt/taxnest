@@ -14,6 +14,11 @@ final class ProspectiveQuotaRetention
 {
     public static function policy(int $companyId): ?array
     {
+        // No prospective policy exists before its additive schema is present.
+        // Preserve legacy deletion/quota paths without querying absent tables.
+        if (! ProspectiveSubscriptionPolicy::available()) {
+            return null;
+        }
         $sub = Subscription::where('company_id', $companyId)->where('active', true)->latest('id')->first();
         if (! $sub || !$sub->hasLifecycleSnapshot()) {
             return null;

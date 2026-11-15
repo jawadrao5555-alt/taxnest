@@ -397,7 +397,10 @@ try {
         return [$table => DB::table($table)->orderBy('id')->get()->toJson()];
     })->put('health_charges', DB::table('health_charges')->whereIn('company_id', [$health->id, $otherHealth->id])->orderBy('id')->get()->toJson())
         ->put('health_batch_movements', DB::table('health_batch_movements')->whereIn('company_id', [$health->id, $otherHealth->id])->orderBy('id')->get()->toJson());
-    if ($healthReport['version'] !== 5 || str_contains(json_encode($healthReport), 'PRIVATE') || $healthBefore->all() !== $healthAfter->all()) {
+    if ($healthReport['version'] !== 6) {
+        throw new RuntimeException('Native health source report version mismatch: expected 6, received '.(int) $healthReport['version']);
+    }
+    if (str_contains(json_encode($healthReport), 'PRIVATE') || $healthBefore->all() !== $healthAfter->all()) {
         throw new RuntimeException('Native health source report leaked or changed retained rows');
     }
     echo "PASS: native healthcare bill follows exact tenant-scoped clinical, pharmacy and stock source IDs without changing rows\n";

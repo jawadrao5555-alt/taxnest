@@ -268,6 +268,13 @@ function tnMadadgar(aiEnabled, waNumber, base, storeKey) {
                 .catch(e => this.messages.push({ role: 'assistant', content: e.message || @js(__('pos.madadgar_err_generic')), error: true }))
                 .finally(() => { this.busy = false; this.scrollDown(); this.$nextTick(() => this.$refs.minput && this.$refs.minput.focus()); });
         },
+        appendEscalationConfirmation(result) {
+            // History may already contain the committed response after refresh.
+            // Identity, never text similarity, distinguishes a retry from a new request.
+            if (Number.isInteger(result.ref) && this.messages.some(m =>
+                m.role === 'assistant' && m.escalated === true && m.ref === result.ref)) return;
+            this.messages.push({ role: 'assistant', content: result.reply, escalated: true, ref: result.ref });
+        },
         confirmEscalation() {
             if (!this.pending || this.busy) return;
             this.busy = true;
@@ -284,7 +291,7 @@ function tnMadadgar(aiEnabled, waNumber, base, storeKey) {
                     if (!r.ok) throw new Error(d.error || @js(__('pos.madadgar_err_send')));
                     return d;
                 })
-                .then(d => { this.pending = null; this.savePending(); this.messages.push({ role: 'assistant', content: d.reply, escalated: true }); })
+                .then(d => { this.pending = null; this.savePending(); this.appendEscalationConfirmation(d); })
                 .catch(e => this.messages.push({ role: 'assistant', content: e.message, error: true }))
                 .finally(() => { this.busy = false; this.scrollDown(); });
         },

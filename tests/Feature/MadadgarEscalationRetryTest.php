@@ -26,6 +26,8 @@ class MadadgarEscalationRetryTest extends MadadgarScopedAssistantTest
         for($i=0;$i<4;$i++)$this->confirm(['request_id'=>null]);
         $this->assertSame(429,$this->confirm(['request_id'=>'33333333-3333-4333-8333-333333333333'])->status());
         $this->assertSame($first,$this->confirm()->getData(true));
+        $history=(new MadadgarController)->history(Request::create('/pos/madadgar/history','GET',['session_id'=>'11111111-1111-4111-8111-111111111111']))->getData(true);
+        $this->assertCount(1,array_filter($history['messages'],fn($m)=>$m['ref']===$first['ref'] && $m['escalated']));
         $this->assertSame(5,DB::table('feature_suggestions')->count());
         $this->assertSame(5,DB::table('madadgar_messages')->count());
         foreach(['title'=>'Different','summary'=>'Changed','kind'=>'feature_request'] as $field=>$value) {

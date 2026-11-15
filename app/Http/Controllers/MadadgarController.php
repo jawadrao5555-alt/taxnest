@@ -66,6 +66,7 @@ class MadadgarController extends Controller
                 'role' => $m->role,
                 'content' => $m->content,
                 'escalated' => (bool) $m->escalation_id,
+                'ref' => $m->escalation_id ? (int) $m->escalation_id : null,
                 'provenance' => $m->answer_provenance,
             ])->values(),
             'remaining' => max(0, self::DAILY_MESSAGE_CAP - $this->todayCount($user->id)),

@@ -22,13 +22,16 @@ export async function aiUsageWorkflow(page,t,v,{baseUrl,login,loopback,dismiss,w
       const summary=document.querySelector('#ai-usage-summary').getBoundingClientRect();
       const dock=document.querySelector('[data-madadgar-placement]');
       const dr=dock?.getBoundingClientRect();
+      let visible={left:Math.max(0,summary.left),right:Math.min(innerWidth,summary.right),top:Math.max(0,summary.top),bottom:Math.min(innerHeight,summary.bottom)};
+      for(let p=document.querySelector('#ai-usage-summary').parentElement;p;p=p.parentElement){if(/(auto|scroll|hidden|clip)/.test(getComputedStyle(p).overflowY)){const r=p.getBoundingClientRect();visible.top=Math.max(visible.top,r.top);visible.bottom=Math.min(visible.bottom,r.bottom);}}
+      const overlaps=dr&&visible.bottom>visible.top&&dr.bottom>visible.top&&dr.top<visible.bottom&&dr.right>visible.left&&dr.left<visible.right;
       const table=document.querySelector('#ai-usage-events');
       return {within:content.left>=0&&content.right<=innerWidth+1,
-        dockSafe:!dock||(dock.dataset.madadgarPlacement==='inline'&&dr.top>=summary.bottom),
+        dockSafe:!dock||(dock.dataset.madadgarPlacement==='inline'&&!overlaps),
         scroll:getComputedStyle(table).overflowX==='auto'&&table.clientWidth<=innerWidth,
         cellPadding:parseFloat(getComputedStyle(table.querySelector('td')).paddingLeft)>=10};
     });
-    check(geometry.within&&geometry.dockSafe,'AI usage content or support dock overlaps/clips the summary');
+    check(geometry.within&&geometry.dockSafe,'AI usage content or support dock overlaps/clips the visible summary: '+JSON.stringify(geometry));
     check(geometry.scroll&&geometry.cellPadding,'Usage events need readable padded cells inside a bounded horizontal scroller');
     if(await p.locator('.tn-admin-sidebar').count()){
       check(await p.locator('.tn-admin-sidebar svg').first().evaluate(el=>el.getBoundingClientRect().width)<=40,'Admin navigation icons are unstyled');

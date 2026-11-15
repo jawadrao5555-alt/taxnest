@@ -28,6 +28,7 @@ final class LocalCollectionReports
             if (isset($args[$unsupported])) throw ValidationException::withMessages([$unsupported=>'This local ledger summary cannot apply that filter. Use company, campus and calendar dates.']);
         }
         $v['date_to'] ??= now()->toDateString();
+        if (isset($v['date_from']) && $v['date_from'] > $v['date_to']) throw ValidationException::withMessages(['date_from'=>'Start date is after the reporting end date.']);
         $school = $company->isSchoolFeePilot();
         $tables = $school ? ['school_fee_accounts','school_fee_receipts','school_fee_day_closes'] : ['hospital_invoices','hospital_payments','hospital_day_closes'];
         [$accounts,$payments,$closes] = $tables;

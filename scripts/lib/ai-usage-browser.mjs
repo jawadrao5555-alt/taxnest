@@ -1,3 +1,4 @@
+import {verifyAiUsageAdminThemes} from './ai-usage-theme-browser.mjs';
 import {scrolledPixelDetail} from './scrolled-pixel-detail.mjs';
 export async function aiUsageWorkflow(page,t,v,{baseUrl,login,loopback,dismiss,waitForOperationalSurface,saveEvidenceScreenshot,pass}) {
   const f=t.aiUsageCases[v.width];
@@ -59,6 +60,7 @@ export async function aiUsageWorkflow(page,t,v,{baseUrl,login,loopback,dismiss,w
   for(const c of f.panels){
     await page.goto(baseUrl+'/admin/companies/'+c.companyId+'/ai-usage',{waitUntil:'domcontentloaded'});
     await verify(page,c);
+    await verifyAiUsageAdminThemes(page,pass,v.width);
     const form=page.locator('form[action$="/ai-usage"]');
     await form.locator('#monthly_budget').fill('0');
     await Promise.all([page.waitForNavigation({waitUntil:'domcontentloaded'}),form.getByRole('button',{name:'Save explicit rates / budget'}).click()]);

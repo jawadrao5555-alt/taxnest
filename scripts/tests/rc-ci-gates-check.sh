@@ -147,6 +147,18 @@ for(const change of ['remove-upload','condition','path','name','missing-file','o
  let rejected=false;try{contract(mutated,`negative-pixels-${change}`);}catch{rejected=true;}
  if(!rejected)throw Error(`Validator accepted unsafe synthetic pixel ${change}`);
 }
+for(const change of ['remove','optional','conditional','different-command','different-cache']) {
+ const mutated=structuredClone(activeDoc),steps=mutated.jobs.browserdesktopmobile.steps;
+ const index=steps.findIndex(s=>s.name==='Verify dedicated Hospital ERP demo role access at desktop and 390px');
+ if(change==='remove')steps.splice(index,1);
+ if(change==='optional')steps[index]['continue-on-error']=true;
+ if(change==='conditional')steps[index].if='success()';
+ if(change==='different-command')steps[index].run='true';
+ if(change==='different-cache')steps[index].env.RC_BROWSER_STATE_ROOT='/tmp/arbitrary';
+ let rejected=false;try{contract(mutated,`negative-erp-${change}`);}catch{rejected=true;}
+ if(!rejected)throw Error(`Validator accepted unsafe ERP role lane ${change}`);
+}
+console.log('PASS: five negative isolated ERP role gate mutations rejected');
 console.log('PASS: ten negative synthetic pixel gate mutations rejected');
 console.log('PASS: eight negative native preservation/callback gate mutations rejected');
 

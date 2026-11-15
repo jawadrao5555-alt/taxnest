@@ -1,5 +1,33 @@
 # TaxNest 23-source reconciliation inventory
 
+## Updated implementation checkpoint: local f274ef1
+
+This section supersedes the **initial inventory** below where it said runtime
+was absent. Code inspected at `f274ef1` includes the following added slices.
+It does not mark a source programme complete. Remote `2c2f860`/run
+[43697615574](https://github.com/jawadrao5555-alt/taxnest/actions/runs/43697615574)
+was reported against an earlier tree: native/browser failures and full-suite
+work were still being investigated. It is not acceptance for local f274ef1.
+Always refresh the exact final head and results before review readiness.
+
+| Original requirement | Implemented authority inspected | Focused evidence available | Still pending / limits |
+|---|---|---|---|
+| #321 / original #301 workstream5: owner-approved welcome, birthday, anniversary, local date, retries/dedup | `CompanyGreetingService`, `GreetingPreferencesController`, `SendOptInGreetings`, greeting tables and console schedule. Global transport and company preference default OFF; explicit event email consent, exact local occurrence, bounded provider-unavailable retry, durable sending/HOLD after uncertain outcome, dispatch-time consent recheck; stale owner membership rechecked | `OptInGreetingsTest` covers default no-send, local/leap dates, consent revocation, stale owner, once-only occurrence, uncertain outcome HOLD. Native race and desktop/390 browser fixtures are added in 2cbe3f5 | Implemented email-only slice, not activated. Hosted race/browser/final suite proof pending. No real delivery, automatic contact/patient import or SMS/WhatsApp claim. Existing historical programme remains unchecked until its full agreed outcome is accepted. |
+| #321: accessible, scoped tutorial discovery | `TutorialController`, `TutorialVideoAdminController`, scoped search, title/language/local-VTT/transcript/reviewed-version metadata and superseded-row handling | `TutorialAccessibilityMetadataTest`; synthetic keyboard/caption browser fixture in `opt-in-greetings-tutorials` | No invented caption content; actual supplied captions and six-theme/screen-reader acceptance not established. Existing publication/audience rules retained. |
+| #321 / #301 workstream6: scoped assistant, sources/date, no escalation by content | `MadadgarAnswerScope`, service/controller persisted actor checks, source provenance columns/UI, category-specific local guidance and untrusted-instruction/current-evidence rejection | `MadadgarScopedAssistantTest` includes tenant/role/inactive denial, injection, unknown tool no-write, quota, historical provenance and localized escaped notices | **Authorized read-data requirement still open at this checkpoint.** The inspected scope helper explicitly answers that it has no live records tool. Deterministic refusal/local help is not completion of billing/payment/stock question answering; separate worker is implementing the allowed read adapter. No provider or production-data proof claimed. |
+| #316/#337/#374: preserve historical rates, explicit configured periods, consistent review | `AdminPlanController` only prepares POS/FBR/ERP period rates when the administrator explicitly chooses Update configured period rates; absent/old-client controls preserve rates. Availability remains a separate deployment flag. Existing configured DI periods stay compatible | `AdminPlanStorePostTest`, `FbrPosTwoPackageLadderMigrationTest`; shared billing evidence reports focused approval matrix 23 tests/278 assertions and lifecycle matrix62/1289, not new hosted acceptance | Final exact-head checkout/browser/native approval/commission results required. Configuration is not activation; missing/unpriced/retired periods cannot silently become annual. No new commercial prices invented. |
+| #316/#320: Healthcare billing authority | `HealthAccessService` maps package checkout/proof routes to non-delegatable owner `billing.manage`; guard-specific route and company checks remain | `HealthPilotReadinessTest` plus existing multi-guard checkout cases | Capability mapping is an implemented boundary, not proof all lifecycle/grant/suspension/accounting requirements are complete. |
+| #266/#313: inventory outcome after frozen packing | `DiInvoiceInventory`, additive posting/precision schema, DI web/API snapshots, accepted finalization helper and local-only recovery; base adapter85ea7f0 and browser fixturef274ef1 | `DiInvoiceInventoryTest`, existing packing/integrity tests; socket-only native probe and synthetic desktop/390 `di-inventory-projection` journey added | **Implementation and safety follow-ups active, not complete.** Finalized environment, original return reservation/concurrency, unknown cost, tenant/branch, legacy no-backfill, hash and no-redispatch recovery need final integrated tests. Native/browser proof pending; no actual fiscal acceptance. Never count a test mock as regulator evidence. |
+
+Focus-test counts above are recorded implementation evidence, not a fresh
+rerun by this inventory pass. Test code presence is separated from execution.
+The 47 original unchecked lines remain unchanged. Seven-day installed-device
+diagnostic completeness, actual backup/restore/RPO/RTO, physical paper/signed
+installation, verified regulator routes/sandbox, CCI actual evidence/batch
+approval, full School ERP and future industry programmes remain separate open
+requirements or external holds. Do not translate additional local commits into
+“all 23 complete.” School/Hospital fiscal submission remains blocked.
+
 ## Register status and evidence rules
 
 This is a checkpoint register, not a declaration that all source requirements

@@ -47,6 +47,16 @@ final class FbrRetainedRefundEventEvidence
     $q->whereRaw("json_type(e.event_scope, '$.$key') IN ('integer','text')")
       ->whereRaw("CAST(json_extract(e.event_scope, '$.$key') AS TEXT) = CAST($column AS TEXT)");
   }
+  // Keep registry identifiers byte-exact even when retained columns use a
+  // case-insensitive/padded collation. Bound constants, no user SQL or casts.
+  $exact=['c.product_type'=>'fbrpos','e.projection_status'=>'projected',
+   'e.event_type'=>'customer.refund.posted','m.local_type'=>'refund',
+   'm.cloud_type'=>'fbr_pos_transaction','r.transaction_type'=>'return','p.transaction_type'=>'sale'];
+  $mysql=DB::connection()->getDriverName()==='mysql';
+  foreach(['schema'=>'local-core.customer-ledger.v1','command_type'=>'refund.record'] as $key=>$value)
+   $exact[$mysql ? "JSON_UNQUOTE(JSON_EXTRACT(e.payload, '$.$key'))" : "json_extract(e.payload, '$.$key')"]=$value;
+  foreach($exact as $expression=>$expected)
+   $q->whereRaw($mysql ? "BINARY $expression = BINARY ?" : "$expression COLLATE BINARY = ?",[$expected]);
   if(Schema::hasColumn('companies','deleted_at'))$q->whereNull('c.deleted_at');
   if(Schema::hasColumn('fbr_pos_transactions','deleted_at'))$q->whereNull('r.deleted_at')->whereNull('p.deleted_at');
   if($bill!==null)$q->where('p.id',$bill);

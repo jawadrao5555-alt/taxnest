@@ -59,6 +59,22 @@ class FbrRetainedRefundEventEvidenceTest extends TestCase {
   ] as $change) {DB::beginTransaction();DB::table('agent_core_events')->where('id',1)->update($change);self::assertSame('INCONSISTENT_RETAINED_LINKS',$this->source()['status']);DB::rollBack();}
   DB::table('agent_core_events')->where('id',1)->update(['event_scope'=>json_encode(['company_id'=>'1','branch_id'=>'10'])]);self::assertSame('PARTIAL',$this->source()['status']);
  }
+ public function test_registered_identifiers_are_case_sensitive_and_not_space_padded():void {
+  foreach([
+   ['agent_core_events',['event_type'=>'customer.REFUND.posted']],
+   ['agent_core_events',['event_type'=>'customer.refund.posted ']],
+   ['agent_core_events',['projection_status'=>'PROJECTED']],
+   ['agent_core_events',['payload'=>json_encode(['schema'=>'LOCAL-CORE.customer-ledger.v1','command_type'=>'refund.record','aggregate_id'=>'opaque-1'])]],
+   ['agent_core_events',['payload'=>json_encode(['schema'=>'local-core.customer-ledger.v1','command_type'=>'REFUND.RECORD','aggregate_id'=>'opaque-1'])]],
+   ['agent_core_aggregate_mappings',['local_type'=>'REFUND']],
+   ['agent_core_aggregate_mappings',['cloud_type'=>'FBR_POS_TRANSACTION']],
+   ['companies',['product_type'=>'FBRPOS']],
+   ['fbr_pos_transactions',['transaction_type'=>'SALE']],
+  ] as [$table,$change]) {
+   DB::beginTransaction();DB::table($table)->where('id',$table==='fbr_pos_transactions'?100:1)->update($change);
+   self::assertSame('INCONSISTENT_RETAINED_LINKS',$this->source()['status']);self::assertSame([],Evidence::bill(1,100,0,25)['rows']);DB::rollBack();
+  }
+ }
  public function test_deleted_parent_return_and_mapping_remain_unknown_not_reconstructed():void {
   foreach([['fbr_pos_transactions',100],['fbr_pos_transactions',101],['agent_core_aggregate_mappings',1]] as [$table,$id]) {
    DB::beginTransaction();DB::table($table)->where('id',$id)->delete();self::assertSame('INCONSISTENT_RETAINED_LINKS',$this->source()['status']);DB::rollBack();

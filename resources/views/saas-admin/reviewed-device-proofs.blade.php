@@ -8,7 +8,7 @@
 @foreach(['device_uid'=>'Device fingerprint','pos_id'=>'POS ID','evidence_reference'=>'Non-secret evidence reference','evidence_sha256'=>'Evidence SHA-256'] as $name=>$label)
 <label class="block">{{ $label }}<input name="{{ $name }}" required class="block w-full bg-gray-800 rounded p-2" maxlength="{{ $name==='evidence_reference'?300:($name==='device_uid'?128:64) }}"></label>
 @endforeach
-<label class="block">Environment<select name="environment" class="block bg-gray-800 p-2"><option value="sandbox">Sandbox</option><option value="production">Production</option></select></label>
+<label for="reviewed-proof-environment" class="block">Environment</label><select id="reviewed-proof-environment" name="environment" class="block bg-gray-800 p-2"><option value="sandbox">Sandbox</option><option value="production">Production</option></select>
 <label class="block">Review findings<textarea name="review_note" required minlength="10" maxlength="2000" class="block w-full bg-gray-800 p-2"></textarea></label>
 <label class="block"><input type="checkbox" name="independent_evidence_reviewed" value="1" required> I reviewed independent device/POS/environment evidence. No passwords, tokens or payment credentials are included.</label>
 <button class="border rounded p-2">Record reviewed proof</button>

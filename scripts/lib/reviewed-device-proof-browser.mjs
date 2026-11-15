@@ -1,7 +1,13 @@
 export async function reviewedDeviceProofWorkflow(page,t,v,{baseUrl,login,waitForOperationalSurface,saveEvidenceScreenshot,pass,loopback}) {
   const f=t.reviewedDeviceProof[v.width];
   const path='/admin/companies/'+f.companyId+'/device-proofs';
-  const send=(target,url,data)=>target.evaluate(async({url,data})=>{const r=await fetch(url,{method:'POST',headers:{'Accept':'application/json','Content-Type':'application/json','X-CSRF-TOKEN':document.querySelector('meta[name="csrf-token"]').content},body:JSON.stringify(data)});return r.status;},{url,data});
+  // These are only explicit denial probes; same session and CSRF, exact status asserted.
+  // Positive review/revoke continue through real browser forms and normal diagnostics.
+  const send=async(target,url,data)=>{
+    const csrf=await target.locator('meta[name="csrf-token"]').getAttribute('content');
+    const response=await target.request.post(new URL(url,baseUrl).href,{headers:{'Accept':'application/json','X-CSRF-TOKEN':csrf},data});
+    return response.status();
+  };
   const assert=(ok,msg)=>{if(!ok)throw Error(msg);};
   await page.goto(baseUrl+path,{waitUntil:'domcontentloaded'});await waitForOperationalSurface(page);
   await page.getByText('No reviewed proof means HOLD.',{exact:false}).waitFor();

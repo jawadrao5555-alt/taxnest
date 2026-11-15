@@ -16,7 +16,7 @@ const buildActiveBytes=fs.readFileSync(buildActive), buildProposalBytes=fs.readF
 if(!buildActiveBytes.equals(buildProposalBytes))throw Error('active and proposed Build PRA Agent workflows must be byte-identical');
 const expected=['workflow-safety','dependency-audit-build','fullphpunit','native-mariadb-di','browserdesktopmobile','jsagentrealtime','manifest-provenance'];
 const mandatoryCommands={
-  'workflow-safety':['rc-ci-gates-check.sh','npm-lock-portability-test.sh','ci-sanitize-evidence-check.sh','rc-failure-observability-check.sh'],
+  'workflow-safety':['rc-ci-gates-check.sh','npm-lock-portability-test.sh','ci-sanitize-evidence-check.sh','rc-failure-observability-check.sh','synthetic-pixels-check.mjs','synthetic-pixels-check.py'],
   'dependency-audit-build':['rc-recertify.sh --all-locks'],
   fullphpunit:['rc-safe-run -- vendor/bin/phpunit','rc-safe-run -- python3 scripts/tests/elaan-native-sql-check.py'],
   'native-mariadb-di':['ci-mariadb-provision.sh install','ci-mariadb-provision.sh verify','rc-mariadb-migration-lab.sh --all','rc-safe-run -- python3 scripts/tests/elaan-native-sql-check.py --mariadb'],
@@ -36,8 +36,27 @@ function contract(doc,label){
     const text=steps.map(s=>s.run||'').join('\n');
     for(const needle of needles)if(!text.includes(needle))throw Error(`${label}: ${name} lacks mandatory command: ${needle}`);
     const artifacts=steps.filter(s=>s.uses==='actions/upload-artifact@v4');
-    const artifact=artifacts[0];
-    for(const extra of artifacts.slice(1)) {
+    const artifact=artifacts.find(s=>s.name==='Upload sanitized CI evidence');
+    for(const extra of artifacts.filter(s=>s!==artifact)) {
+      if(extra.name==='Upload verified synthetic screenshots for visual review') {
+        const gates=steps.filter(s=>s.id==='synthetic_pixels');
+        const gate=gates[0];
+        const commands=[
+          'mkdir -p "$RUNNER_TEMP/taxnest-synthetic-pixels"',
+          'python3 scripts/lib/verify-synthetic-pixels.py "$RUNNER_TEMP/taxnest-synthetic-pixels/$GITHUB_JOB"',
+          'test -f "$RUNNER_TEMP/taxnest-synthetic-pixels/$GITHUB_JOB/VERIFIED_SYNTHETIC_PIXELS"'
+        ];
+        if(name!=='browserdesktopmobile'||jobs[name].env?.RC_SYNTHETIC_PIXEL_EVIDENCE!=='1'
+          ||gates.length!==1||gate.if!=='always()'||gate['continue-on-error']
+          ||JSON.stringify(String(gate.run||'').trim().split('\n'))!==JSON.stringify(commands)
+          ||steps.indexOf(gate)>=steps.indexOf(extra)
+          ||extra.if!=="always() && steps.synthetic_pixels.outcome == 'success'"
+          ||extra.with?.name!=='synthetic-visual-review-${{ github.run_id }}'
+          ||extra.with?.path!=='${{ runner.temp }}/taxnest-synthetic-pixels/${{ github.job }}'
+          ||extra.with?.['if-no-files-found']!=='error'||extra.with?.['retention-days']!==14
+          ||extra['continue-on-error'])throw Error(`${label}: invalid guarded synthetic pixel artifact`);
+        continue;
+      }
       const paths=String(extra.with?.path||'').trim().split('\n');
       const allowed=['${{ steps.browser-preflight.outputs.preview_dir }}/*.webm','${{ steps.browser-preflight.outputs.preview_dir }}/recording-manifest.json'];
       const preflight=steps.find(s=>s.id==='browser-preflight');
@@ -55,6 +74,7 @@ function contract(doc,label){
     if(!sanitize||sanitize.if!=='always()'||!String(sanitize.run||'').includes('ci-sanitize-evidence.sh'))throw Error(`${label}: ${name} lacks the sanitizer collector`);
     if(text.includes('npm ci')&&!text.includes('npm-bootstrap-pinned.sh'))throw Error(`${label}: ${name} invokes npm ci without the pinned helper`);
   }
+  if((jobs.browserdesktopmobile.steps||[]).filter(s=>s.name==='Upload verified synthetic screenshots for visual review').length!==1)throw Error(`${label}: one guarded synthetic pixel upload required`);
   const native=jobs['native-mariadb-di'];
   const browser=jobs.browserdesktopmobile;
   for (const [mode, prefix] of [['upgrade', 'upgrade_'], ['reviewed-callback', 'callback_']]) {
@@ -107,6 +127,23 @@ for (const mode of ['upgrade','reviewed-callback']) {
     if(!rejected)throw Error(`Validator accepted unsafe native ${mode} ${change}`);
   }
 }
+for(const change of ['remove-upload','condition','path','name','missing-file','optional-verifier','missing-verifier','weaken-verifier','disabled-capture','extra-upload']) {
+ const mutated=structuredClone(activeDoc), job=mutated.jobs.browserdesktopmobile, steps=job.steps;
+ const upload=steps.find(s=>s.name==='Upload verified synthetic screenshots for visual review'), gate=steps.find(s=>s.id==='synthetic_pixels');
+ if(change==='remove-upload')steps.splice(steps.indexOf(upload),1);
+ if(change==='condition')upload.if='always()';
+ if(change==='path')upload.with.path='${{ github.workspace }}/.local';
+ if(change==='name')upload.with.name='arbitrary';
+ if(change==='missing-file')upload.with['if-no-files-found']='warn';
+ if(change==='optional-verifier')gate['continue-on-error']=true;
+ if(change==='missing-verifier')steps.splice(steps.indexOf(gate),1);
+ if(change==='weaken-verifier')gate.run='true';
+ if(change==='disabled-capture')delete job.env.RC_SYNTHETIC_PIXEL_EVIDENCE;
+ if(change==='extra-upload')steps.push({uses:'actions/upload-artifact@v4',with:{path:'.local'}});
+ let rejected=false;try{contract(mutated,`negative-pixels-${change}`);}catch{rejected=true;}
+ if(!rejected)throw Error(`Validator accepted unsafe synthetic pixel ${change}`);
+}
+console.log('PASS: ten negative synthetic pixel gate mutations rejected');
 console.log('PASS: eight negative native preservation/callback gate mutations rejected');
 
 if(JSON.stringify(activeContract)!==JSON.stringify(proposalContract))throw Error('active and proposed PR workflows must have equivalent mandatory DAG/container contracts');

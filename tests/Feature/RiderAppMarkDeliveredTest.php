@@ -956,4 +956,29 @@ class RiderAppMarkDeliveredTest extends TestCase
         $this->assertSame(31.51, $delivery['destination_lat']);
         $this->assertSame(74.35, $delivery['destination_lng']);
     }
+    public function test_full_credit_cash_decision_replays_once_and_changed_payment_is_rejected(): void
+    {
+        Schema::table('pos_transactions', function (Blueprint $table) {
+            $table->unsignedBigInteger('branch_id')->nullable();
+            $table->string('status')->default('completed');
+        });
+        (require database_path('migrations/2026_11_06_000001_create_pos_delivery_accounts.php'))->up();
+        $id = $this->makeBill(['total_amount' => 500, 'invoice_mode' => 'local', 'rider_assigned_at' => now()->subMinutes(10)]);
+        $this->recordFix();
+        $response = $this->markDeliveredWithEvidence($id, ['received_amount' => '0']);
+        $this->assertSame(200, $response->status(), $response->getContent());
+        $this->assertSame(200, $this->markDeliveredWithEvidence($id, ['received_amount' => '0'])->status());
+        foreach (['500', null] as $changed) {
+            try {
+                $this->markDeliveredWithEvidence($id, ['received_amount' => $changed]);
+                $this->fail('A replay cannot change or omit the original payment decision.');
+            } catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) {
+                $this->assertSame(409, $e->getStatusCode());
+            }
+        }
+        $this->assertDatabaseCount('pos_delivery_accounts', 1);
+        $this->assertDatabaseCount('pos_delivery_completions', 1);
+        $this->assertDatabaseHas('pos_delivery_accounts', ['transaction_id' => $id, 'received_amount' => 0, 'credit_amount' => 500]);
+    }
+
 }

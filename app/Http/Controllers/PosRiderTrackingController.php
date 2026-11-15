@@ -805,7 +805,7 @@ class PosRiderTrackingController extends Controller
                 'customer_phone' => $b->customer_phone,
                 'address'        => $b->delivery_address,
                 'amount'         => \App\Models\PosRider::collectionAmount($b),
-                'delivery_cash_entry' => !$isPrepaid && $b->invoice_mode !== 'local' && \App\Services\PosDeliveryAccount::ready(),
+                'delivery_cash_entry' => !$isPrepaid && \App\Services\PosDeliveryAccount::ready(),
                 'bill_total_amount' => (float) $b->total_amount,
                 'delivery_items' => $b->rider_collection_amount !== null ? $b->items->where('fulfillment', 'delivery')->filter(fn ($i) => !$i->skip_kitchen)->map(fn ($i) => ['name' => $i->item_name, 'quantity' => (float) $i->quantity])->values() : [],
                 'payment_method' => $b->payment_method,
@@ -893,6 +893,7 @@ class PosRiderTrackingController extends Controller
                 if ((int) $prior->transaction_id !== (int) $txnId) {
                     return response()->json(['ok' => false, 'error' => 'event_conflict'], 409);
                 }
+                \App\Services\PosDeliveryAccount::assertReplay((int) $rider->company_id, (int) $txnId, (int) $rider->id, isset($cashData['received_amount']) ? (string) $cashData['received_amount'] : null);
                 return response()->json(['ok' => true, 'duplicate' => true] + $this->mePayload($rider));
             }
         }
@@ -1152,6 +1153,7 @@ class PosRiderTrackingController extends Controller
                     if ((int) $prior->transaction_id !== (int) $txnId) {
                         return response()->json(['ok' => false, 'error' => 'event_conflict'], 409);
                     }
+                    \App\Services\PosDeliveryAccount::assertReplay((int) $rider->company_id, (int) $txnId, (int) $rider->id, isset($cashData['received_amount']) ? (string) $cashData['received_amount'] : null);
                     return response()->json(['ok' => true, 'duplicate' => true] + $this->mePayload($rider));
                 }
             }
@@ -1171,6 +1173,7 @@ class PosRiderTrackingController extends Controller
                     if ((int) $prior->transaction_id !== (int) $txnId) {
                         return response()->json(['ok' => false, 'error' => 'event_conflict'], 409);
                     }
+                    \App\Services\PosDeliveryAccount::assertReplay((int) $rider->company_id, (int) $txnId, (int) $rider->id, isset($cashData['received_amount']) ? (string) $cashData['received_amount'] : null);
                     return response()->json(['ok' => true, 'duplicate' => true] + $this->mePayload($rider));
                 }
             }

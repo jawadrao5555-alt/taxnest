@@ -97,7 +97,10 @@ concurrency(){
     clean_php php "$ROOT/tests/native/rc_notification_concurrency.php"
     clean_php php "$ROOT/tests/native/rc_staff_discount_concurrency.php"
     clean_php php "$ROOT/tests/native/rc_school_fee_concurrency.php" | tee "$EVIDENCE_DIR/school-fee-concurrency.log"
+    clean_php php "$ROOT/tests/native/rc_delivery_credit_concurrency.php" | tee "$EVIDENCE_DIR/delivery-credit-concurrency.log"
     clean_php php "$ROOT/tests/native/rc_hospital_collection_concurrency.php" | tee "$EVIDENCE_DIR/hospital-collection-concurrency.log"
+    clean_php php "$ROOT/tests/native/rc_local_collection_lifecycle.php" | tee "$EVIDENCE_DIR/local-collection-lifecycle.log"
+    grep -Fqx "PASS: native local School/Hospital bin and restore preserve exact snapshots; purge rollback restores all rows and audited purge removes target only" "$EVIDENCE_DIR/local-collection-lifecycle.log" || fail local-collection-lifecycle-missing-proof
     grep -Fqx "PASS: native school duplicate collection and close remain single; collect-close race serializes cash; post-close replay preserved and fresh payment rejected" "$EVIDENCE_DIR/school-fee-concurrency.log" || fail school-fee-concurrency-missing-success-proof
     clean_php php "$ROOT/tests/native/rc_di_billing_packing.php" | tee "$EVIDENCE_DIR/di-billing-packing.log"
     clean_php php "$ROOT/tests/native/rc_paid_renewal.php" | tee "$EVIDENCE_DIR/paid-renewal.log"

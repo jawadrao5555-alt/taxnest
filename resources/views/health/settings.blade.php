@@ -98,6 +98,7 @@
         </div>
 
         @if($isOwner)
+            @include('billing._policy-status', ['policySubscription' => $company?->subscriptions()->where('active', true)->orderByDesc('id')->first()])
             @include('billing._subscription-history')
         @endif
     </div>

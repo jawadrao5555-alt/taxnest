@@ -84,10 +84,11 @@
                     <form method="POST" action="/fbr-pos/register" class="px-6 pb-6 pt-4 space-y-4" x-data="{ posType: @js(old('pos_type', 'retail')), packageName: @js(old('requested_plan', $pickedPlanName ?? '')), billingCycle: @js(old('billing_cycle', request('billing_cycle', 'annual'))), cycleQuotes: @js($signupCycleQuotes) }">
                         @csrf
 
+                        <div x-show="packageName" x-cloak>@include('billing._signup-policy')</div>
                         <div id="signup-package-choice">
                             <label for="requested-plan" class="block text-sm font-semibold">{{ __('school_workspace.package_choice') }}</label>
-                            <select id="requested-plan" name="requested_plan" x-model="packageName" @change="billingCycle = 'annual'" class="w-full rounded-xl border-gray-300">
-                                <option value="">{{ __('school_workspace.trial_choice') }}</option>
+                            <select id="requested-plan" name="requested_plan" required x-model="packageName" @change="billingCycle = 'annual'" class="w-full rounded-xl border-gray-300">
+                                <option value="">{{ __('billing_policy.choose_plan') }}</option>
                                 @foreach(($registrationPlans ?? collect()) as $registrationPlan)
                                 <option value="{{ $registrationPlan->name }}" @selected(old('requested_plan', $pickedPlanName ?? '') === $registrationPlan->name)>{{ $registrationPlan->name }}</option>
                                 @endforeach

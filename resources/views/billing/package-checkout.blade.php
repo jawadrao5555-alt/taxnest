@@ -2,6 +2,7 @@
     <main class="max-w-5xl mx-auto p-4 space-y-6" id="package-checkout">
         <h1 class="text-2xl font-bold">Package selection and payment review</h1>
         <p>Select an available package and billing period, then upload evidence of a payment already made. This page does not charge a payment method or activate a subscription. Selection alone does not change access. Receipt uploads remain subject to the existing review and temporary-access policy.</p>
+        @include('billing._policy-status')
         @if($errors->any())
         <div role="alert" class="border border-red-400 p-3">{{ $errors->first() }}</div>
         @endif

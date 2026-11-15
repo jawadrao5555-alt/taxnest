@@ -10,6 +10,8 @@
                 <p class="text-gray-500 dark:text-gray-400 mt-2">Annual billing — pick a plan, start selling</p>
             </div>
 
+            @include('billing._policy-status', ['policySubscription' => $currentSubscription])
+
             @if($currentSubscription && $currentSubscription->entitlementPlan())
             <div class="bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-700 rounded-xl p-4 mb-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                 <div class="flex items-center gap-3">
@@ -329,7 +331,7 @@
                     </span>
                     <span class="flex items-center gap-1.5">
                         <svg class="w-4 h-4 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
-                        3-day free trial
+                        {{ __('billing_policy.heading') }}
                     </span>
                 </div>
             </div>

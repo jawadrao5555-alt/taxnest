@@ -9,28 +9,27 @@
         <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Register your company and become its admin</p>
     </div>
 
-    {{-- Task 1483/1484: shown only when the visitor arrived from a package column
-         on the pricing table. The package and the billing cycle they picked are
-         remembered against the company (hidden fields below) so approval
-         activates exactly that one, on exactly that cycle. --}}
+    {{-- The selected package is preserved for explicit signup and later payment review.
+         Account approval is not payment verification or paid-term activation. --}}
     @if(!empty($pickedPlanName))
     <div class="mb-6 rounded-xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/20 px-3 py-2 text-center">
         <p class="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">Package you picked</p>
         <p class="text-sm font-bold text-gray-900 dark:text-gray-100 mt-0.5">{{ $pickedPlanName }}@if(!empty($pickedCycleLabel)) <span class="font-semibold text-gray-500 dark:text-gray-400">· {{ $pickedCycleLabel }} billing</span>@endif</p>
-        <p class="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">Your free trial starts first — this package is activated when your account is approved.</p>
     </div>
     @endif
 
     <form method="POST" action="{{ route('register') }}">
         @csrf
 
-        {{-- Task 1484: carries the clicked package (and its billing cycle) into
-             the signup. Only ever holds values the server already matched, and
-             store() re-checks them anyway. --}}
-        @if(!empty($pickedPlanName))
-        <input type="hidden" name="requested_plan" value="{{ $pickedPlanName }}">
-        <input type="hidden" name="requested_billing_cycle" value="{{ $pickedCycle }}">
-        @endif
+        {{-- Server-provided, product-compatible packages; store() revalidates selection. --}}
+        <label for="required-signup-package" class="block text-sm font-semibold">{{ __('billing_policy.plan') }}</label>
+                <select id="required-signup-package" name="requested_plan" required class="w-full rounded-xl border-gray-300">
+                    <option value="">{{ __('billing_policy.choose_plan') }}</option>
+                    @foreach(($registrationPlans ?? collect()) as $signupPlan)<option value="{{ $signupPlan->name }}" @selected(old('requested_plan', $pickedPlanName ?? '') === $signupPlan->name)>{{ $signupPlan->name }}</option>@endforeach
+                </select>
+                <x-input-error :messages="$errors->get('requested_plan')" class="mt-2" />
+                @include('billing._signup-policy')
+                <input type="hidden" name="requested_billing_cycle" value="{{ $pickedCycle ?? 'annual' }}">
 
         <div class="mt-4">
             <x-input-label for="company_name" value="Company Name" />

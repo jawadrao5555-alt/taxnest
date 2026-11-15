@@ -101,7 +101,12 @@
                             <p class="text-xs font-semibold text-purple-300/50 uppercase tracking-wider">{{ __('pos.auth_select_package') }} <span class="normal-case font-normal">{{ __('pos.auth_pick_billing') }}</span></p>
                         </div>
 
-                        <input type="hidden" name="pricing_plan_id" :value="planId">
+                        <div x-show="planId" x-cloak>@include('billing._signup-policy')</div>
+                        <label for="required-signup-package" class="block text-white text-sm">{{ __('billing_policy.plan') }}</label>
+                        <select id="required-signup-package" name="pricing_plan_id" x-model="planId" required class="w-full rounded-xl border-gray-300">
+                            <option value="">{{ __('billing_policy.choose_plan') }}</option>
+                            @foreach(($plans ?? collect()) as $signupPlan)<option value="{{ $signupPlan->id }}" @selected(old('pricing_plan_id', $preselectedPlanId ?? '') == $signupPlan->id)>{{ $signupPlan->name }}</option>@endforeach
+                        </select>
 
                         {{-- Billing cycle. Annual-only since 23 Aug 2026 (owner), so the
                              picker only renders if a shorter cycle is ever sold again;
@@ -286,7 +291,7 @@
                             <input id="password_confirmation" type="password" name="password_confirmation" required autocomplete="new-password" placeholder="{{ __('pos.auth_ph_reenter') }}" class="w-full rounded-xl text-sm text-white placeholder-purple-300/30 transition" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); padding: 11px 14px; outline: none;" onfocus="this.style.borderColor='rgba(139,92,246,0.5)'; this.style.boxShadow='0 0 0 3px rgba(139,92,246,0.15)';" onblur="this.style.borderColor='rgba(255,255,255,0.12)'; this.style.boxShadow='none';">
                         </div>
 
-                        <button :disabled="planId &amp;&amp; (prices[planId] || {})[cycle] === undefined" type="submit" class="w-full py-3 rounded-xl text-sm font-bold text-white transition-all duration-200" style="background: linear-gradient(135deg, #7c3aed, #a855f7); box-shadow: 0 4px 20px rgba(124, 58, 237, 0.4);" onmouseover="this.style.boxShadow='0 6px 28px rgba(124, 58, 237, 0.55)'; this.style.transform='translateY(-1px)';" onmouseout="this.style.boxShadow='0 4px 20px rgba(124, 58, 237, 0.4)'; this.style.transform='translateY(0)';">
+                        <button :disabled="!planId || (prices[planId] || {})[cycle] === undefined" type="submit" class="w-full py-3 rounded-xl text-sm font-bold text-white transition-all duration-200" style="background: linear-gradient(135deg, #7c3aed, #a855f7); box-shadow: 0 4px 20px rgba(124, 58, 237, 0.4);" onmouseover="this.style.boxShadow='0 6px 28px rgba(124, 58, 237, 0.55)'; this.style.transform='translateY(-1px)';" onmouseout="this.style.boxShadow='0 4px 20px rgba(124, 58, 237, 0.4)'; this.style.transform='translateY(0)';">
                             {{ __('pos.auth_create_account') }}
                         </button>
 

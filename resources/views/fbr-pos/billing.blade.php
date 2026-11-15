@@ -10,6 +10,8 @@
                 <p class="text-gray-500 dark:text-gray-400 mt-2">Choose an available billing period and review the exact total.</p>
             </div>
 
+            @include('billing._policy-status', ['policySubscription' => $currentSubscription])
+
             @if($currentSubscription && $currentSubscription->entitlementPlan())
             <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-xl p-4 mb-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                 <div class="flex items-center gap-3">
@@ -86,7 +88,7 @@
                     </span>
                     <span class="flex items-center gap-1.5">
                         <svg class="w-4 h-4 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                        {{ __('pos.free_trial_3day') }}
+                        {{ __('billing_policy.heading') }}
                     </span>
                 </div>
             </div>

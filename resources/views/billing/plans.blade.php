@@ -5,6 +5,8 @@
                 <h2 class="font-bold text-xl text-gray-800 dark:text-gray-100 leading-tight">Billing & Plans</h2>
             </div>
 
+            @include('billing._policy-status', ['policySubscription' => $currentSubscription])
+
             @if(($pendingSelection ?? null) && ($pendingSelectionPlan ?? null))
             <section class="bg-white dark:bg-gray-900 border border-emerald-300 rounded-xl p-6 mb-6" aria-labelledby="selected-package-payment">
                 <h3 id="selected-package-payment" class="font-semibold text-lg">Selected: {{ $pendingSelectionPlan->name }}</h3>

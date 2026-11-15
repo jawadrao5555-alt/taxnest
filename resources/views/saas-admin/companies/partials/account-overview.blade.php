@@ -6,6 +6,7 @@
     $note = fn ($metadata, $key) => is_string($metadata[$key] ?? null) && trim($metadata[$key]) !== '' ? $metadata[$key] : 'Not recorded';
     $panelClass = 'tn-account-panel rounded-xl border p-4 sm:p-5';
 @endphp
+@include('billing._policy-status', ['policySubscription' => $sub])
 <section id="company-account-overview" data-company-account data-company-control="{{ $account['control'] }}" data-subscription-allowed="{{ $account['access']['allowed'] === null ? 'unknown' : ($account['access']['allowed'] ? 'yes' : 'no') }}" class="mb-6 space-y-4 min-w-0">
     <div class="{{ $panelClass }}">
         <h2 class="text-lg font-bold">Subscription and access</h2>

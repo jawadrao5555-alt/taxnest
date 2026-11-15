@@ -21,13 +21,14 @@ class PackageCheckoutController extends Controller
     public function index(Request $request)
     {
         [$company,$guard]=$this->context($request);
+        $policySubscription=$company->subscriptions()->where('active',true)->orderByDesc('id')->first();
         $plans=PricingPlan::where('is_trial',false)->get()->filter(fn ($plan)=>PlanCompanyCompatibility::matches($company,$plan) && !PlanSellabilityService::isRetired($plan) && ($plan->is_public ?? true));
         $selectedPlan=$plans->firstWhere('id',(int)$request->query('plan_id'));
         $quote=$selectedPlan ? PendingSubscriptionSelection::quote($company,$selectedPlan) : null;
         $checkoutRoute=$guard==='web' ? 'billing.package-checkout' : $guard.'.package-checkout';
         $proofRoute=$guard==='web' ? 'payment-proof.store' : $guard.'.payment-proof.store';
         $layout=match($guard){'pos'=>'pos-layout','fbrpos'=>'fbr-pos-layout','health'=>'health-layout',default=>'app-layout'};
-        return response()->view('billing.package-checkout',compact('company','plans','selectedPlan','quote','checkoutRoute','proofRoute','layout'))->header('Cache-Control','private, no-store');
+        return response()->view('billing.package-checkout',compact('policySubscription','company','plans','selectedPlan','quote','checkoutRoute','proofRoute','layout'))->header('Cache-Control','private, no-store');
     }
 
     public function select(Request $request)

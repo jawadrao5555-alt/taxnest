@@ -31,6 +31,20 @@ class BillingPolicyPresentationTest extends TestCase
             $this->assertStringNotContainsString('<time ',$html);$this->assertStringNotContainsString(e(__('billing_policy.grace_rule')),$html);
         }
     }
+    public function test_nonnull_invalid_policy_is_unavailable_not_legacy():void {
+        foreach(['en','ur','rur']as$locale){app()->setLocale($locale);
+            $policySubscription=new \App\Models\Subscription;
+            $policySubscription->setRawAttributes(['company_id'=>123,'lifecycle_snapshot'=>'{"version":"unknown_version","company_id":123}'],true);
+            $html=Blade::render("@include('billing._policy-status')",compact('policySubscription'));
+            $this->assertStringContainsString('data-policy-version="unavailable"',$html);
+            $this->assertStringContainsString(e(__('billing_policy.unavailable')),$html);
+            $this->assertStringNotContainsString('data-policy-legacy',$html);
+            $this->assertStringNotContainsString('<time ',$html);
+            $policySubscription->setRawAttributes(['company_id'=>123,'lifecycle_snapshot'=>null],true);
+            $legacy=Blade::render("@include('billing._policy-status')",compact('policySubscription'));
+            $this->assertStringContainsString('data-policy-legacy',$legacy);
+        }
+    }
     public function test_signup_selection_is_required_and_every_surface_uses_same_api():void {
         foreach(['auth/register','health/auth/register','fbr-pos/auth/register']as$view){$html=file_get_contents(resource_path('views/'.$view.'.blade.php'));$this->assertMatchesRegularExpression('/name="requested_plan"[^>]*required/',$html);$this->assertStringContainsString("billing._signup-policy",$html);}
         $pos=file_get_contents(resource_path('views/pos/auth/register.blade.php'));$this->assertMatchesRegularExpression('/name="pricing_plan_id"[^>]*required/',$pos);$this->assertStringContainsString(':disabled="!planId ||',$pos);

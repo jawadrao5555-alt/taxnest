@@ -15,4 +15,5 @@ return [
  'phase_expired'=>'Khatam',
  'phase_unknown'=>'Namaloom',
  'choose_plan'=>'Package select karein',
+ 'unavailable'=>'Saved billing policy ka record dastyab nahin ya review chahiye. Trial, paid ya mohlat ki tareekhein andazay se nahin di ja rahi; authorized support se rabta karein. Isay legacy policy qarar nahin diya gaya.',
 ];

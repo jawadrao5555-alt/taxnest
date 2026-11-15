@@ -15,4 +15,5 @@ return [
  'phase_expired'=>'Expired',
  'phase_unknown'=>'Unknown',
  'choose_plan'=>'Select a package',
+ 'unavailable'=>'Saved billing policy evidence is unavailable or needs review. No trial, paid or grace dates are inferred; contact authorized support. This is not a legacy-policy determination.',
 ];

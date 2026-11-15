@@ -1,7 +1,9 @@
-@props(['terms' => null])
-<section data-billing-policy-summary data-policy-version="{{ $terms['version'] ?? 'legacy' }}" class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4 space-y-3 text-sm text-gray-800 dark:text-gray-100">
+@props(['terms' => null, 'unavailable' => false])
+<section data-billing-policy-summary data-policy-version="{{ $unavailable ? 'unavailable' : ($terms['version'] ?? 'legacy') }}" class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4 space-y-3 text-sm text-gray-800 dark:text-gray-100">
     <h3 class="font-semibold">{{ __('billing_policy.heading') }}</h3>
-    @if($terms === null)
+    @if($unavailable)
+        <p data-policy-unavailable role="alert">{{ __('billing_policy.unavailable') }}</p>
+    @elseif($terms === null)
         <p data-policy-legacy>{{ __('billing_policy.legacy_note') }}</p>
     @else
         <dl class="grid grid-cols-1 sm:grid-cols-2 gap-3">

@@ -4,6 +4,7 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
+[[ "${RC_SAFE_RUN:-}" == 1 && -r "${LD_PRELOAD:-}" ]] || { echo 'FAIL: PHPUnit runtime requires the egress guard' >&2; exit 2; }
 git diff --quiet HEAD -- || { echo 'FAIL: PHPUnit source must be clean and committed' >&2; exit 2; }
 head_before=$(git rev-parse HEAD)
 source_digest() { git ls-files -z | xargs -0 sha256sum | sha256sum | cut -d' ' -f1; }

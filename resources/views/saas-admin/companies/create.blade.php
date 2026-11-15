@@ -5,7 +5,7 @@
         <h1 class="text-2xl font-bold text-white">Create New Company</h1>
     </div>
 
-    <form method="POST" action="{{ route('saas.admin.companies.store') }}" class="space-y-6" x-data="{ productType: '{{ old('product_type', 'di') }}' }">
+    <form method="POST" action="{{ route('saas.admin.companies.store') }}" class="space-y-6" x-data="{ productType: '{{ old('product_type', 'di') }}' }" x-init="$watch('productType', () => { if ($refs.requestedPlan) $refs.requestedPlan.value = ''; })">
         @csrf
 
         <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
@@ -86,11 +86,23 @@
                         class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500">
                         @foreach(\App\Services\PosFeatureService::choosableCategories($panel) as $category)
                             @php $meta = \App\Services\PosFeatureService::presetMeta($category); @endphp
-                            <option value="{{ $category }}" {{ old('pos_type', 'general') === $category ? 'selected' : '' }}>{{ $meta['icon'] }} {{ $meta['label'] }}</option>
+                            <option value="{{ $category }}" {{ old('pos_type', 'general') === $category ? 'selected' : '' }}>{{ $meta['icon'] }} {{ $product === 'fbrpos' && $category === 'clinic' ? 'Hospital / Clinic (local collections)' : ($product === 'fbrpos' && $category === 'education' ? 'School / Education (local collections)' : $meta['label']) }}</option>
                         @endforeach
                     </select>
                 </div>
             @endforeach
+        </div>
+
+        <div class="bg-gray-900 border border-gray-800 rounded-xl p-5" id="admin-requested-package">
+            <h3 class="text-sm font-semibold text-white mb-2">Requested package</h3>
+            <p class="text-xs text-gray-400 mb-3">Creation starts a bounded trial only. A package selection records intent, not paid entitlement. Assign the approved package separately. School and Hospital fiscal reporting stays blocked; PRA reporting starts OFF.</p>
+            <select name="requested_plan" x-ref="requestedPlan" class="w-full bg-gray-800 text-white rounded-lg" :key="productType">
+                <option value="">Trial only / no paid package selected</option>
+                @foreach(($registrationPlans ?? collect()) as $plan)
+                <option value="{{ $plan->name }}" x-show="productType === @js(\App\Support\ProductCatalog::normalize($plan->product_type))" :disabled="productType !== @js(\App\Support\ProductCatalog::normalize($plan->product_type))" @selected(old('requested_plan') === $plan->name && old('product_type','di') === \App\Support\ProductCatalog::normalize($plan->product_type))>{{ $plan->name }} · {{ $plan->product_type }}</option>
+                @endforeach
+            </select>
+            <p class="text-xs text-amber-300 mt-2">Review the selected product, category and requested package before creating the company. No live fiscal connection is verified by registration.</p>
         </div>
 
         <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">

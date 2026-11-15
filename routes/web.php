@@ -1790,8 +1790,8 @@ Route::prefix('admin')->middleware(['admin.auth'])->group(function () {
     Route::post('/groups/{id}/detach/{companyId}', [AdminGroupController::class, 'detach'])->name('saas.admin.groups.detach');
 
     Route::get('/companies', [AdminCompanyController::class, 'index'])->name('saas.admin.companies');
-    Route::get('/companies/create', [AdminCompanyController::class, 'create'])->name('saas.admin.companies.create');
-    Route::post('/companies', [AdminCompanyController::class, 'store'])->name('saas.admin.companies.store');
+    Route::get('/companies/create', [\App\Http\Controllers\SaasAdmin\AdminCompanyCreationController::class, 'create'])->name('saas.admin.companies.create');
+    Route::post('/companies', [\App\Http\Controllers\SaasAdmin\AdminCompanyCreationController::class, 'store'])->name('saas.admin.companies.store');
     Route::get('/companies/{id}', [AdminCompanyController::class, 'show'])->name('saas.admin.companies.show');
     Route::get('/companies/{id}/edit', [AdminCompanyController::class, 'edit'])->name('saas.admin.companies.edit');
     Route::put('/companies/{id}', [AdminCompanyController::class, 'update'])->name('saas.admin.companies.update');
@@ -1804,8 +1804,9 @@ Route::prefix('admin')->middleware(['admin.auth'])->group(function () {
     // transfer paid for outside the panel).
     Route::post('/companies/{id}/ai-pages', [AdminCompanyController::class, 'grantAiPages'])->name('saas.admin.companies.aiPages');
     Route::post('/companies/{id}/delete', [AdminCompanyController::class, 'softDelete'])->name('saas.admin.companies.delete');
-    Route::post('/companies/{id}/change-type', [AdminCompanyController::class, 'changeProductType'])->name('saas.admin.companies.changeType');
-    Route::post('/companies/{id}/clone-product', [AdminCompanyController::class, 'cloneToProduct'])->name('saas.admin.companies.cloneProduct');
+    Route::get('/companies/{id}/product-review', [\App\Http\Controllers\SaasAdmin\AdminProductTransitionController::class, 'productReview'])->name('saas.admin.companies.productReview');
+    Route::post('/companies/{id}/change-type', [\App\Http\Controllers\SaasAdmin\AdminProductTransitionController::class, 'changeProductType'])->name('saas.admin.companies.changeType');
+    Route::post('/companies/{id}/clone-product', [\App\Http\Controllers\SaasAdmin\AdminProductTransitionController::class, 'cloneToProduct'])->name('saas.admin.companies.cloneProduct');
     Route::post('/companies/{id}/reveal-access-code', [AdminCompanyController::class, 'revealFbrAccessCode'])->name('saas.admin.companies.revealAccessCode');
     Route::post('/companies/{id}/reset-password', [AdminCompanyController::class, 'resetAdminPassword'])->name('saas.admin.companies.resetPassword');
 
@@ -2586,7 +2587,7 @@ Route::prefix('health')->middleware(['health.auth', 'company.approval'])->group(
         ->name('health.my.earnings');
 });
 
-Route::prefix('fbr-pos')->middleware(['fbrpos.auth', 'company.approval'])->group(function () {
+Route::prefix('fbr-pos')->middleware(['fbrpos.auth', 'company.approval', \App\Http\Middleware\SchoolWorkspace::class])->group(function () {
     Route::post('/survey/{id}/respond', [\App\Http\Controllers\PosSurveyController::class, 'respond'])->defaults('survey_guard', 'fbrpos')->name('fbrpos.survey.respond');
     Route::post('/survey/{id}/dismiss', [\App\Http\Controllers\PosSurveyController::class, 'dismiss'])->defaults('survey_guard', 'fbrpos')->name('fbrpos.survey.dismiss');
     // Same shared users.dark_mode preference as PRA POS. This is deliberately
@@ -2613,9 +2614,19 @@ Route::prefix('fbr-pos')->middleware(['fbrpos.auth', 'company.approval'])->group
     Route::get('/hospital/day-close', [\App\Http\Controllers\FbrPosHospitalController::class, 'dayClose'])->name('fbrpos.hospital.day-close');
     Route::post('/hospital/day-close', [\App\Http\Controllers\FbrPosHospitalController::class, 'close'])->name('fbrpos.hospital.close');
     Route::post('/hospital/campus', [\App\Http\Controllers\FbrPosHospitalController::class, 'switchCampus'])->name('fbrpos.hospital.campus');
+    Route::get('/hospital/settings', [\App\Http\Controllers\HospitalWorkspaceSettingsController::class, 'index'])->name('fbrpos.hospital.settings');
+    Route::post('/hospital/settings/services', [\App\Http\Controllers\HospitalWorkspaceSettingsController::class, 'saveService'])->name('fbrpos.hospital.settings.services');
+    Route::post('/hospital/settings/campus', [\App\Http\Controllers\HospitalWorkspaceSettingsController::class, 'addCampus'])->name('fbrpos.hospital.settings.campus');
+    Route::get('/hospital/printing', [\App\Http\Controllers\HospitalReceiptSettingsController::class, 'index'])->name('fbrpos.hospital.printing');
+    Route::post('/hospital/printing', [\App\Http\Controllers\HospitalReceiptSettingsController::class, 'update'])->name('fbrpos.hospital.printing.update');
+    Route::get('/hospital/printing/preview', [\App\Http\Controllers\HospitalReceiptSettingsController::class, 'preview'])->name('fbrpos.hospital.printing.preview');
     Route::get('/hospital/invoices/{id}', [\App\Http\Controllers\FbrPosHospitalController::class, 'invoice'])->whereNumber('id')->name('fbrpos.hospital.invoice');
     Route::post('/hospital/invoices/{id}/payments', [\App\Http\Controllers\FbrPosHospitalController::class, 'payment'])->whereNumber('id')->name('fbrpos.hospital.payment');
     Route::get('/hospital/receipts/{id}', [\App\Http\Controllers\FbrPosHospitalController::class, 'receipt'])->whereNumber('id')->name('fbrpos.hospital.receipt');
+    Route::get('/school-fees/printing', [\App\Http\Controllers\SchoolReceiptSettingsController::class, 'index'])->name('fbrpos.school-fees.printing');
+    Route::post('/school-fees/printing', [\App\Http\Controllers\SchoolReceiptSettingsController::class, 'update'])->name('fbrpos.school-fees.printing.update');
+    Route::get('/school-fees/printing/preview', [\App\Http\Controllers\SchoolReceiptSettingsController::class, 'preview'])->name('fbrpos.school-fees.printing.preview');
+    Route::get('/school-fees/recover', [\App\Http\Controllers\FbrPosSchoolFeeController::class, 'recover'])->name('fbrpos.school-fees.recover');
     Route::get('/school-fees/settings', [\App\Http\Controllers\FbrPosSchoolFeeController::class, 'settings'])->name('fbrpos.school-fees.settings');
     Route::post('/school-fees/settings/fee-head', [\App\Http\Controllers\FbrPosSchoolFeeController::class, 'saveFeeHead'])->name('fbrpos.school-fees.fee-head');
     Route::post('/school-fees/settings/campus', [\App\Http\Controllers\FbrPosSchoolFeeController::class, 'addCampus'])->name('fbrpos.school-fees.add-campus');
@@ -2752,7 +2763,7 @@ Route::prefix('fbr-pos')->middleware(['fbrpos.auth', 'company.approval'])->group
     Route::get('/reports/export-csv', [FbrPosController::class, 'exportReportCsv'])->name('fbrpos.reports.export-csv');
 
     // 👥 Team management (FBR twin of /pos/team) — admin-only in controller.
-    Route::get('/team', [FbrPosController::class, 'fbrTeam'])->name('fbrpos.team');
+    Route::get('/team', [\App\Http\Controllers\PilotTeamController::class, 'index'])->name('fbrpos.team');
     Route::post('/team', [FbrPosController::class, 'fbrStoreTeamMember'])->name('fbrpos.team.store');
     Route::put('/team/{id}', [FbrPosController::class, 'fbrUpdateTeamMember'])->name('fbrpos.team.update');
     Route::post('/team/{id}/toggle', [FbrPosController::class, 'fbrToggleTeamMember'])->name('fbrpos.team.toggle');

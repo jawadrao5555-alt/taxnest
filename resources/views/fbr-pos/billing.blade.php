@@ -3,10 +3,10 @@
         <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
             <a href="{{ route('fbrpos.customize') }}" class="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition mb-3">
                 <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
-                {{ __('pos.back_to_customize') }}
+                {{ $company->isSchoolFeePilot() ? __('school_workspace.workspace_menu') : __('pos.back_to_customize') }}
             </a>
-            <div class="text-center mb-8">
-                <h2 class="text-2xl font-bold text-gray-900 dark:text-gray-100">{{ __('pos.fbr_pos_plans') }}</h2>
+            <div class="text-center mb-8">@if($company->isSchoolFeePilot())<p class="notice">{{ __('school_workspace.school_billing_note') }}</p>@endif
+                <h2 class="text-2xl font-bold text-gray-900 dark:text-gray-100">{{ $company->isSchoolFeePilot() ? __('school_workspace.school_plans') : __('pos.fbr_pos_plans') }}</h2>
                 <p class="text-gray-500 dark:text-gray-400 mt-2">{{ __('pos.simple_annual_billing') }}</p>
             </div>
 
@@ -63,7 +63,7 @@
                         @if($hasOffer)<p class="text-xs text-blue-600 font-medium mt-0.5">{{ __('pos.save_pkr', ['amount' => number_format($compareYearly - $yearlyTotal)]) }}</p>@endif
 
                         <div class="mt-4 pt-4 border-t border-gray-100 dark:border-gray-800 space-y-2 text-sm text-gray-600 dark:text-gray-400">
-                            @if(!empty($planFeatures))
+                            @if($company->isSchoolFeePilot())<p>{{ __('school_workspace.school_billing_note') }}</p>@elseif(!empty($planFeatures))
                                 @foreach($planFeatures as $feature)
                                 <div class="flex items-center gap-2">
                                     <svg class="w-4 h-4 text-blue-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
@@ -94,7 +94,7 @@
                 <div class="inline-flex flex-wrap items-center justify-center gap-6 text-xs text-gray-400">
                     <span class="flex items-center gap-1.5">
                         <svg class="w-4 h-4 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
-                        {{ __('pos.fbr_compliant') }}
+                        {{ $company->isSchoolFeePilot() ? __('school_workspace.fiscal_off') : __('pos.fbr_compliant') }}
                     </span>
                     <span class="flex items-center gap-1.5">
                         <span class="text-xs font-bold text-blue-400">PKR</span>

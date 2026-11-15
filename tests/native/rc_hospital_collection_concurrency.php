@@ -163,3 +163,24 @@ elseif($r[0]['status']===422&&$r[1]['status']===200){if($q->count()!==1)throw ne
 else throw new RuntimeException('Unsafe Hospital collect-close race');
 if($c->count()!==1||(int)$c->value('cash_paisa')!==(int)$q->sum('amount_paisa')||(int)$c->value('receipt_count')!==$q->count()||(int)$c->value('variance_paisa')!==0)throw new RuntimeException('Hospital snapshot mismatch');
 echo "PASS: native hospital duplicate recovery, concurrent overpayment exclusion, immutable close and payment-close race\n";
+
+// New multi-service/noncash payload must preserve the same InnoDB replay boundary.
+$multiFixture=hospitalFixture(bin2hex(random_bytes(5)));
+$multiPayload=hospitalPayload(['patient_reference'=>'SYN-MULTI-RACE','patient_name'=>'Synthetic patient',
+    'payment_method'=>'bank','payment_reference'=>'SYN-BANK-REFERENCE',
+    'service_lines'=>[['service_head'=>'consultation','amount'=>'500'],['service_head'=>'lab','amount'=>'500']]]);
+$created=hospitalRequest($multiFixture,'store',$multiPayload);
+if($created['status']!==200)throw new RuntimeException('Native multi-service creation failed');
+$multiInvoice=(int)DB::table('hospital_invoices')->where('company_id',$multiFixture['company'])->value('id');
+$finalPayment=hospitalPayload(['_invoice_id'=>$multiInvoice,'amount'=>'600','payment_method'=>'card','payment_reference'=>'SYN-CARD-REFERENCE']);
+$replays=hospitalRace($multiFixture,array_fill(0,2,['action'=>'payment','payload'=>$finalPayment]));
+$multiPayments=fn()=>DB::table('hospital_payments')->where('company_id',$multiFixture['company']);
+if($replays[0]['status']!==200||$replays[1]['status']!==200||(int)$replays[0]['data']['receipt_id']!==(int)$replays[1]['data']['receipt_id']||$multiPayments()->count()!==2)throw new RuntimeException('Native noncash installment replay duplicated');
+if(hospitalRequest($multiFixture,'payment',array_replace($finalPayment,['payment_reference'=>'CHANGED']))['status']!==422)throw new RuntimeException('Native saved payment reference changed');
+$multiClose=array_replace(hospitalClose($multiFixture,2,0),['expected_card_paisa'=>60000,'expected_bank_paisa'=>40000]);
+if(hospitalRequest($multiFixture,'close',$multiClose)['status']!==200)throw new RuntimeException('Native noncash closing failed');
+$multiSnapshot=(array)DB::table('hospital_day_closes')->where('company_id',$multiFixture['company'])->first();
+$finalRetry=hospitalRequest($multiFixture,'payment',$finalPayment);
+if($finalRetry['status']!==200||(int)$finalRetry['data']['receipt_id']!==(int)$replays[0]['data']['receipt_id']||$multiSnapshot!==(array)DB::table('hospital_day_closes')->where('company_id',$multiFixture['company'])->first())throw new RuntimeException('Native noncash closing changed on recovery');
+if((int)$multiSnapshot['cash_paisa']!==0||(int)$multiSnapshot['card_paisa']!==60000||(int)$multiSnapshot['bank_paisa']!==40000)throw new RuntimeException('Native noncash methods contaminated closing cash');
+echo "PASS: native multi-service bank/card duplicate recovery, reference tamper rejection and immutable noncash closing\n";

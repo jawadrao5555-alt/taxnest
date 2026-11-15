@@ -10,7 +10,7 @@
 @endforeach
 <form id="school-add-head" method="post" action="/fbr-pos/school-fees/settings/fee-head">@csrf<input type="hidden" name="active" value="1"><label>{{ __('school.label') }}<input name="label" maxlength="80" required></label><button type="submit">{{ __('school.add_head') }}</button></form>
 </section>
-<section class="card"><h2>{{ __('pos.school_campus') }}</h2><p>{{ __('school.campus_help') }}</p><ul>@foreach($campuses as $campus)<li>{{ $campus->name }} · {{ $campus->city }}</li>@endforeach</ul>
+<section class="card"><h2>{{ __('pos.school_campus') }}</h2>@if($campuses->isEmpty())<p class="notice">{{ __('school_workspace.campus_start') }}</p>@endif<p><a href="/fbr-pos/team">{{ __('school_workspace.campus_access') }}</a></p><p>{{ __('school.campus_help') }}</p><ul>@foreach($campuses as $campus)<li>{{ $campus->name }} · {{ $campus->city }}</li>@endforeach</ul>
 <form id="school-add-campus" method="post" action="/fbr-pos/school-fees/settings/campus">@csrf
 <label>{{ __('school.name') }}<input name="name" maxlength="255" required></label><label>{{ __('school.city') }}<input name="city" maxlength="100"></label><label>{{ __('school.address') }}<input name="address" maxlength="1000"></label><button type="submit">{{ __('school.add_campus') }}</button></form>
 </section>

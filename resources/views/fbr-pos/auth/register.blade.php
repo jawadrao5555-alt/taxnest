@@ -76,13 +76,17 @@
                     <form method="POST" action="/fbr-pos/register" class="px-6 pb-6 pt-4 space-y-4" x-data="{ posType: '{{ old('pos_type', 'retail') }}' }">
                         @csrf
 
-                        {{-- Task 1484: carries the clicked package into the signup so
-                             approval activates exactly that one. Only ever holds a
-                             package the server already matched, and register()
-                             re-checks it anyway. --}}
-                        @if(!empty($pickedPlanName))
-                        <input type="hidden" name="requested_plan" value="{{ $pickedPlanName }}">
-                        @endif
+                        <div id="signup-package-choice">
+                            <label for="requested-plan" class="block text-sm font-semibold">{{ __('school_workspace.package_choice') }}</label>
+                            <select id="requested-plan" name="requested_plan" class="w-full rounded-xl border-gray-300">
+                                <option value="">{{ __('school_workspace.trial_choice') }}</option>
+                                @foreach(($registrationPlans ?? collect()) as $registrationPlan)
+                                <option value="{{ $registrationPlan->name }}" @selected(old('requested_plan', $pickedPlanName ?? '') === $registrationPlan->name)>{{ $registrationPlan->name }}</option>
+                                @endforeach
+                            </select>
+                            <p class="text-xs text-gray-500 mt-1">{{ __('school_workspace.package_note') }}</p>
+                        </div>
+                        <p class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm" x-show="['education','clinic','hospital'].includes(posType)" x-cloak>{{ __('school_workspace.pilot_registration') }}</p>
 
                         <div class="pt-1 pb-2">
                             <p class="text-xs font-semibold text-blue-600/60 uppercase tracking-wider">{{ __('pos.auth_select_business_type') }}</p>

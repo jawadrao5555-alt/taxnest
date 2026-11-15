@@ -3,7 +3,7 @@
 namespace Tests\Feature;
 
 use Tests\TestCase;
-use App\Http\Controllers\SaasAdmin\AdminCompanyController;
+use App\Http\Controllers\SaasAdmin\AdminCompanyCreationController as AdminCompanyController;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -244,4 +244,21 @@ class AdminCompanyCreateTablesFirstFlowTest extends TestCase
             'new companies must inherit the column default of 1.'
         );
     }
+    public function test_admin_create_rejects_foreign_retired_and_unknown_requested_packages_before_writes(): void
+    {
+        \App\Models\PricingPlan::create(['name' => 'ForeignOnly', 'product_type' => 'pos', 'is_trial' => false, 'price' => 1]);
+        \App\Models\PricingPlan::create(['name' => 'Pro', 'product_type' => 'fbrpos', 'is_trial' => false, 'price' => 1]);
+        foreach (['ForeignOnly', 'Pro', 'Invented'] as $name) {
+            $payload = $this->basePayload('fbrpos', 'choice@example.invalid', 'choice-owner@example.invalid');
+            $payload['requested_plan'] = $name;
+            try {
+                app(AdminCompanyController::class)->store($this->makeRequest('/saas-admin/companies', $payload));
+                $this->fail('Invalid requested package was accepted.');
+            } catch (\Illuminate\Validation\ValidationException $e) {
+                $this->assertArrayHasKey('requested_plan', $e->errors());
+            }
+            $this->assertSame(0, DB::table('companies')->count());
+        }
+    }
+
 }

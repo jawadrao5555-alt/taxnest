@@ -186,3 +186,38 @@ if ($snapshots->count() !== 1 || (int) $snapshots->value('receipt_count') !== $r
     throw new RuntimeException('Final close does not exactly match collected cash');
 }
 echo "PASS: native school duplicate collection and close remain single; collect-close race serializes cash; post-close replay preserved and fresh payment rejected\n";
+
+// Multi-head account: duplicate initial card collection, then concurrent balance
+// payments must serialize and never overshoot payable or contaminate cash totals.
+$ledger = schoolFixture(bin2hex(random_bytes(5)));
+$initial = array_replace(schoolPayload(), [
+    'student_name' => 'Synthetic Ledger Student', 'amount' => '400.00', 'payment_method' => 'card',
+    'fee_lines' => [['fee_head' => 'tuition', 'amount' => '1000.00'], ['fee_head' => 'exam', 'amount' => '200.00']],
+]);
+$initialRace = schoolRace($ledger, array_fill(0, 2, ['action' => 'store', 'payload' => $initial]));
+$ledgerRows = fn () => DB::table('school_fee_receipts')->where('company_id', $ledger['company']);
+$accountRows = fn () => DB::table('school_fee_accounts')->where('company_id', $ledger['company']);
+if ($initialRace[0]['status'] !== 200 || $initialRace[1]['status'] !== 200
+    || $initialRace[0]['data']['receipt_id'] !== $initialRace[1]['data']['receipt_id']
+    || $ledgerRows()->count() !== 1 || $accountRows()->count() !== 1
+    || (int) $accountRows()->value('paid_paisa') !== 40000) throw new RuntimeException('Duplicate card collection changed account');
+$accountId = (int) $accountRows()->value('id');
+$payment = array_replace($initial, ['account_id' => $accountId, 'amount' => '600.00', 'payment_method' => 'bank', 'request_key' => (string) Str::uuid()]);
+$secondPayment = array_replace($payment, ['request_key' => (string) Str::uuid()]);
+$overpaymentRace = schoolRace($ledger, [['action' => 'store', 'payload' => $payment], ['action' => 'store', 'payload' => $secondPayment]]);
+$statuses = array_column($overpaymentRace, 'status'); sort($statuses);
+if ($statuses !== [200, 422] || (int) $accountRows()->value('paid_paisa') !== 100000 || $ledgerRows()->count() !== 2) throw new RuntimeException('Concurrent balance overpayment not excluded');
+$finalPayment = array_replace($payment, ['amount' => '200.00', 'payment_method' => 'cash', 'request_key' => (string) Str::uuid()]);
+$finalResult = schoolRequest($ledger, 'store', $finalPayment);
+if ($finalResult['status'] !== 200 || (int) $accountRows()->value('paid_paisa') !== 120000) throw new RuntimeException('Final cash balance payment failed');
+$closing = array_replace(schoolClosePayload($ledger, 3), ['counted_cash' => '200.00', 'expected_cash_paisa' => 20000]);
+if (schoolRequest($ledger, 'close', $closing)['status'] !== 200) throw new RuntimeException('Mixed-method day close failed');
+$savedClose = (array) DB::table('school_fee_day_closes')->where('company_id', $ledger['company'])->first();
+if ((int) $savedClose['cash_amount_paisa'] !== 20000 || (int) $savedClose['receipt_count'] !== 3) throw new RuntimeException('Noncash entered closing cash');
+$recovered = schoolRequest($ledger, 'store', $finalPayment);
+if ($recovered['status'] !== 200 || $recovered['data']['receipt_id'] !== $finalResult['data']['receipt_id']) throw new RuntimeException('Closed partial payment recovery changed receipt');
+foreach (['amount' => '199.00', 'payment_method' => 'bank', 'student_name' => 'Changed Student'] as $field => $value) {
+    if (schoolRequest($ledger, 'store', array_replace($finalPayment, [$field => $value]))['status'] !== 422) throw new RuntimeException('Changed ledger retry accepted');
+}
+if ($savedClose !== (array) DB::table('school_fee_day_closes')->where('company_id', $ledger['company'])->first()) throw new RuntimeException('Ledger retry changed closing snapshot');
+echo "PASS: native School multi-head card duplicate recovery, concurrent bank overpayment exclusion, cash-only close and immutable partial-payment replay\n";

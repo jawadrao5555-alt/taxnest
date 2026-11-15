@@ -427,7 +427,7 @@ class RequestedPackageSignupTest extends TestCase
 
     // ── The signup pages carry the pick into the form ─────────────────
 
-    public function test_signup_pages_carry_the_pick_into_hidden_fields(): void
+    public function test_signup_pages_carry_the_pick_and_fbr_exposes_an_explicit_package_choice(): void
     {
         $this->get('/register?plan=Business&cycle=quarterly')
             ->assertOk()
@@ -436,20 +436,23 @@ class RequestedPackageSignupTest extends TestCase
 
         $this->get('/fbr-pos/register?plan=Business')
             ->assertOk()
-            ->assertSee('name="requested_plan" value="Business"', false);
+            ->assertSee('name="requested_plan"', false)
+            ->assertSee('value="Business" selected', false)
+            ->assertSee('signup-package-choice', false);
 
         // A retired FBR package must not survive the trip into the form.
         $this->get('/fbr-pos/register?plan=Pro')
             ->assertOk()
-            ->assertDontSee('name="requested_plan"', false);
+            ->assertDontSee('value="Pro"', false)
+            ->assertSee('name="requested_plan"', false);
 
         // Nothing picked → no hidden fields at all.
         $this->get('/register')->assertOk()->assertDontSee('name="requested_plan"', false);
-        $this->get('/fbr-pos/register')->assertOk()->assertDontSee('name="requested_plan"', false);
+        $this->get('/fbr-pos/register')->assertOk()->assertSee('name="requested_plan"', false)->assertSee(__('school_workspace.trial_choice'));
 
         // A trial / wrong-product name in the link is not echoed back either.
         $this->get('/register?plan=DI+Trial')->assertOk()->assertDontSee('name="requested_plan"', false);
-        $this->get('/fbr-pos/register?plan=Starter')->assertOk()->assertDontSee('name="requested_plan"', false);
+        $this->get('/fbr-pos/register?plan=Starter')->assertOk()->assertDontSee('value="Starter"', false)->assertSee('name="requested_plan"', false);
     }
 
     public function test_pos_signup_page_carries_only_allow_listed_addons_into_the_form(): void

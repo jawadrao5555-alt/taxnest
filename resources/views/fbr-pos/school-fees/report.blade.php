@@ -12,6 +12,7 @@
 @if($closedReport)
 <p id="school-close-status">{{ __('pos.school_closed') }}</p><p>SC-{{ $closedReport->id }} · {{ $closedReport->closed_at }}</p>
 <dl><dt>{{ __('school.counted_total') }}</dt><dd id="school-counted-total" data-paisa="{{ $closedReport->counted_cash_paisa }}">{{ $closedReport->counted_cash_paisa === null ? __('school.not_recorded') : 'PKR '.number_format($closedReport->counted_cash_paisa / 100, 2) }}</dd><dt>{{ __('school.variance') }}</dt><dd id="school-variance" data-paisa="{{ $closedReport->variance_paisa }}">{{ $closedReport->variance_paisa === null ? __('school.not_recorded') : 'PKR '.number_format($closedReport->variance_paisa / 100, 2) }}</dd></dl>
+<dl><dt>{{ __('school_ledger.variance_reason') }}</dt><dd>{{ $closedReport->variance_reason ?? __('school.not_recorded') }}</dd><dt>{{ __('school_ledger.handover_to') }}</dt><dd>{{ $closedReport->handover_to ?? __('school.not_recorded') }}</dd><dt>{{ __('school_ledger.handover_note') }}</dt><dd>{{ $closedReport->handover_note ?? __('school.not_recorded') }}</dd></dl>
 <button class="no-print" type="button" onclick="window.print()">{{ __('pos.school_print_reprint') }}</button>
 @else
 <p id="school-close-status">{{ __('pos.school_open') }}</p>
@@ -22,6 +23,7 @@
 <input type="hidden" name="expected_branch_key" value="{{ $unassigned ? 0 : ($schoolCampusId ?? 0) }}">
 <input type="hidden" name="date" value="{{ $date }}"><input type="hidden" name="expected_cash_paisa" value="{{ $cashAmountPaisa }}"><input type="hidden" name="expected_receipt_count" value="{{ $receiptCount }}">
 <label for="school-counted-cash">{{ __('school.counted_cash') }}</label><input id="school-counted-cash" name="counted_cash" type="number" min="0" max="99999999.99" step="0.01" inputmode="decimal" value="{{ old('counted_cash') }}" required><p class="muted">{{ __('school.count_help') }}</p>
+<label>{{ __('school_ledger.variance_reason') }}<input name="variance_reason" maxlength="500" value="{{ old('variance_reason') }}"></label><label>{{ __('school_ledger.handover_to') }}<input name="handover_to" maxlength="100" value="{{ old('handover_to') }}"></label><label>{{ __('school_ledger.handover_note') }}<input name="handover_note" maxlength="500" value="{{ old('handover_note') }}"></label>
 <label><input style="width:auto" type="checkbox" name="confirm" value="1" required> {{ __('pos.school_confirm_close') }}</label>
 <button type="submit">{{ __('pos.school_confirm_close') }}</button>
 </form>
@@ -29,8 +31,8 @@
 @endif
 <p class="muted">{{ __('pos.school_calendar_preview') }}</p>
 </section>
-<section class="card"><div class="scroll"><table><thead><tr><th>{{ __('pos.school_receipt') }}</th><th>{{ __('pos.school_student_reference') }}</th><th>{{ __('pos.school_fee_head') }}</th><th>{{ __('pos.school_payment') }}</th><th>PKR</th></tr></thead><tbody>
-@forelse($receipts as $receipt)<tr><td><a href="/fbr-pos/school-fees/{{ $receipt->id }}/receipt{{ $unassigned ? '?unassigned=1' : '' }}">SF-{{ $receipt->id }}</a></td><td>{{ $receipt->student_reference }}</td><td>{{ $receipt->fee_head_label ?? __('pos.school_head_'.$receipt->fee_head) }}</td><td>{{ __('pos.school_cash') }}</td><td>{{ number_format($receipt->amount_paisa / 100, 2) }}</td></tr>
-@empty<tr><td colspan="5">{{ __('pos.school_no_receipts') }}</td></tr>@endforelse
+<section class="card"><div class="scroll"><table><thead><tr><th>{{ __('pos.school_receipt') }}</th><th>{{ __('pos.school_student_reference') }}</th><th>{{ __('pos.school_fee_head') }}</th><th>{{ __('pos.school_payment') }}</th><th>PKR</th><th>{{ __('pos.school_collected_at') }}</th><th>{{ __('school.period') }}</th><th>{{ __('school.campus') }}</th><th>{{ __('school.cashier') }}</th></tr></thead><tbody>
+@forelse($receipts as $receipt)<tr><td><a href="/fbr-pos/school-fees/{{ $receipt->id }}/receipt{{ $unassigned ? '?unassigned=1' : '' }}">SF-{{ $receipt->id }}</a></td><td>{{ $receipt->student_reference }}</td><td>{{ $receipt->fee_head_label ?? __('pos.school_head_'.$receipt->fee_head) }}</td><td>{{ ($receipt->payment_method ?? 'cash') === 'cash' ? __('pos.school_cash') : __('school_ledger.'.$receipt->payment_method) }}</td><td>{{ number_format($receipt->amount_paisa / 100, 2) }}</td><td>{{ $receipt->collected_at }}</td><td>{{ $receipt->fee_period }}</td><td>{{ $receipt->campus_name }}</td><td>{{ $receipt->cashier_name }}</td></tr>
+@empty<tr><td colspan="9">{{ __('pos.school_no_receipts') }}</td></tr>@endforelse
 </tbody></table></div>{{ $receipts->links() }}</section>
 @endsection

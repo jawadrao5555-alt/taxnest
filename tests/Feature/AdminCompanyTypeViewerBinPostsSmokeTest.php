@@ -196,7 +196,7 @@ class AdminCompanyTypeViewerBinPostsSmokeTest extends TestCase
 
         $response = $this->actingAsAdmin()
             ->from("/admin/companies/{$id}")
-            ->post("/admin/companies/{$id}/change-type", ['product_type' => 'pos']);
+            ->post("/admin/companies/{$id}/change-type", ['product_type' => 'pos', 'target_category' => 'other_service', 'target_package' => 'trial']);
 
         $response->assertRedirect("/admin/companies/{$id}");
         $response->assertSessionHas('success');

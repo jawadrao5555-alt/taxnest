@@ -148,7 +148,8 @@ class FbrPosAuthController extends Controller
         // so an unknown or missing name simply records nothing).
         $picked = \App\Services\RequestedPackageService::resolvePlan(request('plan'), 'fbrpos');
 
-        return view('fbr-pos.auth.register', ['pickedPlanName' => $picked?->name]);
+        return view('fbr-pos.auth.register', ['pickedPlanName' => $picked?->name,
+            'registrationPlans' => \App\Services\FbrPosPlanComparisonService::plans()]);
     }
 
     public function register(Request $request)

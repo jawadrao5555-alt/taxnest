@@ -1,6 +1,6 @@
 // TaxNest Suite Service Worker — Tax DI / Nest Pra Pos / Nest FBR Pos
 // Strategy: Stale-while-revalidate for static assets, network-first for HTML, offline fallback.
-const CACHE_VERSION = 'taxnest-sale-online-recovery-20261103-r2'; // auto-bumped by deploy-live.sh — purges old caches + triggers SW update badge on every deploy (Task 710)
+const CACHE_VERSION = 'taxnest-private-collections-20261115-r1'; // auto-bumped by deploy-live.sh — purges old caches + triggers SW update badge on every deploy (Task 710)
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 // OFFLINE-FIRST SALE SCREEN (Jul 2026): dedicated cache for /pos/invoice/create
@@ -206,10 +206,37 @@ self.addEventListener('activate', e => {
     );
 });
 
+// Administrative collections and shared landing pages must never recover an old
+// retail/dashboard response after a category cutover, account switch or deploy.
+// Dedicated retail sale/table/waiter cache handlers below intentionally stay intact.
+function isPrivateCollectionPath(path) {
+    return /^\/fbr-pos\/(?:school-fees|hospital)(?:\/|$)/.test(path)
+        || /^\/fbr-pos\/(?:dashboard|transactions|day-close)(?:\/|$)/.test(path);
+}
+function responseForbidsStorage(response) {
+    return /(?:^|,)\s*(?:private|no-store)\b/i.test(response?.headers?.get('cache-control') || '');
+}
+async function evictNavigation(request) {
+    const names = await caches.keys();
+    await Promise.all(names.map(async name => (await caches.open(name)).delete(request)));
+}
+function privateOfflineResponse() {
+    return new Response(OFFLINE_HTML, {status:503, headers:{'Content-Type':'text/html; charset=utf-8', 'Cache-Control':'no-store'}});
+}
+
 self.addEventListener('fetch', e => {
     const req = e.request;
     const url = new URL(req.url);
     if (url.origin !== location.origin) return;
+
+    if (req.method === 'GET' && isPrivateCollectionPath(url.pathname)) {
+        e.respondWith((async () => {
+            await evictNavigation(req);
+            try { return await fetch(req, {cache:'no-store'}); }
+            catch (_) { return privateOfflineResponse(); }
+        })());
+        return;
+    }
 
     // Session hygiene: ANY logout (DI /logout, /pos/logout, /fbr-pos/logout, admin, franchise —
     // GET or POST) purges all cached authenticated pages so the next user on a shared
@@ -428,17 +455,24 @@ self.addEventListener('fetch', e => {
     // query string (not handled by the WAITER_CACHE block) stays network-only too.
     if (url.pathname === WAITER_PAGE || skipPatterns.some(p => url.pathname.includes(p))) return;
 
-    // HTML pages: network-first → cache → offline page
+    // Generic HTML honors server privacy, including redirects after cutover.
     if (req.mode === 'navigate') {
-        e.respondWith(
-            fetch(req).then(res => {
-                if (res.ok) {
-                    const copy = res.clone();
-                    caches.open(RUNTIME_CACHE).then(c => c.put(req, copy));
+        e.respondWith((async () => {
+            try {
+                const res = await fetch(req);
+                if (responseForbidsStorage(res)) {
+                    await evictNavigation(req);
+                } else if (res.ok) {
+                    await (await caches.open(RUNTIME_CACHE)).put(req, res.clone());
                 }
                 return res;
-            }).catch(() => caches.match(req).then(r => r || caches.match(OFFLINE_PAGE)))
-        );
+            } catch (_) {
+                const cached = await caches.match(req);
+                if (cached && !responseForbidsStorage(cached)) return cached;
+                if (cached) await evictNavigation(req);
+                return (await caches.match(OFFLINE_PAGE)) || privateOfflineResponse();
+            }
+        })());
         return;
     }
 

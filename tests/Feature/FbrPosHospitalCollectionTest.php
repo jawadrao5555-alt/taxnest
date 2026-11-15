@@ -108,6 +108,7 @@ class FbrPosHospitalCollectionTest extends TestCase
             'role' => 'employee', 'pos_role' => 'pos_cashier', 'is_active' => true,
         ]));
         (require database_path('migrations/2026_11_15_020000_create_hospital_collection_tables.php'))->up();
+        (require database_path('migrations/2026_11_15_040000_extend_hospital_collection_ledger.php'))->up();
         $this->actingAs($this->cashier, 'fbrpos');
         app()->instance('currentCompanyId', $this->hospital->id);
         app()->bind('currentBranchId', fn () => null);
@@ -272,4 +273,41 @@ class FbrPosHospitalCollectionTest extends TestCase
         $this->denied(fn()=>$this->collect($p,$invoice->id),403);
     }
 
+
+    public function test_multi_service_snapshots_patient_lookup_and_bank_reference_replay(): void {
+        DB::table('hospital_services')->insert(['company_id'=>$this->hospital->id,'code'=>'custom','label'=>'Synthetic scan','service_head'=>'lab','rate_paisa'=>50000,'active'=>true]);
+        $payload=$this->payload(['patient_name'=>'Synthetic Patient','payment_method'=>'bank','payment_reference'=>'SYN-BANK-1',
+            'service_lines'=>[['service_head'=>'custom','amount'=>'500'],['service_head'=>'consultation','amount'=>'500']]]);
+        $id=$this->collect($payload)->getData(true)['receipt_id'];
+        $invoice=DB::table('hospital_invoices')->first();
+        $lines=json_decode($invoice->service_lines,true);
+        $this->assertSame('Synthetic scan',$lines[0]['label']);
+        $this->assertSame('Synthetic Patient',$invoice->patient_name);
+        $this->assertSame('SYN-BANK-1',DB::table('hospital_payments')->find($id)->payment_reference);
+        DB::table('hospital_services')->where('code','custom')->update(['label'=>'Changed','active'=>false]);
+        $this->assertSame($id,$this->collect($payload)->getData(true)['receipt_id']);
+        $this->conflict(fn()=>$this->collect(array_replace($payload,['payment_reference'=>'CHANGED'])),'request_key');
+        $this->conflict(fn()=>$this->collect(array_replace($payload,['patient_name'=>'Changed'])),'request_key');
+        $changed=$payload; $changed['service_lines'][0]['amount']='501';$changed['service_lines'][1]['amount']='499';
+        $this->conflict(fn()=>$this->collect($changed),'request_key');
+        $this->assertSame('Synthetic scan',json_decode(DB::table('hospital_invoices')->first()->service_lines,true)[0]['label']);
+        $this->conflict(fn()=>$this->collect(array_replace($payload,['request_key'=>(string)Str::uuid()])),'service_lines');
+        $html=app(FbrPosHospitalController::class)->index()->getContent();
+        $this->assertStringContainsString('Synthetic Patient',$html);
+    }
+
+    public function test_history_filters_displayed_invoice_number_dates_paid_balance_and_settled_state(): void {
+        $this->collect($this->payload()); $invoice=DB::table('hospital_invoices')->first();
+        $controller=app(FbrPosHospitalController::class);
+        $history=function(array $filters)use($controller){$r=Request::create('/fbr-pos/hospital/history','GET',$filters);app()->instance('request',$r);return $controller->history($r)->original->getData()['invoices'];};
+        $this->assertCount(1,$history(['search'=>'HI-'.$invoice->id,'status'=>'partial','paid_min'=>'400','paid_max'=>'400','balance_min'=>'600','balance_max'=>'600']));
+        $this->assertCount(0,$history(['status'=>'settled']));
+        $this->assertCount(0,$history(['to'=>today()->subDay()->format('Y-m-d')]));
+        $this->collect($this->payload(['amount'=>'600','payment_method'=>'card','payment_reference'=>'SYN-CARD']),$invoice->id);
+        $rows=$history(['search'=>'HI-'.$invoice->id,'status'=>'settled','balance_max'=>'0']);
+        $this->assertCount(1,$rows);$this->assertSame(100000,(int)$rows->first()->paid_paisa);$this->assertSame(0,(int)$rows->first()->balance_paisa);
+        $this->assertCount(0,$history(['status'=>'partial']));
+        DB::table('hospital_payments')->insert(['company_id'=>$this->hospital->id+99,'branch_id'=>null,'invoice_id'=>$invoice->id,'request_key'=>(string)Str::uuid(),'amount_paisa'=>1,'payment_method'=>'cash','balance_paisa'=>0,'collected_by'=>$this->cashier->id,'cashier_name'=>'Other','campus_name'=>'Other','collected_at'=>now(),'created_at'=>now(),'updated_at'=>now()]);
+        $this->assertCount(1,$history(['status'=>'settled']));
+    }
 }

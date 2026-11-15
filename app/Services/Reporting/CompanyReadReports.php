@@ -10,8 +10,21 @@ use Illuminate\Validation\ValidationException;
 /** Explicit SELECT-only reports. No fiscal API, job dispatch, raw query input or customer/device credentials. */
 final class CompanyReadReports
 {
+    private function localCollections(array $args, ?array $allowed): ?array
+    {
+        $v=validator($args,['company_name'=>'required|string|min:2|max:150','company_id'=>'nullable|integer|min:1','date_from'=>'nullable|date_format:Y-m-d','date_to'=>'nullable|date_format:Y-m-d'])->validate();
+        $chosen=$this->company($v['company_name'],$allowed,isset($v['company_id'])?(int)$v['company_id']:null);
+        $company=\App\Models\Company::withoutGlobalScopes()->findOrFail($chosen->id);
+        if (!$company->isLocalCollectionPilot()) return null;
+        $from=$v['date_from']??now()->toDateString(); $to=$v['date_to']??$from;
+        if (Carbon::parse($from)->gt(Carbon::parse($to)) || Carbon::parse($from)->diffInDays(Carbon::parse($to))>92) throw ValidationException::withMessages(['date_from'=>'Use an ordered calendar range of at most 93 days.']);
+        if (array_diff(array_keys($args),['company_name','company_id','date_from','date_to','date_basis','branch_id'])) throw ValidationException::withMessages(['arguments'=>'Local collection reports support company, campus and calendar dates only.']);
+        return app(LocalCollectionReports::class)->read($company,array_replace($args,['date_from'=>$from,'date_to'=>$to]));
+    }
+
     public function dayClose(array $args, ?array $allowed): array
     {
+        if ($local = $this->localCollections($args, $allowed)) return $local;
         if (array_diff(array_keys($args), ['company_name', 'company_id', 'date_from', 'date_to', 'stream', 'branch_id', 'terminal_id', 'after_id', 'limit'])) {
             throw ValidationException::withMessages(['arguments' => 'Unsupported filter. Day Close uses saved business dates only.']);
         }
@@ -76,6 +89,7 @@ final class CompanyReadReports
             throw ValidationException::withMessages(['date_from' => 'Use an ordered date range of at most 93 days.']);
         }
         $company = $this->company($v['company_name'], $allowed, isset($v['company_id']) ? (int) $v['company_id'] : null);
+        if (\App\Models\Company::withoutGlobalScopes()->findOrFail($company->id)->isLocalCollectionPilot()) throw ValidationException::withMessages(['report'=>'Use the local collection billing summary, payment summary or saved closing report. Retail/fiscal bill and item adapters are not the School/Hospital ledger.']);
         $d = match ($company->product_type) {
             'pos' => ['table' => 'pos_transactions', 'items' => 'pos_transaction_items', 'fk' => 'transaction_id', 'fiscal' => 'pra_status', 'number' => 'pra_invoice_number', 'authority' => 'PRA', 'tax' => 'tax_amount'],
             'fbrpos' => ['table' => 'fbr_pos_transactions', 'items' => 'fbr_pos_transaction_items', 'fk' => 'transaction_id', 'fiscal' => 'fbr_status', 'number' => 'fbr_invoice_number', 'authority' => 'FBR POS', 'tax' => 'tax_amount'],
@@ -135,6 +149,7 @@ final class CompanyReadReports
 
     public function summary(array $args, ?array $allowed): array
     {
+        if ($local = $this->localCollections($args, $allowed)) return $local;
         $c = $this->context($args, $allowed);
         $q = $this->completed($c);
         $ret = $this->returnExpr($c);
@@ -328,6 +343,7 @@ final class CompanyReadReports
 
     public function payments(array $args, ?array $allowed): array
     {
+        if ($local = $this->localCollections($args, $allowed)) return $local;
         $c = $this->context($args, $allowed);
         $ret = $this->returnExpr($c);
         $t = $c['d']['table'];

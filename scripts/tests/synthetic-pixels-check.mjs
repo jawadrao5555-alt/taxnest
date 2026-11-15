@@ -59,3 +59,6 @@ test('trial policy and ERP signup permit only named synthetic views',()=>{
  for(const prefix of ['billing-policy-trial','signup-erps'])for(const width of [1366,390])assert.equal(pixelName(`${prefix}-${width}`),`${prefix}-${width}.png`);
  for(const name of ['billing-policy-arbitrary-390','signup-erps-1280','signup-erps-390.png','../billing-policy-trial-390'])assert.throws(()=>pixelName(name));
 });
+
+// Frozen phase/locale notices are explicitly allowlisted, never arbitrary exports.
+for(const phase of ['trial','confirmed','grace'])for(const locale of ['en','ur','rur'])for(const width of [1366,390])assert.equal(pixelName(`prospective-reminder-${phase}-${locale}-${width}`),`prospective-reminder-${phase}-${locale}-${width}.png`);

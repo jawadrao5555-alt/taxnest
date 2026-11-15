@@ -1515,7 +1515,7 @@ async function workflow(page,t,v,diagnostics) {
   if(t.madadgarReadCases)return madadgarReadWorkflow(page,t,v,{baseUrl,login,loopback,saveEvidenceScreenshot,pass});
   if(t.aiUsageCases)return aiUsageWorkflow(page,t,v,{baseUrl,login,loopback,dismiss,waitForOperationalSurface,saveEvidenceScreenshot,pass});
   if(t.praReadCases)return praBoundedReadWorkflow(page,t,v,{baseUrl,login,loopback,saveEvidenceScreenshot,pass,dismiss,waitForOperationalSurface});
-  if(t.policyCases)return prospectivePolicyWorkflow(page,t,v,{baseUrl,saveEvidenceScreenshot,pass});
+  if(t.policyCases)return prospectivePolicyWorkflow(page,t,v,{baseUrl,saveEvidenceScreenshot,pass,login,loopback,dismiss,waitForOperationalSurface});
   if(t.expenseCases)return platformExpenseWorkflow(page,t,v,{baseUrl,login,loopback,saveEvidenceScreenshot,pass});
   if(t.diReadCases)return diBoundedReadWorkflow(page,t,v,{baseUrl,login,loopback,saveEvidenceScreenshot,pass});
   if(t.privateProfileCases)return privateProfileWorkflow(page,t,v,{baseUrl,saveEvidenceScreenshot,pass});

@@ -1215,6 +1215,7 @@ foreach([1366,390] as $width){
     $policySubscription=\App\Services\TrialSubscriptionService::ensureSelectedTrial($policyCompany->id,'di',$policyPlan->id);
     $policyCases[$width]=['login'=>$policyOwner->email,'terms'=>\App\Services\ProspectiveSubscriptionPolicy::display($policySubscription),'plan'=>$policyPlan->name];
 }
+require __DIR__.'/lib/prospective-reminder-fixture.php';
 $billingSelectionCases = [];
 foreach ([1366,390] as $width) {
     $billingCompany = $company('Synthetic Billing Selection '.$width, 'billing-selection-'.$width.'@rc-browser.invalid', 'RCBILLSEL'.$width, 'di',

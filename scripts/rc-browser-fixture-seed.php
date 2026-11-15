@@ -1230,7 +1230,14 @@ foreach ([1366,390] as $width) {
     $billingSelectionCases[$width] = ['login' => $billingOwner->email, 'planId' => $nextPlan->id, 'original' => $oldPlan->name];
     $publicPlans=[];
     foreach(['di','pos','fbrpos','erps'] as $signupProduct){
-        $signupPlan=\App\Models\PricingPlan::create(['name'=>'Synthetic Signup '.$signupProduct.' '.$width,'product_type'=>$signupProduct,'price'=>1000,'price_yearly'=>12000,'invoice_limit'=>25,'is_trial'=>false,'is_public'=>true]);
+        // POS/FBR deliberately expose only their canonical sellable packages.
+        // Do not invent a plan that the actual signup correctly refuses to offer.
+        $signupPlan=match($signupProduct){
+            'pos'=>\App\Services\PosPlanComparisonService::plans()->first(),
+            'fbrpos'=>\App\Services\FbrPosPlanComparisonService::plans()->first(),
+            default=>\App\Models\PricingPlan::create(['name'=>'Synthetic Signup '.$signupProduct.' '.$width,'product_type'=>$signupProduct,'price'=>1000,'price_yearly'=>12000,'invoice_limit'=>25,'is_trial'=>false,'is_public'=>true]),
+        };
+        if(!$signupPlan)$fail('canonical synthetic signup catalogue is empty for '.$signupProduct);
         $publicPlans[$signupProduct]=['id'=>$signupPlan->id,'name'=>$signupPlan->name];
     }
     $billingSelectionCases[$width]['publicPlans']=$publicPlans;

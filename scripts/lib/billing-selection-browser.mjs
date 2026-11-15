@@ -37,7 +37,10 @@ async function signupFormsWorkflow(existingPage,t,v,{baseUrl,saveEvidenceScreens
       await picker.selectOption('');
       if(await picker.evaluate(el=>el.checkValidity()))throw Error(product+' signup accepted missing package');
       const chosen=t.billingSelection[v.width].publicPlans[product];
-      await picker.selectOption(product==='pos'?String(chosen.id):chosen.name);
+      const chosenValue=product==='pos'?String(chosen.id):chosen.name;
+      const available=await picker.locator('option').evaluateAll(options=>options.map(o=>o.value));
+      if(!available.includes(chosenValue))throw Error(product+' synthetic signup package is not in the actual server catalogue');
+      await picker.selectOption(chosenValue);
       if(!await picker.evaluate(el=>el.checkValidity()))throw Error(product+' selected package remains invalid');
       await form.locator('[data-prospective-signup-policy]').waitFor({state:'visible'});
       if(product==='fbrpos'&&!await form.locator('button[type="submit"]').isEnabled())throw Error('Quoted FBR package signup button incorrectly disabled');

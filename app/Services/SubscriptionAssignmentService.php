@@ -37,25 +37,26 @@ class SubscriptionAssignmentService
             : 'monthly';
     }
 
-    /** POS/FBR POS/ERPS remain annual-only; DI short periods require configured prices. */
-    public const SELLABLE_CYCLES = ['annual'];
+    /** Supported period vocabulary; availability is resolved per plan and policy. */
+    public const SELLABLE_CYCLES = ['monthly', 'quarterly', 'semi_annual', 'annual'];
 
     /** The cycle any new purchase / renewal / approval is charged on. */
     public static function purchaseCycle(?string $requested = null, ?string $productType = null): string
     {
-        if ($productType !== 'di' || $requested === null || $requested === '') return 'annual';
+        if ($requested === null || $requested === '') return 'annual';
         if (!in_array($requested, ['monthly', 'quarterly', 'semi_annual', 'annual', 'yearly'], true)) {
             throw \Illuminate\Validation\ValidationException::withMessages(['billing_cycle' => 'Choose a supported billing period.']);
         }
         return self::normalizeCycle($requested);
     }
 
-    /** DI short cycles require an explicitly configured price; other panels remain annual. */
-    public static function cyclesForPlan(PricingPlan $plan): array
+    /** Short cycles require an explicit price and shared-product policy opt-in. */
+    public static function cyclesForPlan(PricingPlan $plan, bool $frozenQuote = false): array
     {
-        if ($plan->product_type !== 'di') return self::SELLABLE_CYCLES;
-        return array_values(array_filter(['monthly', 'quarterly', 'semi_annual', 'annual'],
-            fn ($cycle) => $cycle === 'annual' || $plan->explicitCyclePrice($cycle) !== null));
+        if (!$frozenQuote && $plan->product_type !== 'di' && !config('billing.shared_configured_cycles', false)) return ['annual'];
+        return array_values(array_filter(self::SELLABLE_CYCLES,
+            fn ($cycle) => ($cycle !== 'monthly' || $frozenQuote || !config('billing.disable_fresh_monthly', false))
+                && ($cycle === 'annual' || $plan->explicitCyclePrice($cycle) !== null)));
     }
 
     public static function cycleForPlan(PricingPlan $plan, ?string $requested): string
@@ -111,6 +112,9 @@ class SubscriptionAssignmentService
         // Keep non-DI annual prices intact; DI can select only a configured short period.
         $cycle = self::cycleForPlan($plan, $cycle);
 
+        if ($type !== 'di' && $cycle !== 'annual') {
+            return ['cycle' => $cycle, 'final_price' => round((float) $plan->explicitCyclePrice($cycle), 2), 'discount_percent' => 0.0];
+        }
         if ($type === 'pos' || $type === 'fbrpos' || $type === 'standalone' || NestErps::isProductType($type)) {
             // Both POS lines, standalone and Nest ERPS store the ANNUAL total
             // in `price` (6% already baked in) — use it as-is, never × 12.
@@ -173,15 +177,21 @@ class SubscriptionAssignmentService
             // (e.g. POS is annual-only), so the expiry below always matches the charge.
             // The company is passed so a renewal is charged base package + the
             // extra-branch slots it has already bought (Rs 10,000/branch/year).
-            $priced = self::computePrice($plan, $billingCycle, $company);
-            $cycle = $priced['cycle'];
             if ($approvedQuote !== null) {
+                $cycle = self::purchaseCycle($billingCycle, $plan->product_type);
                 $error = DistributorDiscountService::validateSnapshot($approvedQuote, $company, $plan, $cycle);
                 if ($error) throw \Illuminate\Validation\ValidationException::withMessages(['billing_cycle' => $error]);
-                $priced['discount_percent'] = (float) ($approvedQuote['pricing_snapshot']['discount_percent'] ?? $priced['discount_percent']);
-                $priced['base_price'] = round((float) $approvedQuote['gross_package_price'] - (float) $approvedQuote['discount_amount'], 2);
-                $priced['extra_branch_price'] = round((float) ($approvedQuote['undiscounted_addon_amount'] ?? 0), 2);
-                $priced['final_price'] = round((float) $approvedQuote['net_quote'], 2);
+                $priced = [
+                    'cycle' => $cycle,
+                    'discount_percent' => (float) ($approvedQuote['pricing_snapshot']['discount_percent'] ?? 0),
+                    'base_price' => round((float) $approvedQuote['gross_package_price'] - (float) $approvedQuote['discount_amount'], 2),
+                    'extra_branch_price' => round((float) ($approvedQuote['undiscounted_addon_amount'] ?? 0), 2),
+                    'extra_branch_slots' => (int) ($approvedQuote['pricing_snapshot']['extra_branch_slots'] ?? 0),
+                    'final_price' => round((float) $approvedQuote['net_quote'], 2),
+                ];
+            } else {
+                $priced = self::computePrice($plan, $billingCycle, $company);
+                $cycle = $priced['cycle'];
             }
             $months = Subscription::getMonthsForCycle($cycle);
 

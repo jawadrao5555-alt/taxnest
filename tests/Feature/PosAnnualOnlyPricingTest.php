@@ -1,281 +1,80 @@
 <?php
-
 namespace Tests\Feature;
 
-use App\Models\PricingPlan;
-use App\Models\Subscription;
-use App\Services\SubscriptionAssignmentService;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
+use App\Models\{Company,PricingPlan,Subscription};
+use App\Services\{SubscriptionAssignmentService,DistributorDiscountService};
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
-/**
- * Annual-only pricing contract (23 Aug 2026).
- *
- * Historical short-cycle columns may remain populated, but POS and FBR POS
- * purchases remain annual. DI annual prices retain their original calculation;
- * explicitly configured DI short periods have separate coverage.
- */
+/** Existing annual contracts stay unchanged; configured short periods require policy activation. */
 class PosAnnualOnlyPricingTest extends TestCase
 {
-    protected function setUp(): void
+    use RefreshDatabase;
+
+    public function test_shared_cycles_require_opt_in_and_never_silently_fall_back(): void
     {
-        parent::setUp();
-
-        // drop + recreate (not hasTable-guard): an earlier test class may have
-        // left a pricing_plans WITHOUT price_quarterly in the shared :memory:
-        // connection — inheriting that shape would 500 every INSERT here.
-        Schema::dropIfExists('pricing_plans');
-        if (true) {
-            Schema::create('pricing_plans', function ($table) {
-                $table->id();
-                $table->string('name');
-                $table->string('product_type')->default('di');
-                $table->decimal('price', 12, 2)->default(0);
-                $table->decimal('price_monthly', 12, 2)->nullable();
-                $table->decimal('price_quarterly', 12, 2)->nullable();
-                $table->decimal('compare_at_price', 12, 2)->nullable();
-                $table->boolean('is_trial')->default(false);
-                $table->integer('invoice_limit')->default(-1);
-                $table->integer('user_limit')->nullable();
-                $table->integer('branch_limit')->nullable();
-                $table->text('features')->nullable();
-                $table->timestamps();
-            });
-        }
-
-        Schema::dropIfExists('subscriptions');
-        if (true) {
-            Schema::create('subscriptions', function ($table) {
-                $table->id();
-                $table->unsignedBigInteger('company_id');
-                $table->unsignedBigInteger('pricing_plan_id');
-                $table->date('start_date');
-                $table->date('end_date');
-                $table->boolean('active')->default(true);
-                $table->string('billing_cycle')->default('monthly');
-                $table->decimal('discount_percent', 5, 2)->default(0);
-                $table->decimal('final_price', 12, 2)->default(0);
-                $table->timestamps();
-            });
-        }
-
-        Schema::dropIfExists('companies');
-        Schema::create('companies', function ($table) {
-            $table->id();
-            $table->string('product_type')->default('pos');
-            $table->softDeletes();
-            $table->timestamps();
-        });
-        DB::table('companies')->insert([
-            ['id' => 4242, 'created_at' => now(), 'updated_at' => now()],
-            ['id' => 9001, 'created_at' => now(), 'updated_at' => now()],
-            ['id' => 9002, 'created_at' => now(), 'updated_at' => now()],
-        ]);
-
-        Schema::dropIfExists('sale_campaigns');
-        if (true) {
-            Schema::create('sale_campaigns', function ($table) {
-                $table->id();
-                $table->string('product_type')->nullable();
-                $table->decimal('percent', 5, 2)->default(0);
-                $table->string('badge')->nullable();
-                $table->date('starts_on')->nullable();
-                $table->date('ends_on')->nullable();
-                $table->boolean('active')->default(false);
-                $table->timestamps();
-            });
+        foreach (['pos','fbrpos','health'] as $type) {
+            $plan = new PricingPlan(['name'=>'Starter','product_type'=>$type,'price'=>14999,'price_quarterly'=>4299]);
+            $this->assertSame(['annual'], SubscriptionAssignmentService::cyclesForPlan($plan));
+            $this->assertEquals(14999,SubscriptionAssignmentService::computePrice($plan,'annual')['final_price']);
+            try { SubscriptionAssignmentService::computePrice($plan,'quarterly'); $this->fail('Unactivated cycle sold'); }
+            catch (ValidationException $e) { $this->assertArrayHasKey('billing_cycle',$e->errors()); }
         }
     }
 
-    private function makePosPlan(array $overrides = []): PricingPlan
+    public function test_configured_cycles_use_exact_rates_and_calendar_months_and_leave_other_purchases_untouched(): void
     {
-        return PricingPlan::create(array_merge([
-            'name' => 'Starter',
-            'product_type' => 'pos',
-            'price' => 14999,
-            'price_quarterly' => 4299,
-            'is_trial' => false,
-            'invoice_limit' => 800,
-        ], $overrides));
-    }
-
-    public function test_pos_quarterly_request_uses_annual_price(): void
-    {
-        $plan = $this->makePosPlan();
-
-        $priced = SubscriptionAssignmentService::computePrice($plan, 'quarterly');
-
-        $this->assertSame('annual', $priced['cycle']);
-        $this->assertSame(14999.0, $priced['final_price']);
-    }
-
-    public function test_pos_annual_cycle_still_uses_annual_price(): void
-    {
-        $plan = $this->makePosPlan();
-
-        $priced = SubscriptionAssignmentService::computePrice($plan, 'annual');
-
-        $this->assertSame('annual', $priced['cycle']);
-        $this->assertSame(14999.0, $priced['final_price']);
-    }
-
-    /** A populated retired column must never make its rate purchasable. */
-    public function test_pos_monthly_request_cannot_charge_monthly_price(): void
-    {
-        $plan = $this->makePosPlan(['price_monthly' => 1549]);
-
-        $priced = SubscriptionAssignmentService::computePrice($plan, 'monthly');
-
-        $this->assertSame('annual', $priced['cycle']);
-        $this->assertSame(14999.0, $priced['final_price']);
-    }
-
-    /** No monthly rate set = the plan is not sold monthly; fall back to annual. */
-    public function test_pos_plan_without_monthly_price_forces_annual(): void
-    {
-        $plan = $this->makePosPlan(['price_monthly' => 0]);
-
-        $priced = SubscriptionAssignmentService::computePrice($plan, 'monthly');
-
-        $this->assertSame('annual', $priced['cycle']);
-        $this->assertSame(14999.0, $priced['final_price']);
-    }
-
-    /** Even a direct service caller cannot create a short POS term. */
-    public function test_assign_pos_monthly_request_creates_annual_subscription(): void
-    {
-        $plan = $this->makePosPlan(['price_monthly' => 1549]);
-
-        $sub = SubscriptionAssignmentService::assign(4242, $plan->id, 'monthly');
-
-        $this->assertSame('annual', $sub->billing_cycle);
-        $this->assertSame(14999.0, (float) $sub->final_price);
-        $this->assertSame(
-            now()->addMonths(12)->toDateString(),
-            \Illuminate\Support\Carbon::parse($sub->end_date)->toDateString()
-        );
-    }
-
-    public function test_pos_plan_without_quarterly_price_forces_annual(): void
-    {
-        $plan = $this->makePosPlan(['price_quarterly' => null]);
-
-        $priced = SubscriptionAssignmentService::computePrice($plan, 'quarterly');
-
-        $this->assertSame('annual', $priced['cycle']);
-        $this->assertSame(14999.0, $priced['final_price']);
-    }
-
-    public function test_pos_monthly_and_semi_annual_force_annual(): void
-    {
-        $plan = $this->makePosPlan();
-
-        foreach (['monthly', 'semi_annual', 'garbage', null] as $cycle) {
-            $priced = SubscriptionAssignmentService::computePrice($plan, (string) $cycle);
-            $this->assertSame('annual', $priced['cycle'], "cycle [$cycle] must force annual");
-            $this->assertSame(14999.0, $priced['final_price']);
+        config(['billing.shared_configured_cycles'=>true]);
+        $this->travelTo(\Carbon\Carbon::parse('2028-01-31 12:00:00'));
+        foreach (['pos','fbrpos','health'] as $type) {
+            $plan=PricingPlan::create(['name'=>'Starter','product_type'=>$type,'price'=>14999,
+                'price_monthly'=>1549,'price_quarterly'=>4299,'price_semi_annual'=>8199,'invoice_limit'=>800]);
+            $before=$plan->fresh()->getAttributes();
+            foreach (['monthly'=>[1549,'2028-02-29'],'quarterly'=>[4299,'2028-04-30'],
+                'semi_annual'=>[8199,'2028-07-31'],'annual'=>[14999,'2029-01-31']] as $cycle=>[$amount,$end]) {
+                $company=Company::create(['name'=>'Synthetic buyer','ntn'=>'CYCLE'.$type.$cycle,'product_type'=>$type]);
+                $sub=SubscriptionAssignmentService::assign($company->id,$plan->id,$cycle);
+                $this->assertSame($cycle,$sub->billing_cycle);
+                $this->assertEquals($amount,$sub->final_price);
+                $this->assertSame($end,$sub->end_date->toDateString());
+                $this->assertSame(800,$sub->entitlementPlan()->invoice_limit);
+            }
+            $this->assertSame($before,$plan->fresh()->getAttributes());
         }
     }
 
-    /** FBR POS price is the annual total; retired columns are never charged. */
-    public function test_fbrpos_charges_annual_for_every_requested_cycle(): void
+    public function test_missing_or_zero_short_rate_is_hidden_and_rejected(): void
     {
-        $plan = PricingPlan::create([
-            'name' => 'FBR Basic',
-            'product_type' => 'fbrpos',
-            'price' => 27999,           // ANNUAL rate
-            'price_quarterly' => 7349,
-            'price_monthly' => 2599,
-            'is_trial' => false,
-            'invoice_limit' => -1,
-        ]);
-
-        foreach (['annual', 'quarterly', 'monthly'] as $cycle) {
-            $priced = SubscriptionAssignmentService::computePrice($plan, $cycle);
-            $this->assertSame('annual', $priced['cycle'], "fbrpos {$cycle} request must become annual");
-            $this->assertSame(27999.0, (float) $priced['final_price'], "fbrpos {$cycle} request must charge annual");
+        config(['billing.shared_configured_cycles'=>true]);
+        $plan=new PricingPlan(['product_type'=>'fbrpos','price'=>14999,'price_monthly'=>0]);
+        $this->assertSame(['annual'],SubscriptionAssignmentService::cyclesForPlan($plan));
+        foreach (['monthly','quarterly','semi_annual','garbage'] as $cycle) {
+            try { SubscriptionAssignmentService::computePrice($plan,$cycle); $this->fail('Unpriced cycle sold'); }
+            catch (ValidationException $e) { $this->assertArrayHasKey('billing_cycle',$e->errors()); }
         }
     }
 
-    /** A cycle the fbrpos row does not price falls back to annual, never to a guess. */
-    public function test_fbrpos_unpriced_cycle_falls_back_to_annual(): void
+    public function test_monthly_frozen_quote_survives_policy_and_catalogue_changes(): void
     {
-        $plan = PricingPlan::create([
-            'name' => 'FBR Annual Only',
-            'product_type' => 'fbrpos',
-            'price' => 17999,
-            'is_trial' => false,
-            'invoice_limit' => -1,
-        ]);
-
-        foreach (['quarterly', 'monthly', 'semi_annual', 'garbage'] as $cycle) {
-            $priced = SubscriptionAssignmentService::computePrice($plan, $cycle);
-            $this->assertSame('annual', $priced['cycle'], "cycle [{$cycle}] must fall back to annual");
-            $this->assertSame(17999.0, (float) $priced['final_price']);
-        }
-    }
-
-    public function test_di_annual_formula_is_unchanged(): void
-    {
-        $plan = PricingPlan::create([
-            'name' => 'DI Plan',
-            'product_type' => 'di',
-            'price' => 1000, // monthly base for di
-            'is_trial' => false,
-            'invoice_limit' => -1,
-        ]);
-
-        $priced = SubscriptionAssignmentService::computePrice($plan, 'annual');
-        $expected = Subscription::calculateFinalPrice(1000.0, 'annual');
-
-        $this->assertSame('annual', $priced['cycle']);
-        $this->assertSame($expected['final_price'], $priced['final_price']);
-    }
-
-    public function test_assign_pos_quarterly_request_creates_twelve_month_subscription(): void
-    {
-        $plan = $this->makePosPlan();
-
-        $sub = SubscriptionAssignmentService::assign(9001, $plan->id, 'quarterly');
-
-        $this->assertSame('annual', $sub->billing_cycle);
-        $this->assertSame(14999.0, (float) $sub->final_price);
-        $this->assertSame(
-            now()->addMonths(12)->toDateString(),
-            \Carbon\Carbon::parse($sub->end_date)->toDateString()
-        );
-        $this->assertTrue((bool) $sub->active);
-    }
-
-    public function test_assign_pos_annual_creates_twelve_month_subscription(): void
-    {
-        $plan = $this->makePosPlan();
-
-        $sub = SubscriptionAssignmentService::assign(9002, $plan->id, 'annual');
-
-        $this->assertSame('annual', $sub->billing_cycle);
-        $this->assertSame(14999.0, (float) $sub->final_price);
-        $this->assertSame(
-            now()->addMonths(12)->toDateString(),
-            \Carbon\Carbon::parse($sub->end_date)->toDateString()
-        );
-    }
-
-    public function test_legacy_yearly_normalizes_to_annual(): void
-    {
-        $this->assertSame('annual', SubscriptionAssignmentService::normalizeCycle('yearly'));
-        $this->assertSame('quarterly', SubscriptionAssignmentService::normalizeCycle('quarterly'));
-        $this->assertSame('monthly', SubscriptionAssignmentService::normalizeCycle(null));
-    }
-
-    public function test_standalone_quarterly_forces_annual_even_with_quarterly_price(): void
-    {
-        $plan = $this->makePosPlan(['product_type' => 'standalone', 'price' => 20000, 'price_quarterly' => 6000]);
-
-        $priced = SubscriptionAssignmentService::computePrice($plan, 'quarterly');
-
-        $this->assertSame('annual', $priced['cycle']);
-        $this->assertSame(20000.0, $priced['final_price']);
+        config(['billing.shared_configured_cycles'=>true]);
+        $company=Company::create(['name'=>'Frozen buyer','ntn'=>'FROZENMONTH','product_type'=>'fbrpos']);
+        $plan=PricingPlan::create(['name'=>'Starter','product_type'=>'fbrpos','price'=>14999,'price_monthly'=>1549,'invoice_limit'=>800]);
+        $quote=DistributorDiscountService::quote($company,$plan,'monthly');
+        $plan->update(['price_monthly'=>null,'invoice_limit'=>900]);
+        config(['billing.disable_fresh_monthly'=>true,'billing.shared_configured_cycles'=>false]);
+        $this->assertNotContains('monthly',SubscriptionAssignmentService::cyclesForPlan($plan));
+        $proof=\App\Models\PaymentProof::create(['company_id'=>$company->id,'pricing_plan_id'=>$plan->id,
+            'billing_cycle'=>'monthly','amount'=>1549,'status'=>'pending','proof_path'=>'synthetic-only',
+            'distributor_quote_snapshot'=>$quote]);
+        $admin=\App\Models\AdminUser::create(['name'=>'Synthetic reviewer','email'=>'frozen@example.test','password'=>'unused','role'=>'super_admin']);
+        $input=['pricing_plan_id'=>$plan->id,'billing_cycle'=>'monthly','verified_received_amount'=>1549];
+        $this->actingAs($admin,'admin')->post(route('saas.admin.payment-proofs.approve',$proof->id),$input)->assertSessionHas('success');
+        $sub=Subscription::findOrFail($proof->fresh()->subscription_id);
+        $this->post(route('saas.admin.payment-proofs.approve',$proof->id),$input)->assertRedirect();
+        $this->assertSame(1,Subscription::where('company_id',$company->id)->count());
+        $this->assertEquals(1549,$sub->final_price);
+        $this->assertSame('monthly',$sub->billing_cycle);
+        $this->assertSame(800,$sub->entitlementPlan()->invoice_limit);
     }
 }

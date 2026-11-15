@@ -86,6 +86,10 @@ class PaymentProofController extends Controller
                 ->with('payment_proof', 'error');
         }
 
+        if (!\App\Services\PendingSubscriptionSelection::quote($company, $plan, $validated['billing_cycle'])) {
+            \App\Services\SubscriptionAssignmentService::cycleForPlan($plan, $validated['billing_cycle']);
+        }
+
         // Private (non-public) disk: receipts are downloadable by admins only.
         $path = $request->file('proof')->store('payment-proofs/' . $companyId, 'local');
         $result = DB::transaction(function () use ($companyId, $plan, $validated, $path) {
@@ -107,7 +111,7 @@ class PaymentProofController extends Controller
             // Store the cycle the APPROVAL will actually assign (computePrice
             // always annual since 23 Aug 2026) so the proof row
             // and the resulting subscription can never disagree.
-            'billing_cycle' => \App\Services\SubscriptionAssignmentService::computePrice($plan, $validated['billing_cycle'])['cycle'],
+            'billing_cycle' => $snapshot['cycle'],
             // Preserve what the shop says it transferred for the admin's bank
             // reconciliation. The expected quote remains server-owned inside
             // the immutable snapshot and is never derived from this input.

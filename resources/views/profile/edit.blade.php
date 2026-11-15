@@ -1,4 +1,7 @@
 <x-app-layout>
+    @if(auth()->user()?->role === 'company_admin')
+    <div class="max-w-7xl mx-auto p-4"><a href="{{ route('greetings.index') }}">{{ __('greetings.link') }}</a></div>
+    @endif
     <div class="py-8">
         <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
             <div class="mb-2">

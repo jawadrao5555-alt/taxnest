@@ -277,3 +277,6 @@ Schedule::command('di:fair-use-alerts')->dailyAt('06:40')->withoutOverlapping();
 
 // Dated source prices become catalogue candidates when due, never automatic shop repricing.
 Schedule::command('catalogue:apply-effective-prices')->hourly()->timezone('Asia/Karachi')->withoutOverlapping();
+
+// Greetings require global release plus explicit company and recipient consent.
+\Illuminate\Support\Facades\Schedule::command('greetings:dispatch')->hourly()->withoutOverlapping();

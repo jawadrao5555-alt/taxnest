@@ -24,7 +24,8 @@ class TutorialController extends Controller
         TutorialVideo::applyOwnerControls();
 
         $videos = TutorialVideo::publicVisible()
-            ->orderBy('sort')->orderBy('id')->get();
+            ->orderBy('sort')->orderBy('id')->get()
+            ->filter(fn (TutorialVideo $v) => ! $v->superseded && $this->matchesSearch($v));
 
         // Product folders in fixed order; unknown products go last.
         $products = [];
@@ -39,7 +40,7 @@ class TutorialController extends Controller
             }
         }
         foreach ($byProduct as $key => $list) {
-            if (!isset(TutorialVideo::PRODUCTS[$key])) {
+            if (! isset(TutorialVideo::PRODUCTS[$key])) {
                 $products[$key] = [
                     'label' => ucfirst((string) $key),
                     'count' => $list->count(),
@@ -69,6 +70,7 @@ class TutorialController extends Controller
         $videos = TutorialVideo::published()
             ->where(fn ($q) => $q->where('product', 'nestpos')->orWhereNull('product'))
             ->orderBy('sort')->orderBy('id')->get()
+            ->filter(fn (TutorialVideo $v) => ! $v->superseded && $this->matchesSearch($v))
             ->filter(fn (TutorialVideo $v) => $v->visibleToCompany($company) && $v->visibleToRole($user))
             ->values();
 
@@ -94,12 +96,20 @@ class TutorialController extends Controller
         $videos = TutorialVideo::published()
             ->where('product', 'fbrpos')
             ->orderBy('sort')->orderBy('id')->get()
+            ->filter(fn (TutorialVideo $v) => ! $v->superseded && $this->matchesSearch($v))
             ->filter(fn (TutorialVideo $v) => $v->visibleToCompany($company) && $v->visibleToRole($user))
             ->values();
 
         return view('fbr-pos.tutorials', [
             'groups' => $this->relevantGroups(TutorialVideo::groupedFrom($videos), $company),
         ]);
+    }
+
+    private function matchesSearch(TutorialVideo $video): bool
+    {
+        $query = mb_strtolower(mb_substr(trim((string) request('q', '')), 0, 120));
+
+        return $query === '' || str_contains(mb_strtolower($video->title.' '.$video->description.' '.$video->category), $query);
     }
 
     private function relevantGroups(array $groups, ?Company $company): array
@@ -112,8 +122,8 @@ class TutorialController extends Controller
 
         return array_filter(
             $groups,
-            fn (array $group, string $key) => !empty($group['videos'])
-                && (!isset($moduleByCategory[$key])
+            fn (array $group, string $key) => ! empty($group['videos'])
+                && (! isset($moduleByCategory[$key])
                     || PosFeatureService::moduleRelevant($company, $moduleByCategory[$key])),
             ARRAY_FILTER_USE_BOTH
         );

@@ -1722,6 +1722,7 @@ Route::prefix('admin')->middleware(['admin.auth'])->group(function () {
     Route::post('/tutorial-videos/{id}/toggle-published', [\App\Http\Controllers\TutorialVideoAdminController::class, 'togglePublished'])->name('admin.tutorial-videos.toggle-published');
     Route::post('/tutorial-videos/{id}/toggle-public', [\App\Http\Controllers\TutorialVideoAdminController::class, 'togglePublic'])->name('admin.tutorial-videos.toggle-public');
     Route::post('/tutorial-videos/{id}/gate', [\App\Http\Controllers\TutorialVideoAdminController::class, 'setGate'])->name('admin.tutorial-videos.gate');
+    Route::post('/tutorial-videos/{id}/metadata', [\App\Http\Controllers\TutorialVideoAdminController::class, 'metadata'])->name('admin.tutorial-videos.metadata');
     Route::post('/tutorial-videos/{id}/role', [\App\Http\Controllers\TutorialVideoAdminController::class, 'setRole'])->name('admin.tutorial-videos.role');
 
     // POS Feature Suggestions review (owner request 20 Jul 2026)
@@ -3219,4 +3220,11 @@ Route::middleware(['admin.auth', 'throttle:60,1'])->group(function () {
     Route::post('/admin/reporting/oauth/authorize', [\App\Http\Controllers\Reporting\OAuthController::class, 'approve']);
     Route::get('/admin/reporting/connections', [\App\Http\Controllers\Reporting\OAuthController::class, 'connections']);
     Route::post('/admin/reporting/connections/{id}/revoke', [\App\Http\Controllers\Reporting\OAuthController::class, 'revoke'])->whereUuid('id');
+});
+
+Route::middleware('auth')->prefix('profile/greetings')->name('greetings.')->group(function () {
+    Route::get('/', [\App\Http\Controllers\GreetingPreferencesController::class, 'index'])->name('index');
+    Route::post('/', [\App\Http\Controllers\GreetingPreferencesController::class, 'save'])->name('save');
+    Route::post('/recipient', [\App\Http\Controllers\GreetingPreferencesController::class, 'recipient'])->name('recipient');
+    Route::post('/preview', [\App\Http\Controllers\GreetingPreferencesController::class, 'preview'])->name('preview');
 });

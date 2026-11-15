@@ -1,0 +1,18 @@
+<?php
+return [
+    'title' => 'Ikhtiyari customer greetings',
+    'enable' => 'Sirf razamand afrad ko email greetings bhejein',
+    'timezone' => 'Muqami waqt ka ilaqa',
+    'save' => 'Tarjeehat mehfooz karein',
+    'preview' => 'Sirf namoona dekhein, bhejna nahin',
+    'recipients' => 'Wasool karne walay aur wazeh razamandi',
+    'name' => 'Naam',
+    'email' => 'Email',
+    'event' => 'Mauqa',
+    'date' => 'Mauqay ki tareekh',
+    'consent' => 'Wasool karne walay ne is mauqay ki email ki wazeh ijazat di hai',
+    'audit' => 'Bheje gaye paighamat ka record',
+    'add' => 'Wasool karne wala shamil karein',
+    'revoke' => 'Mehfooz karein ya razamandi wapas lein',
+    'link' => 'Ikhtiyari greetings aur razamandi',
+];

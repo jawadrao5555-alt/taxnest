@@ -27,13 +27,13 @@ class TutorialVideo extends Model
         'duration_seconds', 'controls_applied',
         // Task 1582: category family this video is for (all / food_service /
         // goods_retail / pharmacy / services). Legacy rows read as 'all'.
-        'audience_family',
+        'audience_family', 'caption_path', 'caption_language', 'transcript', 'release_version', 'reviewed_on', 'superseded',
     ];
 
     protected $casts = [
         'is_published' => 'boolean',
         'show_public' => 'boolean',
-        'controls_applied' => 'boolean',
+        'controls_applied' => 'boolean', 'superseded' => 'boolean',
     ];
 
     /** Product folders on the public page, in display order. */

@@ -32,16 +32,36 @@ class TutorialVideoAdminController extends Controller
         ]);
     }
 
+    public function metadata(Request $request, $id)
+    {
+        \App\Models\AdminUser::requireReleaseAdministrator();
+        $video = TutorialVideo::findOrFail($id);
+        $data = $request->validate([
+            'caption_path' => ['nullable', 'string', 'max:255', 'regex:~^/videos/[a-zA-Z0-9_/-]+\.vtt$~'],
+            'caption_language' => 'nullable|in:en,ur',
+            'transcript' => 'nullable|string|max:20000',
+            'release_version' => 'nullable|string|max:80',
+            'reviewed_on' => 'nullable|date_format:Y-m-d|before_or_equal:today',
+            'superseded' => 'required|boolean',
+        ]);
+        if (! empty($data['caption_path']) && (! is_file(public_path(ltrim($data['caption_path'], '/'))) || empty($data['caption_language']))) {
+            throw \Illuminate\Validation\ValidationException::withMessages(['caption_path' => 'Choose an existing local VTT caption file and its language.']);
+        }
+        $video->update($data); // Never alters publication, product, role or feature permissions.
+
+        return back()->with('success', 'Tutorial accessibility metadata saved.');
+    }
+
     public function togglePublished($id)
     {
         \App\Models\AdminUser::requireReleaseAdministrator();
 
         $video = TutorialVideo::findOrFail($id);
-        $video->update(['is_published' => !$video->is_published]);
+        $video->update(['is_published' => ! $video->is_published]);
 
         return redirect('/admin/tutorial-videos')->with(
             'success',
-            "'{$video->title}' is now " . ($video->is_published ? 'PUBLISHED (companies with the feature can watch it).' : 'UNPUBLISHED (hidden everywhere).')
+            "'{$video->title}' is now ".($video->is_published ? 'PUBLISHED (companies with the feature can watch it).' : 'UNPUBLISHED (hidden everywhere).')
         );
     }
 
@@ -50,11 +70,11 @@ class TutorialVideoAdminController extends Controller
         \App\Models\AdminUser::requireReleaseAdministrator();
 
         $video = TutorialVideo::findOrFail($id);
-        $video->update(['show_public' => !$video->show_public]);
+        $video->update(['show_public' => ! $video->show_public]);
 
         return redirect('/admin/tutorial-videos')->with(
             'success',
-            "'{$video->title}' is now " . ($video->show_public ? 'SHOWN on the public landing page.' : 'HIDDEN from the public landing page.')
+            "'{$video->title}' is now ".($video->show_public ? 'SHOWN on the public landing page.' : 'HIDDEN from the public landing page.')
         );
     }
 
@@ -69,7 +89,7 @@ class TutorialVideoAdminController extends Controller
         ]);
         $gate = (string) ($data['required_feature'] ?? '');
 
-        if ($gate !== '' && !array_key_exists($gate, self::gateOptions())) {
+        if ($gate !== '' && ! array_key_exists($gate, self::gateOptions())) {
             return redirect('/admin/tutorial-videos')->with('error', 'Unknown feature gate.');
         }
 
@@ -81,7 +101,7 @@ class TutorialVideoAdminController extends Controller
 
         return redirect('/admin/tutorial-videos')->with(
             'success',
-            "'{$video->title}' gate: " . ($gate === '' ? 'everyone (core feature).' : $gate . ' subscriptions only.')
+            "'{$video->title}' gate: ".($gate === '' ? 'everyone (core feature).' : $gate.' subscriptions only.')
         );
     }
 
@@ -97,7 +117,7 @@ class TutorialVideoAdminController extends Controller
         ]);
         $role = (string) $data['min_role'];
 
-        if (!array_key_exists($role, self::roleOptions())) {
+        if (! array_key_exists($role, self::roleOptions())) {
             return redirect('/admin/tutorial-videos')->with('error', 'Unknown role tier.');
         }
 
@@ -109,7 +129,7 @@ class TutorialVideoAdminController extends Controller
 
         return redirect('/admin/tutorial-videos')->with(
             'success',
-            "'{$video->title}' role tier: " . self::roleOptions()[$role] . '.'
+            "'{$video->title}' role tier: ".self::roleOptions()[$role].'.'
         );
     }
 
@@ -134,7 +154,7 @@ class TutorialVideoAdminController extends Controller
         // a barcode video should not reach a salon just because barcode is
         // not a paid gate. Resolved through PosFeatureService::moduleAvailable.
         foreach (PosFeatureService::ALL_FLAGS as $flag) {
-            $opts[$flag] = 'Module: ' . (PosFeatureService::moduleMeta($flag)['label'] ?? ucwords(str_replace('_', ' ', $flag)));
+            $opts[$flag] = 'Module: '.(PosFeatureService::moduleMeta($flag)['label'] ?? ucwords(str_replace('_', ' ', $flag)));
         }
 
         return $opts;

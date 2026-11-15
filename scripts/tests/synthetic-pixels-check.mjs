@@ -29,3 +29,8 @@ test('scrolled detail proof refuses clipped, missing or masked-footer-region con
  for(const rect of [null,{...good,y:-1},{...good,height:830},{...good,x:100},{...good,width:0}])assert.throws(()=>assertDetailBounds([rect],viewport));
  assert.throws(()=>assertDetailBounds([],viewport));
 });
+
+test('AI rate controls permit only explicit product names and fixed viewports',()=>{
+ for(const product of ['pos','fbr'])for(const width of [1366,390])assert.equal(pixelName(`ai-usage-controls-${product}-${width}`),`ai-usage-controls-${product}-${width}.png`);
+ for(const name of ['ai-usage-controls-erp-390','ai-usage-controls-pos-1280','ai-usage-controls-fbr-390.png','ai-usage-controls-../secret-390'])assert.throws(()=>pixelName(name));
+});

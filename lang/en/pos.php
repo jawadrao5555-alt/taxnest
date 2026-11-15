@@ -4,6 +4,9 @@
 // Purity locked by tests/Unit/LangPurityTest.php — no Roman Urdu / Urdu script here.
 
 return [
+    'hospital_use_collection_desk' => 'Use the Hospital collection desk and its cash day close, not retail checkout or bulk closing.',
+    'auth_bt_hospital_clinic' => 'Hospital / Clinic',
+    'fbr_missing_hospital_route' => 'Hospital fiscal submission is disabled until the official reporting route and a successful sandbox response are verified.',
     'school_legacy_title' => 'Legacy Retail History',
     'school_legacy_notice' => 'Read-only historical retail record, not a school fee receipt. Stored amounts and fiscal references are shown unchanged. Printing does not submit to FBR. School totals exclude these invoices.',
     'school_legacy_current' => 'Current campus archive',

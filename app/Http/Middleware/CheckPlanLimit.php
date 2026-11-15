@@ -48,6 +48,11 @@ class CheckPlanLimit
                 return $next($request);
             }
         }
+        if ($resource === 'invoices' && $request->is('fbr-pos/hospital') && $company?->isHospitalCollectionPilot()) {
+            $key = (string) $request->input('request_key', '');
+            if ($key !== '' && \Illuminate\Support\Facades\DB::table('hospital_payments')
+                ->where('company_id', $companyId)->where('request_key', $key)->exists()) return $next($request);
+        }
         $subscription = null;
         if ($company) {
             $access = SubscriptionAccessService::hasAccess($company);
@@ -196,7 +201,7 @@ class CheckPlanLimit
                     break;
                 }
                 if ($productType === 'fbrpos') {
-                    if ($company?->isSchoolFeePilot()) {
+                    if ($company?->isSchoolFeePilot() || $company?->isHospitalCollectionPilot()) {
                         $check = PlanLimitService::canCreateFbrPosBill($companyId);
                     } else {
                         // REPLAY GUARD BEFORE QUOTA (offline-first invariant): a retry

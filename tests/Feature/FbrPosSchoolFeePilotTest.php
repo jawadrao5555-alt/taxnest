@@ -84,6 +84,7 @@ class FbrPosSchoolFeePilotTest extends TestCase
             $table->timestamps();
             $table->unique(['company_id', 'branch_key', 'report_date']);
         });
+        (require database_path('migrations/2026_11_15_010000_extend_school_fee_collection_details.php'))->up();
         $this->school = Company::withoutEvents(fn () => Company::create([
             'name' => 'Synthetic School', 'product_type' => 'fbrpos',
             'pos_type' => 'education', 'business_category' => 'education',
@@ -114,7 +115,7 @@ class FbrPosSchoolFeePilotTest extends TestCase
     private function payload(array $overrides = []): array
     {
         return array_replace([
-            'student_reference' => 'SYN-001', 'fee_head' => 'tuition',
+            'student_reference' => 'SYN-001', 'fee_head' => 'tuition', 'fee_period' => '2026-11',
             'amount' => '1250.50', 'payment_method' => 'cash', 'cash_confirmed' => '1',
             'expected_branch_key' => app('currentBranchId') ?? 0,
             'request_key' => (string) Str::uuid(),
@@ -589,7 +590,7 @@ class FbrPosSchoolFeePilotTest extends TestCase
     {
         $request = Request::create('/fbr-pos/day-close/close', 'POST', array_replace([
             'date' => today()->format('Y-m-d'), 'confirm' => '1',
-            'expected_cash_paisa' => 125050, 'expected_receipt_count' => 1,
+            'expected_cash_paisa' => 125050, 'expected_receipt_count' => 1, 'counted_cash' => '1250.50',
             'expected_branch_key' => app('currentBranchId') ?? 0,
         ], $overrides), [], [], ['HTTP_ACCEPT' => 'application/json']);
         $request->setLaravelSession(app('session.store'));
@@ -819,4 +820,216 @@ class FbrPosSchoolFeePilotTest extends TestCase
         $this->assertFalse($retail->isSchoolFeePilot());
         $this->assertTrue($retail->fbr_reporting_enabled);
     }
+    private function schoolSettingsPost(string $method, array $data)
+    {
+        $request = Request::create('/fbr-pos/school-fees/settings', 'POST', $data);
+        $request->setLaravelSession(app('session.store'));
+        app()->instance('request', $request);
+        return app(FbrPosSchoolFeeController::class)->$method($request);
+    }
+
+    public function test_fee_month_is_required_for_new_cash_but_legacy_saved_replay_remains_valid(): void
+    {
+        $data = $this->payload(['fee_period' => null]);
+        try { $this->collect($data); $this->fail('Month required.'); }
+        catch (ValidationException $e) { $this->assertArrayHasKey('fee_period', $e->errors()); }
+        $data['fee_period'] = '2026-11';
+        $id = $this->collect($data)->getData(true)['receipt_id'];
+        try { $this->collect(array_replace($data, ['fee_period' => '2026-12'])); $this->fail('Month immutable.'); }
+        catch (ValidationException $e) { $this->assertArrayHasKey('request_key', $e->errors()); }
+        DB::table('school_fee_receipts')->where('id', $id)->update(['fee_period' => null]);
+        unset($data['fee_period']);
+        $this->assertSame($id, $this->collect($data)->getData(true)['receipt_id']);
+        $this->assertSame(1, DB::table('school_fee_receipts')->count());
+    }
+
+    public function test_custom_fee_heads_are_tenant_scoped_and_receipt_labels_are_frozen(): void
+    {
+        $this->expectHttpStatus(403, fn () => $this->schoolSettingsPost('saveFeeHead', ['label' => 'Transport', 'active' => 1]));
+        $this->cashier->role = 'company_admin';
+        $this->cashier->pos_role = 'pos_admin';
+        $this->actingAs($this->cashier, 'fbrpos');
+        $this->schoolSettingsPost('saveFeeHead', ['label' => 'Transport', 'active' => 1]);
+        $code = DB::table('school_fee_heads')->value('code');
+        $data = $this->payload(['fee_head' => $code]);
+        $id = $this->collect($data)->getData(true)['receipt_id'];
+        $this->schoolSettingsPost('saveFeeHead', ['code' => $code, 'label' => 'Bus transport', 'active' => 0]);
+        $this->assertSame($id, $this->collect($data)->getData(true)['receipt_id']);
+        $receipt = app(FbrPosSchoolFeeController::class)->receipt($id)->getContent();
+        $this->assertStringContainsString('Transport', $receipt);
+        $this->assertStringNotContainsString('Bus transport', $receipt);
+        try { $this->collect($this->payload(['fee_head' => $code])); $this->fail('Disabled head rejected.'); }
+        catch (ValidationException $e) { $this->assertArrayHasKey('fee_head', $e->errors()); }
+        DB::table('school_fee_heads')->insert(['company_id' => 999, 'code' => 'foreign', 'label' => 'Private head', 'active' => true]);
+        $this->expectHttpStatus(404, fn () => $this->schoolSettingsPost('saveFeeHead', ['code' => 'foreign', 'label' => 'Changed', 'active' => 1]));
+        try { $this->collect($this->payload(['fee_head' => 'foreign'])); $this->fail('Foreign head rejected.'); }
+        catch (ValidationException $e) { $this->assertArrayHasKey('fee_head', $e->errors()); }
+        Http::assertNothingSent();
+    }
+
+    public function test_counted_cash_variance_is_saved_once_and_changed_count_rejected(): void
+    {
+        $this->school->forceFill(['pos_cashier_dayclose' => true])->saveQuietly();
+        $this->collect($this->payload());
+        try { $this->closeSchoolDay(['counted_cash' => null]); $this->fail('Actual count required.'); }
+        catch (ValidationException $e) { $this->assertArrayHasKey('counted_cash', $e->errors()); }
+        $closed = $this->closeSchoolDay(['counted_cash' => '1200.00'])->getData(true);
+        $this->assertSame(120000, (int) $closed['counted_cash_paisa']);
+        $this->assertSame(-5050, (int) $closed['variance_paisa']);
+        $this->assertSame($closed['report_id'], $this->closeSchoolDay(['counted_cash' => '1200'])->getData(true)['report_id']);
+        try { $this->closeSchoolDay(['counted_cash' => '1250.50']); $this->fail('Changed count rejected.'); }
+        catch (ValidationException $e) { $this->assertArrayHasKey('counted_cash', $e->errors()); }
+        $this->assertSame(-5050, (int) DB::table('school_fee_day_closes')->value('variance_paisa'));
+    }
+
+    public function test_receipt_search_spans_dates_but_does_not_cross_campus_or_change_closing_totals(): void
+    {
+        $id = $this->collect($this->payload(['student_reference' => 'FIND-ME']))->getData(true)['receipt_id'];
+        DB::table('school_fee_receipts')->where('id', $id)->update(['collected_at' => now()->subDays(10)]);
+        $this->collect($this->payload(['student_reference' => 'TODAY-ONLY']));
+        $request = Request::create('/fbr-pos/transactions', 'GET', ['search' => 'SF-'.$id, 'fee_period' => '2026-11']);
+        app()->instance('request', $request);
+        $html = app(FbrPosSchoolFeeController::class)->history($request)->getContent();
+        $this->assertStringContainsString('FIND-ME', $html);
+        $this->assertStringNotContainsString('TODAY-ONLY', $html);
+        $this->school->forceFill(['pos_cashier_dayclose' => true])->saveQuietly();
+        $html = app(FbrPosSchoolFeeController::class)->dayClose($request)->getContent();
+        $this->assertStringNotContainsString('FIND-ME', $html);
+        $this->assertStringContainsString('TODAY-ONLY', $html);
+        $this->assertStringContainsString('data-paisa="125050"', $html);
+    }
+
+    public function test_school_campus_setup_is_owner_only_and_receipt_actor_and_campus_are_snapshotted(): void
+    {
+        Schema::create('branches', function (Blueprint $table) {
+            $table->id(); $table->unsignedBigInteger('company_id'); $table->string('name');
+            $table->string('city')->nullable(); $table->text('address')->nullable();
+            $table->boolean('is_active')->default(true); $table->boolean('is_head_office')->default(false); $table->timestamps();
+        });
+        $this->expectHttpStatus(403, fn () => $this->schoolSettingsPost('addCampus', ['name' => 'New Campus']));
+        $this->cashier->role = 'company_admin';
+        $this->cashier->pos_role = 'pos_admin';
+        $this->actingAs($this->cashier, 'fbrpos');
+        $this->schoolSettingsPost('addCampus', ['name' => 'New Campus', 'city' => 'Synthetic City']);
+        $branch = DB::table('branches')->first();
+        $this->assertSame($this->school->id, (int) $branch->company_id);
+        app()->forgetInstance(\App\Services\BranchContextService::class);
+        $id = $this->collect($this->payload(['expected_branch_key' => $branch->id]))->getData(true)['receipt_id'];
+        DB::table('branches')->where('id', $branch->id)->update(['name' => 'Changed Campus']);
+        $this->cashier->name = 'Changed Cashier';
+        $this->cashier->saveQuietly();
+        $html = app(FbrPosSchoolFeeController::class)->receipt($id)->getContent();
+        $this->assertStringContainsString('New Campus', $html);
+        $this->assertStringContainsString('Synthetic Cashier', $html);
+        $row = DB::table('school_fee_receipts')->where('id', $id)->first();
+        $this->assertSame('New Campus', $row->campus_name);
+        $this->assertSame('Synthetic Cashier', $row->cashier_name);
+        app('session.store')->put('impersonation', ['readonly' => true]);
+        $this->expectHttpStatus(403, fn () => $this->schoolSettingsPost('addCampus', ['name' => 'Forbidden']));
+        $this->assertSame(1, DB::table('branches')->count());
+    }
+
+    public function test_first_campus_keeps_owner_readonly_access_to_unassigned_receipts_and_closed_snapshot(): void
+    {
+        $this->school->forceFill(['pos_cashier_dayclose' => true])->saveQuietly();
+        $this->cashier->role = 'company_admin';
+        $this->cashier->pos_role = 'pos_admin';
+        $this->actingAs($this->cashier, 'fbrpos');
+        $oldId = $this->collect($this->payload())->getData(true)['receipt_id'];
+        $oldClose = $this->closeSchoolDay()->getData(true)['report_id'];
+        Schema::create('branches', function (Blueprint $table) {
+            $table->id(); $table->unsignedBigInteger('company_id'); $table->string('name');
+            $table->string('city')->nullable(); $table->text('address')->nullable();
+            $table->boolean('is_active')->default(true); $table->boolean('is_head_office')->default(false); $table->timestamps();
+        });
+        $this->schoolSettingsPost('addCampus', ['name' => 'First Campus']);
+        app()->forgetInstance(\App\Services\BranchContextService::class);
+        $controller = app(FbrPosSchoolFeeController::class);
+        $request = Request::create('/fbr-pos/transactions', 'GET', ['unassigned' => '1']);
+        app()->instance('request', $request);
+        $html = $controller->history($request)->getContent();
+        $this->assertStringContainsString('SF-'.$oldId, $html);
+        $this->assertStringContainsString('/receipt?unassigned=1', $html);
+        $this->assertSame(200, $controller->receipt($oldId)->getStatusCode());
+        $html = $controller->dayClose($request)->getContent();
+        $this->assertStringContainsString('SC-'.$oldClose, $html);
+        $this->assertStringNotContainsString('id="school-close-form"', $html);
+        $this->assertSame($oldClose, $this->closeSchoolDay(['unassigned' => '1', 'expected_branch_key' => 0])->getData(true)['report_id']);
+        $this->expectHttpStatus(403, fn () => $this->collect($this->payload(['unassigned' => '1'])));
+        app()->instance('request', Request::create('/fbr-pos/school-fees/'.$oldId.'/receipt'));
+        $this->expectHttpStatus(404, fn () => $controller->receipt($oldId));
+        $this->cashier->role = 'employee';
+        $this->cashier->pos_role = 'pos_cashier';
+        $this->actingAs($this->cashier, 'fbrpos');
+        app()->forgetInstance(\App\Services\BranchContextService::class);
+        app()->instance('request', $request);
+        $this->expectHttpStatus(403, fn () => $controller->history($request));
+        $this->assertNull(DB::table('school_fee_receipts')->where('id', $oldId)->value('branch_id'));
+        $this->assertSame(0, (int) DB::table('school_fee_day_closes')->where('id', $oldClose)->value('branch_key'));
+    }
+
+    public function test_campus_setup_respects_existing_entitlement_limit(): void
+    {
+        Schema::create('branches', function (Blueprint $table) {
+            $table->id(); $table->unsignedBigInteger('company_id'); $table->string('name');
+            $table->boolean('is_active')->default(true); $table->boolean('is_head_office')->default(false); $table->timestamps();
+        });
+        Schema::table('companies', fn (Blueprint $table) => $table->integer('branch_limit_override')->nullable());
+        $this->school->forceFill(['is_internal_account' => false, 'branch_limit_override' => 0])->saveQuietly();
+        $this->cashier->role = 'company_admin';
+        $this->cashier->pos_role = 'pos_admin';
+        $this->actingAs($this->cashier, 'fbrpos');
+        try { $this->schoolSettingsPost('addCampus', ['name' => 'Over quota']); $this->fail('Campus quota required.'); }
+        catch (ValidationException $e) { $this->assertArrayHasKey('name', $e->errors()); }
+        $this->assertSame(0, DB::table('branches')->count());
+    }
+
+    public function test_owner_can_close_unassigned_cash_after_first_campus_without_touching_active_cash(): void
+    {
+        $this->cashier->role = 'company_admin';
+        $this->cashier->pos_role = 'pos_admin';
+        $this->actingAs($this->cashier, 'fbrpos');
+        $oldId = $this->collect($this->payload())->getData(true)['receipt_id'];
+        Schema::create('branches', function (Blueprint $table) {
+            $table->id(); $table->unsignedBigInteger('company_id'); $table->string('name');
+            $table->string('city')->nullable(); $table->text('address')->nullable();
+            $table->boolean('is_active')->default(true); $table->boolean('is_head_office')->default(false); $table->timestamps();
+        });
+        $this->schoolSettingsPost('addCampus', ['name' => 'New Active Campus']);
+        app()->forgetInstance(\App\Services\BranchContextService::class);
+        $branchId = DB::table('branches')->value('id');
+        $activeId = $this->collect($this->payload(['expected_branch_key' => $branchId, 'amount' => '200.00']))->getData(true)['receipt_id'];
+        $request = Request::create('/fbr-pos/day-close', 'GET', ['unassigned' => '1']);
+        app()->instance('request', $request);
+        $html = app(FbrPosSchoolFeeController::class)->dayClose($request)->getContent();
+        $this->assertStringContainsString('id="school-close-form"', $html);
+        $this->assertStringContainsString('name="unassigned" value="1"', $html);
+        $this->assertStringContainsString('name="expected_branch_key" value="0"', $html);
+        $this->assertStringContainsString('data-paisa="125050"', $html);
+        try { $this->closeSchoolDay(['unassigned' => '1', 'expected_branch_key' => $branchId]); $this->fail('Historical scope must be explicit.'); }
+        catch (ValidationException $e) { $this->assertArrayHasKey('expected_branch_key', $e->errors()); }
+        $closed = $this->closeSchoolDay(['unassigned' => '1', 'expected_branch_key' => 0, 'counted_cash' => '1250.00'])->getData(true);
+        $snapshot = (array) DB::table('school_fee_day_closes')->first();
+        $this->assertSame(0, (int) $snapshot['branch_key']);
+        $this->assertSame(125050, (int) $snapshot['cash_amount_paisa']);
+        $this->assertSame(-50, (int) $snapshot['variance_paisa']);
+        $this->assertSame(1, (int) $snapshot['receipt_count']);
+        $this->assertSame($closed['report_id'], $this->closeSchoolDay(['unassigned' => '1', 'expected_branch_key' => 0, 'counted_cash' => '1250.00'])->getData(true)['report_id']);
+        $this->assertNull(DB::table('school_fee_receipts')->where('id', $oldId)->value('branch_id'));
+        $this->assertSame((int) $branchId, (int) DB::table('school_fee_receipts')->where('id', $activeId)->value('branch_id'));
+        $this->assertSame(0, DB::table('school_fee_day_closes')->where('branch_key', $branchId)->count());
+        app()->instance('request', Request::create('/fbr-pos/day-close'));
+        $html = app(FbrPosSchoolFeeController::class)->dayClose(request())->getContent();
+        $this->assertStringContainsString('data-paisa="20000"', $html);
+        $this->assertStringContainsString('id="school-close-form"', $html);
+        app('session.store')->put('impersonation', ['readonly' => true]);
+        $this->expectHttpStatus(403, fn () => $this->closeSchoolDay(['unassigned' => '1', 'expected_branch_key' => 0]));
+        app('session.store')->forget('impersonation');
+        $this->cashier->role = 'employee'; $this->cashier->pos_role = 'pos_cashier';
+        $this->actingAs($this->cashier, 'fbrpos');
+        app()->forgetInstance(\App\Services\BranchContextService::class);
+        $this->expectHttpStatus(403, fn () => $this->closeSchoolDay(['unassigned' => '1', 'expected_branch_key' => 0]));
+        $this->assertSame($snapshot, (array) DB::table('school_fee_day_closes')->first());
+    }
+
 }

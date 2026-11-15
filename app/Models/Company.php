@@ -16,10 +16,23 @@ class Company extends Model
             && ($this->pos_type === 'education' || $this->business_category === 'education');
     }
 
+    /** Standalone hospital collections are not retail IMS or PRA invoices. */
+    public function isHospitalCollectionPilot(): bool
+    {
+        return $this->product_type === 'fbrpos'
+            && (in_array($this->pos_type, ['clinic', 'hospital'], true)
+                || in_array($this->business_category, ['clinic', 'hospital'], true));
+    }
+
+    public function isLocalCollectionPilot(): bool
+    {
+        return $this->isSchoolFeePilot() || $this->isHospitalCollectionPilot();
+    }
+
     /** Fail closed even when a stale settings form or admin wrote the raw flag. */
     public function getFbrReportingEnabledAttribute($value): bool
     {
-        return !$this->isSchoolFeePilot() && (bool) $value;
+        return !$this->isLocalCollectionPilot() && (bool) $value;
     }
 
 
@@ -718,7 +731,7 @@ class Company extends Model
      */
     public function agentServesFbr(): bool
     {
-        if ($this->isSchoolFeePilot()) return false;
+        if ($this->isLocalCollectionPilot()) return false;
         return (bool) $this->fbr_pos_enabled
             && ($this->fbr_connection_mode ?? 'cloud') === 'fiscal_device';
     }
@@ -739,7 +752,7 @@ class Company extends Model
      */
     public function fbrPosIntegrationConfigured(): bool
     {
-        if ($this->isSchoolFeePilot()) return false;
+        if ($this->isLocalCollectionPilot()) return false;
         $posId = preg_replace('/[^0-9]/', '', (string) ($this->fbr_pos_id ?? ''));
         if ($posId === '' || (int) $posId === 0) {
             return false;
@@ -793,7 +806,7 @@ class Company extends Model
      */
     public function fbrIntegrationUndecided(): bool
     {
-        if ($this->isSchoolFeePilot()) return false;
+        if ($this->isLocalCollectionPilot()) return false;
         if (!\Illuminate\Support\Facades\Schema::hasColumn('companies', 'fbr_integration_decision')) {
             return false;
         }
@@ -832,6 +845,7 @@ class Company extends Model
      */
     public function fbrIntegrationMissing(): array
     {
+        if ($this->isHospitalCollectionPilot()) return ['hospital_route'];
         if ($this->isSchoolFeePilot()) return ['school_route'];
         $missing = [];
         $posId = preg_replace('/[^0-9]/', '', (string) ($this->fbr_pos_id ?? ''));
@@ -1076,7 +1090,7 @@ class Company extends Model
      */
     public function agentHandlesPra(): bool
     {
-        if ($this->isSchoolFeePilot()) return false;
+        if ($this->isLocalCollectionPilot()) return false;
         if (($this->pra_connection_mode ?? 'cloud') === 'fiscal_device') {
             return true;
         }

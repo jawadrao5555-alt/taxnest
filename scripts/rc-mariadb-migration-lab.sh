@@ -97,6 +97,7 @@ concurrency(){
     clean_php php "$ROOT/tests/native/rc_notification_concurrency.php"
     clean_php php "$ROOT/tests/native/rc_staff_discount_concurrency.php"
     clean_php php "$ROOT/tests/native/rc_school_fee_concurrency.php" | tee "$EVIDENCE_DIR/school-fee-concurrency.log"
+    clean_php php "$ROOT/tests/native/rc_hospital_collection_concurrency.php" | tee "$EVIDENCE_DIR/hospital-collection-concurrency.log"
     grep -Fqx "PASS: native school duplicate collection and close remain single; collect-close race serializes cash; post-close replay preserved and fresh payment rejected" "$EVIDENCE_DIR/school-fee-concurrency.log" || fail school-fee-concurrency-missing-success-proof
     clean_php php "$ROOT/tests/native/rc_di_billing_packing.php" | tee "$EVIDENCE_DIR/di-billing-packing.log"
     clean_php php "$ROOT/tests/native/rc_paid_renewal.php" | tee "$EVIDENCE_DIR/paid-renewal.log"

@@ -44,7 +44,7 @@ if (DB::connection()->getDriverName() !== 'mysql'
     || config('database.connections.mysql.unix_socket') !== $socket) {
     $fail('connection is outside the browser-lab allowlist.');
 }
-foreach (['companies', 'users', 'admin_users', 'branches', 'hotel_rooms', 'pos_service_work_orders', 'health_patients', 'invoices', 'invoice_items', 'school_fee_receipts'] as $table) {
+foreach (['companies', 'users', 'admin_users', 'branches', 'hotel_rooms', 'pos_service_work_orders', 'health_patients', 'invoices', 'invoice_items', 'school_fee_receipts', 'school_fee_heads', 'hospital_invoices', 'hospital_payments', 'hospital_day_closes'] as $table) {
     if (!Schema::hasTable($table)) {
         $fail("required migrated table is absent: {$table}");
     }
@@ -399,6 +399,20 @@ $schoolMobileUser = $user($schoolMobile, 'Synthetic Mobile School Owner', 'schoo
 \App\Models\Subscription::create(['company_id' => $schoolMobile->id, 'active' => true,
     'override_type' => 'lifetime', 'start_date' => now(), 'end_date' => now()->addYear()]);
 
+// Independent fictional hospital tenant per viewport; no health details or fiscal calls.
+$hospitalCases = [];
+foreach ([1366, 390] as $width) {
+    $hospital = $company('Synthetic RC Hospital '.$width, 'hospital-company-'.$width.'@rc-browser.invalid', 'RCHOSP'.$width, 'fbrpos', [
+        'business_category' => 'clinic', 'pos_type' => 'clinic', 'fbr_pos_enabled' => true,
+        'fbr_reporting_enabled' => false, 'fbr_pos_environment' => 'sandbox',
+        'pos_setup_completed' => true, 'feature_flags' => PosFeatureService::defaultsForCategory('clinic'),
+    ]);
+    $hospitalUser = $user($hospital, 'Synthetic Hospital Owner '.$width, 'hospital-cash-'.$width.'@rc-browser.invalid', 'company_admin', 'pos_admin');
+    \App\Models\Subscription::create(['company_id' => $hospital->id, 'active' => true,
+        'override_type' => 'lifetime', 'start_date' => now(), 'end_date' => now()->addYear()]);
+    $hospitalCases[$width] = $hospitalUser->email;
+}
+
 // Read-only compatibility fixtures from the old retail ledger. These are
 // fictional stored values, never submitted or represented as real FBR acceptance.
 $schoolLegacyInvoices = [];
@@ -584,7 +598,7 @@ foreach (['pra' => 'pos', 'fbr' => 'fbrpos'] as $panel => $product) {
             'pos_integration_mode' => $panel === 'fbr' ? 'fbr' : 'pra',
         ]);
         $categoryUser = $user($companyCategory, "Synthetic {$category} owner", "category-user-{$panel}-{$category}@rc-browser.invalid", 'company_admin', 'pos_admin');
-        if ($panel === 'fbr' && $category === 'education') {
+        if ($panel === 'fbr' && in_array($category, ['education', 'clinic'], true)) {
             // Preserve the complete category actor matrix, but assert the native
             // school desk rather than retail stock/service workflows. The
             // dedicated school-fees journey performs cash and reprint mutations.
@@ -592,9 +606,9 @@ foreach (['pra' => 'pos', 'fbr' => 'fbrpos'] as $panel => $product) {
                 'override_type' => 'lifetime', 'start_date' => now(), 'end_date' => now()->addYear()]);
             $categoryJourneys[] = [
                 'name' => "category-{$panel}-{$category}", 'login' => $categoryUser->email, 'password' => $password,
-                'loginPath' => '/fbr-pos/login', 'paths' => ['/fbr-pos/school-fees'],
-                'expectedPaths' => ['/fbr-pos/school-fees'], 'markers' => ['School fee collection'],
-                'mainMarkers' => ['School fee collection'],
+                'loginPath' => '/fbr-pos/login', 'paths' => [$category === 'clinic' ? '/fbr-pos/hospital' : '/fbr-pos/school-fees'],
+                'expectedPaths' => [$category === 'clinic' ? '/fbr-pos/hospital' : '/fbr-pos/school-fees'], 'markers' => [$category === 'clinic' ? 'Hospital' : 'School fee collection'],
+                'mainMarkers' => [$category === 'clinic' ? 'Hospital' : 'School fee collection'],
             ];
             continue;
         }
@@ -1088,6 +1102,8 @@ $fixture = [
         ['name' => 'service-work-orders-denied', 'login' => $serviceDenied->email, 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/work-orders', '/pos/work-orders/report.csv'], 'denied' => true],
     ], $categoryJourneys, $optionalArchiveJourneys),
     'transactionalJourneys' => [
+        ['name'=>'hospital-collections','login'=>$hospitalCases[1366],'mobileLogin'=>$hospitalCases[390],'password'=>$password,'loginPath'=>'/fbr-pos/login',
+            'paths'=>['/fbr-pos/hospital'],'markers'=>['Hospital'],'hospitalCollection'=>true,'manualOnly'=>true],
         ['name'=>'school-fees','login'=>$schoolUser->email,'mobileLogin'=>$schoolMobileUser->email,'password'=>$password,'loginPath'=>'/fbr-pos/login',
             'paths'=>['/fbr-pos/school-fees'],'markers'=>['School fee collection'],'schoolFee'=>true,'legacyInvoices'=>$schoolLegacyInvoices,'manualOnly'=>true],
         ['name'=>'restore-session-boundary','login'=>$admin->email,'password'=>$password,'loginPath'=>'/admin/login', 'paths'=>[], 'manualOnly'=>true, 'restoreSessionBoundary'=>true],

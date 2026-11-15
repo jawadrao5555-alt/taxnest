@@ -295,6 +295,11 @@ class PlanLimitService
         }
 
         $monthlyCount = function () use ($companyId, $company): int {
+            if ($company?->isHospitalCollectionPilot()) {
+                return \Illuminate\Support\Facades\DB::table('hospital_invoices')
+                    ->where('company_id', $companyId)
+                    ->whereBetween('created_at', [now()->startOfMonth(), now()->endOfMonth()])->count();
+            }
             if ($company?->isSchoolFeePilot()) {
                 return \Illuminate\Support\Facades\DB::table('school_fee_receipts')
                     ->where('company_id', $companyId)

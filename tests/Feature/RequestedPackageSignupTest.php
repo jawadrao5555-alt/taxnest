@@ -22,7 +22,7 @@ use Tests\TestCase;
  * configured periods for DI and annual for FBR POS and PRA POS.
  *
  * The dangerous half is the other one: a tampered, unknown, trial or
- * wrong-product name in the link must be ignored rather than recorded, so no
+ * wrong-product name must never be recorded (FBR POST rejects it; old DI behavior ignores it), so no
  * shop is ever activated on something it did not pick and pay for.
  */
 class RequestedPackageSignupTest extends TestCase
@@ -205,9 +205,21 @@ class RequestedPackageSignupTest extends TestCase
         }
 
         $this->post('/fbr-pos/register', $payload)->assertSessionHasNoErrors()
-            ->assertRedirect($posType === 'education' ? '/fbr-pos/school-fees' : '/fbr-pos/create');
+            ->assertRedirect($posType === 'education' ? '/fbr-pos/school-fees' : ($posType === 'clinic' ? '/fbr-pos/hospital' : '/fbr-pos/create'));
 
         return Company::where('name', $company)->firstOrFail();
+    }
+
+    private function rejectFbrPackage(string $plan): void
+    {
+        $before = Company::count();
+        $this->postJson('/fbr-pos/register', [
+            'company_name' => 'Synthetic Invalid Package', 'company_ntn' => '9876501',
+            'name' => 'Synthetic Owner', 'email' => 'invalid-package@example.test',
+            'password' => 'secret-pass-123', 'password_confirmation' => 'secret-pass-123',
+            'pos_type' => 'retail', 'requested_plan' => $plan,
+        ])->assertUnprocessable()->assertJsonValidationErrors('requested_plan');
+        $this->assertSame($before, Company::count());
     }
 
     /** Post a Digital Invoice signup, optionally carrying a package + cycle. */
@@ -256,6 +268,51 @@ class RequestedPackageSignupTest extends TestCase
 
     // ── Recording the request at signup ───────────────────────────────
 
+    public function test_hospital_signup_is_standalone_local_only_and_selects_its_own_product_package(): void
+    {
+        $this->get('/fbr-pos/register')->assertOk()->assertSee('Hospital / Clinic');
+        $hospital = $this->fbrSignup('Synthetic Clinic', 'clinic@example.test', 'Business', 'clinic');
+        $this->assertTrue($hospital->isHospitalCollectionPilot());
+        $this->assertFalse($hospital->isSchoolFeePilot());
+        $this->assertFalse($hospital->fbr_reporting_enabled);
+        $this->assertSame($this->plan('Business', 'fbrpos')->id, (int) $hospital->requested_plan_id);
+        $this->assertSame('clinic', $hospital->pos_type);
+    }
+
+    public function test_public_registration_rejects_cross_product_category_and_plan_payload_shapes(): void
+    {
+        foreach ([
+            ['/fbr-pos/register', ['product_type' => 'pos'], 'product_type'],
+            ['/pos/register', ['product_type' => 'fbrpos'], 'product_type'],
+            ['/fbr-pos/register', ['pos_type' => 'warehouse'], 'pos_type'],
+            ['/pos/register', ['pos_type' => 'pharmacy'], 'pos_type'],
+            ['/fbr-pos/register', ['pos_type' => 'clinic', 'business_category' => 'retail'], 'business_category'],
+            ['/fbr-pos/register', ['requested_plan' => ['Business']], 'requested_plan'],
+            ['/fbr-pos/register', ['pricing_plan_id' => $this->plan('Starter', 'pos')->id], 'pricing_plan_id'],
+            ['/pos/register', ['pricing_plan_id' => $this->plan('Business', 'fbrpos')->id], 'pricing_plan_id'],
+        ] as [$url, $payload, $error]) {
+            $this->postJson($url, $payload)->assertUnprocessable()->assertJsonValidationErrors($error);
+        }
+        $this->assertSame(0, Company::count());
+    }
+
+    public function test_fbr_legacy_plan_id_cannot_override_named_plan_or_select_retired_package(): void
+    {
+        $starter = PricingPlan::create(['name' => 'Starter', 'product_type' => 'fbrpos', 'price' => 2000, 'is_trial' => false]);
+        $base = ['company_name' => 'Synthetic Legacy Package', 'company_ntn' => '9876502',
+            'name' => 'Synthetic Owner', 'email' => 'legacy-package@example.test',
+            'password' => 'secret-pass-123', 'password_confirmation' => 'secret-pass-123', 'pos_type' => 'general'];
+        foreach ([
+            ['pricing_plan_id' => $starter->id, 'requested_plan' => 'Business'],
+            ['pricing_plan_id' => $this->plan('Pro', 'fbrpos')->id],
+            ['pricing_plan_id' => $this->plan('FBR Trial', 'fbrpos')->id],
+        ] as $selection) {
+            $this->postJson('/fbr-pos/register', $base + $selection)
+                ->assertUnprocessable()->assertJsonValidationErrors('pricing_plan_id');
+        }
+        $this->assertSame(0, Company::count());
+    }
+
     public function test_school_signup_uses_existing_fbr_product_and_keeps_reporting_disabled(): void
     {
         $this->get('/fbr-pos/register')->assertOk()->assertSee('School / Education');
@@ -303,11 +360,9 @@ class RequestedPackageSignupTest extends TestCase
     }
 
     /** A stale link to the retired FBR package must record nothing at all. */
-    public function test_fbr_signup_ignores_the_retired_package(): void
+    public function test_fbr_signup_rejects_the_retired_package(): void
     {
-        $company = $this->fbrSignup('Old Link Mart', 'oldlink@example.com', 'Pro');
-
-        $this->assertNull($company->requested_plan_id);
+        $this->rejectFbrPackage('Pro');
     }
 
     public function test_di_signup_records_the_package_and_configured_cycle(): void
@@ -346,8 +401,7 @@ class RequestedPackageSignupTest extends TestCase
     public function test_a_package_belonging_to_another_product_is_ignored(): void
     {
         // 'Starter' is a real paid package — just not an FBR POS one.
-        $fbr = $this->fbrSignup('Cross Product Mart', 'cross@example.com', 'Starter');
-        $this->assertNull($fbr->requested_plan_id, 'An FBR shop must never be recorded against a PRA POS package');
+        $this->rejectFbrPackage('Starter');
 
         // 'Pro Max' is a real PRA POS package name — never a DI one.
         $di = $this->diSignup('Cross Product Traders', 'cross2@example.com', 'Pro Max', 'annual');
@@ -357,8 +411,7 @@ class RequestedPackageSignupTest extends TestCase
 
     public function test_a_trial_package_is_ignored(): void
     {
-        $fbr = $this->fbrSignup('Trial Mart', 'trialmart@example.com', 'FBR Trial');
-        $this->assertNull($fbr->requested_plan_id);
+        $this->rejectFbrPackage('FBR Trial');
 
         $di = $this->diSignup('Trial Traders', 'trialtraders@example.com', 'DI Trial', 'annual');
         $this->assertNull($di->requested_plan_id);
@@ -366,8 +419,7 @@ class RequestedPackageSignupTest extends TestCase
 
     public function test_a_tampered_or_unknown_package_is_ignored(): void
     {
-        $fbr = $this->fbrSignup('Hacky Mart', 'hacky@example.com', "Business' OR 1=1 --");
-        $this->assertNull($fbr->requested_plan_id);
+        $this->rejectFbrPackage("Business' OR 1=1 --");
 
         $di = $this->diSignup('Ghost Traders', 'ghost@example.com', 'Package That Does Not Exist', 'annual');
         $this->assertNull($di->requested_plan_id);

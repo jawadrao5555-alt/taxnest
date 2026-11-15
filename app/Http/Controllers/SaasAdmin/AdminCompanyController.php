@@ -141,6 +141,9 @@ class AdminCompanyController extends Controller
                 $companyData['pos_type'] = $posType;
             }
             $companyData += \App\Services\PosFeatureService::registrationAttributes($posType);
+            if ($request->product_type === 'fbrpos' && in_array($posType, ['education', 'clinic', 'hospital'], true)) {
+                $companyData['fbr_reporting_enabled'] = false;
+            }
         }
 
         // Nest ERPS (Task 1568): the company is stamped with the vertical it

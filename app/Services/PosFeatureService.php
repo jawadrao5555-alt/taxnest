@@ -1568,8 +1568,8 @@ class PosFeatureService
             'retail', 'pharmacy', 'grocery', 'clothing', 'electronics',
             'hardware', 'autoparts', 'bakery',
             'restaurant', 'salon',
-            // Rule 33A school pilot: local cash receipts only until transport is verified.
-            'education',
+            // Local collection pilots: fiscal transport must be officially verified first.
+            'education', 'clinic',
         ],
     ];
 

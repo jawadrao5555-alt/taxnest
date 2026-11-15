@@ -198,6 +198,9 @@ class PosAuthController extends Controller
     public function register(Request $request)
     {
         $request->validate([
+            'product_type' => 'nullable|string|in:pos',
+            'business_category' => 'nullable|string|same:pos_type',
+            'requested_plan' => 'nullable|string|max:255',
             'company_name' => 'required|string|max:255',
             // Unique INSIDE the PRA POS line only (owner ruling, 5 Sep 2026):
             // one taxpayer may run a hotel here and an outlet on FBR POS under
@@ -216,7 +219,8 @@ class PosAuthController extends Controller
             // PRA panel = service businesses only (see PosFeatureService::PANEL_CATEGORIES),
             // plus the 'general' catch-all for a service that fits none of them.
             'pos_type' => 'required|in:' . implode(',', array_merge(\App\Services\PosFeatureService::categories('pra'), ['general'])),
-            'pricing_plan_id' => 'required|integer|exists:pricing_plans,id',
+            'pricing_plan_id' => ['required', 'integer', \Illuminate\Validation\Rule::exists('pricing_plans', 'id')
+                ->where('product_type', 'pos')->where('is_trial', 0)],
             // Optional: a shop that skips the cycle picker (or posts a bad one)
             // is charged annually — see RequestedPackageService::cycleForPlan().
             'billing_cycle' => 'nullable|string|max:20',

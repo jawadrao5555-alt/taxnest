@@ -45,7 +45,7 @@ class RetryFbrPosSubmissionJob implements ShouldQueue
         }
 
         // Rule 33A school transport is unverified: no dispatch or retry bookkeeping.
-        if ($transaction->company?->isSchoolFeePilot()) return;
+        if ($transaction->company?->isLocalCollectionPilot()) return;
 
         if (\App\Services\FbrPosAgentClaim::active($transaction) || $transaction->fbr_status === 'verification_pending') return;
 

@@ -54,7 +54,7 @@ class SubscriptionAccessService
         };
     }
 
-    public static function hasAccess(Company $company): array
+    public static function hasAccess(Company $company, bool $existingHospitalBill = false): array
     {
         $subscription = Subscription::where('company_id', $company->id)
             ->where('active', true)
@@ -66,6 +66,9 @@ class SubscriptionAccessService
             return ['allowed' => false, 'reason' => 'No active subscription. Please subscribe to a plan.', 'override' => null];
         }
 
+        // Settling an existing hospital invoice consumes no new bill quota.
+        // Expiry, missing subscriptions and other access restrictions still apply.
+        $existingHospitalBill = $existingHospitalBill && $company->isHospitalCollectionPilot();
         $type = $subscription->override_type ?? 'none';
 
         // 1. Lifetime
@@ -83,7 +86,7 @@ class SubscriptionAccessService
                 return ['allowed' => false, 'reason' => 'Free invoice limit not configured.', 'override' => 'usage_free'];
             }
             $count = self::billableCount($company);
-            if ($count >= $limit) {
+            if (!$existingHospitalBill && $count >= $limit) {
                 return [
                     'allowed' => false,
                     'reason' => "Free invoice limit reached ({$count}/{$limit}). Please upgrade your plan.",
@@ -106,7 +109,7 @@ class SubscriptionAccessService
                 if ($subscription->free_invoice_limit !== null) {
                     $limit = (int) $subscription->free_invoice_limit;
                     $used = self::billableCount($company, $subscription->override_granted_at);
-                    if ($limit > 0 && $used >= $limit) {
+                    if (!$existingHospitalBill && $limit > 0 && $used >= $limit) {
                         return [
                             'allowed' => false,
                             'reason' => "Temporary invoice allowance reached ({$used}/{$limit}). Please subscribe to a plan.",
@@ -158,7 +161,7 @@ class SubscriptionAccessService
             $limit = (int) ($plan->invoice_limit ?? 0);
             if ($limit > 0) {
                 $count = self::billableCount($company);
-                if ($count >= $limit) {
+                if (!$existingHospitalBill && $count >= $limit) {
                     return [
                         'allowed' => false,
                         'reason' => "Free trial invoice limit reached ({$count}/{$limit}). Please subscribe to a plan.",
@@ -318,6 +321,11 @@ class SubscriptionAccessService
     protected static function billableCount(Company $company, $since = null): int
     {
         // FBR POS bills live in their own table (fbr_pos_transactions).
+        if ($company->isHospitalCollectionPilot()) {
+            return \Illuminate\Support\Facades\DB::table('hospital_invoices')
+                ->where('company_id', $company->id)
+                ->when($since, fn ($q) => $q->where('created_at', '>=', $since))->count();
+        }
         if ($company->isSchoolFeePilot()) {
             return \Illuminate\Support\Facades\DB::table('school_fee_receipts')
                 ->where('company_id', $company->id)

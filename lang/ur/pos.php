@@ -4,6 +4,9 @@
 // Purity locked by tests/Unit/LangPurityTest.php — Latin words only from the whitelist.
 
 return [
+    'hospital_use_collection_desk' => 'ہسپتال کی وصولی ڈیسک اور اس کا نقد ڈے کلوز استعمال کریں، ریٹیل چیک آؤٹ یا اجتماعی بندش نہیں۔',
+    'auth_bt_hospital_clinic' => 'ہسپتال / کلینک',
+    'fbr_missing_hospital_route' => 'ہسپتال کی مالیاتی ترسیل سرکاری رپورٹنگ راستے اور کامیاب سینڈ باکس جواب کی تصدیق تک بند ہے۔',
     'school_legacy_title' => 'پرانی ریٹیل ہسٹری',
     'school_legacy_notice' => 'یہ صرف پڑھنے کے لیے پرانا ریٹیل ریکارڈ ہے، اسکول فیس رسید نہیں۔ محفوظ رقم اور مالیاتی حوالے بغیر تبدیلی دکھائے گئے ہیں۔ پرنٹ سے ایف بی آر کو ارسال نہیں ہوتا۔ یہ رسیدیں اسکول کے مجموعے میں شامل نہیں۔',
     'school_legacy_current' => 'موجودہ کیمپس کا ریکارڈ',

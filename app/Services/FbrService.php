@@ -38,8 +38,8 @@ class FbrService
 
     public function submitPosDiPayload(array $payload, string $token, string $environment, ?int $companyId, bool $automatic = false): array
     {
-        if ($companyId && \App\Models\Company::find($companyId)?->isSchoolFeePilot()) {
-            return ['state' => 'blocked', 'reference' => null, 'error_codes' => ['school_route_unverified']];
+        if ($companyId && \App\Models\Company::find($companyId)?->isLocalCollectionPilot()) {
+            return ['state' => 'blocked', 'reference' => null, 'error_codes' => [\App\Models\Company::find($companyId)->isHospitalCollectionPilot() ? 'hospital_route_unverified' : 'school_route_unverified']];
         }
 
         \App\Support\PraDiSandboxGate::enforce($companyId, $environment);
@@ -2392,8 +2392,8 @@ class FbrService
     {
         // Covers manual submissions, queue retries and fiscal-device enqueue paths.
         // No endpoint or school acknowledgement contract has been sandbox-verified.
-        if ($transaction->company?->isSchoolFeePilot()) {
-            return ['status' => 'blocked', 'errors' => [__('pos.fbr_missing_school_route')]];
+        if ($transaction->company?->isLocalCollectionPilot()) {
+            return ['status' => 'blocked', 'errors' => [$transaction->company->isHospitalCollectionPilot() ? __('pos.fbr_missing_hospital_route') : __('pos.fbr_missing_school_route')]];
         }
 
         if (\App\Services\FbrPosAgentClaim::active($transaction) || $transaction->fbr_status === 'verification_pending') {

@@ -4,6 +4,9 @@
 // Purity locked by tests/Unit/LangPurityTest.php — no Arabic-script characters here.
 
 return [
+    'hospital_use_collection_desk' => 'Hospital collection desk aur us ka cash day close istemal karein, retail checkout ya bulk closing nahin.',
+    'auth_bt_hospital_clinic' => 'Hospital / Clinic',
+    'fbr_missing_hospital_route' => 'Hospital ki fiscal submission band hai jab tak official reporting route aur sandbox response verify nahin hotay.',
     'school_legacy_title' => 'Purani Retail History',
     'school_legacy_notice' => 'Sirf parhne ke liye purana retail record, school fee receipt nahin. Mehfooz raqam aur fiscal references baghair tabdeeli dikhaye gaye hain. Print se FBR submission nahin hoti. Yeh invoices school totals mein shamil nahin.',
     'school_legacy_current' => 'Maujooda campus ka archive',

@@ -137,6 +137,8 @@ concurrency(){
     grep -Fqx "PASS: native FBR prospective concurrent capture delete retry retains paid quota; mixed day-close excludes trial renewal no reset changed source denied rollback and legacy preserved no fiscal calls" "$EVIDENCE_DIR/fbr-quota-retention.log" || fail fbr-quota-missing-native-proof
     clean_php php "$ROOT/tests/native/rc_fbr_quota_admission.php" | tee "$EVIDENCE_DIR/fbr-quota-admission.log"
     grep -Fqx "PASS: native FBR actual store old-snapshot distinct UUID last-slot race admits one; identical UUID race and full-quota replay return same bill without fiscal calls" "$EVIDENCE_DIR/fbr-quota-admission.log" || fail fbr-quota-missing-admission-proof
+    clean_php php "$ROOT/tests/native/rc_di_pra_quota_admission.php" | tee "$EVIDENCE_DIR/di-pra-quota-admission.log"
+    grep -Fqx "PASS: native DI PRA old-snapshot distinct bill last-slot admission permits one; DI same-claim retry unknown hold definite rejection and frozen production expiry preserved without provider calls" "$EVIDENCE_DIR/di-pra-quota-admission.log" || fail di-pra-quota-missing-admission-proof
     clean_php php "$ROOT/tests/native/rc_paid_renewal.php" | tee "$EVIDENCE_DIR/paid-renewal.log"
     clean_php php "$ROOT/tests/native/rc_trial_signup.php" | tee "$EVIDENCE_DIR/trial-signup.log"
     clean_php php "$ROOT/tests/native/rc_subscription_financial_adjustments.php" | tee "$EVIDENCE_DIR/subscription-financial-adjustments.log"

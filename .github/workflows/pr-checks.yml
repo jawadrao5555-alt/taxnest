@@ -315,7 +315,7 @@ jobs:
       - name: Check online POS recovery with real service-worker navigation
         env:
           RC_BROWSER_STATE_ROOT: /tmp/taxnest-rc-browser-${{ github.run_id }}-${{ github.job }}
-        run: bash scripts/rc-safe-run -- env PLAYWRIGHT_BROWSERS_PATH="$RC_BROWSER_STATE_ROOT/playwright-cache" node --test scripts/tests/sale-online-recovery-browser.test.mjs scripts/tests/sw-private-navigation.test.mjs scripts/tests/fbr-signup-button.test.mjs scripts/tests/madadgar-pending-identity-test.mjs scripts/tests/ai-usage-theme-browser.test.mjs scripts/tests/scrolled-pixel-browser.test.mjs
+        run: bash scripts/rc-safe-run -- env PLAYWRIGHT_BROWSERS_PATH="$RC_BROWSER_STATE_ROOT/playwright-cache" node --test scripts/tests/sale-online-recovery-browser.test.mjs scripts/tests/sw-private-navigation.test.mjs scripts/tests/fbr-signup-button.test.mjs scripts/tests/platform-expense-pattern.test.mjs scripts/tests/madadgar-pending-identity-test.mjs scripts/tests/ai-usage-theme-browser.test.mjs scripts/tests/scrolled-pixel-browser.test.mjs
       - name: Verify DI billing periods and Smart Packing at desktop and 390px
         env:
           RC_MARIADB_PORT: '33117'

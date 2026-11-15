@@ -12,7 +12,7 @@
 <h2 class="text-xl">Record an expense</h2>
 <div class="grid md:grid-cols-2 gap-3">
 <label>Expense date<input type="date" name="entry_date" required value="{{ now()->toDateString() }}"></label>
-<label>Category<input name="category" required maxlength="80" pattern="[a-z][a-z0-9_-]{0,79}" placeholder="e.g. hosting"></label>
+<label>Category<input name="category" required maxlength="80" pattern="[a-z][a-z0-9_\-]{0,79}" placeholder="e.g. hosting"></label>
 <label>Amount (PKR)<input name="amount" inputmode="decimal" required pattern="(?:0|[1-9][0-9]{0,9})(?:\.[0-9]{1,2})?" placeholder="0.00"></label>
 <label>Reference<input name="reference" required maxlength="160"></label>
 </div><label>Notes (optional, no credentials or bank details)<textarea name="notes" maxlength="2000"></textarea></label>

@@ -63,6 +63,9 @@ export async function madadgarEscalationRecovery(page,f,v,{baseUrl,root,open,ask
   check(retryPayload.request_id===firstPayload.request_id,'Retry changed its request ID');
   check(postCount===2,'Unexpected extra confirmation POST');
   await page.waitForFunction(()=>!window.Alpine.$data(document.querySelector('[x-data^="tnMadadgar("]')).busy);
+  const acknowledgment=root(page).locator('[x-text="m.content"]').filter({hasText:saved.reply});
+  await acknowledgment.waitFor({state:'visible'});
+  check(await acknowledgment.count()===1,'Refresh recovery displayed duplicate acknowledgment bubbles');
   const csrf=await page.locator('meta[name="csrf-token"]').getAttribute('content');
   const post=payload=>page.context().request.post(baseUrl+escalationPath,{data:payload,headers:{Accept:'application/json','X-CSRF-TOKEN':csrf},maxRedirects:0});
   for(const changed of [{title:'Changed title'},{summary:'Changed summary'},{kind:'feature_request'}]){

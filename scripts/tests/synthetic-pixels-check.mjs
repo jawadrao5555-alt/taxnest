@@ -44,3 +44,8 @@ test('DI bounded read evidence allows only two reviewed names at existing viewpo
  for(const prefix of ['di-read-billing','di-read-payments-unknown'])for(const width of [1366,390])assert.equal(pixelName(`${prefix}-${width}`),`${prefix}-${width}.png`);
  for(const name of ['di-read-custom-390','di-read-billing-1280','di-read-payments-unknown-390.png','../di-read-billing-390'])assert.throws(()=>pixelName(name));
 });
+
+test('PRA read evidence permits only three bounded synthetic intents',()=>{
+ for(const intent of ['closing','recipe','campus-unknown'])for(const width of [1366,390])assert.equal(pixelName(`madadgar-pra-${intent}-${width}`),`madadgar-pra-${intent}-${width}.png`);
+ for(const name of ['madadgar-pra-arbitrary-390','madadgar-pra-closing-1280','madadgar-pra-recipe-390.png','../madadgar-pra-campus-unknown-390'])assert.throws(()=>pixelName(name));
+});

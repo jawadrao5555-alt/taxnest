@@ -1810,12 +1810,14 @@ class RestaurantPosController extends Controller
         $existingTxn = PosTransaction::withoutGlobalScope('hide_archived')
             ->where('company_id', $companyId)
             ->where('offline_uuid', $payUuid)
+            ->when(DB::transactionLevel() > 0, fn ($q) => $q->lockForUpdate())
             ->first();
         if (!$existingTxn) {
             return null;
         }
         $originalOrder = RestaurantOrder::where('company_id', $companyId)
             ->where('pos_transaction_id', $existingTxn->id)
+            ->when(DB::transactionLevel() > 0, fn ($q) => $q->lockForUpdate())
             ->first();
         // Ghost tidy (best-effort, never blocks the replay): the retry's re-hold
         // may have minted a duplicate 'held' order — cancel it and free its table

@@ -466,6 +466,22 @@ class PosPayUuidReplayGuardTest extends TestCase
         $this->assertSame(1, $this->billCountForUuid($companyId, $uuid));
     }
 
+    public function test_same_receipt_recovery_inside_outer_transaction_preserves_single_bill(): void
+    {
+        $companyId = $this->makeRestaurantCompany();
+        $user = $this->makeUser($companyId);
+        $uuid = 'synthetic-nested-pay-retry';
+        $orderId = $this->makeOrder($companyId, ['order_type' => 'takeaway']);
+        $first = $this->payJson($orderId, $user, ['payment_method' => 'cash', 'pay_uuid' => $uuid]);
+        $first->assertOk();
+        DB::transaction(function () use ($companyId,$user,$uuid,$orderId,$first) {
+            DB::table('pos_transactions')->where('company_id',$companyId)->count();
+            $retry = $this->payJson($orderId,$user,['payment_method'=>'cash','pay_uuid'=>$uuid]);
+            $retry->assertOk()->assertJson(['success'=>true,'replayed'=>true,'transaction_id'=>$first->json('transaction_id')]);
+            $this->assertSame(1,$this->billCountForUuid($companyId,$uuid));
+        });
+    }
+
     public function test_completed_order_without_matching_uuid_still_gets_400(): void
     {
         $companyId = $this->makeRestaurantCompany();

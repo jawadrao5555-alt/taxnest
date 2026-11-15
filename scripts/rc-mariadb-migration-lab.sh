@@ -131,6 +131,8 @@ concurrency(){
     clean_php php "$ROOT/tests/native/rc_di_billing_packing.php" | tee "$EVIDENCE_DIR/di-billing-packing.log"
     clean_php php "$ROOT/tests/native/rc_prospective_policy_concurrency.php" | tee "$EVIDENCE_DIR/prospective-policy-concurrency.log"
     grep -Fqx "PASS: native selected trial concurrent reviewed proof preserves exact72h and one paid term invoice receipt audit; partial rollback, retry, paid grace renewal, expired history reprint, current role and legacy retained; no payment executed" "$EVIDENCE_DIR/prospective-policy-concurrency.log" || fail prospective-policy-missing-native-proof
+    clean_php php "$ROOT/tests/native/rc_prospective_quota_retention.php" | tee "$EVIDENCE_DIR/prospective-quota-retention.log"
+    grep -Fqx "PASS: native prospective quota concurrent capture delete retry retains one paid slot; trial excluded renewal no reset changed source refused atomic rollback unknown aggregate hold legacy preserved" "$EVIDENCE_DIR/prospective-quota-retention.log" || fail prospective-quota-missing-native-proof
     clean_php php "$ROOT/tests/native/rc_paid_renewal.php" | tee "$EVIDENCE_DIR/paid-renewal.log"
     clean_php php "$ROOT/tests/native/rc_trial_signup.php" | tee "$EVIDENCE_DIR/trial-signup.log"
     clean_php php "$ROOT/tests/native/rc_subscription_financial_adjustments.php" | tee "$EVIDENCE_DIR/subscription-financial-adjustments.log"

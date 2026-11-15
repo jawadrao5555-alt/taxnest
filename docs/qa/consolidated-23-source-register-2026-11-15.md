@@ -1,5 +1,102 @@
 # TaxNest 23-source reconciliation inventory
 
+## Canonical current register: inspected 80ddc5e (15 November 2026)
+
+**This section supersedes every historical missing-code/status statement below.**
+It records bounded implementation, not acceptance of all 23 source programmes.
+No source is certified complete here. The original 47 unchecked requirements in
+`source-301-original-unchecked-2026-11-15.md` are unchanged.
+
+Status labels: **A** = final exact-head acceptance pending; **I** = concrete
+internal implementation or coverage work; **E** = external/operator evidence or
+activation; **F** = explicitly future/out-of-scope programme. Test code presence
+is not an executed PASS. Historical test counts and reviewed pixels apply only
+to their named heads. The coordinator must refresh the exact final SHA, CI run,
+job results and visual review before changing A; no CI result is inferred here.
+
+| Source | Implemented slice / authority | Remaining classification and evidence |
+|---|---|---|
+| #389 | Owner-dispatch predicate port and actual predicate tests | A: exact-head workflow checks. |
+| #381 | Private push hints, reconnect refresh/coalescing and account-token guard | A: Android compile; E: signed physical-device push acceptance. |
+| #378 | ERP fiscal integration contract; School/Hospital fiscal dispatch blocked | E/F: official route, authorized sandbox and actual acceptance; no invented route. |
+| #377 | `ErpDemoHospitalSeeder`, dedicated guarded native/browser lane, ten synthetic roles, actual route assertions and clinician linkage | A: dedicated native/browser results. F: full clinical ERP; lab workflow absent and not implemented by this fixture. |
+| #376 | Landing/tablet layout correction and browser scenarios | A: final 390/768/1024/1366 rendered acceptance. |
+| #375 | Gated FBR APK, independent Plus APK and removal of unsafe security advice | A: rendered downloads; E: signed artifact and installation proof. |
+| #374 | Shared configured periods, explicit rates/activation and frozen quote compatibility; `shared-billing-cycles-393.md` | A: checkout/native/approval results; E: owner-approved commercial activation, no invented prices. |
+| #373 | Reviewed number-only acknowledgment, frozen environment, claim/device binding and uncertain-outcome holds; `standalone-reviewed-acknowledgement.md` | A: callback/native/browser proof; E: real device and central reconciliation. Does not enable School/Hospital fiscal submission. |
+| #338 | Umbrella tracking reused DI/fiscal slices | A/I/E: child outcomes remain individually open, including HOLD228; no separate blanket completion. |
+| #337 | Umbrella tracking billing/diagnostics/security foundations | A/I/E: child outcomes, not metadata or green CI alone, govern closure. |
+| #328 | Full-received/full-credit decisions, retained receivable, retry-safe collection and returns; `udhaar-full-credit-393.md` | A: native/browser/Android results; E: installed-device verification. Historical partial amounts preserved. |
+| #321 | Private profiles, default-OFF opt-in greetings, tutorial accessibility metadata, bounded company reads, usage controls and atomic explicit escalation retry | A: native/browser/final pixels; I: remaining bounded read adapters and full accessibility/programme coverage, described below. |
+| #320 | Two-step/reset/revocation/impersonation/deletion controls and synthetic restore quarantine | A: integrated checks; E: real backup freshness, restoration, physical erasure and RPO/RTO. Quarantine is not restore proof. |
+| #319 | Retained diagnostic registry, School/Hospital local sources and authenticated tenant backup metadata | I: DI retained stock association adapter below; A: final source/privacy tests; E: producer enrollment, elapsed collection and actual restoration. Missing telemetry stays unknown. |
+| #318 | Existing integrity/return/pharmacy slices and reviewed acknowledgment integration | A: final regression/native proof; E: regulator/device acceptance. |
+| #316 | Frozen billing documents/lifecycle tests; atomic paid approval and commission rollback; `shared-billing-cycles-393.md` | A: native concurrent approval and rendered checkout; I: item-level reconciliation of every original finance/grant scenario, not assumed complete from the selected matrix. |
+| #314 | Shared-platform/local School pilot integration only | F: full School ERP and future industries. Preserve original Q1–Q6/E1–E9 scope. |
+| #313 | DI packing/cycles/proof preservation plus inventory integration | A: final import/returns/native/browser proof; E: statutory acceptance. |
+| #301 | Original master preserved; implementation distributed across child sources | I/A: all 47 original unchecked outcomes require scenario-level mapping and acceptance. No master closure from aggregate CI. |
+| #266 | Frozen packing quantities, DI stock posting/returns, product locking and exact decimal preservation in `DiInvoiceInventory` | A: final race/recovery/original-return evidence; no historical backfill. |
+| #264 | Configured DI periods and immutable quotes | A: final price/date/renewal/document/isolation evidence. |
+| #237 | Optional default-OFF cashier policy with live server/session/offline enforcement | A: browser/regressions; E: any owner-authorized activation. Old compulsory policy is not adopted. |
+| #228 | Offline row-locator/release-parser evidence tooling | E: actual authorized workbook and owner batch review remain HOLD; historical source CI is not final-head evidence. |
+
+### Concrete internal boundaries, not generic missing-feature claims
+
+`MadadgarCompanyReadTools` at this inspected head deliberately refuses DI/other
+panel guards, cashier/manager reads, retail closing, and recipe cost/capacity
+questions. These are bounded adapter omissions, not permission to widen roles
+or invent figures. Assigned follow-up must preserve persisted-role, company and
+campus restrictions, source/time provenance and audited read-only behavior.
+Retry-safe explicit escalation does not itself complete the original diagnostic
+retrieval → reproduction → focused PR → approval → release programme.
+All-six-theme and screen-reader acceptance is still a coverage requirement;
+absence of its evidence is not proof that all corresponding runtime is absent.
+
+### Exact diagnostic source/association reconciliation
+
+The following distinction comes from current source, not the older diagnostic
+release notes:
+
+- `app/Services/Reporting/DiagnosticSourceEvidence.php` registry version 12
+  **already includes** `pos.backup_evidence`, `di.backup_evidence`,
+  `fbrpos.backup_evidence` and `health.backup_evidence`, backed by
+  `tenant_backup_evidence`. It also includes School accounts/receipts/closings
+  and Hospital invoices/payments/closings. Do not describe these as missing.
+- Concrete I gap: `DiagnosticBillEvidence.php` DI definitions expose only
+  `fbr_attempts` and still list `stock` in `unimplemented_links`.
+  `DiInvoiceInventory.php` now writes `di_invoice_inventory_postings` with
+  exact `company_id`, `invoice_id`, `invoice_item_id` and `movement_id`, and
+  `inventory_movements` with `reference_type=di_invoice_item`. A bounded
+  adapter can follow those retained IDs with matching tenant/invoice/item and
+  movement checks. The generic source registry also lacks a DI stock/posting
+  source. No amount/time/name matching or historical reconstruction is allowed.
+- Other currently declared unimplemented bill links are DI `payments` and
+  `print_events`; FBR POS `payments` and `offline_agent_events`; Healthcare ERP
+  `lab_orders` and `print_events`; PRA unuploaded/unattributed offline events.
+  This pass did not establish safe retained contracts for those missing links.
+  `PosPayment` belongs to PRA `PosTransaction`, not FBR POS: do not reuse its
+  numeric transaction IDs across products. Existing FBR print jobs and print
+  evidence **are** already associated and must not be called absent.
+- Healthcare has no lab route family. A lab fixture role opening the patient
+  register or a clinical PDF attachment is not a lab-order/result/refund source.
+  This remains outside the bounded #377 fixture delivery, not an instruction
+  to build a new clinical subsystem.
+- Generic `sequence_gaps=UNAVAILABLE`, `client_clock_skew=UNAVAILABLE` and
+  incomplete collection flags are truthful unknowns, not defects to fill with
+  fabricated telemetry. PRA retained device evidence is separately handled.
+  Missing/unuploaded events cannot be recovered from elapsed calendar dates.
+- Backup producer metadata proves only authenticated retained reports, never
+  backup bytes, restore success or RPO/RTO. Source enrollment and real elapsed
+  collection are external/operator actions, not reasons to claim the adapter
+  absent or to silently activate collection.
+
+## Historical checkpoints (not the current missing-code/status register)
+
+Everything below is retained historical evidence. Its absent/pending statements
+must be read at its named checkpoint and must not override the canonical table
+above. Original requirements remain binding where still in scope; historical
+PASS counts cannot certify a later head.
+
 ## Implemented intake correction and visual follow-up (local 9639ed5)
 
 This update supersedes the **missing code** issue-intake row at checkpoint

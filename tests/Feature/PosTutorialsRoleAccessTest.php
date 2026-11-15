@@ -167,6 +167,22 @@ class PosTutorialsRoleAccessTest extends TestCase
         }
     }
 
+    public function test_rider_json_recovery_ledger_request_redirects_without_entering_owner_controller(): void
+    {
+        Auth::guard('pos')->setUser($this->makeUser('pos_rider', 299));
+        $request = Request::create('https://nestpos.test/pos/delivery-accounts', 'GET');
+        $request->headers->set('Accept', 'application/json');
+        $called = false;
+        $response = (new PosAuth())->handle($request, function () use (&$called) {
+            $called = true;
+            return response('PRIVATE OWNER LEDGER');
+        });
+        $this->assertFalse($called);
+        $this->assertSame(302, $response->getStatusCode());
+        $this->assertSame('/pos/rider', $response->headers->get('Location'));
+        $this->assertStringNotContainsString('PRIVATE OWNER LEDGER', $response->getContent());
+    }
+
     public function test_unconfined_roles_pass_and_custom_access_never_gates_tutorials(): void
     {
         // Cashier (unconfined) passes straight through.

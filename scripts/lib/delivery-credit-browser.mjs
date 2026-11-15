@@ -26,7 +26,13 @@ export async function deliveryCreditWorkflow(page,t,v,{baseUrl,login,dismiss,wai
       if(changed.status()!==409)throw new Error('Changed delivered decision was not rejected');
     }
     const forbidden=await rider.request.get(baseUrl+'/pos/delivery-accounts',{headers:{Accept:'application/json'},maxRedirects:0});
-    if(forbidden.status()!==403)throw new Error('Rider was allowed owner recovery ledger');
+    const target=new URL(forbidden.headers().location||'',baseUrl);
+    if(forbidden.status()!==302||target.origin!==new URL(baseUrl).origin||target.pathname!=='/pos/rider')
+      throw new Error('Rider confinement did not redirect to its own portal: '+forbidden.status());
+    const deniedBody=await forbidden.text();
+    if(deniedBody.includes('SYN-CREDIT-PRIVATE-')||deniedBody.includes('Synthetic credit customer'))throw new Error('Rider denial leaked recovery ledger data');
+    await rider.goto(target.href,{waitUntil:'domcontentloaded'});
+    if(new URL(rider.url()).pathname!=='/pos/rider'||await rider.locator('form[action*="/delivery-accounts/"]').count())throw new Error('Rider redirect exposed owner recovery controls');
   } finally {await context.close();}
   await page.goto(baseUrl+'/pos/delivery-accounts',{waitUntil:'domcontentloaded'});await waitForOperationalSurface(page);await dismiss(page);
   const article=page.locator('article').filter({hasText:'Synthetic credit customer '+v.width});

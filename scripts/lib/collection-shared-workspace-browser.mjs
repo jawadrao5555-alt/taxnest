@@ -17,7 +17,7 @@ export async function collectionSharedWorkspaceChecks(page, kind, v, {baseUrl, s
   await create.locator('[name="password"]').fill('SyntheticOnly123!');
   await create.locator('[name="pos_role"]').selectOption('pos_cashier');
   if(campusLabel) await create.locator('[name="default_branch_id"]').selectOption({label:campusLabel});
-  await Promise.all([page.waitForNavigation({waitUntil:'domcontentloaded'}),create.locator('button').click()]);
+  await Promise.all([page.waitForNavigation({waitUntil:'domcontentloaded'}),create.locator('button[type="submit"]').click()]);
   const row=page.getByRole('row').filter({hasText:email});
   if(await row.count()!==1) throw new Error(kind+' synthetic cashier creation failed');
   await row.getByRole('button',{name:'Edit',exact:true}).click();

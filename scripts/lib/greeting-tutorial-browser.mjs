@@ -5,8 +5,8 @@ export async function greetingTutorialWorkflow(page,t,v,{baseUrl,saveEvidenceScr
   check(!await prefs().locator('input[type="checkbox"]').isChecked(),'Greeting preference must start OFF');
   await prefs().locator('textarea[name="templates[welcome]"]').fill('Invalid {secret}');
   await Promise.all([page.waitForNavigation({waitUntil:'domcontentloaded'}),prefs().getByRole('button').click()]);
-  await page.locator('[role="alert"]').waitFor();
-  check(await page.locator('[role="alert"]').evaluate(el=>el===document.activeElement),'Validation error must receive keyboard focus');
+  await page.locator('#greeting-errors[role="alert"]').waitFor();
+  check(await page.locator('#greeting-errors[role="alert"]').evaluate(el=>el===document.activeElement),'Validation error must receive keyboard focus');
   await saveEvidenceScreenshot(page,'greetings-validation-'+v.width);
   await prefs().locator('textarea[name="templates[welcome]"]').fill('Hello {name} from {company}');
   // Keep the production-like preference OFF. Consent recording itself never activates delivery.

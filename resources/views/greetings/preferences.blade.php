@@ -2,7 +2,7 @@
 <main class="max-w-4xl mx-auto p-4 space-y-5">
 <h1 class="text-xl font-bold">{{ __('greetings.title') }}</h1>
 <p>{{ __('greetings.notice') }}</p>
-@if($errors->any())<div role="alert" tabindex="-1">{{ $errors->first() }}</div>@endif
+@if($errors->any())<div id="greeting-errors" role="alert" tabindex="-1">{{ $errors->first() }}</div>@endif
 <form method="POST" action="{{ route('greetings.save') }}" class="space-y-3">@csrf
 <input type="hidden" name="enabled" value="0"><label class="block"><input type="checkbox" name="enabled" value="1" @checked($preferences?->enabled)> {{ __('greetings.enable') }}</label>
 <label class="block">{{ __('greetings.timezone') }}<input name="timezone" value="{{ $preferences?->timezone ?? 'Asia/Karachi' }}" required class="block"></label>
@@ -30,5 +30,5 @@
 <p>{{ __('greetings.hold_notice') }}</p>
 <ul>@foreach($deliveries as $delivery)<li>{{ $delivery->occurrence }} · {{ $delivery->event }} · {{ $delivery->status }} · {{ $delivery->reason }} · attempts {{ $delivery->attempts }}</li>@endforeach</ul>
 </main>
-<script>document.querySelector('[role="alert"]')?.focus();</script>
+<script>document.getElementById('greeting-errors')?.focus();</script>
 </x-app-layout>

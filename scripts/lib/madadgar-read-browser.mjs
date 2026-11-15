@@ -1,3 +1,4 @@
+import { madadgarEscalationRecovery } from './madadgar-escalation-browser.mjs';
 export async function madadgarReadWorkflow(page,t,v,{baseUrl,login,loopback,saveEvidenceScreenshot,pass}) {
   const f=t.madadgarReadCases[v.width];
   const check=(ok,message)=>{if(!ok)throw Error(message);};
@@ -34,17 +35,20 @@ export async function madadgarReadWorkflow(page,t,v,{baseUrl,login,loopback,save
   await saveEvidenceScreenshot(page,'madadgar-school-source-'+v.width);
   const foreign=await ask(page,'today collections for company '+f.foreignCompany);
   check(foreign.provenance?.answer_source!=='company_read'&&!foreign.reply.includes('123.45')&&!foreign.reply.includes('999.99'),'Foreign-company instruction accessed numeric read');
+  const escalation=await madadgarEscalationRecovery(page,f,v,{baseUrl,root,open,ask,saveEvidenceScreenshot,check});
   const context=await page.context().browser().newContext({viewport:v,serviceWorkers:'block'});
   await context.route('**/*',r=>loopback(new URL(r.request().url()).hostname)?r.continue():r.abort('blockedbyclient'));
   try {
     const cashier=await context.newPage();
     await login(cashier,{...t,login:f.cashier});
     await open(cashier);
+    const history=await context.request.get(baseUrl+'/fbr-pos/madadgar/history?session_id='+escalation.sessionId);
+    check(!(await history.json()).messages.some(m=>m.content===escalation.reply),'Cashier accessed another user confirmation history');
     const denied=await ask(cashier,'today collections');
     check(denied.provenance?.scope_reason==='company_read_unavailable'&&denied.provenance.capabilities.live_data_read===false,'Cashier received owner-only read');
     check(!denied.reply.includes('123.45')&&!denied.reply.includes('999.99'),'Cashier denial leaked collections');
     await root(cashier).locator('[data-madadgar-provenance]').waitFor();
     await saveEvidenceScreenshot(cashier,'madadgar-cashier-denied-'+v.width);
   } finally {await context.close();}
-  pass('MADADGAR READ PASS: '+v.width+': actual UI known campus collection/source/date, fiscal OFF, no individual references, foreign intent denied and cashier denied; provider local-only');
+  pass('MADADGAR READ PASS: '+v.width+': actual UI known campus collection/source/date, fiscal OFF, no individual references, foreign intent denied and cashier denied; provider local-only; explicit lost-response confirmation refresh/same UUID/ref, no autosend, changed details409, one saved message/suggestion');
 }

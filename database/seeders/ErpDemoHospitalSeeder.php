@@ -19,6 +19,14 @@ use RuntimeException;
 
 class ErpDemoHospitalSeeder extends Seeder
 {
+    public const DEMO_ROLES = [
+        'reception' => 'health_receptionist', 'doctor' => 'health_doctor',
+        'cashier' => 'health_cashier', 'pharmacy' => 'health_pharmacist',
+        'lab' => 'health_lab_tech', 'nursing' => 'health_nurse',
+        'accounts' => 'health_accountant', 'auditor' => 'health_auditor',
+        'hr' => 'health_hr',
+    ];
+
     public function run(): void
     {
         $connection = DB::connection();
@@ -63,6 +71,9 @@ class ErpDemoHospitalSeeder extends Seeder
                 'company_status' => 'active',
                 'health_org_type' => 'hospital',
                 'health_modules' => HealthModuleService::MODULES,
+                'fbr_reporting_enabled' => false,
+                'fbr_universal_enabled' => false,
+                'fbr_pos_enabled' => false,
             ]);
 
             $plan = PricingPlan::create([
@@ -95,7 +106,21 @@ class ErpDemoHospitalSeeder extends Seeder
                 'is_active' => true,
             ]);
 
+            // Fictional, least-privilege logins for the acceptance checklist only.
+            // Same explicit local secret; never committed or printed by this seed.
+            $staff = [];
+            foreach (self::DEMO_ROLES as $alias => $role) {
+                $staff[$alias] = User::create([
+                    'name' => 'Demo '.ucfirst($alias),
+                    'email' => 'erp.'.$alias.'@example.test',
+                    'password' => Hash::make($password),
+                    'company_id' => $company->id,
+                    'role' => 'employee', 'health_role' => $role, 'is_active' => true,
+                ]);
+            }
+
             HealthDoctor::create([
+                'user_id' => $staff['doctor']->id,
                 'company_id' => $company->id,
                 'name' => 'Demo Doctor',
                 'consultation_fee' => 1000,

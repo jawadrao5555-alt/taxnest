@@ -25,3 +25,53 @@ Use the real existing suites before manual acceptance
 Report pass, fail, blocked or missing for each case. Attach safe evidence, rerun the original failure after a correction and record the final Git commit. This file and the seed do not certify ERP readiness.
 
 This integrated source #377 is a fixture and acceptance aid only, separate from standalone Hospital POS. It does not certify full HMIS/ERP readiness or permit production seeding. CI SQLite provisioning and isolated Health feature tests are evidence only for the cases actually executed; the manual MariaDB demo checklist remains pending unless recorded separately.
+
+## Repeatable synthetic role acceptance (follow-up to source #377)
+
+The guarded fixture now also creates reception, doctor, cashier, pharmacy, lab,
+nursing, accounts, auditor and HR users. Their email aliases are respectively
+`erp.reception@example.test`, `erp.doctor@example.test`,
+`erp.cashier@example.test`, `erp.pharmacy@example.test`, `erp.lab@example.test`,
+`erp.nursing@example.test`, `erp.accounts@example.test`,
+`erp.auditor@example.test` and `erp.hr@example.test`. They use the explicit local
+`ERP_DEMO_PASSWORD`, never a committed default. The fictional doctor is linked
+to the doctor login. These users are employees with the existing least-privilege
+Healthcare role defaults, not company administrators. All three company FBR
+switches are explicitly off. This fixture does not create standalone Hospital
+POS records, production accounts or a public registration route.
+
+Run `bash scripts/check-erp-demo-acceptance.sh`. This uses the repository's
+clean-environment, loopback-only egress guard and SQLite in-memory tests. The
+new fixture test signs in through the real login route for all nine roles,
+opens an allowed route and rejects an unrelated direct route and module-setting
+write. It also tests owner module-off denial, restored access without losing the
+patient record, cross-company patient URL denial, seeder production refusal,
+missing-secret refusal and refusal to reseed existing data.
+
+The wrapper includes the existing substantive OPD/prescription/pharmacy/IPD,
+accounts, attendance, audit and fiscal-fake suites. Their service/HTTP assertions
+are **not** MariaDB concurrency or Chrome rendering evidence. Record actual run
+counts and failures in the PR, and do not replace the pending manual checklist
+above with a blanket “ERP passed.”
+
+### Explicit remaining boundaries
+
+- **Lab order/sample/result/refund workflow is missing:** the module/capability
+  definitions exist, but this tree has no `/health/lab` route family. The lab
+  login's patient access and denial of unrelated clinical/accounts actions do
+  not prove a lab workflow. Clinical PDF attachments are not a lab subsystem.
+- **Native MariaDB + desktop/mobile role journeys remain pending.** The current
+  standalone browser fixture requires a different exact database. Do not relax
+  either database guard or seed into it. Provision a separate empty
+  `taxnest_erp_demo` loopback lane with the existing explicit opt-in before
+  collecting native/browser evidence.
+- Payroll-source/attendance tests are not a payroll engine, bank payout or HR
+  production acceptance. Maternity/emergency workflows, live queue/scheduler
+  operation and a simulated backup/restore drill are not established here.
+- Fiscal tests use fakes only; no official route, regulator acceptance or
+  production submission readiness is implied.
+
+Local acceptance execution for this change: the wrapper completed on PHP 8.4.27
+with **274 tests, 1,675 assertions, no failures, 25 PHPUnit deprecations**. This
+is the combined fixture/role and existing domain suite, not the full repository
+suite. The native/browser and operations gaps above remain open.

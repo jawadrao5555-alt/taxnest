@@ -8,7 +8,7 @@ final class ProfileFieldRules
     {
         return ['nullable', 'string', 'max:30', 'regex:/^\+?[0-9][0-9 ()-]*$/D', function ($attribute, $value, $fail) {
             $digits = preg_replace('/\D/', '', (string) $value);
-            if (strlen($digits) < 7 || strlen($digits) > 15) $fail(__('Please enter a valid phone number containing 7 to 15 digits.'));
+            if (strlen($digits) < 7 || strlen($digits) > 15) $fail(__('profile_fields.invalid_phone'));
         }];
     }
     public static function cnic(): array

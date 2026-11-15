@@ -148,4 +148,15 @@ class ProfileTest extends TestCase
         $this->actingAs($owner->fresh())->patch('/profile',['name'=>$owner->name,'email'=>$same->email])->assertSessionHasErrors('email');
     }
 
+    public function test_cached_admin_cannot_edit_business_after_role_revocation(): void
+    {
+        $company=\App\Models\Company::create(['name'=>'Preserved synthetic company','ntn'=>'9876545','product_type'=>'di']);
+        $user=User::factory()->create(['company_id'=>$company->id,'role'=>'company_admin']);
+        \Illuminate\Support\Facades\DB::table('users')->where('id',$user->id)->update(['role'=>'company_user']);
+        $request=\Illuminate\Http\Request::create('/profile/company','PUT',['name'=>'Unwanted change','company_id'=>99999]);
+        $request->setUserResolver(fn()=>$user);
+        (new \App\Http\Controllers\ProfileController())->updateCompany($request);
+        $this->assertSame('Preserved synthetic company',$company->fresh()->name);
+    }
+
 }

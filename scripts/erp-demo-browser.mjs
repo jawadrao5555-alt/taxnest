@@ -23,7 +23,7 @@ try {
       assert.equal((await page.goto(`${baseUrl}/health/login`)).status(),200);
       await page.locator('[name=login]').fill(`erp.${role}@example.test`);
       await page.locator('[name=password]').fill(fixture.password);
-      await Promise.all([page.waitForURL(u=>u.pathname!=='/health/login'),page.locator('button[type=submit]').click()]);
+      await Promise.all([page.waitForURL(u=>u.pathname!=='/health/login'),page.locator('form[action$="/health/login"] button[type=submit]').click()]);
       const response=await page.goto(baseUrl+allowed);assert.equal(response.status(),200,`${role} allowed route`);
       assert(!/SQLSTATE|Whoops|Stack trace|Internal Server Error/.test(await page.locator('body').innerText()));
       // This is acceptance of access + rendering, not a completed clinical journey.

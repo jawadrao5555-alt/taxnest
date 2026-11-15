@@ -20,4 +20,13 @@ class ErpDemoLaneGuardTest extends TestCase
         $this->assertSame(2,$process->getExitCode());
         $this->assertStringContainsString('ERP DEMO REFUSED',$process->getErrorOutput());
     }
+    public function test_browser_login_targets_credentials_form_not_language_picker(): void
+    {
+        $source=file_get_contents(base_path('scripts/erp-demo-browser.mjs'));
+        $this->assertStringContainsString('form[action$="/health/login"] button[type=submit]', $source);
+        $template=file_get_contents(resource_path('views/health/auth/login.blade.php'));
+        $this->assertStringContainsString("url('/health/guest-language')", $template);
+        $this->assertStringContainsString("url('/health/login')", $template);
+    }
+
 }

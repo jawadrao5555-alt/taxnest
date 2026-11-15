@@ -670,6 +670,9 @@ class FbrPosController extends Controller
         if (Company::find(app('currentCompanyId'))?->isSchoolFeePilot()) {
             return app(FbrPosSchoolFeeController::class)->dashboard();
         }
+        if (Company::find(app('currentCompanyId'))?->isHospitalCollectionPilot()) {
+            return app(FbrPosHospitalController::class)->dashboard();
+        }
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
         $branchSvc = app(\App\Services\BranchContextService::class);
@@ -996,7 +999,7 @@ class FbrPosController extends Controller
     public function performDayClose(int $companyId, string $date, ?int $userId, ?string $notes = null, ?array $cashRecon = null, bool $allowEmpty = false, ?array $actionOverride = null): ?FbrDayCloseReport
     {
         // Never create a misleading retail zero-total Z-report for school cash.
-        if (Company::find($companyId)?->isSchoolFeePilot()) return null;
+        if (Company::find($companyId)?->isLocalCollectionPilot()) return null;
         // Fast-path: already closed → return without locking
         $existing = FbrDayCloseReport::where('company_id', $companyId)
             ->where('report_date', $date)->first();
@@ -1395,6 +1398,9 @@ class FbrPosController extends Controller
         $company = Company::find($companyId);
         if ($company?->isSchoolFeePilot()) {
             return redirect()->away('/fbr-pos/school-fees');
+        }
+        if ($company?->isHospitalCollectionPilot()) {
+            return redirect()->away('/fbr-pos/hospital');
         }
 
         // 💊 Pharmacy Mode (Task 1558) — Step 9, scale. A medical store runs a
@@ -1903,6 +1909,7 @@ class FbrPosController extends Controller
         $company = Company::find($companyId);
         // Never reinterpret tuition as retail goods or an exempt/zero-rate sale.
         abort_if($company?->isSchoolFeePilot(), 422, __('pos.school_use_fee_desk'));
+        abort_if($company?->isHospitalCollectionPilot(), 422, __('pos.hospital_use_collection_desk'));
 
         // 🧹 Server-side empty-row scrub — defense-in-depth in case JS cleanEmptyItems missed any
         $rawItems = $request->input('items', []);
@@ -3492,6 +3499,9 @@ class FbrPosController extends Controller
     {
         if (Company::find(app('currentCompanyId'))?->isSchoolFeePilot()) {
             return app(FbrPosSchoolFeeController::class)->history($request);
+        }
+        if (Company::find(app('currentCompanyId'))?->isHospitalCollectionPilot()) {
+            return app(FbrPosHospitalController::class)->history($request);
         }
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
@@ -7333,6 +7343,9 @@ class FbrPosController extends Controller
         if (Company::find(app('currentCompanyId'))?->isSchoolFeePilot()) {
             return app(FbrPosSchoolFeeController::class)->dayClose($request);
         }
+        if (Company::find(app('currentCompanyId'))?->isHospitalCollectionPilot()) {
+            return app(FbrPosHospitalController::class)->dayClose($request);
+        }
         // Owner rule (5 Aug 2026, mirrored from PRA): Day Close is admin/manager
         // work by DEFAULT. A cashier reaches it only when the company switch or
         // a Team Custom Access tick re-opens it — dayCloseAllowed = single
@@ -8024,6 +8037,7 @@ class FbrPosController extends Controller
     public function closeAllPriorDays(Request $request)
     {
         abort_if(Company::find(app('currentCompanyId'))?->isSchoolFeePilot(), 422, __('pos.school_close_blocked'));
+        abort_if(Company::find(app('currentCompanyId'))?->isHospitalCollectionPilot(), 422, __('pos.hospital_use_collection_desk'));
         // Same authority gate as the single close (owner rule 5 Aug 2026).
         $user = Auth::guard('fbrpos')->user();
         if ($user && !\App\Services\PosAccessService::dayCloseAllowed($user)) {
@@ -8153,6 +8167,9 @@ class FbrPosController extends Controller
     {
         if (Company::find(app('currentCompanyId'))?->isSchoolFeePilot()) {
             return app(FbrPosSchoolFeeController::class)->close($request);
+        }
+        if (Company::find(app('currentCompanyId'))?->isHospitalCollectionPilot()) {
+            return app(FbrPosHospitalController::class)->close($request);
         }
         // Owner rule (5 Aug 2026, mirrored from PRA): cashier day-close only
         // via company switch / Custom Access tick.

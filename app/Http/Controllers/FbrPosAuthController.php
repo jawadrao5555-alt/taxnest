@@ -154,6 +154,11 @@ class FbrPosAuthController extends Controller
     public function register(Request $request)
     {
         $request->validate([
+            'product_type' => 'nullable|string|in:fbrpos',
+            'business_category' => 'nullable|string|same:pos_type',
+            'requested_plan' => 'nullable|string|max:255',
+            // Older forms send an ID; validate it within this product, never as an entitlement.
+            'pricing_plan_id' => ['nullable', 'integer', \Illuminate\Validation\Rule::exists('pricing_plans', 'id')->where('product_type', 'fbrpos')->where('is_trial', 0)],
             'company_name' => 'required|string|max:255',
             // Unique INSIDE the FBR POS line only (owner ruling, 5 Sep 2026):
             // the same NTN legitimately runs a hotel on PRA POS and a Tier-1
@@ -191,17 +196,25 @@ class FbrPosAuthController extends Controller
         // hasColumn-guarded: signup must never 500 on a deployment (or a minimal
         // test schema) where the column has not landed yet.
         $storeSlipDefault = \Illuminate\Support\Facades\Schema::hasColumn('companies', 'kitchen_printer_enabled')
-            ? ['kitchen_printer_enabled' => $posType !== 'education']
+            ? ['kitchen_printer_enabled' => !in_array($posType, ['education', 'clinic', 'hospital'], true)]
             : [];
 
-        // Task 1484: the package the shop clicked on the landing table, carried
-        // here by a hidden field. Re-resolved server-side, so a tampered,
-        // unknown, trial or wrong-product name is ignored rather than stored —
-        // and a signup with no package behind it stores nothing at all.
-        // FBR POS is licensed by the YEAR, so there is no cycle to remember.
-        $requestedPackage = \App\Services\RequestedPackageService::companyAttributes(
-            \App\Services\RequestedPackageService::resolvePlan($request->input('requested_plan'), 'fbrpos')
-        );
+        // The optional selected package is validated against this product.
+        // Missing selection remains compatible; a nonempty invalid choice must
+        // not silently create a different package/trial account.
+        $selectedPlan = \App\Services\RequestedPackageService::resolvePlan($request->input('requested_plan'), 'fbrpos');
+        if ($request->filled('requested_plan') && !$selectedPlan) {
+            throw ValidationException::withMessages(['requested_plan' => 'Select an available FBR POS package.']);
+        }
+        if ($request->filled('pricing_plan_id')) {
+            $legacyPlan = \App\Models\PricingPlan::find($request->integer('pricing_plan_id'));
+            if (!$legacyPlan || \App\Services\PlanSellabilityService::isRetired($legacyPlan)
+                || ($selectedPlan && (int) $selectedPlan->id !== (int) $legacyPlan->id)) {
+                throw ValidationException::withMessages(['pricing_plan_id' => 'Select a matching available FBR POS package.']);
+            }
+            $selectedPlan ??= $legacyPlan;
+        }
+        $requestedPackage = \App\Services\RequestedPackageService::companyAttributes($selectedPlan);
 
         // Company, owner, credential ledger and zero-price trial are one unit.
         // Never sign in or consume the referral session after a partial signup.
@@ -279,7 +292,8 @@ class FbrPosAuthController extends Controller
     private function redirectToPortal(): \Illuminate\Http\RedirectResponse
     {
         $company = Auth::guard('fbrpos')->user()?->company;
-        return redirect()->away($company?->isSchoolFeePilot() ? '/fbr-pos/school-fees' : self::PORTAL);
+        return redirect()->away($company?->isSchoolFeePilot() ? '/fbr-pos/school-fees'
+            : ($company?->isHospitalCollectionPilot() ? '/fbr-pos/hospital' : self::PORTAL));
     }
 
     /**

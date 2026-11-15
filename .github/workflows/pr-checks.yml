@@ -109,9 +109,9 @@ jobs:
           php-version: '8.4'
       - name: Install locked PHP dependencies without application scripts
         run: composer install --no-interaction --prefer-dist --no-progress --no-ansi --no-scripts
-      - name: Check school cash collection and existing retail regressions
+      - name: Check school and hospital collections and existing retail regressions
         run: |
-          for test in tests/Feature/FbrPosSchoolFeePilotTest.php tests/Feature/RequestedPackageSignupTest.php tests/Feature/FbrPosStoreReplayGuardTest.php tests/Feature/FbrPosFiscalReceiptIdentityTest.php; do
+          for test in tests/Feature/FbrPosSchoolFeePilotTest.php tests/Feature/FbrPosHospitalCollectionTest.php tests/Feature/RequestedPackageSignupTest.php tests/Feature/FbrPosStoreReplayGuardTest.php tests/Feature/FbrPosFiscalReceiptIdentityTest.php; do
             bash scripts/rc-safe-run -- vendor/bin/phpunit "$test" --testdox || exit $?
           done
       - name: Check PRA DI sandbox and production environment isolation
@@ -296,13 +296,13 @@ jobs:
         run: |
           bash scripts/rc-browser-fixture.sh setup
           RC_BROWSER_ONLY=fbr-di-bulk bash scripts/rc-browser-fixture.sh run
-      - name: Verify school cash collection and reprint at desktop and 390px
+      - name: Verify school and hospital collections at desktop and 390px
         id: school_fee_browser
         env:
           RC_MARIADB_PORT: '33117'
           RC_BROWSER_PORT: '5911'
           RC_BROWSER_STATE_ROOT: /tmp/taxnest-rc-browser-${{ github.run_id }}-${{ github.job }}
-        run: RC_BROWSER_ONLY=school-fees bash scripts/rc-browser-fixture.sh run
+        run: RC_BROWSER_ONLY=school-fees,hospital-collections bash scripts/rc-browser-fixture.sh run
       - name: Verify Tax Integrations at desktop and 390px mobile
         env:
           RC_MARIADB_PORT: '33117'

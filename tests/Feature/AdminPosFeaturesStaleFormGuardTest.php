@@ -237,6 +237,35 @@ class AdminPosFeaturesStaleFormGuardTest extends TestCase
         $this->assertSame('gym', $this->company()->business_category);
     }
 
+    public function test_authorized_category_change_synchronizes_both_fields_and_blocks_fiscal_for_local_pilot(): void
+    {
+        Schema::table('companies', function (Blueprint $t) {
+            $t->string('pos_type')->nullable();
+            $t->boolean('fbr_reporting_enabled')->default(true);
+        });
+        DB::table('companies')->where('id', $this->companyId)->update([
+            'product_type' => 'fbrpos', 'business_category' => 'retail', 'pos_type' => 'retail',
+        ]);
+        $this->actAsAdmin();
+        $this->put($this->url(), ['business_category' => 'clinic'])->assertRedirect()->assertSessionHasNoErrors();
+        $hospital = $this->company();
+        $this->assertSame('clinic', $hospital->business_category);
+        $this->assertSame('clinic', $hospital->pos_type);
+        $this->assertFalse((bool) $hospital->getRawOriginal('fbr_reporting_enabled'));
+        $this->assertTrue($hospital->isHospitalCollectionPilot());
+        DB::table('companies')->where('id', $this->companyId)->update([
+            'pos_type' => 'education', 'fbr_reporting_enabled' => true,
+        ]);
+        $this->put($this->url(), ['business_category' => 'clinic'])->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame('clinic', $this->company()->pos_type);
+        $this->assertFalse((bool) $this->company()->getRawOriginal('fbr_reporting_enabled'));
+        $this->put($this->url(), ['business_category' => 'retail'])->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame('retail', $this->company()->pos_type);
+        $this->assertFalse($this->company()->isLocalCollectionPilot());
+        // Leaving the pilot must never implicitly turn fiscal reporting back on.
+        $this->assertFalse((bool) $this->company()->getRawOriginal('fbr_reporting_enabled'));
+    }
+
     // ── helpers ───────────────────────────────────────────────────────────
 
     private function seedShop(): void

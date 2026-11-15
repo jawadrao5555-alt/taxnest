@@ -16,7 +16,8 @@
         <input type="hidden" name="expected_branch_key" value="{{ $schoolCampusId ?? 0 }}">
         <div class="grid">
             <div><label for="student_reference">{{ __('pos.school_student_reference') }}</label><input id="student_reference" name="student_reference" value="{{ old('student_reference') }}" maxlength="100" required autocomplete="off"><div class="muted">{{ __('pos.school_reference_hint') }}</div></div>
-            <div><label for="fee_head">{{ __('pos.school_fee_head') }}</label><select id="fee_head" name="fee_head" required>@foreach(['tuition','admission','exam'] as $head)<option value="{{ $head }}" @selected(old('fee_head', 'tuition') === $head)>{{ __('pos.school_head_'.$head) }}</option>@endforeach</select></div>
+            <div><label for="fee_head">{{ __('pos.school_fee_head') }}</label><select id="fee_head" name="fee_head" required>@foreach($feeHeads as $head)<option value="{{ $head['code'] }}" @selected(old('fee_head', 'tuition') === $head['code'])>{{ $head['label'] }}</option>@endforeach</select></div>
+            <div><label for="fee_period">{{ __('school.period') }}</label><input type="month" id="fee_period" name="fee_period" value="{{ old('fee_period', now()->format('Y-m')) }}" required><div class="muted">{{ __('school.default_month') }}</div></div>
             <div><label for="amount">{{ __('pos.school_amount') }} (PKR)</label><input id="amount" name="amount" type="number" min="0.01" max="99999999.99" step="0.01" value="{{ old('amount') }}" required inputmode="decimal"></div>
         </div>
         <label class="cash-confirm"><input type="checkbox" name="cash_confirmed" value="1" required @disabled($collectionClosed)> <span>{{ __('pos.school_confirm_cash') }}</span></label>
@@ -26,7 +27,7 @@
 <section class="card"><h2>{{ __('pos.school_receipt_history') }}</h2><div class="scroll">
 <table><thead><tr><th>{{ __('pos.school_receipt') }}</th><th>{{ __('pos.school_student_reference') }}</th><th>{{ __('pos.school_fee_head') }}</th><th>PKR</th><th>{{ __('pos.school_collected_at') }}</th></tr></thead><tbody>
 @forelse($receipts as $receipt)
-<tr><td><a href="/fbr-pos/school-fees/{{ $receipt->id }}/receipt">SF-{{ $receipt->id }}</a></td><td>{{ $receipt->student_reference }}</td><td>{{ __('pos.school_head_'.$receipt->fee_head) }}</td><td>{{ number_format($receipt->amount_paisa / 100, 2) }}</td><td>{{ $receipt->collected_at }}</td></tr>
+<tr><td><a href="/fbr-pos/school-fees/{{ $receipt->id }}/receipt">SF-{{ $receipt->id }}</a></td><td>{{ $receipt->student_reference }}</td><td>{{ $receipt->fee_head_label ?? __('pos.school_head_'.$receipt->fee_head) }}</td><td>{{ number_format($receipt->amount_paisa / 100, 2) }}</td><td>{{ $receipt->collected_at }}</td></tr>
 @empty<tr><td colspan="5">{{ __('pos.school_no_receipts') }}</td></tr>@endforelse
 </tbody></table></div>{{ $receipts->links() }}</section>
 <script>

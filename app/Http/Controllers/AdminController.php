@@ -1133,6 +1133,19 @@ class AdminController extends Controller
                 : $company->business_category,
         ];
 
+        // Keep both category fields coherent on an explicit authorized change.
+        // Runtime fail-closed detection reads either field during rolling upgrades.
+        if ($isSuperAdmin && $request->filled('business_category')) {
+            if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'pos_type')) {
+                $update['pos_type'] = $update['business_category'];
+            }
+            if ($company->product_type === 'fbrpos'
+                && in_array($update['business_category'], ['education', 'clinic', 'hospital'], true)
+                && \Illuminate\Support\Facades\Schema::hasColumn('companies', 'fbr_reporting_enabled')) {
+                $update['fbr_reporting_enabled'] = false;
+            }
+        }
+
         $flags = $oldFlags;
         if ($flagsPresent) {
             $flags = [];

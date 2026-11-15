@@ -39,6 +39,27 @@ export async function schoolFeeWorkflow(page, t, v, { baseUrl, saveEvidenceScree
   await page.getByRole('button', { name: 'Print / Reprint', exact: true }).click();
   if (await page.evaluate(() => window.__legacyPrint) !== 1) throw new Error('Legacy reprint did not invoke browser print');
   await saveEvidenceScreenshot(page, 'school-fee-legacy-readonly-' + v.width);
+  // Configure real school controls before taking the cash baseline.
+  const campusName = 'Synthetic Campus ' + v.width;
+  const customLabel = 'Synthetic Transport ' + v.width;
+  await page.goto(baseUrl + '/fbr-pos/school-fees/settings', { waitUntil: 'domcontentloaded' });
+  for (const name of [campusName, campusName + ' Annex']) {
+    const campus = page.locator('#school-add-campus');
+    await campus.locator('[name="name"]').fill(name);
+    await Promise.all([page.waitForNavigation({ waitUntil: 'domcontentloaded' }), campus.locator('button[type="submit"]').click()]);
+  }
+  const headForm = page.locator('#school-add-head');
+  await headForm.locator('[name="label"]').fill(customLabel);
+  await Promise.all([page.waitForNavigation({ waitUntil: 'domcontentloaded' }), headForm.locator('button[type="submit"]').click()]);
+  await page.goto(baseUrl + '/fbr-pos/school-fees', { waitUntil: 'domcontentloaded' });
+  const switcher = page.locator('#school-campus-switcher');
+  await Promise.all([page.waitForNavigation({ waitUntil: 'domcontentloaded' }), switcher.locator('select').selectOption({ label: campusName })]);
+  const branchKey = await page.locator('#school-collection [name="expected_branch_key"]').inputValue();
+  if (branchKey === '0') throw new Error('Configured campus did not bind collection');
+  const feePeriod = await page.locator('#school-collection [name="fee_period"]').inputValue();
+  if (!/^\d{4}-\d{2}$/.test(feePeriod)) throw new Error('School fee period default is invalid');
+  await page.locator('#school-collection [name="fee_head"]').selectOption({ label: customLabel });
+  const feeHead = await page.locator('#school-collection [name="fee_head"]').inputValue();
   const reportTotals = async path => {
     const response = await page.goto(baseUrl + path, { waitUntil: 'domcontentloaded' });
     if (!response?.ok()) throw new Error('School cash report failed: ' + path);
@@ -59,7 +80,7 @@ export async function schoolFeeWorkflow(page, t, v, { baseUrl, saveEvidenceScree
         throw new Error('School navigation exposed retail menu: ' + retail);
       }
     }
-    if (await page.locator('#school-campus-switcher').count()) throw new Error('Single-campus school rendered unnecessary campus switcher');
+    if (await page.locator('#school-campus-switcher select option').count() !== 2) throw new Error('Configured campus selector does not contain both authorized campuses');
     return { count: Number(await page.locator('#school-today-count').innerText()),
       paisa: Number(await page.locator('#school-today-cash').getAttribute('data-paisa')),
       status: (await page.locator('#school-today-status').innerText()).trim() };
@@ -80,6 +101,7 @@ export async function schoolFeeWorkflow(page, t, v, { baseUrl, saveEvidenceScree
   page.on('request', countStorageFailurePost);
   await page.evaluate(() => { Storage.prototype.setItem = () => { throw new DOMException('Synthetic storage unavailable', 'QuotaExceededError'); }; });
   await form.locator('[name="student_reference"]').fill('SYN-NOT-SENT');
+  await form.locator('[name="fee_period"]').fill(feePeriod);
   await form.locator('[name="amount"]').fill('1.00');
   await form.locator('[name="cash_confirmed"]').check();
   await form.getByRole('button', { name: 'Record cash received', exact: true }).click();
@@ -93,7 +115,8 @@ export async function schoolFeeWorkflow(page, t, v, { baseUrl, saveEvidenceScree
   const reference = 'SYN-' + v.width + '-' + randomUUID().slice(0, 8);
   const key = await form.locator('[name="request_key"]').inputValue();
   await form.locator('[name="student_reference"]').fill(reference);
-  await form.locator('[name="fee_head"]').selectOption('tuition');
+  await form.locator('[name="fee_head"]').selectOption(feeHead);
+  await form.locator('[name="fee_period"]').fill(feePeriod);
   await form.locator('[name="amount"]').fill('1250.50');
   await form.locator('[name="cash_confirmed"]').check();
   const overflow = await page.evaluate(() => Math.max(document.documentElement.scrollWidth, document.body.scrollWidth));
@@ -126,7 +149,8 @@ export async function schoolFeeWorkflow(page, t, v, { baseUrl, saveEvidenceScree
   if (await form.locator('[name="request_key"]').inputValue() !== key) throw new Error('Refresh replaced the uncertain saved payment key');
   await page.locator('#school-recovery-notice').filter({ hasText: 'Do not collect cash again' }).waitFor();
   await form.locator('[name="student_reference"]').fill(reference);
-  await form.locator('[name="fee_head"]').selectOption('tuition');
+  await form.locator('[name="fee_head"]').selectOption(feeHead);
+  await form.locator('[name="fee_period"]').fill(feePeriod);
   await form.locator('[name="amount"]').fill('1250.50');
   await form.locator('[name="cash_confirmed"]').check();
   await saveEvidenceScreenshot(page, 'school-fee-lost-response-recovery-' + v.width);
@@ -144,7 +168,7 @@ export async function schoolFeeWorkflow(page, t, v, { baseUrl, saveEvidenceScree
   if (await page.evaluate(name => sessionStorage.getItem(name), pendingStorageKey) !== null) throw new Error('Matching receipt did not clear pending recovery key');
   const assertReceipt = async () => {
     const body = await page.locator('body').innerText();
-    for (const text of [reference, 'Tuition', 'Cash', 'PKR 1,250.50', 'LOCAL RECEIPT ONLY', 'Not submitted to FBR']) {
+    for (const text of [reference, customLabel, feePeriod, campusName, v.width < 768 ? 'Synthetic Mobile School Owner' : 'Synthetic School Owner', 'Cash', 'PKR 1,250.50', 'LOCAL RECEIPT ONLY', 'Not submitted to FBR']) {
       if (!body.includes(text)) throw new Error('School receipt missing: ' + text);
     }
     if (await page.locator('article canvas,article svg,article img').count()) throw new Error('Local school receipt unexpectedly rendered a fiscal QR/image');
@@ -166,17 +190,17 @@ export async function schoolFeeWorkflow(page, t, v, { baseUrl, saveEvidenceScree
   const csrf = await form.locator('[name="_token"]').inputValue();
   const replay = await page.request.post(baseUrl + '/fbr-pos/school-fees', {
     headers: { Accept: 'application/json', 'X-CSRF-TOKEN': csrf },
-    form: { request_key: key, student_reference: reference, fee_head: 'tuition', amount: '1250.50', payment_method: 'cash', expected_branch_key: '0' },
+    form: { request_key: key, student_reference: reference, fee_head: feeHead, fee_period: feePeriod, amount: '1250.50', payment_method: 'cash', expected_branch_key: branchKey },
   });
   const replayed = await replay.json();
   if (!replay.ok() || !replayed.success || Number(replayed.receipt_id) !== receiptId) throw new Error('Lost-response retry did not return the same persisted receipt');
   // A saved-but-lost response may be retried, but changing its immutable
   // payment details must return a clear 422 without changing the receipt.
   const originalReceipt = await (await page.request.get(baseUrl + receiptPath)).text();
-  for (const change of [{ amount: '999.00' }, { fee_head: 'exam' }, { student_reference: reference + '-CHANGED' }]) {
+  for (const change of [{ fee_period: '2000-01' }, { amount: '999.00' }, { fee_head: 'exam' }, { student_reference: reference + '-CHANGED' }]) {
     const conflict = await page.request.post(baseUrl + '/fbr-pos/school-fees', {
       headers: { Accept: 'application/json', 'X-CSRF-TOKEN': csrf },
-      form: { request_key: key, student_reference: reference, fee_head: 'tuition', amount: '1250.50', payment_method: 'cash', expected_branch_key: '0', ...change },
+      form: { request_key: key, student_reference: reference, fee_head: feeHead, fee_period: feePeriod, amount: '1250.50', payment_method: 'cash', expected_branch_key: branchKey, ...change },
     });
     const rejected = await conflict.json();
     if (conflict.status() !== 422 || !rejected.errors?.request_key?.[0]?.includes('different details')) {
@@ -205,9 +229,15 @@ export async function schoolFeeWorkflow(page, t, v, { baseUrl, saveEvidenceScree
     }
     await saveEvidenceScreenshot(page, 'school-fee-' + (path.endsWith('transactions') ? 'sales-history-' : 'cash-preview-') + v.width);
   }
+  await page.goto(baseUrl + '/fbr-pos/transactions?search=' + encodeURIComponent(reference), { waitUntil: 'domcontentloaded' });
+  if (await page.getByRole('row').filter({ hasText: reference }).count() !== 1) throw new Error('Receipt search missed collection');
+  await page.goto(baseUrl + '/fbr-pos/transactions?search=NO-MATCH-SYNTHETIC', { waitUntil: 'domcontentloaded' });
+  if (await page.getByRole('row').filter({ hasText: reference }).count()) throw new Error('Receipt search ignored filter');
+  await reportTotals('/fbr-pos/day-close');
   const closeForm = page.locator('#school-close-form');
   await closeForm.waitFor();
   const closeUrl = new URL(await closeForm.getAttribute('action'), baseUrl).href;
+  await closeForm.locator('[name="counted_cash"]').fill('1250.00');
   const closeFields = await closeForm.locator('input').evaluateAll(inputs => Object.fromEntries(
     inputs.filter(input => input.name).map(input => [input.name, input.value])));
   await closeForm.locator('[name="confirm"]').check();
@@ -217,9 +247,11 @@ export async function schoolFeeWorkflow(page, t, v, { baseUrl, saveEvidenceScree
   ]);
   await page.locator('#school-close-status').filter({ hasText: 'Closed' }).waitFor();
   const closedTotals = await reportTotals('/fbr-pos/day-close');
+  if (Number(await page.locator('#school-counted-total').getAttribute('data-paisa')) !== 125000
+      || Number(await page.locator('#school-variance').getAttribute('data-paisa')) !== -50) throw new Error('Counted school cash/variance snapshot incorrect');
   const postCloseRetry = await page.request.post(baseUrl + '/fbr-pos/school-fees', {
     headers: { Accept: 'application/json', 'X-CSRF-TOKEN': csrf },
-    form: { request_key: key, student_reference: reference, fee_head: 'tuition', amount: '1250.50', payment_method: 'cash', expected_branch_key: '0' },
+    form: { request_key: key, student_reference: reference, fee_head: feeHead, fee_period: feePeriod, amount: '1250.50', payment_method: 'cash', expected_branch_key: branchKey },
   });
   if (!postCloseRetry.ok() || Number((await postCloseRetry.json()).receipt_id) !== receiptId) throw new Error('Saved retry failed after final close');
   const repeatedClose = await page.request.post(closeUrl, {
@@ -229,7 +261,7 @@ export async function schoolFeeWorkflow(page, t, v, { baseUrl, saveEvidenceScree
   for (const change of [{ request_key: randomUUID(), cash_confirmed: '1' }, { amount: '999.00' }, { fee_head: 'exam' }, { student_reference: reference + '-CHANGED' }]) {
     const blocked = await page.request.post(baseUrl + '/fbr-pos/school-fees', {
       headers: { Accept: 'application/json', 'X-CSRF-TOKEN': csrf },
-      form: { request_key: key, student_reference: reference, fee_head: 'tuition', amount: '1250.50', payment_method: 'cash', expected_branch_key: '0', ...change },
+      form: { request_key: key, student_reference: reference, fee_head: feeHead, fee_period: feePeriod, amount: '1250.50', payment_method: 'cash', expected_branch_key: branchKey, ...change },
     });
     if (blocked.status() !== 422) throw new Error('Closed school day accepted late or changed payment');
   }
@@ -249,7 +281,8 @@ export async function schoolFeeWorkflow(page, t, v, { baseUrl, saveEvidenceScree
     throw new Error('Closed desk stranded the known saved-request recovery');
   }
   await form.locator('[name="student_reference"]').fill(reference);
-  await form.locator('[name="fee_head"]').selectOption('tuition');
+  await form.locator('[name="fee_head"]').selectOption(feeHead);
+  await form.locator('[name="fee_period"]').fill(feePeriod);
   await form.locator('[name="amount"]').fill('1250.50');
   await form.locator('[name="cash_confirmed"]').check();
   await Promise.all([
@@ -265,5 +298,5 @@ export async function schoolFeeWorkflow(page, t, v, { baseUrl, saveEvidenceScree
   const dashboardAfter = await dashboardTotals();
   if (dashboardAfter.count !== dashboardBefore.count + 1 || dashboardAfter.paisa !== dashboardBefore.paisa + 125050
       || dashboardBefore.status !== 'Open' || dashboardAfter.status !== 'Closed') throw new Error('School dashboard totals/status disagree with final cash close');
-  pass('SCHOOL FEE PASS: ' + v.width + ': public category selection, real cash POST with lost response, refresh recovery to same receipt, UUID-only storage/failure guard, closed-day recovery, persisted receipt/history, same-key retry, print CSS and reprint action; no fiscal submission and no physical printer claim');
+  pass('SCHOOL FEE PASS: ' + v.width + ': campus setup/custom fee head/month and cashier snapshots, receipt search/counted-cash variance, public category selection, real cash POST with lost response, refresh recovery to same receipt, UUID-only storage/failure guard, closed-day recovery, persisted receipt/history, same-key retry, print CSS and reprint action; no fiscal submission and no physical printer claim');
 }

@@ -54,3 +54,8 @@ test('platform expense evidence is one exact reconciled synthetic view',()=>{
  for(const width of [1366,390])assert.equal(pixelName(`platform-expense-reconciled-${width}`),`platform-expense-reconciled-${width}.png`);
  for(const name of ['platform-expense-arbitrary-390','platform-expense-reconciled-1280','platform-expense-reconciled-390.png','../platform-expense-reconciled-390'])assert.throws(()=>pixelName(name));
 });
+
+test('trial policy and ERP signup permit only named synthetic views',()=>{
+ for(const prefix of ['billing-policy-trial','signup-erps'])for(const width of [1366,390])assert.equal(pixelName(`${prefix}-${width}`),`${prefix}-${width}.png`);
+ for(const name of ['billing-policy-arbitrary-390','signup-erps-1280','signup-erps-390.png','../billing-policy-trial-390'])assert.throws(()=>pixelName(name));
+});

@@ -27,7 +27,7 @@ export async function aiUsageWorkflow(page,t,v,{baseUrl,login,loopback,dismiss,w
       const overlaps=dr&&visible.bottom>visible.top&&dr.bottom>visible.top&&dr.top<visible.bottom&&dr.right>visible.left&&dr.left<visible.right;
       const table=document.querySelector('#ai-usage-events');
       return {within:content.left>=0&&content.right<=innerWidth+1,
-        dockSafe:!dock||(dock.dataset.madadgarPlacement==='inline'&&!overlaps),
+        dockSafe:!dock||(dock.dataset.madadgarPlacement==='inline'&&!overlaps&&getComputedStyle(dock).bottom==='auto'&&getComputedStyle(dock).left==='auto'),
         scroll:getComputedStyle(table).overflowX==='auto'&&table.clientWidth<=innerWidth,
         cellPadding:parseFloat(getComputedStyle(table.querySelector('td')).paddingLeft)>=10};
     });

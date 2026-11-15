@@ -18,9 +18,9 @@ export async function collectionSharedWorkspaceChecks(page, kind, v, {baseUrl, s
   await create.locator('[name="pos_role"]').selectOption('pos_cashier');
   if(campusLabel) await create.locator('[name="default_branch_id"]').selectOption({label:campusLabel});
   await Promise.all([page.waitForNavigation({waitUntil:'domcontentloaded'}),create.locator('button[type="submit"]').click()]);
-  const row=page.getByRole('row').filter({hasText:email});
+  const row=page.locator('[data-pilot-team-member]').filter({hasText:email});
   if(await row.count()!==1) throw new Error(kind+' synthetic cashier creation failed');
-  await row.getByRole('button',{name:'Edit',exact:true}).click();
+  await row.locator('summary').click();
   const edit=page.locator('form').filter({has:page.locator(`input[name="email"][value="${email}"]`)});
   await edit.locator('[name="name"]').waitFor({state:'visible'});
   const savedName=await edit.locator('[name="name"]').inputValue();
@@ -29,13 +29,16 @@ export async function collectionSharedWorkspaceChecks(page, kind, v, {baseUrl, s
   await edit.waitFor({state:'hidden'});
   await page.reload({waitUntil:'domcontentloaded'});
   if((await row.innerText()).includes('Unsaved synthetic edit')) throw new Error(kind+' cancelled team edit persisted');
-  await row.getByRole('button',{name:'Edit',exact:true}).click();
+  await row.locator('summary').click();
   await edit.locator('[name="name"]').fill(savedName+' updated');
-  await Promise.all([page.waitForNavigation({waitUntil:'domcontentloaded'}),edit.getByRole('button',{name:'Save Changes',exact:true}).click()]);
+  await Promise.all([page.waitForNavigation({waitUntil:'domcontentloaded'}),edit.locator('button[type="submit"]').click()]);
   if(!(await row.innerText()).includes(savedName+' updated')) throw new Error(kind+' team edit did not persist');
+  await row.locator('summary').click();
   await Promise.all([page.waitForNavigation({waitUntil:'domcontentloaded'}),row.getByRole('button',{name:'Deactivate',exact:true}).click()]);
+  await row.locator('summary').click();
   await row.getByRole('button',{name:'Activate',exact:true}).waitFor();
   await Promise.all([page.waitForNavigation({waitUntil:'domcontentloaded'}),row.getByRole('button',{name:'Activate',exact:true}).click()]);
+  await row.locator('summary').click();
   await row.getByRole('button',{name:'Deactivate',exact:true}).waitFor();
   await saveEvidenceScreenshot(page,kind+'-team-edit-active-'+v.width);
 }

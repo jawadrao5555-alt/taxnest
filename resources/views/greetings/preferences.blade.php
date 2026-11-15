@@ -20,7 +20,7 @@
 @if($recipient)<input type="hidden" name="id" value="{{ $recipient->id }}">@endif
 <label class="block">{{ __('greetings.name') }}<input name="name" value="{{ $recipient?->name }}" required maxlength="120"></label>
 <label class="block">{{ __('greetings.email') }}<input type="email" name="email" value="{{ $recipient?->email }}" required></label>
-<label class="block">{{ __('greetings.event') }}<select name="event">@foreach(\App\Services\CompanyGreetingService::EVENTS as $event)<option value="{{ $event }}" @selected($recipient?->event===$event)>{{ __('greetings.'.$event) }}</option>@endforeach</select></label>
+<label class="block" for="greeting-event-{{ $recipient?->id ?? 'new' }}">{{ __('greetings.event') }}</label><select id="greeting-event-{{ $recipient?->id ?? 'new' }}" name="event">@foreach(\App\Services\CompanyGreetingService::EVENTS as $event)<option value="{{ $event }}" @selected($recipient?->event===$event)>{{ __('greetings.'.$event) }}</option>@endforeach</select>
 <label class="block">{{ __('greetings.date') }}<input type="date" name="event_date" value="{{ $recipient?->event_date }}" required></label>
 <input type="hidden" name="email_consent" value="0"><label class="block"><input type="checkbox" name="email_consent" value="1" @checked($recipient?->email_consent)> {{ __('greetings.consent') }}</label>
 <button>{{ $recipient ? __('greetings.revoke') : __('greetings.add') }}</button>

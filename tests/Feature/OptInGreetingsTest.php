@@ -65,7 +65,8 @@ class OptInGreetingsTest extends TestCase
         $this->actingAs($owner)->from('/profile/greetings')->followingRedirects()
             ->post('/profile/greetings', ['enabled'=>false,'timezone'=>'Asia/Karachi','templates'=>['welcome'=>'Invalid {secret}']])
             ->assertOk()->assertSee('id="greeting-errors" role="alert" tabindex="-1"', false)
-            ->assertSee("document.getElementById('greeting-errors')", false);
+            ->assertSee("document.getElementById('greeting-errors')", false)
+            ->assertSee('for="greeting-event-new"', false)->assertSee('id="greeting-event-new" name="event"', false);
     }
 
     public function test_default_release_gate_never_calls_transport(): void

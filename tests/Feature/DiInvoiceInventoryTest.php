@@ -96,6 +96,18 @@ class DiInvoiceInventoryTest extends TestCase {
   $this->assertSame(0,DB::table('inventory_movements')->count());
  }
 
+ public function test_synthetic_interrupted_projection_uses_persisted_defaults_for_integrity():void {
+  $invoice=Invoice::withoutGlobalScopes()->create(['company_id'=>$this->company->id,'invoice_number'=>'SYN-FIXTURE-HOLD','buyer_name'=>'Synthetic stock buyer','buyer_ntn'=>'','buyer_address'=>'Synthetic address','total_amount'=>1012.34,'total_value_excluding_st'=>1012.34,'total_sales_tax'=>0,'status'=>'draft','document_type'=>'Sale Invoice','inventory_enabled_snapshot'=>true,'inventory_environment_snapshot'=>'production']);
+  $invoice->items()->create(['hs_code'=>'33049900','description'=>'Synthetic stock line','quantity'=>'10.1234','price'=>100,'tax'=>0,'default_uom'=>'KG','inventory_snapshot'=>['version'=>1,'company_id'=>$this->company->id,'product_id'=>$this->product->id,'branch_id'=>null,'base_uom'=>'KG','base_quantity'=>'10.1234','source_invoice_item_id'=>null]]);
+  DiFiscalSubmissionState::accepted($invoice,'SYNTHETIC-NOT-REGULATOR-HOLD','production','synthetic_browser_fixture');
+  $invoice->inventory_posting_state='reconciliation_hold';
+  $invoice->save();$invoice->refresh()->load('items');
+  $invoice->integrity_hash=IntegrityHashService::generate($invoice);$invoice->save();
+  $this->assertTrue(IntegrityHashService::verify($invoice->fresh()),'Held fixture must sign persisted/default-normalized values');
+  DiInvoiceInventory::retryStock($invoice->fresh());
+  $this->assertSame('posted',$invoice->fresh()->inventory_posting_state);
+  $this->assertSame('-10.1234',$this->stock());
+ }
  public function test_unexpected_stock_failure_preserves_acknowledgement_and_local_only_retry():void {
   $invoice=$this->draft($this->payload('1.2345',false));
   DB::statement("CREATE TRIGGER synthetic_stock_failure BEFORE INSERT ON inventory_movements BEGIN SELECT RAISE(ABORT, 'synthetic stock failure'); END");

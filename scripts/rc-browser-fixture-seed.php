@@ -1106,6 +1106,8 @@ foreach ([1366,390] as $width) {
         if($kind==='hold') {
             // Simulate an acknowledged fixture whose local projection has not completed.
             $invoice->inventory_posting_state='reconciliation_hold';
+            $invoice->save();
+            $invoice->refresh()->load('items'); // Sign durable DB defaults, not an incompletely hydrated factory model.
             $invoice->integrity_hash=\App\Services\IntegrityHashService::generate($invoice);
             $invoice->save();
         } else \App\Services\DiInvoiceInventory::saveAccepted($invoice);

@@ -15,6 +15,10 @@ class AgentCoreLedgerRefundProjectorTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        // This fixture rebuilds branches and reuses company IDs. Do not retain
+        // another test's branch/healing memo across that database boundary.
+        \App\Services\BranchStockService::flushMemo();
         Schema::dropAllTables();
 
         Schema::create('companies', function (Blueprint $table): void {

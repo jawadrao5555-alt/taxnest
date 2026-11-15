@@ -13,3 +13,9 @@ Outer FBR product creation/edit/stock correction, stock purchase/void/transfer, 
 The three FBR prospective hints also check policy schema availability before querying subscriptions, preserving legacy/minimal-schema store and delete paths.
 
 No quantities, amounts, fiscal behavior, legacy entitlements, or refund eligibility are changed. Required native receiving-versus-sale and other lock-order probes must run on the integrated commit; SQLite regressions cannot establish InnoDB deadlock freedom.
+
+## Demonstrated fixture isolation correction
+
+In the isolated review worktree based on `dd013266`, an aggregate run placing branch-stock cases before `AgentCoreLedgerRefundProjectorTest` read stock quantity 3 instead of the expected 4; placing that refund fixture before `FbrPosProductFullEditTest` produced six unexpected branch-selection errors. The same 66-test ordering reproduced the latter six failures with identical 567 assertions both before and after the outer-lock patch. Each affected class passed independently.
+
+Both fixtures drop/recreate the database and reuse company IDs but omitted `BranchStockService::flushMemo()`. Its static branch/healed/table memo could therefore survive the fixture's database boundary. Resetting that memo only in those two fixtures' setup retained every original quantity and branch assertion and produced 140 tests / 548 assertions PASS in the combined diagnostic order. This does not change production caching and does not establish that every full-suite failure is fixed.

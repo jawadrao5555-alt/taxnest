@@ -24,3 +24,11 @@ No real FBR, customer invoices, stock, payment or production settings were used.
 `di-inventory-projection` seeds two independent fictional DI tenants for desktop and 390px. No regulator transport is invoked: acknowledgement references explicitly start `SYNTHETIC-NOT-REGULATOR` and provenance is `synthetic_browser_fixture`.
 
 The UI proof checks posted status, one movement with base quantity50 and balance50 from opening100, sandbox no-stock status, and a synthetic interrupted projection held before stock writes. Clicking only local stock retry posts10.1234 to39.8766; exact retry must leave that balance and one movement unchanged. Foreign-tenant invoice and stock history URLs must deny without acknowledgement leakage. Browser fiscal submission routes are blocked and any attempted dispatch fails acceptance. Sanitized screenshots cover posted invoice, movement, sandbox notice and local recovery at both widths. This is not real FBR acceptance evidence or completed hosted-browser proof until CI executes it.
+
+## Operational rollback and fatal database failures
+
+Do not run `migrate:rollback` after any invoice posting/reservation data exists: down() drops additive posting evidence, even though it deliberately does not narrow physical quantities. Operational rollback must disable new rollout/code only while preserving tables and verified snapshots. A schema rollback is not certified as financially reversible.
+
+A recoverable stock statement/validation error rolls back its savepoint and persists the accepted invoice with inventory HOLD. MySQL deadlock, serialization loss or lost connection may destroy the whole parent transaction; these errors are rethrown, never swallowed as a successful accepted-row commit. The already committed fiscal lease remains non-reclaimable, and automated sync/job/API/batch acceptance has the separate FbrService success log (retaining the regulator invoice number) written before stock finalization. Recovery must use that evidence, never issue another regulator request blindly.
+
+Manual confirmation is an owner-provided assertion, not a regulator call. If its transaction fails fatally, the invoice remains pending verification; the owner must repeat the explicit confirmation. There is no automatic confirmation, automatic regulator retry or invented durable manual-acknowledgement journal.

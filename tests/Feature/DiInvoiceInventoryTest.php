@@ -152,4 +152,32 @@ class DiInvoiceInventoryTest extends TestCase {
   $this->assertSame(1,DB::table('inventory_movements')->count());Http::assertNothingSent();
  }
 
+ public function test_stale_owner_demotion_inactivity_or_company_transfer_cannot_retry_stock():void {
+  $invoice=$this->draft($this->payload());$this->accept($invoice);
+  $request=\Illuminate\Http\Request::create('/invoice/'.$invoice->id.'/retry-inventory','POST');$request->setUserResolver(fn()=>$this->owner);$request->setLaravelSession(app('session')->driver());
+  $foreign=Company::create(['name'=>'Other synthetic','ntn'=>'STALEOWNER','product_type'=>'di']);
+  foreach([['role'=>'employee'],['is_active'=>false],['company_id'=>$foreign->id]] as $change) {
+   DB::table('users')->where('id',$this->owner->id)->update(array_merge(['role'=>'company_admin','is_active'=>true,'company_id'=>$this->company->id],$change));
+   try{app(\App\Http\Controllers\InvoiceInventoryController::class)->retry($request,$invoice);$this->fail('Stale owner authority accepted');}catch(\Symfony\Component\HttpKernel\Exception\HttpExceptionInterface $e){$this->assertSame(403,$e->getStatusCode());}
+  }
+  $this->assertSame(1,DB::table('inventory_movements')->count());Http::assertNothingSent();
+ }
+ public function test_fatal_stock_exception_rethrows_and_parent_rollback_preserves_prior_ack_log_and_lease():void {
+  $invoice=$this->draft($this->payload('1',false));$invoice=DiFiscalSubmissionState::reserve($invoice->id,'sync','production');
+  $log=\App\Models\FbrLog::create(['invoice_id'=>$invoice->id,'request_payload'=>'{}','response_payload'=>json_encode(['invoiceNumber'=>'SYNTHETIC-DURABLE-ACK']),'status'=>'success','environment_used'=>'production']);
+  DB::statement("CREATE TRIGGER synthetic_fatal_stock_failure BEFORE INSERT ON inventory_movements BEGIN SELECT RAISE(ABORT, 'Deadlock found when trying to get lock'); END");
+  DB::statement('SAVEPOINT synthetic_parent_before_ack');
+  DiFiscalSubmissionState::accepted($invoice,'SYNTHETIC-DURABLE-ACK','production','synthetic_test');
+  try{DiInvoiceInventory::saveAccepted($invoice);$this->fail('Fatal transaction failure swallowed');}catch(\Illuminate\Database\DeadlockException){}
+  // SQLite ABORT does not reproduce InnoDB's automatic whole-transaction deadlock rollback.
+  // Model that boundary explicitly; the assertion above tests real Laravel exception propagation.
+  DB::statement('ROLLBACK TO SAVEPOINT synthetic_parent_before_ack');
+  DB::statement('RELEASE SAVEPOINT synthetic_parent_before_ack');
+  DB::statement('DROP TRIGGER synthetic_fatal_stock_failure');
+  $this->assertSame('SYNTHETIC-DURABLE-ACK',json_decode($log->fresh()->response_payload,true)['invoiceNumber']);
+  $this->assertNotSame('locked',$invoice->fresh()->status);$this->assertTrue($invoice->fresh()->is_fbr_processing);$this->assertSame(0,DB::table('inventory_movements')->count());
+  $this->assertNull(DiFiscalSubmissionState::reserve($invoice->id,'sync','production'));
+  $this->travel(11)->minutes();$this->assertNull(DiFiscalSubmissionState::reserve($invoice->id,'sync','production'));$this->assertSame('pending_verification',$invoice->fresh()->status);Http::assertNothingSent();
+ }
+
 }

@@ -534,6 +534,9 @@
             </div>
         </div>
     </x-slot>
+    @if($invoice->inventory_posting_state === 'posted')
+      <div id="di-inventory-posted" class="max-w-7xl mx-auto my-4 p-4 border rounded">Physical inventory posted using frozen base quantities.</div>
+    @endif
     @if($invoice->inventory_posting_state === 'sandbox_no_stock')
       <div id="di-inventory-sandbox" class="max-w-7xl mx-auto my-4 p-4 border rounded">Sandbox / test invoice: physical inventory was not changed.</div>
     @endif

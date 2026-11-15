@@ -122,6 +122,11 @@ final class DiInvoiceInventory {
      $locked->inventory_posting_state=$locked->items()->whereNotNull('inventory_snapshot')->exists()?'posted':'not_applicable';
      $locked->inventory_posting_error=null;
     } catch(\Throwable $error) {
+     // MySQL deadlocks/lost connections can roll back the ENTIRE parent transaction.
+     // Never claim the local accepted-row save survived a destroyed transaction.
+     if($error instanceof \Illuminate\Database\DeadlockException || $error instanceof \Illuminate\Database\LostConnectionException
+       || (new \Illuminate\Database\ConcurrencyErrorDetector)->causedByConcurrencyError($error)
+       || (new \Illuminate\Database\LostConnectionDetector)->causedByLostConnection($error))throw $error;
      // The savepoint rolls back ALL stock/movement writes, not the regulator reference.
      report($error);
      $locked->inventory_posting_state='reconciliation_hold';
@@ -137,6 +142,7 @@ final class DiInvoiceInventory {
   DB::transaction(function()use($invoice){
    $locked=Invoice::withoutGlobalScopes()->where('company_id',$invoice->company_id)->whereKey($invoice->id)->lockForUpdate()->firstOrFail();
    if($locked->status!=='locked' || !$locked->fbr_invoice_number || $locked->inventory_enabled_snapshot!==true)self::reject('Only an acknowledged invoice can retry its local stock projection.');
+   if($locked->inventory_environment_snapshot!=='production' || $locked->fiscal_submission_environment!=='production' || $locked->inventory_posting_state==='sandbox_no_stock')self::reject('Only the original production invoice can recover physical stock; sandbox or unknown environments cannot be relabelled.');
    if(!IntegrityHashService::verify($locked))self::reject('Invoice integrity must be verified before local stock recovery.');
    self::saveAccepted($locked);$invoice->setRawAttributes($locked->getAttributes(),true);
   });

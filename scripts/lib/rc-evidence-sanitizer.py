@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import json
 import os
 import pathlib
 import re
@@ -51,6 +52,32 @@ NATIVE_SUMMARY_NAMES = {
     "upgrade-after.json",
     "upgrade-after-mismatch.json",
 }
+NATIVE_SCHEMA_NAMES = {"upgrade-decimal-schema-before.json", "upgrade-decimal-schema-after.json"}
+SCHEMA_FIELDS = {"inventory_stocks.quantity", "inventory_movements.quantity", "inventory_movements.balance_after"}
+
+
+def validated_schema_evidence(data: bytes) -> bytes:
+    """Exact non-sensitive schema shape, never generic database metadata/data."""
+    if len(data) > 8192:
+        raise ValueError("schema evidence exceeds size bound")
+    value = json.loads(data)
+    if not isinstance(value, dict) or set(value) != SCHEMA_FIELDS:
+        raise ValueError("unrecognized schema evidence fields")
+    for column in value.values():
+        if not isinstance(column, dict) or set(column) != {"data_type", "numeric_precision", "numeric_scale", "is_nullable", "column_default"}:
+            raise ValueError("unrecognized schema evidence attributes")
+        if column["data_type"] != "decimal" or column["is_nullable"] not in {"YES", "NO"}:
+            raise ValueError("unrecognized schema evidence type")
+        for key, low, high in [("numeric_precision", 1, 65), ("numeric_scale", 0, 30)]:
+            v = column[key]
+            if isinstance(v, bool) or not isinstance(v, (str, int)) or not re.fullmatch(r"[0-9]{1,2}", str(v)) or not low <= int(v) <= high:
+                raise ValueError("invalid schema precision")
+        default = column["column_default"]
+        if default is not None and (not isinstance(default, str) or not re.fullmatch(r"-?[0-9]{1,65}(?:\.[0-9]{1,30})?|NULL", default)):
+            raise ValueError("unrecognized schema default")
+    return (json.dumps(value, sort_keys=True, indent=2) + "\n").encode("utf-8")
+
+
 NATIVE_EVIDENCE_DIR = re.compile(r"^native_[A-Za-z0-9_]+$")
 SUPPLEMENTAL_EVIDENCE_DIR = re.compile(r"^supp(?:_|-)[A-Za-z0-9_-]+$")
 TEXT_SUFFIXES = {".json", ".md", ".txt", ".xml", ".junit"}
@@ -112,7 +139,7 @@ def allowlisted_sources(workspace: pathlib.Path, target: pathlib.Path) -> list[t
             len(relative.parts) == 2
             and NATIVE_EVIDENCE_DIR.fullmatch(relative.parts[0])
             and (
-                source.name in NATIVE_SUMMARY_NAMES
+                source.name in NATIVE_SUMMARY_NAMES or source.name in NATIVE_SCHEMA_NAMES
                 or source.name.startswith("native")
                 and source.suffix.lower() == ".json"
             )
@@ -178,6 +205,8 @@ def copy_redacted(
 ) -> int:
     with source.open("rb") as handle:
         data = handle.read(MAX_FILE_BYTES + 1)
+    if source.name in NATIVE_SCHEMA_NAMES:
+        data = validated_schema_evidence(data)
     text, _ = sanitize_bytes(data, max_bytes=MAX_FILE_BYTES, runtime=runtime)
     encoded = text.encode("utf-8")
     if total + len(encoded) > MAX_TOTAL_BYTES:

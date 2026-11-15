@@ -115,7 +115,7 @@ function inventoryDecimalSchema(PDO $pdo): array
     $result = [];
     foreach (['inventory_stocks' => ['quantity'], 'inventory_movements' => ['quantity', 'balance_after']] as $table => $fields) {
         foreach ($fields as $field) {
-            $q = $pdo->prepare('SELECT data_type,numeric_precision,numeric_scale FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name=? AND column_name=?');
+            $q = $pdo->prepare('SELECT data_type,numeric_precision,numeric_scale,is_nullable,column_default FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name=? AND column_name=?');
             $q->execute([$table, $field]);
             $result[$table.'.'.$field] = $q->fetch(PDO::FETCH_ASSOC);
         }

@@ -4,6 +4,7 @@ set -Eeuo pipefail
 umask 077
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+python3 "$ROOT/scripts/tests/rc-schema-evidence-test.py"
 work="$(mktemp -d "${TMPDIR:-/tmp}/taxnest-evidence-test.XXXXXX")"
 cleanup() {
     rm -rf -- "$work"
@@ -54,6 +55,10 @@ printf '<testsuite><testcase name="owner-schema"/></testsuite>\n' \
     >"$workspace/.local/recertification/supp-preflight-1/owner-approval-schema.junit.xml"
 printf '{"native":"upgrade-before"}\n' \
     >"$workspace/.local/recertification/native_mariadb106_evidence/upgrade-before.json"
+for phase in before after; do
+  printf '%s\n' '{"inventory_stocks.quantity":{"data_type":"decimal","numeric_precision":18,"numeric_scale":4,"is_nullable":"NO","column_default":"0.0000"},"inventory_movements.quantity":{"data_type":"decimal","numeric_precision":18,"numeric_scale":4,"is_nullable":"NO","column_default":null},"inventory_movements.balance_after":{"data_type":"decimal","numeric_precision":18,"numeric_scale":4,"is_nullable":"YES","column_default":"NULL"}}' >"$workspace/.local/recertification/native_mariadb106_evidence/upgrade-decimal-schema-$phase.json"
+done
+printf '{"raw":"PRIVATE-SCHEMA-CANARY"}\n' >"$workspace/.local/recertification/native_mariadb106_evidence/upgrade-arbitrary-schema.json"
 printf '{"native":"summary"}\n' \
     >"$workspace/.local/recertification/native_mariadb106_evidence/native-summary.json"
 printf '{"must_not_copy":"source"}\n' \
@@ -75,6 +80,9 @@ GITHUB_WORKSPACE="$workspace" GITHUB_JOB=quoted-redactor-test \
 [[ -f "$target/evidence-metadata.txt" ]]
 [[ -f "$target/logs/recertification/supp-preflight-1/fbr-kot-timestamp.junit.xml" ]]
 [[ -f "$target/logs/recertification/supp-preflight-1/owner-approval-schema.junit.xml" ]]
+[[ -f "$target/logs/recertification/native_mariadb106_evidence/upgrade-decimal-schema-before.json" ]]
+[[ -f "$target/logs/recertification/native_mariadb106_evidence/upgrade-decimal-schema-after.json" ]]
+[[ ! -f "$target/logs/recertification/native_mariadb106_evidence/upgrade-arbitrary-schema.json" ]]
 [[ -f "$target/logs/recertification/native_mariadb106_evidence/upgrade-before.json" ]]
 [[ -f "$target/logs/recertification/native_mariadb106_evidence/native-summary.json" ]]
 [[ ! -e "$target/logs/recertification/native_mariadb106_evidence/source" ]]

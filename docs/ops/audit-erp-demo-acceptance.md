@@ -75,3 +75,40 @@ Local acceptance execution for this change: the wrapper completed on PHP 8.4.27
 with **274 tests, 1,675 assertions, no failures, 25 PHPUnit deprecations**. This
 is the combined fixture/role and existing domain suite, not the full repository
 suite. The native/browser and operations gaps above remain open.
+
+## Dedicated native and browser role lane
+
+`bash scripts/check-erp-demo-browser.sh [absolute-playwright-cache]` is a separate
+lane, not a mode of the standalone POS fixture. Required installed tools are
+PHP with MySQL support, MariaDB 10.6 server/client/admin/install-db, Node with
+locked Playwright dependencies, trusted Chromium and built assets. The worktree
+must be clean and committed before exact-SHA pixel evidence is generated.
+
+The wrapper starts inside `rc-safe-run`, creates paired unique private
+`/tmp/taxnest-erp-demo-UID-RANDOM` and
+`/tmp/taxnest-rc-mariadb-erp-demo-UID-RANDOM` roots, and uses only
+`taxnest_erp_demo`. The bootstrap refuses any pre-existing table before running
+migrations. Only the legacy sample identities inserted by those fresh migrations
+are removed before the guarded demo seed; an existing database cannot be reset.
+Mail is array-only, background dispatch synchronous, fiscal switches off and
+all egress remains loopback-only. The environment is scoped to the child process;
+no `.env` or application config is written. Cleanup stops the private PHP server
+and MariaDB and deletes private credential JSON on success or failure.
+
+Ten roles (owner plus nine staff) sign in through the actual UI at 1366×900 and
+390×844, open their allowed screen and test an unrelated denied direct route.
+The owner case instead verifies settings access. These are role access/rendering
+cases, not clinical end-to-end workflows. The lab role opens the patient register
+because a lab workflow itself remains absent.
+
+Screenshots use only the guarded synthetic capture helper. The explicit
+`hospital-erp-demo` fixture kind, exact database, paired socket, fresh nonce and
+fixture hash are checked; a separate loopback proof endpoint binds captures to
+the generated fixture. Private credentials are never evidence artifacts.
+Export and visual-review requirements from `docs/qa/synthetic-pixel-artifacts.md`
+still apply. The JSON result summary contains roles/statuses, not passwords.
+
+Local execution was attempted but blocked by the host before seeding:
+`Can't start server : UNIX Socket : Operation not permitted`. No native/browser
+pass is claimed from that attempt. Run this lane on the approved hosted native
+browser runner; do not work around the socket restriction by weakening guards.

@@ -353,6 +353,7 @@ class FbrPosController extends Controller
                     ->firstOrFail();
                 $items = \App\Models\FbrPosTransactionItem::where('transaction_id', $locked->id)
                     ->lockForUpdate()->get();
+                \App\Services\FbrProspectiveQuotaRetention::capture(collect([$locked]), 'single-delete');
                 app(\App\Services\OptionalLocalBillArchive::class)->capture($locked, 'fbrpos', $items);
                 \App\Services\InventoryService::restoreFbrTransaction(
                     (int) $companyId,
@@ -1149,6 +1150,7 @@ class FbrPosController extends Controller
                             Auth::guard('fbrpos')->id()
                         );
                     }
+                    \App\Services\FbrProspectiveQuotaRetention::capture($deleteRows, 'day-close');
                     FbrPosTransactionItem::whereIn('transaction_id', $deleteRows->pluck('id'))->delete();
                     $this->lastWashDeleted = FbrPosTransaction::where('company_id', $companyId)
                         ->whereIn('id', $deleteRows->pluck('id'))

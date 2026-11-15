@@ -308,11 +308,12 @@ class PlanLimitService
                     ->where('company_id', $companyId)
                     ->whereBetween('created_at', [ProspectiveQuotaRetention::monthStart($companyId), now()->endOfMonth()])->count();
             }
-            return \App\Models\FbrPosTransaction::where('company_id', $companyId)
+            $live = \App\Models\FbrPosTransaction::where('company_id', $companyId)
                 ->where('status', 'completed')
                 ->where('transaction_type', 'sale')
                 ->whereBetween('created_at', [ProspectiveQuotaRetention::monthStart($companyId), now()->endOfMonth()])
                 ->count();
+            return $live + FbrProspectiveQuotaRetention::deletedCount($companyId);
         };
 
         // Admin override wins (interpreted as bills/month, same as PRA POS).

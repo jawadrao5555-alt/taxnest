@@ -10,7 +10,7 @@ class LocalCollectionLifecycle
 {
     // Children before parents; snapshots are never rewritten during bin or restore.
     public const TABLES = [
-        'prospective_pos_quota_retention',
+        'prospective_pos_quota_retention', 'prospective_fbr_quota_retention',
         'school_fee_receipts', 'school_fee_day_closes', 'school_fee_accounts', 'school_fee_heads',
         'hospital_payments', 'hospital_day_closes', 'hospital_invoices', 'hospital_services',
     ];

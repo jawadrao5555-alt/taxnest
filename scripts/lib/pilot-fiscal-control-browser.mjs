@@ -1,0 +1,30 @@
+export async function pilotFiscalControlWorkflow(page,t,v,{baseUrl,login,loopback,saveEvidenceScreenshot,pass}){
+ const f=t.pilotFiscalCases[v.width],check=(v,m)=>{if(!v)throw Error(m);};
+ const url=id=>baseUrl+'/admin/companies/'+id+'/pilot-fiscal-control';
+ for(const c of f.companies){
+  await page.goto(url(c.id),{waitUntil:'domcontentloaded'});
+  const panel=page.locator('#pilot-fiscal-control');await panel.waitFor({state:'visible'});
+  check((await panel.locator('[data-pilot-fiscal-status]').innerText()).includes('OFF'),'Pilot effective OFF absent');
+  check(await panel.locator('#pilot-fiscal-on').isDisabled(),'Unverified ON control enabled');
+  const before=await page.request.get(url(c.id),{headers:{Accept:'application/json'}});check(before.status()===200,'Owner fiscal read failed');const initial=await before.json();
+  check(initial.company_id===c.id&&initial.enabled===false&&initial.historical_submission===false,'Fiscal state company mismatch or armed');
+  const token=await page.locator('meta[name=csrf-token]').getAttribute('content');
+  const rejected=await page.request.post(url(c.id),{headers:{Accept:'application/json','X-CSRF-TOKEN':token},data:{enabled:true}});
+  check(rejected.status()===422,'Direct unverified ON was not rejected');
+  check(JSON.stringify(await rejected.json())===JSON.stringify(initial),'Rejected ON mutated effective fiscal state');
+  await Promise.all([page.waitForNavigation({waitUntil:'domcontentloaded'}),panel.locator('#pilot-fiscal-off').click()]);
+  const after=await page.request.get(url(c.id),{headers:{Accept:'application/json'}});
+  check(JSON.stringify(await after.json())===JSON.stringify(initial),'OFF changed effective state or historical eligibility');
+  const other=f.companies.find(x=>x.id!==c.id);const sibling=await page.request.get(url(other.id),{headers:{Accept:'application/json'}});
+  check((await sibling.json()).company_id===other.id,'Company-specific control lost target scope');
+  await saveEvidenceScreenshot(page,'pilot-fiscal-control-'+c.category+'-'+v.width);
+ }
+ for(const denied of [{login:f.support,loginPath:'/admin/login'},{login:f.companies[0].owner,loginPath:'/fbr-pos/login'}]){
+  const ctx=await page.context().browser().newContext({viewport:v,serviceWorkers:'block'});
+  await ctx.route('**/*',r=>loopback(new URL(r.request().url()).hostname)?r.continue():r.abort('blockedbyclient'));
+  try{const p=await ctx.newPage();await login(p,{...t,...denied});
+   for(const c of f.companies){const r=await ctx.request.get(url(c.id),{headers:{Accept:'application/json'},maxRedirects:0});check([401,403].includes(r.status()),'Tenant/support accessed fiscal admin company '+c.id);check(!(await r.text()).includes('required_evidence'),'Denied response exposed company fiscal control');}
+  }finally{await ctx.close();}
+ }
+ pass('PILOT FISCAL CONTROL PASS: '+v.width+': school/hospital effective OFF, disabled ON, direct ON422 unchanged state, explicit targeted OFF, tenant/support denied; no bill or fiscal dispatch');
+}

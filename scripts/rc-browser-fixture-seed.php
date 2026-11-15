@@ -1088,6 +1088,17 @@ foreach([1366,390] as $width){
  $support=AdminUser::create(['name'=>'Synthetic Expense Support '.$width,'email'=>'expense-support-'.$width.'@rc-browser.invalid','password'=>$password,'role'=>'support']);
  $expenseCases[$width]=['login'=>$reviewer->email,'support'=>$support->email];
 }
+$pilotFiscalCases=[];
+foreach([1366,390] as $width){
+ $admin=AdminUser::create(['name'=>'Synthetic Fiscal Reviewer '.$width,'email'=>'pilot-fiscal-admin-'.$width.'@rc-browser.invalid','password'=>$password,'role'=>'super_admin']);
+ $support=AdminUser::create(['name'=>'Synthetic Fiscal Support '.$width,'email'=>'pilot-fiscal-support-'.$width.'@rc-browser.invalid','password'=>$password,'role'=>'support']);
+ $pilotFiscalCases[$width]=['login'=>$admin->email,'support'=>$support->email,'companies'=>[]];
+ foreach(['education'=>'school','clinic'=>'hospital'] as $category=>$label){
+  $c=$company('Synthetic fiscal '.$label.' '.$width,'pilot-fiscal-'.$label.'-'.$width.'@rc-browser.invalid','RCPFC'.$label.$width,'fbrpos',['pos_type'=>$category,'business_category'=>$category,'pos_setup_completed'=>true,'fbr_pos_enabled'=>true,'fbr_reporting_enabled'=>false,'pra_reporting_enabled'=>false]);
+  $owner=$user($c,'Synthetic fiscal tenant','pilot-fiscal-owner-'.$label.'-'.$width.'@rc-browser.invalid','company_admin','pos_admin');
+  $pilotFiscalCases[$width]['companies'][]=['id'=>$c->id,'category'=>$label,'owner'=>$owner->email];
+ }
+}
 $aiUsageCases=[];
 foreach ([1366,390] as $width) {
     $reviewer=AdminUser::create(['name'=>'Synthetic AI reviewer '.$width,'email'=>'ai-reviewer-'.$width.'@rc-browser.invalid','password'=>$password,'role'=>'super_admin']);
@@ -1302,6 +1313,7 @@ $fixture = [
     'transactionalJourneys' => [
         ['name'=>'madadgar-company-reads','manualOnly'=>true,'login'=>$madadgarReadCases[1366]['login'],'password'=>$password,'loginPath'=>'/fbr-pos/login','paths'=>[],'madadgarReadCases'=>$madadgarReadCases],
         ['name'=>'prospective-billing-policy','manualOnly'=>true,'login'=>$policyCases[1366]['login'],'password'=>$password,'loginPath'=>'/login','paths'=>[],'policyCases'=>$policyCases],
+        ['name'=>'pilot-fiscal-controls','manualOnly'=>true,'login'=>$pilotFiscalCases[1366]['login'],'password'=>$password,'loginPath'=>'/admin/login','paths'=>[],'pilotFiscalCases'=>$pilotFiscalCases],
         ['name'=>'platform-expense-records','manualOnly'=>true,'login'=>$expenseCases[1366]['login'],'password'=>$password,'loginPath'=>'/admin/login','paths'=>[],'expenseCases'=>$expenseCases],
         ['name'=>'ai-usage-budget','manualOnly'=>true,'login'=>$aiUsageCases[1366]['admin'],'password'=>$password,'loginPath'=>'/admin/login','paths'=>[],'aiUsageCases'=>$aiUsageCases],
         ['name'=>'pra-bounded-reads','manualOnly'=>true,'login'=>$praReadCases[1366]['login'],'password'=>$password,'loginPath'=>'/pos/login','paths'=>[],'praReadCases'=>$praReadCases],

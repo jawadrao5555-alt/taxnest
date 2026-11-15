@@ -1,3 +1,4 @@
+import {pilotFiscalControlWorkflow} from './lib/pilot-fiscal-control-browser.mjs';
 import { prospectivePolicyWorkflow } from './lib/prospective-policy-browser.mjs';
 import { platformExpenseWorkflow } from './lib/platform-expense-browser.mjs';
 import { praBoundedReadWorkflow } from './lib/pra-bounded-read-browser.mjs';
@@ -1516,6 +1517,7 @@ async function workflow(page,t,v,diagnostics) {
   if(t.aiUsageCases)return aiUsageWorkflow(page,t,v,{baseUrl,login,loopback,dismiss,waitForOperationalSurface,saveEvidenceScreenshot,pass});
   if(t.praReadCases)return praBoundedReadWorkflow(page,t,v,{baseUrl,login,loopback,saveEvidenceScreenshot,pass,dismiss,waitForOperationalSurface});
   if(t.policyCases)return prospectivePolicyWorkflow(page,t,v,{baseUrl,saveEvidenceScreenshot,pass,login,loopback,dismiss,waitForOperationalSurface});
+  if(t.pilotFiscalCases)return pilotFiscalControlWorkflow(page,t,v,{baseUrl,login,loopback,saveEvidenceScreenshot,pass});
   if(t.expenseCases)return platformExpenseWorkflow(page,t,v,{baseUrl,login,loopback,saveEvidenceScreenshot,pass});
   if(t.diReadCases)return diBoundedReadWorkflow(page,t,v,{baseUrl,login,loopback,saveEvidenceScreenshot,pass});
   if(t.privateProfileCases)return privateProfileWorkflow(page,t,v,{baseUrl,saveEvidenceScreenshot,pass});
@@ -2430,6 +2432,7 @@ async function one(browser,label,v,t) {
   if(t.aiUsageCases)t={...t,login:t.aiUsageCases[v.width].admin};
   if(t.praReadCases)t={...t,login:t.praReadCases[v.width].login};
   if(t.policyCases)t={...t,login:t.policyCases[v.width].login};
+  if(t.pilotFiscalCases)t={...t,login:t.pilotFiscalCases[v.width].login};
   if(t.expenseCases)t={...t,login:t.expenseCases[v.width].login};
   if(t.diReadCases)t={...t,login:t.diReadCases[v.width].login};
   if(t.privateProfileCases)t={...t,login:t.privateProfileCases[v.width].login};

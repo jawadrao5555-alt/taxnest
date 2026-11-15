@@ -39,6 +39,8 @@ class ProspectiveSubscriptionPolicyTest extends TestCase
         $c = Company::create(['name' => 'Synthetic prospective buyer', 'ntn' => 'PROSPECTIVE-'.uniqid(), 'product_type' => $product, 'status' => 'approved', 'company_status' => 'active']);
         $p = PricingPlan::create(['name' => 'Business', 'product_type' => $product, 'price' => 1000, 'is_trial' => false, 'invoice_limit' => 2, 'user_limit' => 3, 'branch_limit' => 1, 'inventory_enabled' => false, 'reports_enabled' => false, 'caller_id_enabled' => false, 'rider_tracking_enabled' => false, 'ai_page_limit' => 4]);
 
+        $p->forceFill(['caller_id_enabled'=>false,'rider_tracking_enabled'=>false])->save();
+
         return [$c, $p, TrialSubscriptionService::ensureSelectedTrial($c->id, $product, $p->id)];
     }
 

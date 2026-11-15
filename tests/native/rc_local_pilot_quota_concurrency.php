@@ -31,7 +31,9 @@ function pilotRequest(array $fixture,array $payload):array {
     $request=Request::create('/fbr-pos/'.($fixture['kind']==='school'?'school-fees':'hospital'),'POST',$payload,[],[],['HTTP_ACCEPT'=>'application/json']);
     $request->setLaravelSession($session);app()->instance('request',$request);
     try {
-        $response=app($fixture['kind']==='school'?FbrPosSchoolFeeController::class:FbrPosHospitalController::class)->store($request);
+        $controller=app($fixture['kind']==='school'?FbrPosSchoolFeeController::class:FbrPosHospitalController::class);
+        $action=$payload['_action']??'store';
+        $response=$action==='payment'?$controller->payment($request,(int)$payload['_invoice_id']):$controller->{$action}($request);
         return ['status'=>$response->getStatusCode(),'data'=>$response->getData(true)];
     } catch(ValidationException $e) { return ['status'=>422,'keys'=>array_keys($e->errors())]; }
     catch(HttpExceptionInterface $e) { return ['status'=>$e->getStatusCode()]; }
@@ -65,13 +67,13 @@ function pilotRace(array $fixture,array $jobs):array {
         return array_map(fn($i)=>json_decode(file_get_contents($file.'.result-'.$i),true,512,JSON_THROW_ON_ERROR),[0,1]);
     } finally {foreach($workers as$p)if($p->isRunning())$p->stop();foreach(glob($file.'*')?:[]as$f)unlink($f);}
 }
-function pilotFixture(string $kind):array {
+function pilotFixture(string $kind,int $limit=1):array {
     pilotClock('2028-04-10T10:00:00+00:00');$suffix=bin2hex(random_bytes(7));
     $category=$kind==='school'?'education':'clinic';
     $company=Company::create(['name'=>'Synthetic pilot quota '.$kind,'ntn'=>'PQ-'.$suffix,'product_type'=>'fbrpos',
         'business_category'=>$category,'pos_type'=>$category,'status'=>'approved','company_status'=>'active',
         'fbr_pos_enabled'=>true,'fbr_reporting_enabled'=>false,'is_internal_account'=>false]);
-    $plan=PricingPlan::create(['name'=>'Business','product_type'=>'fbrpos','price'=>1000,'invoice_limit'=>1,'user_limit'=>3,'branch_limit'=>1]);
+    $plan=PricingPlan::create(['name'=>'Business','product_type'=>'fbrpos','price'=>1000,'invoice_limit'=>$limit,'user_limit'=>3,'branch_limit'=>1]);
     TrialSubscriptionService::ensureSelectedTrial($company->id,'fbrpos',$plan->id);
     $quote=SubscriptionAssignmentService::computePrice($plan,'annual',$company);
     $sub=SubscriptionAssignmentService::assign($company->id,$plan->id,'annual',paidRenewal:true,verifiedReceived:$quote['final_price']);
@@ -84,6 +86,54 @@ function pilotPayload(string $kind):array {
     $base=['request_key'=>(string)Str::uuid(),'expected_branch_key'=>0,'amount'=>'100.00','payment_method'=>'cash'];
     return $base+($kind==='school'?['student_reference'=>'SYN-Q-STUDENT','fee_head'=>'tuition','fee_period'=>now()->format('Y-m'),'cash_confirmed'=>'1']
         :['patient_reference'=>'SYN-Q-PATIENT','service_head'=>'consultation','total_amount'=>'100.00','payment_confirmed'=>'1']);
+}
+function pilotPartial(array $fixture):array {
+    $payload=array_replace(pilotPayload($fixture['kind']),['amount'=>'40.00']);
+    if($fixture['kind']==='school')$payload['fee_lines']=[['fee_head'=>'tuition','amount'=>'100.00']];
+    $saved=pilotRequest($fixture,$payload);pilotProof($saved['status']===200,'Initial partial collection failed');
+    $row=DB::table(pilotTable($fixture['kind']))->where('id',$saved['data']['receipt_id'])->first();
+    $payment=array_replace($payload,['request_key'=>(string)Str::uuid(),'amount'=>'60.00']);
+    if($fixture['kind']==='school')$payment['account_id']=$row->account_id;
+    else{$payment['_action']='payment';$payment['_invoice_id']=$row->invoice_id;}
+    return [$payload,$payment,$saved['data']['receipt_id']];
+}
+function pilotClose(array $fixture,int $count,int $cash):array {
+    return ['_action'=>'close','date'=>substr($fixture['now'],0,10),'confirm'=>'1','expected_branch_key'=>0,
+        'expected_receipt_count'=>$count,'expected_cash_paisa'=>$cash,'expected_card_paisa'=>0,'expected_bank_paisa'=>0,
+        'counted_cash'=>number_format($cash/100,2,'.',''),'variance_note'=>''];
+}
+function pilotPartialAndClose(string $kind):void {
+    $f=pilotFixture($kind,10);[$original,$payment]=pilotPartial($f);
+    $r=pilotRace($f,[$payment,array_replace($payment,['request_key'=>(string)Str::uuid()])]);
+    $statuses=array_column($r,'status');sort($statuses);
+    pilotProof($statuses===[200,422],'Concurrent partial balance accepted two payments');
+    $loser=$r[0]['status']===422?0:1;
+    pilotProof(in_array('amount',$r[$loser]['keys']??[],true),'Partial balance rejected for unrelated reason');
+    $rows=DB::table(pilotTable($kind))->where('company_id',$f['company']);
+    pilotProof($rows->count()===2&&(int)$rows->sum('amount_paisa')===10000,'Partial balance cash exceeded payable');
+    if($kind==='school')pilotProof((int)DB::table('school_fee_accounts')->where('company_id',$f['company'])->value('paid_paisa')===10000,'School account snapshot lost payment');
+    else pilotProof(DB::table('hospital_invoices')->where('company_id',$f['company'])->count()===1,'Hospital installment duplicated invoice');
+
+    $f=pilotFixture($kind,10);[$original,$payment,$receiptId]=pilotPartial($f);
+    $payment['amount']='30.00';$r=pilotRace($f,[$payment,pilotClose($f,1,4000)]);
+    $rows=fn()=>DB::table(pilotTable($kind))->where('company_id',$f['company']);
+    $closeTable=$kind==='school'?'school_fee_day_closes':'hospital_day_closes';
+    $closes=fn()=>DB::table($closeTable)->where('company_id',$f['company']);
+    if($r[0]['status']===200&&$r[1]['status']===422){
+        pilotProof($rows()->count()===2&&!$closes()->exists(),'Stale close captured old cash');
+        pilotProof(pilotRequest($f,pilotClose($f,2,7000))['status']===200,'Refreshed close failed');
+    }elseif($r[0]['status']===422&&$r[1]['status']===200){
+        pilotProof($rows()->count()===1,'Payment inserted after close');
+    }else throw new RuntimeException('Unsafe old-snapshot payment-close race');
+    pilotProof($closes()->count()===1,'Close snapshot missing or duplicated');
+    $saved=$closes()->first();
+    pilotProof((int)$saved->{$kind==='school'?'cash_amount_paisa':'cash_paisa'}===(int)$rows()->sum('amount_paisa')&&(int)$saved->receipt_count===$rows()->count(),'Closing cash/count does not match saved payments');
+    $snapshot=$closes()->get()->toJson();$receipts=$rows()->orderBy('id')->get()->toJson();
+    $replay=pilotRequest($f,$original);
+    pilotProof($replay['status']===200&&$replay['data']['receipt_id']===$receiptId,'Closed-day lost response did not recover original receipt');
+    $changed=pilotRequest($f,array_replace($original,['amount'=>'39.00']));
+    pilotProof($changed['status']===422&&in_array('request_key',$changed['keys']??[],true),'Closed-day changed payment data accepted');
+    pilotProof($snapshot===$closes()->get()->toJson()&&$receipts===$rows()->orderBy('id')->get()->toJson(),'Closed cash snapshot or receipt changed on retry');
 }
 foreach(['school','hospital']as$kind) {
     // Distinct requests compete for the one remaining paid slot under old RR snapshots.
@@ -103,6 +153,15 @@ foreach(['school','hospital']as$kind) {
     pilotProof($r[0]['status']===200&&$r[1]['status']===200&&$r[0]['data']['receipt_id']===$r[1]['data']['receipt_id'],'Old snapshot duplicate retry did not recover same receipt');
     pilotProof(DB::table(pilotTable($kind))->where('company_id',$same['company'])->count()===1,'Same identity inserted twice');
     pilotProof(!Company::findOrFail($same['company'])->fbr_reporting_enabled,'Pilot fiscal flag changed');
+    $tamper=pilotFixture($kind);$first=pilotPayload($kind);$second=array_replace($first,['amount'=>'99.00']);
+    $conflict=pilotRace($tamper,[$first,$second]);$success=array_keys(array_filter($conflict,fn($x)=>$x['status']===200));
+    pilotProof(count($success)===1,'Changed-data race did not have exactly one winner');$loser=1-$success[0];
+    pilotProof($conflict[$loser]['status']===422&&in_array('request_key',$conflict[$loser]['keys']??[],true),'Old snapshot changed-data retry missed identity conflict');
+    $saved=DB::table(pilotTable($kind))->where('company_id',$tamper['company']);
+    pilotProof($saved->count()===1&&(int)$saved->sum('amount_paisa')===($success[0]===0?10000:9900),'Changed-data race corrupted original cash');
+
 }
+foreach(['school','hospital']as$kind)pilotPartialAndClose($kind);
 Http::assertNothingSent();Carbon::setTestNow();CarbonImmutable::setTestNow();
 echo "PASS: native School Hospital paid last-slot serialized under old RR snapshot; same payment recovers same receipt changed data rejected cash unchanged no fiscal calls\n";
+echo "PASS: native School Hospital old RR partial balance excludes overpayment; payment-close race and saved closing cash immutable on same-receipt retry and changed-data rejection\n";

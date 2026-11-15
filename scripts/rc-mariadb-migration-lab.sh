@@ -141,6 +141,7 @@ concurrency(){
     grep -Fqx "PASS: native DI PRA old-snapshot distinct bill last-slot admission permits one; DI same-claim retry unknown hold definite rejection and frozen production expiry preserved without provider calls" "$EVIDENCE_DIR/di-pra-quota-admission.log" || fail di-pra-quota-missing-admission-proof
     clean_php php "$ROOT/tests/native/rc_local_pilot_quota_concurrency.php" | tee "$EVIDENCE_DIR/local-pilot-quota-concurrency.log"
     grep -Fqx "PASS: native School Hospital paid last-slot serialized under old RR snapshot; same payment recovers same receipt changed data rejected cash unchanged no fiscal calls" "$EVIDENCE_DIR/local-pilot-quota-concurrency.log" || fail local-pilot-quota-missing-native-proof
+    grep -Fqx "PASS: native School Hospital old RR partial balance excludes overpayment; payment-close race and saved closing cash immutable on same-receipt retry and changed-data rejection" "$EVIDENCE_DIR/local-pilot-quota-concurrency.log" || fail local-pilot-quota-missing-close-proof
     clean_php php "$ROOT/tests/native/rc_paid_renewal.php" | tee "$EVIDENCE_DIR/paid-renewal.log"
     clean_php php "$ROOT/tests/native/rc_trial_signup.php" | tee "$EVIDENCE_DIR/trial-signup.log"
     clean_php php "$ROOT/tests/native/rc_subscription_financial_adjustments.php" | tee "$EVIDENCE_DIR/subscription-financial-adjustments.log"

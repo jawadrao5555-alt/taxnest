@@ -168,6 +168,8 @@ concurrency(){
     grep -Fqx "PASS: native password reset grant permits one concurrent completion and preserves other account" "$EVIDENCE_DIR/password-reset-grant.log" || fail password-reset-grant-missing-success-proof
     grep -Fqx "PASS: native reset rotates the company browser session generation atomically" "$EVIDENCE_DIR/password-reset-grant.log" || fail password-reset-session-generation-missing-success-proof
     grep -Fqx "PASS: native reset link claim preserves its original TIMESTAMP deadline" "$EVIDENCE_DIR/password-reset-grant.log" || fail password-reset-link-deadline-missing-success-proof
+    clean_php php "$ROOT/tests/native/rc_fbr_refund_diagnostic_evidence.php" | tee "$EVIDENCE_DIR/fbr-refund-diagnostic-evidence.log"
+    grep -Fqx "PASS: native FBR registered projected refund JSON integer binary identity exact tenant branch return-parent chain rejects forged aliases and missing links; IDs-only cursor includes late arrivals without provider calls" "$EVIDENCE_DIR/fbr-refund-diagnostic-evidence.log" || fail fbr-refund-diagnostic-missing-native-proof
     clean_php php "$ROOT/tests/native/rc_diagnostic_source_collection.php" | tee "$EVIDENCE_DIR/diagnostic-source-observations.log"
     grep -Fqx "PASS: native IMS links and print source read/collection retain exact tenant/product attribution and unchanged bill" "$EVIDENCE_DIR/diagnostic-source-observations.log" || fail diagnostic-ims-print-attribution-missing-success-proof
     grep -Fqx "PASS: native shared source excludes global and foreign rows; exhausted cursor retains window evidence and original rows" "$EVIDENCE_DIR/diagnostic-source-observations.log" || fail diagnostic-shared-source-attribution-missing-success-proof

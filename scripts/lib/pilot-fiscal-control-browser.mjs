@@ -23,7 +23,9 @@ export async function pilotFiscalControlWorkflow(page,t,v,{baseUrl,login,loopbac
   const ctx=await page.context().browser().newContext({viewport:v,serviceWorkers:'block'});
   await ctx.route('**/*',r=>loopback(new URL(r.request().url()).hostname)?r.continue():r.abort('blockedbyclient'));
   try{const p=await ctx.newPage();await login(p,{...t,...denied});
-   for(const c of f.companies){const r=await ctx.request.get(url(c.id),{headers:{Accept:'application/json'},maxRedirects:0});check([401,403].includes(r.status()),'Tenant/support accessed fiscal admin company '+c.id);check(!(await r.text()).includes('required_evidence'),'Denied response exposed company fiscal control');}
+   const deniedToken=await p.locator('meta[name=csrf-token]').getAttribute('content');
+   for(const c of f.companies){const r=await ctx.request.get(url(c.id),{headers:{Accept:'application/json'},maxRedirects:0});check([401,403].includes(r.status()),'Tenant/support accessed fiscal admin company '+c.id);check(!(await r.text()).includes('required_evidence'),'Denied response exposed company fiscal control');
+    const write=await ctx.request.post(url(c.id),{headers:{Accept:'application/json','X-CSRF-TOKEN':deniedToken},data:{enabled:true},maxRedirects:0});check([401,403].includes(write.status()),'Tenant/support POST reached privileged fiscal control');}
   }finally{await ctx.close();}
  }
  pass('PILOT FISCAL CONTROL PASS: '+v.width+': school/hospital effective OFF, disabled ON, direct ON422 unchanged state, explicit targeted OFF, tenant/support denied; no bill or fiscal dispatch');

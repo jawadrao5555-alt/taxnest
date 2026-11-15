@@ -1,3 +1,4 @@
+import { collectionSharedWorkspaceChecks } from './collection-shared-workspace-browser.mjs';
 import { privateCollectionCacheCheck } from './collection-private-cache-browser.mjs';
 import { randomUUID } from 'node:crypto';
 
@@ -5,6 +6,7 @@ import { randomUUID } from 'node:crypto';
 export async function hospitalWorkflow(page, t, v, { baseUrl, saveEvidenceScreenshot, pass }) {
   if (new URL(page.url()).pathname !== '/fbr-pos/hospital') throw new Error('Hospital login did not reach native collection desk');
   await hospitalWorkspaceChecks(page, v, { baseUrl, saveEvidenceScreenshot });
+  await collectionSharedWorkspaceChecks(page,'hospital',v,{baseUrl,saveEvidenceScreenshot});
   const configuredService=await hospitalRateChecks(page,v,{baseUrl,saveEvidenceScreenshot});
   const reference = 'SYN-PAT-' + v.width + '-' + randomUUID().slice(0, 8);
   const create = page.locator('#hospital-collection');
@@ -103,10 +105,12 @@ export async function hospitalWorkflow(page, t, v, { baseUrl, saveEvidenceScreen
     await payment.locator('[name="payment_method"]').selectOption(method);
     await payment.locator('[name="payment_reference"]').fill(payload.payment_reference);
     await payment.locator('[name="payment_confirmed"]').check();
-    const lostPartialId = method === 'card' ? await loseResponseAndRefresh(payment, invoiceUrl + '/payments', payload) : null;
+    const lostPartialId = await loseResponseAndRefresh(payment, invoiceUrl + '/payments', payload);
     await Promise.all([page.waitForURL(/\/fbr-pos\/hospital\/receipts\/\d+$/), payment.locator('button[type="submit"]').click()]);
     if (lostPartialId && Number(new URL(page.url()).pathname.split('/').pop()) !== lostPartialId) throw new Error('Hospital partial-payment refresh recovery returned another receipt');
     await assertReceipt(30000, remaining);
+    const pendingKeys=await page.evaluate(()=>Object.keys(sessionStorage).filter(name=>name.startsWith('taxnest.hospital.pending.')));
+    if(pendingKeys.length) throw new Error('Hospital saved receipt did not clear pending payment key');
     if (!(await page.locator('article').innerText()).includes(payload.payment_reference)) throw new Error('Hospital receipt missing bank/card reference');
     if (method === 'card') { cardPayload = payload; cardReceipt = Number(new URL(page.url()).pathname.split('/').pop()); }
     await saveEvidenceScreenshot(page, 'hospital-' + method + '-receipt-' + v.width);
@@ -119,6 +123,7 @@ export async function hospitalWorkflow(page, t, v, { baseUrl, saveEvidenceScreen
   }
   await page.goto(invoiceUrl, { waitUntil: 'domcontentloaded' });
   if (Number(await page.locator('#hospital-balance').getAttribute('data-paisa')) !== 0) throw new Error('Hospital balance did not settle to zero');
+  if(!await page.locator('#hospital-payment button[type="submit"]').isDisabled()) throw new Error('Settled Hospital bill allowed a fresh installment');
   await page.goto(baseUrl+'/fbr-pos/hospital/history?search=HI-'+invoiceId+'&status=settled',{waitUntil:'domcontentloaded'});
   if(!(await page.locator('body').innerText()).includes(reference)) throw new Error('Displayed HI number/settled filter missed invoice');
   await page.goto(baseUrl+'/fbr-pos/hospital/history?search=HI-'+invoiceId+'&status=partial',{waitUntil:'domcontentloaded'});

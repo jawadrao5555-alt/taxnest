@@ -1,3 +1,4 @@
+import { collectionSharedWorkspaceChecks } from './collection-shared-workspace-browser.mjs';
 import { privateCollectionCacheCheck } from './collection-private-cache-browser.mjs';
 import { randomUUID } from 'node:crypto';
 
@@ -58,6 +59,8 @@ export async function schoolFeeWorkflow(page, t, v, { baseUrl, saveEvidenceScree
     await campus.locator('[name="name"]').fill(name);
     await Promise.all([page.waitForNavigation({ waitUntil: 'domcontentloaded' }), campus.locator('button[type="submit"]').click()]);
   }
+  await collectionSharedWorkspaceChecks(page,'school',v,{baseUrl,saveEvidenceScreenshot},campusName);
+  await page.goto(baseUrl+'/fbr-pos/school-fees/settings',{waitUntil:'domcontentloaded'});
   const headForm = page.locator('#school-add-head');
   await headForm.locator('[name="label"]').fill(customLabel);
   await Promise.all([page.waitForNavigation({ waitUntil: 'domcontentloaded' }), headForm.locator('button[type="submit"]').click()]);

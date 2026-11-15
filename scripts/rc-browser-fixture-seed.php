@@ -1081,6 +1081,12 @@ foreach ([1366,390] as $securityWidth) {
         }
     }
 }
+$privateProfileCases = [];
+foreach ([1366, 390] as $width) {
+    $profileCompany = $company('Synthetic private profile '.$width, 'private-profile-'.$width.'@rc-browser.invalid', 'RCPROFILE'.$width, 'di');
+    $profileOwner = $user($profileCompany, 'Synthetic profile owner', 'private-profile-owner-'.$width.'@rc-browser.invalid', 'company_admin');
+    $privateProfileCases[$width] = ['login'=>$profileOwner->email, 'companyName'=>$profileCompany->name, 'companyId'=>$profileCompany->id];
+}
 $greetingCases = [];
 foreach ([1366, 390] as $width) {
     $greetCompany = $company('Synthetic greeting workspace '.$width, 'greeting-'.$width.'@rc-browser.invalid', 'RCGREET'.$width, 'di');
@@ -1213,6 +1219,7 @@ $fixture = [
     ], $categoryJourneys, $optionalArchiveJourneys),
     'transactionalJourneys' => [
         ['name'=>'madadgar-company-reads','manualOnly'=>true,'login'=>$madadgarReadCases[1366]['login'],'password'=>$password,'loginPath'=>'/fbr-pos/login','paths'=>[],'madadgarReadCases'=>$madadgarReadCases],
+        ['name'=>'private-profile-fields','manualOnly'=>true,'login'=>$privateProfileCases[1366]['login'],'password'=>$password,'loginPath'=>'/login','paths'=>[],'privateProfileCases'=>$privateProfileCases],
         ['name'=>'opt-in-greetings-tutorials','manualOnly'=>true,'login'=>$greetingCases[1366]['login'],'password'=>$password,'loginPath'=>'/login','paths'=>[],'greetingCases'=>$greetingCases],
         ['name'=>'di-inventory-projection','manualOnly'=>true,'login'=>$diInventoryCases[1366]['login'],'password'=>$password,'loginPath'=>'/login','paths'=>[],'diInventoryCases'=>$diInventoryCases],
         ['name'=>'delivery-credit','login'=>$deliveryCreditCases[1366]['login'],'password'=>$password,'loginPath'=>'/pos/login','paths'=>['/pos/delivery-accounts'],'markers'=>['Synthetic credit customer'],'deliveryCredit'=>$deliveryCreditCases,'manualOnly'=>true],

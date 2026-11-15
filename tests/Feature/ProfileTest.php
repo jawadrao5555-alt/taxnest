@@ -18,7 +18,12 @@ class ProfileTest extends TestCase
             ->actingAs($user)
             ->get('/profile');
 
-        $response->assertOk();
+        $response->assertOk()
+            ->assertSee('id="date_of_birth"', false)
+            ->assertSee('max="'.now()->toDateString().'"', false)
+            ->assertSee('id="profile-phone"', false)
+            ->assertSee('id="profile-username"', false)
+            ->assertSee(__('profile_fields.no_message_consent'));
     }
 
     public function test_profile_information_can_be_updated(): void

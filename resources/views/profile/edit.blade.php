@@ -40,6 +40,24 @@
                             @error('email') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
                         </div>
                     </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <x-input-label for="profile-phone" :value="__('Phone')" />
+                            <x-text-input id="profile-phone" name="phone" type="text" class="mt-1 block w-full" :value="old('phone', $user->phone)" />
+                            <x-input-error class="mt-2" :messages="$errors->get('phone')" />
+                        </div>
+                        <div>
+                            <x-input-label for="profile-username" :value="__('Username')" />
+                            <x-text-input id="profile-username" name="username" type="text" class="mt-1 block w-full" :value="old('username', $user->username)" />
+                            <x-input-error class="mt-2" :messages="$errors->get('username')" />
+                        </div>
+                        <div>
+                            <x-input-label for="date_of_birth" :value="__('profile_fields.date_of_birth')" />
+                            <x-text-input id="date_of_birth" name="date_of_birth" type="date" max="{{ now()->toDateString() }}" class="mt-1 block w-full" :value="old('date_of_birth', $user->date_of_birth?->format('Y-m-d'))" aria-describedby="profile-birth-privacy" />
+                            <x-input-error class="mt-2" :messages="$errors->get('date_of_birth')" />
+                            <p id="profile-birth-privacy" class="text-sm text-gray-500">{{ __('profile_fields.no_message_consent') }}</p>
+                        </div>
+                    </div>
                     <div class="flex justify-end">
                         <button type="submit" class="px-6 py-2.5 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-700 transition shadow-sm">Save Account</button>
                     </div>

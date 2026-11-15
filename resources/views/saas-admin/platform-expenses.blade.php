@@ -1,5 +1,5 @@
 <x-admin-layout>
-<section id="platform-expenses" class="p-4 sm:p-6 max-w-6xl mx-auto text-white">
+<section id="platform-expenses" class="p-4 sm:p-6 max-w-6xl mx-auto">
 <style>#platform-expenses input,#platform-expenses textarea{display:block;background:#fff;color:#111827;padding:10px;border:1px solid #64748b;border-radius:6px;max-width:100%;width:100%;min-height:44px}#platform-expenses button,#platform-expenses .expense-link{display:inline-flex;align-items:center;justify-content:center;background:#075985;color:white;padding:12px 16px;min-height:44px;border-radius:6px}#platform-expenses label{display:block;margin:8px 0}#platform-expenses th,#platform-expenses td{padding:10px;text-align:left;vertical-align:top}#platform-expenses summary{cursor:pointer;min-height:44px}#platform-expenses [hidden]{display:none!important}</style>
 <h1 class="text-2xl font-bold">Platform expense records</h1>
 <p class="my-3">TaxNest platform record keeping only. Recording or reversing an entry does not send money, refund a payment, or change tenant sales or Hospital accounts. PKR only. Dates use {{ config('app.timezone') }}; the entered record date is distinct from the saved audit timestamp.</p>

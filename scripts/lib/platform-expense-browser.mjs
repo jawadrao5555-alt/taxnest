@@ -1,3 +1,4 @@
+import {verifyExpenseThemes} from './platform-expense-theme-browser.mjs';
 import {scrolledPixelDetail} from './scrolled-pixel-detail.mjs';
 export async function platformExpenseWorkflow(page,t,v,{baseUrl,login,loopback,saveEvidenceScreenshot,pass}){
  const f=t.expenseCases[v.width],path='/admin/platform-expenses',category='synthetic_'+v.width,reference='SYN-EXPENSE-'+v.width;
@@ -32,6 +33,7 @@ export async function platformExpenseWorkflow(page,t,v,{baseUrl,login,loopback,s
  check(await page.locator('[data-expense-id]').count()===2,'Append-only original/reversal rows not retained');
  check((await page.locator(`[data-expense-id="${saved.id}"]`).innerText()).includes('Reversed (original retained)'),'Original expense erased or still reversible');
  check((await page.locator('#expense-totals').innerText()).includes('Net recorded expenses: PKR 0.00'),'Reversal failed to net recorded totals once');
+ await verifyExpenseThemes(page,v.width,pass);
  await scrolledPixelDetail(page,['#expense-totals'],'platform-expense-reconciled-'+v.width,saveEvidenceScreenshot);
  const context=await page.context().browser().newContext({viewport:v,serviceWorkers:'block'});await context.route('**/*',r=>loopback(new URL(r.request().url()).hostname)?r.continue():r.abort('blockedbyclient'));
  try{const support=await context.newPage();await login(support,{...t,login:f.support});const denied=await context.request.get(baseUrl+path,{headers:{Accept:'application/json'},maxRedirects:0});check(denied.status()===403&&!(await denied.text()).includes(reference),'Support role read platform expense');}finally{await context.close();}

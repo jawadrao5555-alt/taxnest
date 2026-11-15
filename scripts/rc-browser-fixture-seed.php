@@ -981,6 +981,7 @@ foreach([1366,390] as $width){
 $reviewedDeviceProofCases=[];
 foreach ([1366,390] as $proofWidth) {
     $proofCompany=$company('Synthetic Device Review '.$proofWidth,'proof-company-'.$proofWidth.'@rc-browser.invalid','RCPROOF'.$proofWidth,'pos',['pra_reporting_enabled'=>false,'pos_setup_completed'=>true]);
+    DB::table('pos_agent_devices')->insert(['company_id'=>$proofCompany->id,'device_uid'=>'Synthetic-Browser-Device-'.$proofWidth,'created_at'=>now(),'updated_at'=>now()]);
     $proofReviewer=AdminUser::create(['name'=>'Synthetic Proof Reviewer '.$proofWidth,'email'=>'proof-reviewer-'.$proofWidth.'@rc-browser.invalid','password'=>$password,'role'=>'super_admin']);
     $proofSupport=AdminUser::create(['name'=>'Synthetic Proof Support '.$proofWidth,'email'=>'proof-support-'.$proofWidth.'@rc-browser.invalid','password'=>$password,'role'=>'support']);
     $reviewedDeviceProofCases[$proofWidth]=['companyId'=>$proofCompany->id,'login'=>$proofReviewer->email,'support'=>$proofSupport->email];

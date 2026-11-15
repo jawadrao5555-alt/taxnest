@@ -10,8 +10,10 @@ class ReviewedDeviceProofTest extends TestCase
 {
     protected function setUp(): void {
         parent::setUp(); Schema::dropAllTables();
-        Schema::create('companies',function(Blueprint $t){$t->id();$t->string('name');$t->softDeletes();$t->timestamps();});
+        Schema::create('companies',function(Blueprint $t){$t->id();$t->string('name');$t->string('product_type')->nullable();$t->string('pos_type')->nullable();$t->string('business_category')->nullable();$t->softDeletes();$t->timestamps();});
         Schema::create('admin_users',function(Blueprint $t){$t->id();$t->string('name');$t->string('email');$t->string('password');$t->string('role');$t->timestamps();});
+        Schema::create('pos_agent_devices',function(Blueprint $t){$t->id();$t->unsignedBigInteger('company_id');$t->string('device_uid');});
+        DB::table('pos_agent_devices')->insert(['company_id'=>1,'device_uid'=>'DEVICE-A']);
         (require database_path('migrations/2026_11_16_130000_create_reviewed_device_proofs_table.php'))->up();
         DB::table('companies')->insert([['id'=>1,'name'=>'Synthetic'],['id'=>2,'name'=>'Other']]);
         $admin=AdminUser::create(['name'=>'Reviewer','email'=>'reviewer@example.test','password'=>'SyntheticOnly123!','role'=>'super_admin']);
@@ -52,6 +54,15 @@ class ReviewedDeviceProofTest extends TestCase
         $actor=auth('admin')->user(); DB::table('admin_users')->where('id',$actor->id)->update(['role'=>'admin']);
         $this->expectException(\Symfony\Component\HttpKernel\Exception\HttpException::class);
         ReviewedDeviceProof::approve(1,$this->data()+['actor_id'=>$actor->id,'reviewer_role'=>'super_admin']);
+    }
+    public function test_nonregistered_device_and_school_scope_cannot_be_approved(): void {
+        foreach ([['device_uid'=>'NOT-REGISTERED'],['device_uid'=>'device-a']] as $change) {
+            try {ReviewedDeviceProof::approve(1,array_merge($this->data(),$change));$this->fail('Unregistered device approved');}
+            catch(\Symfony\Component\HttpKernel\Exception\HttpException $e){$this->assertSame(422,$e->getStatusCode());}
+        }
+        DB::table('companies')->where('id',1)->update(['product_type'=>'fbrpos','pos_type'=>'education']);
+        $this->expectException(\Symfony\Component\HttpKernel\Exception\HttpException::class);
+        ReviewedDeviceProof::approve(1,$this->data());
     }
     public function test_approval_requires_independent_evidence_acknowledgement(): void {
         $data=$this->data();unset($data['independent_evidence_reviewed']);

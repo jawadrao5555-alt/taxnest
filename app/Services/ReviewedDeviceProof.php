@@ -39,7 +39,10 @@ final class ReviewedDeviceProof
             'independent_evidence_reviewed'=>'accepted',
         ])->validate();
         return DB::transaction(function() use($companyId,$data,$actor) {
-            Company::whereKey($companyId)->lockForUpdate()->firstOrFail();
+            $company=Company::whereKey($companyId)->lockForUpdate()->firstOrFail();
+            abort_if($company->isLocalCollectionPilot(),422,'School and Hospital reporting routes remain unverified; device proof cannot authorize them.');
+            $device=Schema::hasTable('pos_agent_devices') ? DB::table('pos_agent_devices')->where('company_id',$companyId)->where('device_uid',$data['device_uid'])->first() : null;
+            abort_unless($device && $device->device_uid === $data['device_uid'],422,'Review requires the exact device already registered to this company.');
             unset($data['independent_evidence_reviewed']);
             $data['evidence_sha256']=strtolower($data['evidence_sha256']);
             return DB::table('reviewed_device_proofs')->insertGetId($data+['company_id'=>$companyId,'action'=>'approve','actor_id'=>$actor->id,'created_at'=>now()]);

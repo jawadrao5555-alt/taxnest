@@ -30,6 +30,7 @@ $company=Company::create(['name'=>'Synthetic proof native','ntn'=>bin2hex(random
 $admin=AdminUser::create(['name'=>'Synthetic proof reviewer','email'=>bin2hex(random_bytes(8)).'@proof.invalid','password'=>bcrypt('SyntheticOnly123!'),'role'=>'super_admin']);auth('admin')->setUser($admin);
 $data=['device_uid'=>'Device-A','pos_id'=>'POS-A','environment'=>'sandbox','evidence_reference'=>'Synthetic independently reviewed fixture only','evidence_sha256'=>str_repeat('a',64),'review_note'=>'Synthetic evidence does not establish device or central acceptance','independent_evidence_reviewed'=>true];
 proof(ReviewedDeviceProof::reviewedProof($company->id,'Device-A','POS-A','sandbox')===null,'Missing proof did not HOLD');
+DB::table('pos_agent_devices')->insert(['company_id'=>$company->id,'device_uid'=>'Device-A','created_at'=>now(),'updated_at'=>now()]);
 $id=ReviewedDeviceProof::approve($company->id,$data);$original=(array)DB::table('reviewed_device_proofs')->find($id);
 foreach([['device-a','POS-A','sandbox'],['Device-A','pos-a','sandbox'],['Device-A','POS-A','production'],['Device-B','POS-A','sandbox']] as $scope)proof(ReviewedDeviceProof::reviewedProof($company->id,...$scope)===null,'Native collation/scope alias accepted');
 proof((int)ReviewedDeviceProof::reviewedProof($company->id,'Device-A','POS-A','sandbox')->id===$id,'Exact native scope failed');

@@ -4,10 +4,11 @@ export async function pilotFiscalControlWorkflow(page,t,v,{baseUrl,login,loopbac
  const snapshots=new Map();
  const companySnapshot=async c=>{
   await page.goto(baseUrl+'/admin/companies/'+c.id,{waitUntil:'domcontentloaded'});
-  const raw=await page.getByText('FBR Reporting',{exact:true}).locator('..').innerText();
-  check(raw.includes('Disabled')&&!raw.includes('Enabled'),'Raw FBR reporting flag is not OFF');
+  const displayedReporting=await page.getByText('FBR Reporting',{exact:true}).locator('..').innerText();
+  check(displayedReporting.includes('Disabled')&&!displayedReporting.includes('Enabled'),'Displayed effective FBR reporting status is not OFF');
   const history={};for(const label of ['Transactions','Total Revenue']){const rows=page.getByText(label,{exact:true});check(await rows.count()>0,'Rendered company history metric missing: '+label);history[label]=await rows.evaluateAll(nodes=>nodes.map(n=>n.parentElement.innerText));}
-  return {raw,history};
+  // This is rendered effective status; native probes separately assert raw DB/history preservation.
+  return {displayedReporting,history};
  };
  for(const c of f.companies)snapshots.set(c.id,await companySnapshot(c));
  const url=id=>baseUrl+'/admin/companies/'+id+'/pilot-fiscal-control';
@@ -47,7 +48,7 @@ export async function pilotFiscalControlWorkflow(page,t,v,{baseUrl,login,loopbac
  for(const c of f.companies){
   const state=await page.request.get(url(c.id),{headers:{Accept:'application/json'}});const data=await state.json();
   check(state.status()===200&&data.company_id===c.id&&data.enabled===false&&data.historical_submission===false,'Forbidden probe changed effective fiscal state');
-  check(JSON.stringify(await companySnapshot(c))===JSON.stringify(snapshots.get(c.id)),'Forbidden probe changed raw flag or rendered history totals');
+  check(JSON.stringify(await companySnapshot(c))===JSON.stringify(snapshots.get(c.id)),'Forbidden probe changed displayed reporting status or rendered history totals');
  }
  pass('PILOT FISCAL CONTROL PASS: '+v.width+': school/hospital effective OFF, disabled ON, direct ON422 unchanged state, explicit targeted OFF, tenant/support denied; no bill or fiscal dispatch');
 }

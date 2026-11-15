@@ -1,3 +1,4 @@
+import {scrolledPixelDetail} from './scrolled-pixel-detail.mjs';
 import { collectionSharedWorkspaceChecks } from './collection-shared-workspace-browser.mjs';
 import { privateCollectionCacheCheck } from './collection-private-cache-browser.mjs';
 import { randomUUID } from 'node:crypto';
@@ -191,6 +192,7 @@ export async function schoolFeeWorkflow(page, t, v, { baseUrl, saveEvidenceScree
   };
   await assertReceipt();
   await saveEvidenceScreenshot(page, 'school-fee-cash-receipt-' + v.width);
+  await scrolledPixelDetail(page,['#school-receipt-method','#school-receipt-campus','#school-receipt-cashier','#school-receipt-head','#school-receipt-balance','#school-print-receipt'],'school-recovered-receipt-details-'+v.width,saveEvidenceScreenshot);
   await page.evaluate(() => { window.__schoolPrintCount = 0; window.print = () => { window.__schoolPrintCount++; }; });
   await page.getByRole('button', { name: 'Print / Reprint', exact: true }).click();
   if (await page.evaluate(() => window.__schoolPrintCount) !== 1) throw new Error('Receipt print action did not invoke browser print');
@@ -291,6 +293,7 @@ export async function schoolFeeWorkflow(page, t, v, { baseUrl, saveEvidenceScree
   }
   if (await (await page.request.get(baseUrl + receiptPath)).text() !== originalReceipt) throw new Error('Final close changed original receipt');
   await saveEvidenceScreenshot(page, 'school-fee-final-close-' + v.width);
+  await scrolledPixelDetail(page,['#school-receipt-count','#school-cash-total','#school-counted-total','#school-variance'],'school-closed-totals-details-'+v.width,saveEvidenceScreenshot);
   // The closed desk still permits only a known pending saved-request replay.
   await page.evaluate(({ name, key }) => sessionStorage.setItem(name, key), { name: pendingStorageKey, key });
   await page.goto(baseUrl + '/fbr-pos/school-fees', { waitUntil: 'domcontentloaded' });
@@ -409,6 +412,7 @@ async function schoolLedgerChecks(page, v, { baseUrl, saveEvidenceScreenshot }, 
   if(!/bank/i.test(await page.locator('#school-receipt-method').innerText())) throw new Error('Bank receipt has wrong payment method');
   for (const value of [ref,'1,500.00','500.00','1,000.00']) if(!first.includes(value)) throw new Error('Partial multi-head receipt missing '+value);
   await saveEvidenceScreenshot(page,'school-multihead-bank-receipt-'+v.width);
+  await scrolledPixelDetail(page,['#school-receipt-method','#school-receipt-campus','#school-receipt-cashier','#school-receipt-head','#school-receipt-balance','#school-print-receipt'],'school-bank-receipt-details-'+v.width,saveEvidenceScreenshot);
   await page.goto(baseUrl+'/fbr-pos/school-fees?student_search='+ref,{waitUntil:'domcontentloaded'});
   const balance=page.locator('tr').filter({hasText:ref}).filter({has:page.locator('.school-pay-balance')});
   if(await balance.count()!==1) throw new Error('Student lookup did not return exactly one outstanding fee account');
@@ -446,11 +450,13 @@ async function schoolLedgerChecks(page, v, { baseUrl, saveEvidenceScreenshot }, 
   }
   if(!/card/i.test(await page.locator('#school-receipt-method').innerText())) throw new Error('Card receipt has wrong payment method');
   await saveEvidenceScreenshot(page,'school-card-balance-paid-'+v.width);
+  await scrolledPixelDetail(page,['#school-receipt-method','#school-receipt-campus','#school-receipt-cashier','#school-receipt-head','#school-receipt-balance','#school-print-receipt'],'school-card-receipt-details-'+v.width,saveEvidenceScreenshot);
   if(await (await page.request.get(baseUrl+firstPath)).text() !== firstHtml) throw new Error('Later installment changed first partial receipt snapshot');
   if(Number((await page.locator('#school-receipt-balance').innerText()).replace(/[^0-9.]/g,'')) !== 0) throw new Error('Final card installment did not settle balance');
   await page.goto(baseUrl+'/fbr-pos/day-close',{waitUntil:'domcontentloaded'});
   if(Number(await page.locator('#school-cash-total').getAttribute('data-paisa'))!==0) throw new Error('Recorded bank/card payments contaminated cash close total');
   await saveEvidenceScreenshot(page,'school-noncash-cash-total-'+v.width);
+  await scrolledPixelDetail(page,['#school-receipt-count','#school-cash-total'],'school-noncash-totals-details-'+v.width,saveEvidenceScreenshot);
 }
 
 

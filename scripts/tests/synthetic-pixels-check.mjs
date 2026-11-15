@@ -1,3 +1,4 @@
+import {assertDetailBounds} from '../lib/scrolled-pixel-detail.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {pixelName,pixelOrigin,verifyMarker,initializeSyntheticPixels,captureSyntheticPixels,validateCaptureContext,fixtureIdentity} from '../lib/synthetic-pixel-capture.mjs';
@@ -20,4 +21,11 @@ test('ERP fixture is an exact second identity, never a generic alternate databas
  for(const override of [{fixture_kind:'standalone-browser'},{database:'production'},{database:'taxnest_rc_browser'},{socket:'/tmp/taxnest-rc-mariadb-erp-demo-1000-other/run/mariadb.sock'}])assert.throws(()=>fixtureIdentity(p,{...f,...override}));
  for(const path of ['/tmp/arbitrary/fixture.json',p.replace('1000-abc123','1000-abc123/../other'),p.replace('taxnest-erp-demo','taxnest-rc-browser')])assert.throws(()=>fixtureIdentity(path,f));
  assert.throws(()=>verifyMarker({version:1,synthetic:true,nonce:'n',fixture_sha256:'h',fixture_kind:'standalone-browser',database:'taxnest_rc_browser'},'h','n','hospital-erp-demo','taxnest_erp_demo'));
+});
+
+test('scrolled detail proof refuses clipped, missing or masked-footer-region content',()=>{
+ const viewport={width:390,height:844},good={x:20,y:20,width:300,height:600};
+ assertDetailBounds([good],viewport);
+ for(const rect of [null,{...good,y:-1},{...good,height:830},{...good,x:100},{...good,width:0}])assert.throws(()=>assertDetailBounds([rect],viewport));
+ assert.throws(()=>assertDetailBounds([],viewport));
 });

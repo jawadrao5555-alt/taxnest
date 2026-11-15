@@ -11,3 +11,7 @@ Run `node --test scripts/tests/synthetic-pixels-check.mjs` and `python3 scripts/
 ## Dedicated ERP demo identity
 
 A second, explicit `hospital-erp-demo` identity is supported only for `taxnest_erp_demo`, fixture `/tmp/taxnest-erp-demo-<UID>-<alphanumeric>/safe-runtime/browser-state/fixture.json`, and its exactly paired `/tmp/taxnest-rc-mariadb-erp-demo-<UID>-<same alphanumeric>/run/mariadb.sock`. The dedicated fresh ERP bootstrap/router must verify the actual database/socket and emit `fixture_kind`, `database`, nonce and final fixture digest. It is not a standard browser fixture and cannot capture standalone names. Its only names are `erp-demo-<owner|reception|doctor|cashier|pharmacy|lab|nursing|accounts|auditor|hr>-<1366|390>`. Signed records and exported manifests retain fixture kind. Wrong database, kind, path or paired socket is rejected; all existing masking, loopback, signature and PNG gates remain mandatory.
+
+## Scrolled detail proof
+
+Receipt and closing pages now produce additional explicitly named `*-receipt-details-*` and `*-totals-details-*` views, including the receipt recovered after a lost response. These scroll to deterministic stored-field selectors, assert every required field/print control fits fully inside the fixed viewport above the watermark, capture through the same mask/signature gate, and restore the original scroll. They do not change data, unmask fields, resize viewports or claim full physical-print verification. Missing/clipped detail fails the browser journey rather than silently exporting an incomplete proof.

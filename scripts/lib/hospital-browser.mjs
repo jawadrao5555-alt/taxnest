@@ -1,3 +1,4 @@
+import {scrolledPixelDetail} from './scrolled-pixel-detail.mjs';
 import { collectionSharedWorkspaceChecks } from './collection-shared-workspace-browser.mjs';
 import { privateCollectionCacheCheck } from './collection-private-cache-browser.mjs';
 import { randomUUID } from 'node:crypto';
@@ -80,6 +81,7 @@ export async function hospitalWorkflow(page, t, v, { baseUrl, saveEvidenceScreen
     if (await page.locator('article canvas,article svg,article img:not([data-hospital-logo])').count()) throw new Error('Hospital receipt unexpectedly renders fiscal QR');
   };
   await assertReceipt(40000, 60000);
+  await scrolledPixelDetail(page,['.hospital-receipt dl','#hospital-print-receipt'],'hospital-cash-receipt-details-'+v.width,saveEvidenceScreenshot);
   const invoiceHref = await page.locator('a[href*="/hospital/invoices/"]').first().getAttribute('href');
   if (!invoiceHref || !/\/invoices\/\d+$/.test(invoiceHref)) throw new Error('Hospital receipt has no invoice balance link');
   const invoiceUrl = new URL(invoiceHref, baseUrl).href;
@@ -114,6 +116,7 @@ export async function hospitalWorkflow(page, t, v, { baseUrl, saveEvidenceScreen
     if (!(await page.locator('article').innerText()).includes(payload.payment_reference)) throw new Error('Hospital receipt missing bank/card reference');
     if (method === 'card') { cardPayload = payload; cardReceipt = Number(new URL(page.url()).pathname.split('/').pop()); }
     await saveEvidenceScreenshot(page, 'hospital-' + method + '-receipt-' + v.width);
+    await scrolledPixelDetail(page,['.hospital-receipt dl','#hospital-print-receipt'],'hospital-'+method+'-receipt-details-'+v.width,saveEvidenceScreenshot);
   }
   const cardRetry = await page.request.post(invoiceUrl + '/payments', { headers, form: cardPayload });
   if (!cardRetry.ok() || Number((await cardRetry.json()).receipt_id) !== cardReceipt) throw new Error('Hospital saved partial-payment retry duplicated receipt');
@@ -170,6 +173,7 @@ export async function hospitalWorkflow(page, t, v, { baseUrl, saveEvidenceScreen
   await page.reload({ waitUntil: 'domcontentloaded' });
   if (JSON.stringify(await totals()) !== JSON.stringify(before) || Number(await page.locator('#hospital-variance').getAttribute('data-paisa')) !== -100) throw new Error('Hospital closing snapshot mutated after retries');
   await saveEvidenceScreenshot(page, 'hospital-final-close-' + v.width);
+  await scrolledPixelDetail(page,['#hospital-cash-total','#hospital-card-total','#hospital-bank-total','#hospital-variance'],'hospital-closed-totals-details-'+v.width,saveEvidenceScreenshot);
   await page.goto(new URL(partialInvoice,baseUrl).href,{waitUntil:'domcontentloaded'});
   if(Number(await page.locator('#hospital-balance').getAttribute('data-paisa'))!==15000) throw new Error('Closing changed outstanding partial invoice balance');
   await privateCollectionCacheCheck(page,{baseUrl,path:'/fbr-pos/hospital',screenshotName:'hospital-offline-private-cache-'+v.width,saveEvidenceScreenshot});

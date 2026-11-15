@@ -63,6 +63,8 @@ class PosCounterOrderOpenStatusesTest extends TestCase
             $table->string('role')->nullable();
             $table->string('pos_role')->nullable();
             $table->text('pos_custom_access')->nullable();
+            // Production users are active unless explicitly disabled.
+            $table->boolean('is_active')->default(true);
             $table->timestamps();
         });
 
@@ -370,6 +372,39 @@ class PosCounterOrderOpenStatusesTest extends TestCase
         $this->assertSame('ready', DB::table('restaurant_orders')->find($id)->status);
         $this->assertTrue(RestaurantWaiterController::settleWaiterOrder($this->companyId, $id, $this->makeTxn(), $cashier, true));
         $this->assertNull(DB::table('restaurant_orders')->find($id)->online_payment_awaited_at);
+    }
+
+    public function test_enabled_online_policy_blocks_ready_waiter_confirmation_in_existing_session(): void
+    {
+        (require database_path('migrations/2026_11_16_120000_create_pos_online_payment_policies_table.php'))->up();
+        $cashier = $this->actAs($this->makeUser('pos_cashier'));
+        $id = $this->order(['table_id' => $this->table(), 'status' => 'ready']);
+        DB::table('pos_online_payment_policies')->insert(['company_id' => $this->companyId,
+            'user_id' => $cashier->id, 'requires_approval' => true, 'updated_by' => $cashier->id]);
+        try {
+            RestaurantWaiterController::settleWaiterOrder($this->companyId, $id, $this->makeTxn(), $cashier, true);
+            $this->fail('A stale cashier session confirmed a restricted payment.');
+        } catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) {
+            $this->assertSame(403, $e->getStatusCode());
+        }
+        $this->assertSame('ready', DB::table('restaurant_orders')->find($id)->status);
+        $this->assertNull(DB::table('restaurant_orders')->find($id)->pos_transaction_id);
+    }
+
+    public function test_default_off_does_not_allow_inactive_or_foreign_cached_waiter_actor(): void
+    {
+        foreach (['is_active' => false, 'company_id' => $this->companyId + 1] as $field => $value) {
+            $cashier = $this->actAs($this->makeUser('pos_cashier'));
+            $id = $this->order(['table_id' => $this->table(), 'status' => 'ready']);
+            DB::table('users')->where('id', $cashier->id)->update([$field => $value]);
+            try {
+                RestaurantWaiterController::settleWaiterOrder($this->companyId, $id, $this->makeTxn(), $cashier, true);
+                $this->fail('An inactive or foreign cached actor confirmed payment.');
+            } catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) {
+                $this->assertSame(403, $e->getStatusCode());
+            }
+            $this->assertSame('ready', DB::table('restaurant_orders')->find($id)->status);
+        }
     }
 
     public function test_preparing_table_stale_edit_revision_is_not_settled(): void

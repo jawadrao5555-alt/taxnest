@@ -78,6 +78,9 @@ function contract(doc,label){
     if(text.includes('npm ci')&&!text.includes('npm-bootstrap-pinned.sh'))throw Error(`${label}: ${name} invokes npm ci without the pinned helper`);
   }
   if((jobs.browserdesktopmobile.steps||[]).filter(s=>s.name==='Upload verified synthetic screenshots for visual review').length!==1)throw Error(`${label}: one guarded synthetic pixel upload required`);
+  const fullSteps=(jobs.fullphpunit.steps||[]).filter(s=>s.name==='Run full suite in clean loopback-only environment');
+  if(fullSteps.length!==1 || fullSteps[0].if || fullSteps[0]['continue-on-error']
+    || fullSteps[0].run!=='bash scripts/rc-safe-run -- bash scripts/rc-phpunit-opcache')throw Error(`${label}: full suite must run without filters in the bounded verified runtime`);
   const native=jobs['native-mariadb-di'];
   const browser=jobs.browserdesktopmobile;
   const erp=(browser.steps||[]).find(s=>s.name==='Verify dedicated Hospital ERP demo role access at desktop and 390px');
@@ -167,6 +170,18 @@ for(const name of Object.keys(mandatoryCommands)) {
  let rejected=false;try{contract(mutated,`negative-exact-head-${name}`);}catch{rejected=true;}
  if(!rejected)throw Error(`Validator accepted inferred checkout in ${name}`);
 }
+for(const change of ['remove','optional','conditional','filter','bypass-runtime']) {
+ const mutated=structuredClone(activeDoc), steps=mutated.jobs.fullphpunit.steps;
+ const index=steps.findIndex(s=>s.name==='Run full suite in clean loopback-only environment');
+ if(change==='remove')steps.splice(index,1);
+ if(change==='optional')steps[index]['continue-on-error']=true;
+ if(change==='conditional')steps[index].if='success()';
+ if(change==='filter')steps[index].run+=' --filter OneTest';
+ if(change==='bypass-runtime')steps[index].run='bash scripts/rc-safe-run -- vendor/bin/phpunit';
+ let rejected=false;try{contract(mutated,`negative-full-${change}`);}catch{rejected=true;}
+ if(!rejected)throw Error(`Validator accepted incomplete full suite ${change}`);
+}
+console.log('PASS: five full-suite omission/filter/runtime mutations rejected');
 console.log('PASS: seven non-exact-head checkout mutations rejected');
 console.log('PASS: five negative isolated ERP role gate mutations rejected');
 console.log('PASS: ten negative synthetic pixel gate mutations rejected');

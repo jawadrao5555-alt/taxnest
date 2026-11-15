@@ -124,7 +124,7 @@ jobs:
       - name: Check native MySQL 8 receipt scopes without a database listener
         run: bash scripts/rc-safe-run -- python3 scripts/tests/elaan-native-sql-check.py
       - name: Run full suite in clean loopback-only environment
-        run: bash scripts/rc-safe-run -- vendor/bin/phpunit
+        run: bash scripts/rc-safe-run -- bash scripts/rc-phpunit-opcache
       - name: Sanitize CI evidence
         id: sanitize_evidence
         if: always()

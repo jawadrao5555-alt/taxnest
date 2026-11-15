@@ -115,12 +115,17 @@ class CompanyDeletionLifecycle
     /** Called inside the database purge transaction so evidence cannot claim a rolled-back purge. */
     public function purged(Company $company, AdminUser $actor): ?int
     {
+        $collections = app(LocalCollectionLifecycle::class);
         if (! $this->supported()) {
+            if (array_sum($collections->counts((int) $company->id)) > 0) {
+                throw new \LogicException('Local collections require durable deletion evidence before purge.');
+            }
             return null;
         }
         $request = $this->active((int) $company->id, true)
             ?: $this->createRequest($company, 'admin', null, (int) $actor->id,
                 (string) $actor->email, 'Legacy bin entry permanently deleted', self::ON_HOLD);
+        $localCounts = $collections->purge((int) $company->id);
         DB::table('company_deletion_requests')->where('id', $request->id)->update([
             'active_key' => null,
             'status' => self::PURGED,
@@ -128,7 +133,7 @@ class CompanyDeletionLifecycle
             'updated_at' => now(),
         ]);
         $this->event((int) $request->id, (int) $company->id, 'database_purge_committed', 'admin',
-            (int) $actor->id, ['retained_evidence' => ['admin_audit_logs', 'registered_credentials', 'support_cases', 'support_case_events', 'support_case_links']]);
+            (int) $actor->id, ['local_collection_rows_purged' => $localCounts, 'retained_evidence' => ['admin_audit_logs', 'registered_credentials', 'support_cases', 'support_case_events', 'support_case_links']]);
 
         return (int) $request->id;
     }
@@ -194,6 +199,7 @@ class CompanyDeletionLifecycle
                 $counts[$table] = DB::table($table)->where('company_id', $companyId)->count();
             }
         }
+        $counts += app(LocalCollectionLifecycle::class)->counts($companyId);
         ksort($counts);
 
         return [

@@ -15,11 +15,31 @@ $branch=DB::table('branches')->insertGetId(['company_id'=>$company->id,'name'=>'
 $parent=max((int)DB::table('fbr_pos_transactions')->max('id'),(int)DB::table('pos_transactions')->max('id'))+100;
 DB::table('fbr_pos_transactions')->insert(['id'=>$parent,'company_id'=>$company->id,'branch_id'=>$branch,'invoice_number'=>'SYN-REF-'.$suffix,'transaction_type'=>'sale','status'=>'completed','invoice_mode'=>'local','fbr_status'=>'local','created_at'=>$stamp,'updated_at'=>$stamp]);
 DB::table('pos_transactions')->insert(['id'=>$parent,'company_id'=>$pra->id,'invoice_number'=>'SYN-REF-PRA-'.$suffix,'transaction_type'=>'sale','status'=>'completed','invoice_mode'=>'local','pra_status'=>'local','created_at'=>$stamp,'updated_at'=>$stamp]);
-$make=function(int $ordinal,?string $eventTime=null)use($company,$parent,$branch,$suffix,$stamp):array{
- $return=DB::table('fbr_pos_transactions')->insertGetId(['company_id'=>$company->id,'branch_id'=>$branch,'invoice_number'=>'SYN-RET-'.$suffix.'-'.$ordinal,'transaction_type'=>'return','parent_transaction_id'=>$parent,'status'=>'completed','invoice_mode'=>'local','fbr_status'=>'local','created_at'=>$stamp,'updated_at'=>$stamp]);
- $opaque='native-refund-'.$suffix.'-'.$ordinal;
- $mapping=DB::table('agent_core_aggregate_mappings')->insertGetId(['company_id'=>$company->id,'branch_id'=>$branch,'local_type'=>'refund','local_aggregate_id'=>$opaque,'cloud_type'=>'fbr_pos_transaction','cloud_id'=>$return,'created_at'=>$stamp,'updated_at'=>$stamp]);
- $event=DB::table('agent_core_events')->insertGetId(['company_id'=>$company->id,'device_uid'=>'synthetic-native-refund','event_id'=>(string)Str::uuid(),'idempotency_key'=>(string)Str::uuid(),'content_hash'=>str_repeat('a',64),'event_type'=>'customer.refund.posted','payload'=>json_encode(['schema'=>'local-core.customer-ledger.v1','command_type'=>'refund.record','aggregate_id'=>$opaque,'private'=>'PRIVATE-REFUND-DATA']),'event_scope'=>json_encode(['company_id'=>(int)$company->id,'branch_id'=>(int)$branch]),'projection_status'=>'projected','projection_result'=>json_encode(['return_transaction_id'=>(int)$return,'refund_total'=>987654]),'created_at'=>$eventTime??$stamp,'updated_at'=>$stamp]);return compact('return','mapping','event','opaque');
+$actor=\App\Models\User::create(['company_id'=>$company->id,'name'=>'Synthetic refund owner','email'=>$suffix.'@refund-native.invalid','password'=>bcrypt('SyntheticOnly123!'),'role'=>'company_admin','pos_role'=>'pos_admin','is_active'=>true]);
+DB::table('agent_core_aggregate_mappings')->insert(['company_id'=>$company->id,'branch_id'=>$branch,'local_type'=>'order','local_aggregate_id'=>'native-order-'.$suffix,'cloud_type'=>'fbr_pos_transaction','cloud_id'=>$parent,'created_at'=>$stamp,'updated_at'=>$stamp]);
+$make=function(int $ordinal,?string $eventTime=null)use($company,$parent,$branch,$suffix,$stamp,$actor):array{
+ // Canonical string scope and refund.record payload follow the existing
+ // AgentCoreLedgerRefundProjectorTest acceptance fixture, but the inbox and
+ // registered projector below produce the stored event/result/mapping here.
+ $line=DB::table('fbr_pos_transaction_items')->insertGetId(['transaction_id'=>$parent,'item_name'=>'Synthetic refund line','quantity'=>1,'unit_price'=>100,'subtotal'=>100,'tax_amount'=>0,'total'=>100,'created_at'=>$stamp,'updated_at'=>$stamp]);
+ DB::table('fbr_pos_transactions')->where('id',$parent)->update(['subtotal'=>100*$ordinal,'total_amount'=>100*$ordinal,'payment_method'=>'cash']);
+ $lineAggregate='native-line-'.$suffix.'-'.$ordinal;
+ DB::table('agent_core_aggregate_mappings')->insert(['company_id'=>$company->id,'branch_id'=>$branch,'local_type'=>'sale_line','local_aggregate_id'=>$lineAggregate,'cloud_type'=>'fbr_pos_transaction_item','cloud_id'=>$line,'created_at'=>$stamp,'updated_at'=>$stamp]);
+ $opaque='native-refund-'.$suffix.'-'.$ordinal;$device='synthetic-native-refund';
+ $wire=['event_id'=>(string)Str::uuid(),'idempotency_key'=>(string)Str::uuid(),'event_type'=>'customer.refund.posted','occurred_at'=>now()->toIso8601String(),
+  'scope'=>['company_id'=>(string)$company->id,'branch_id'=>(string)$branch,'user_id'=>(string)$actor->id],
+  'payload'=>['schema'=>'local-core.customer-ledger.v1','command_type'=>'refund.record','aggregate_id'=>$opaque,'aggregate_revision'=>1,
+   'data'=>['order_id'=>'native-order-'.$suffix,'amount_cents'=>10000,'method'=>'cash','line_ids'=>[$lineAggregate],'private'=>'PRIVATE-REFUND-DATA']]];
+ app(\App\Services\AgentCoreEventInboxService::class)->accept($company,$device,[$wire]);
+ $stored=\App\Models\AgentCoreEvent::where('company_id',$company->id)->where('event_id',$wire['event_id'])->sole();
+ refundProof((array)$stored->event_scope==$wire['scope']&&is_string($stored->event_scope['company_id'])&&is_string($stored->event_scope['branch_id']),'Inbox changed canonical refund scope serialization');
+ $outcome=app(\App\Services\AgentCoreProjectorRegistry::class)->project($company,$device,$stored,$wire);
+ refundProof($outcome->status==='projected'&&is_int($outcome->result['return_transaction_id']??null),'Registered refund projector failed to produce integer return identity');
+ $stored->forceFill(['projection_status'=>$outcome->status,'projection_result'=>$outcome->result])->save();
+ if($eventTime!==null)DB::table('agent_core_events')->where('id',$stored->id)->update(['created_at'=>$eventTime]);
+ $return=$outcome->result['return_transaction_id'];$event=$stored->id;
+ $mapping=(int)DB::table('agent_core_aggregate_mappings')->where('company_id',$company->id)->where('branch_id',$branch)->where('local_type','refund')->where('local_aggregate_id',$opaque)->value('id');
+ return compact('return','mapping','event','opaque');
 };
 $first=$make(1);$source=fn(?int $branchId=null,int $after=0,int $limit=25)=>Evidence::source($company->id,$branchId,$day.' 00:00:00',$day.' 23:59:59',$after,$limit,[]);
 $before=DB::table('agent_core_events')->where('id',$first['event'])->first();$report=app(DiagnosticBillEvidence::class)->read(['company_name'=>$company->name,'bill_id'=>$parent],[$company->id]);

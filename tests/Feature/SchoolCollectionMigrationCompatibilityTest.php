@@ -55,8 +55,37 @@ class SchoolCollectionMigrationCompatibilityTest extends TestCase
             $this->assertNull($after['handover_to']);
             $this->assertNull($after['handover_note']);
         }
-        $migration->down();
-        $this->assertSame($receipts, DB::table('school_fee_receipts')->orderBy('id')->get()->map(fn ($r) => (array) $r)->all());
-        $this->assertSame($closings, DB::table('school_fee_day_closes')->orderBy('id')->get()->map(fn ($r) => (array) $r)->all());
+        $lines = json_encode([['fee_head'=>'tuition','label'=>'Synthetic tuition','amount_paisa'=>9000], ['fee_head'=>'exam','label'=>'Synthetic exam','amount_paisa'=>3000]]);
+        $account = DB::table('school_fee_accounts')->insertGetId([
+            'company_id'=>17,'branch_id'=>31,'student_reference'=>'SYN-NEW','student_name'=>'Synthetic student',
+            'fee_period'=>'2026-11','fee_lines'=>$lines,'payable_paisa'=>12000,'paid_paisa'=>6000,
+            'created_at'=>'2026-11-16 10:00:00','updated_at'=>'2026-11-16 10:00:00',
+        ]);
+        $newReceipt = $receipts[1]; unset($newReceipt['id']);
+        DB::table('school_fee_receipts')->insert(array_replace($newReceipt, [
+            'request_key'=>'00000000-0000-4000-8000-000000000100','account_id'=>$account,'requested_account_id'=>$account,
+            'student_reference'=>'SYN-NEW','student_name'=>'Synthetic student','fee_head'=>'multiple','fee_period'=>'2026-11',
+            'collected_at'=>'2026-11-16 10:00:00','created_at'=>'2026-11-16 10:00:00','updated_at'=>'2026-11-16 10:00:00',
+            'payment_method'=>'bank','amount_paisa'=>6000,'fee_lines'=>$lines,'payable_paisa'=>12000,'paid_paisa'=>6000,'balance_paisa'=>6000,
+        ]));
+        $newClosing = $closings[1]; unset($newClosing['id']);
+        DB::table('school_fee_day_closes')->insert(array_replace($newClosing, [
+            'closed_at'=>'2026-11-16 18:00:00','created_at'=>'2026-11-16 18:00:00','updated_at'=>'2026-11-16 18:00:00',
+            'report_date'=>'2026-11-16','cash_amount_paisa'=>0,'counted_cash_paisa'=>50,'variance_paisa'=>50,
+            'variance_reason'=>'Synthetic overage','handover_to'=>'Synthetic supervisor','handover_note'=>'Synthetic sealed envelope',
+        ]));
+        $saved = [];
+        foreach (['school_fee_accounts','school_fee_receipts','school_fee_day_closes'] as $table) {
+            $saved[$table] = DB::table($table)->orderBy('id')->get()->map(fn ($r)=>(array)$r)->all();
+        }
+        for ($attempt=0; $attempt<2; $attempt++) {
+            $migration->down();
+            foreach ($saved as $table=>$rows) $this->assertSame($rows, DB::table($table)->orderBy('id')->get()->map(fn ($r)=>(array)$r)->all());
+            $migration->up(); $migration->up();
+            foreach ($saved as $table=>$rows) $this->assertSame($rows, DB::table($table)->orderBy('id')->get()->map(fn ($r)=>(array)$r)->all());
+        }
+        // Keep the original pre-upgrade history equality, including other tenants/campuses.
+        foreach ($receipts as $before) $this->assertSame($before, array_intersect_key((array)DB::table('school_fee_receipts')->find($before['id']), $before));
+        foreach ($closings as $before) $this->assertSame($before, array_intersect_key((array)DB::table('school_fee_day_closes')->find($before['id']), $before));
     }
 }

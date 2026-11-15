@@ -35,6 +35,13 @@ export async function platformExpenseWorkflow(page,t,v,{baseUrl,login,loopback,s
  check((await page.locator('#expense-totals').innerText()).includes('Net recorded expenses: PKR 0.00'),'Reversal failed to net recorded totals once');
  await verifyExpenseThemes(page,v.width,pass);
  await scrolledPixelDetail(page,['#expense-totals'],'platform-expense-reconciled-'+v.width,saveEvidenceScreenshot);
+ const history=page.locator('#expense-history'),originalLeft=await history.evaluate(e=>e.scrollLeft);
+ try {
+  for(const [column,name] of [[3,'amount'],[4,'audit'],[5,'correction']]) {
+   await scrolledPixelDetail(page,[`#expense-history th:nth-child(${column})`,`#expense-history tbody tr:nth-child(1) td:nth-child(${column})`,`#expense-history tbody tr:nth-child(2) td:nth-child(${column})`],'platform-expense-history-'+name+'-'+v.width,saveEvidenceScreenshot);
+  }
+ } finally {await history.evaluate((e,left)=>e.scrollLeft=left,originalLeft);}
+
  const context=await page.context().browser().newContext({viewport:v,serviceWorkers:'block'});await context.route('**/*',r=>loopback(new URL(r.request().url()).hostname)?r.continue():r.abort('blockedbyclient'));
  try{const support=await context.newPage();await login(support,{...t,login:f.support});const denied=await context.request.get(baseUrl+path,{headers:{Accept:'application/json'},maxRedirects:0});check(denied.status()===403&&!(await denied.text()).includes(reference),'Support role read platform expense');}finally{await context.close();}
  pass('PLATFORM EXPENSE PASS: '+v.width+': actual record-only form, committed response loss and explicit same-ID refresh retry, changed-data409, one original, full reversal and duplicate protection, frozen original retained, filtered net0 and non-superadmin403; no money execution');

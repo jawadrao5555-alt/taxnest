@@ -97,6 +97,7 @@ export async function aiUsageWorkflow(page,t,v,{baseUrl,login,loopback,dismiss,w
       await verify(owner,c);
       check(!(await owner.locator('body').innerText()).includes(foreign.companyName),'Query broadened company scope');
       await saveEvidenceScreenshot(owner,'ai-usage-owner-'+(c.prefix==='/pos'?'pos':'fbr')+'-'+v.width);
+      await scrolledPixelDetail(owner,['#ai-usage-summary dt:nth-of-type(7)','#ai-usage-summary dd:nth-of-type(7)','#ai-usage-summary dt:nth-of-type(8)','#ai-usage-summary dd:nth-of-type(8)','#ai-usage-summary dt:nth-of-type(9)','#ai-usage-summary dd:nth-of-type(9)'],'ai-usage-owner-limits-'+(c.prefix==='/pos'?'pos':'fbr')+'-'+v.width,saveEvidenceScreenshot);
     } finally { await ctx.close(); }
     const cashierCtx=await context();
     try {

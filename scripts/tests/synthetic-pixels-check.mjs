@@ -62,3 +62,7 @@ test('trial policy and ERP signup permit only named synthetic views',()=>{
 
 // Frozen phase/locale notices are explicitly allowlisted, never arbitrary exports.
 for(const phase of ['trial','confirmed','grace'])for(const locale of ['en','ur','rur'])for(const width of [1366,390])assert.equal(pixelName(`prospective-reminder-${phase}-${locale}-${width}`),`prospective-reminder-${phase}-${locale}-${width}.png`);
+test('owner limits and expense columns have only exact reviewed captures',()=>{
+ for(const prefix of ['ai-usage-owner-limits-pos','ai-usage-owner-limits-fbr','platform-expense-history-amount','platform-expense-history-audit','platform-expense-history-correction'])for(const width of [1366,390])assert.equal(pixelName(`${prefix}-${width}`),`${prefix}-${width}.png`);
+ for(const name of ['platform-expense-history-arbitrary-390','ai-usage-owner-limits-pos-1280','platform-expense-history-audit-390.png','../ai-usage-owner-limits-fbr-390'])assert.throws(()=>pixelName(name));
+});

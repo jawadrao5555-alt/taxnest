@@ -10,7 +10,7 @@ use Illuminate\Validation\ValidationException;
 /** Registered, SELECT-only source metadata. Never returns stored payloads or unrestricted columns. */
 final class DiagnosticSourceEvidence
 {
-    public const REGISTRY_VERSION = 12;
+    public const REGISTRY_VERSION = 13;
 
     public const FIELD_CONTRACT_VERSION = 1;
 
@@ -25,6 +25,7 @@ final class DiagnosticSourceEvidence
         'pos.di' => ['pos', 'pos_di_sandbox_submissions', 'created_at'],
         'pos.orders' => ['pos', 'restaurant_orders', 'created_at'],
         'di.fiscal' => ['di', 'fbr_logs', 'created_at'],
+        'di.stock_postings' => ['di', 'di_invoice_inventory_postings', 'created_at'],
         'di.sales' => ['di', 'invoices', 'created_at'],
         'fbrpos.fiscal' => ['fbrpos', 'fbr_pos_logs', 'created_at'],
         'fbrpos.sales' => ['fbrpos', 'fbr_pos_transactions', 'created_at'],
@@ -205,6 +206,14 @@ final class DiagnosticSourceEvidence
             }
             $q->whereBetween('e.'.$stamp, [$from->copy()->setTimezone(config('app.timezone'))->format('Y-m-d H:i:s'),
                 $to->copy()->setTimezone(config('app.timezone'))->format('Y-m-d H:i:s')]);
+            if ($v['source'] === 'di.stock_postings') {
+                if (!DiRetainedStockEvidence::available()) {
+                    return $meta + ['status'=>'UNAVAILABLE','observed'=>null,'rows'=>[], 'pagination'=>['has_more'=>false,'next_after_id'=>null]];
+                }
+                if ((clone $q)->whereNotIn('e.id', DiRetainedStockEvidence::validIds((int)$company->id))->exists()) {
+                    return $meta + ['status'=>'INCONSISTENT_RETAINED_LINKS','observed'=>null,'rows'=>[], 'pagination'=>['has_more'=>false,'next_after_id'=>null]];
+                }
+            }
             $limit = (int) ($v['limit'] ?? 25);
             $extent = (clone $q)->selectRaw('COUNT(*) AS retained_rows, MIN(e.'.$stamp.') AS first_at, MAX(e.'.$stamp.') AS last_at')->first();
             $select = array_merge(['e.id', 'e.'.$stamp.' as event_at'], array_map(fn ($column) => 'e.'.$column, $safeColumns));

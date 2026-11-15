@@ -29,7 +29,7 @@ job results and visual review before changing A; no CI result is inferred here.
 | #328 | Full-received/full-credit decisions, retained receivable, retry-safe collection and returns; `udhaar-full-credit-393.md` | A: native/browser/Android results; E: installed-device verification. Historical partial amounts preserved. |
 | #321 | Private profiles, default-OFF opt-in greetings, tutorial accessibility metadata, bounded company reads, usage controls and atomic explicit escalation retry | A: native/browser/final pixels; I: remaining bounded read adapters and full accessibility/programme coverage, described below. |
 | #320 | Two-step/reset/revocation/impersonation/deletion controls and synthetic restore quarantine | A: integrated checks; E: real backup freshness, restoration, physical erasure and RPO/RTO. Quarantine is not restore proof. |
-| #319 | Retained diagnostic registry, School/Hospital local sources and authenticated tenant backup metadata | I: DI retained stock association adapter below; A: final source/privacy tests; E: producer enrollment, elapsed collection and actual restoration. Missing telemetry stays unknown. |
+| #319 | Retained diagnostic registry, School/Hospital local sources and authenticated tenant backup metadata | DI retained stock association/source now implemented (see evidence note below); A: final source/privacy/native tests; E: producer enrollment, elapsed collection and actual restoration. Missing telemetry stays unknown. |
 | #318 | Existing integrity/return/pharmacy slices and reviewed acknowledgment integration | A: final regression/native proof; E: regulator/device acceptance. |
 | #316 | Frozen billing documents/lifecycle tests; atomic paid approval and commission rollback; `shared-billing-cycles-393.md` | A: native concurrent approval and rendered checkout; I: item-level reconciliation of every original finance/grant scenario, not assumed complete from the selected matrix. |
 | #314 | Shared-platform/local School pilot integration only | F: full School ERP and future industries. Preserve original Q1–Q6/E1–E9 scope. |
@@ -57,19 +57,21 @@ absence of its evidence is not proof that all corresponding runtime is absent.
 The following distinction comes from current source, not the older diagnostic
 release notes:
 
-- `app/Services/Reporting/DiagnosticSourceEvidence.php` registry version 12
+- `app/Services/Reporting/DiagnosticSourceEvidence.php` registry version 13
   **already includes** `pos.backup_evidence`, `di.backup_evidence`,
   `fbrpos.backup_evidence` and `health.backup_evidence`, backed by
   `tenant_backup_evidence`. It also includes School accounts/receipts/closings
   and Hospital invoices/payments/closings. Do not describe these as missing.
-- Concrete I gap: `DiagnosticBillEvidence.php` DI definitions expose only
-  `fbr_attempts` and still list `stock` in `unimplemented_links`.
+- Historical gap now corrected by `DiRetainedStockEvidence` (see
+  `di-retained-stock-diagnostics-393.md`): the earlier
+  `DiagnosticBillEvidence.php` DI definitions exposed only
+  `fbr_attempts` and listed `stock` in `unimplemented_links`.
   `DiInvoiceInventory.php` now writes `di_invoice_inventory_postings` with
   exact `company_id`, `invoice_id`, `invoice_item_id` and `movement_id`, and
   `inventory_movements` with `reference_type=di_invoice_item`. A bounded
-  adapter can follow those retained IDs with matching tenant/invoice/item and
-  movement checks. The generic source registry also lacks a DI stock/posting
-  source. No amount/time/name matching or historical reconstruction is allowed.
+  adapter now follows those retained IDs with matching tenant/invoice/item and
+  movement checks. Registry v13 adds `di.stock_postings`; bill evidence v6
+  includes stock. Inconsistent links fail closed in reads and collection. No amount/time/name matching or historical reconstruction is allowed.
 - Other currently declared unimplemented bill links are DI `payments` and
   `print_events`; FBR POS `payments` and `offline_agent_events`; Healthcare ERP
   `lab_orders` and `print_events`; PRA unuploaded/unattributed offline events.

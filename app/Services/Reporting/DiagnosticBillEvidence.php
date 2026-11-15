@@ -37,7 +37,7 @@ final class DiagnosticBillEvidence
             'pos' => 'pos_transactions', 'di' => 'invoices', 'fbrpos' => 'fbr_pos_transactions', 'erps' => 'health_bills',
             default => null,
         };
-        $base = ['version' => 5, 'company' => ['id' => (int) $company->id, 'name' => $company->name, 'product' => $product],
+        $base = ['version' => 6, 'company' => ['id' => (int) $company->id, 'name' => $company->name, 'product' => $product],
             'bill_id' => (int) $v['bill_id'], 'complete' => false, 'physical_print' => 'unknown', 'fiscal_acceptance' => 'not_assessed',
             'notes' => ['Only explicit stored foreign-key/reference links are included. Matching numbers, amounts or timestamps are never treated as associations.',
                 'Each source has its own immutable ID cursor and may have late arrivals. Missing/deleted/uncollected evidence remains unknown.',
@@ -138,6 +138,14 @@ final class DiagnosticBillEvidence
             }
         }
 
+        if ($product === 'di') {
+            try {
+                $sources['stock'] = DiRetainedStockEvidence::bill((int)$company->id, (int)$v['bill_id'], (int)($v['after_id'] ?? 0), (int)($v['limit'] ?? 25));
+            } catch (\Illuminate\Database\QueryException) {
+                $sources['stock'] = ['status'=>'SOURCE_QUERY_FAILED','rows'=>[],'has_more'=>false,'next_after_id'=>null];
+            }
+        }
+
         // Healthcare charges freeze the source type and immutable source ID
         // that produced a bill line. Follow that explicit link to the original
         // clinical/pharmacy row, but require both the charge and the source row
@@ -220,7 +228,7 @@ final class DiagnosticBillEvidence
         return $base + ['status' => 'PARTIAL', 'sources' => $sources,
             'unimplemented_links' => match ($product) {
                 'pos' => ['unuploaded_or_unattributed_offline_events'],
-                'di' => ['payments', 'stock', 'print_events'],
+                'di' => ['payments', 'print_events'],
                 'fbrpos' => ['payments', 'offline_agent_events'],
                 'erps' => ['lab_orders', 'print_events'],
             }];

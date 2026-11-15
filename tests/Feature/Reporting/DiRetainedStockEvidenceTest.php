@@ -15,7 +15,7 @@ class DiRetainedStockEvidenceTest extends TestCase
         Schema::create('companies',function(Blueprint $t){$t->id();$t->string('name');$t->string('product_type');});
         Schema::create('branches',function(Blueprint $t){$t->id();$t->integer('company_id');});
         Schema::create('invoices',function(Blueprint $t){$t->id();$t->integer('company_id');$t->integer('branch_id')->nullable();});
-        Schema::create('invoice_items',function(Blueprint $t){$t->id();$t->integer('invoice_id');});
+        Schema::create('invoice_items',function(Blueprint $t){$t->id();$t->integer('invoice_id');$t->json('inventory_snapshot')->nullable();});
         Schema::create('inventory_movements',function(Blueprint $t){$t->id();foreach(['company_id','product_id','reference_id'] as $c)$t->integer($c);$t->integer('branch_id')->nullable();$t->string('reference_type');$t->text('notes');});
         Schema::create('di_invoice_inventory_postings',function(Blueprint $t){$t->id();foreach(['company_id','invoice_id','invoice_item_id','movement_id','product_id'] as $c)$t->integer($c);$t->integer('branch_id')->nullable();$t->timestamp('created_at');});
         DB::table('companies')->insert([['id'=>1,'name'=>'Synthetic DI','product_type'=>'di'],['id'=>2,'name'=>'Other DI','product_type'=>'di']]);
@@ -25,7 +25,7 @@ class DiRetainedStockEvidenceTest extends TestCase
     private function posting(int $id,int $company,?int $branch): void
     {
         DB::table('invoices')->insert(['id'=>$id,'company_id'=>$company,'branch_id'=>$branch]);
-        DB::table('invoice_items')->insert(['id'=>$id,'invoice_id'=>$id]);
+        DB::table('invoice_items')->insert(['id'=>$id,'invoice_id'=>$id,'inventory_snapshot'=>json_encode(['version'=>1,'company_id'=>$company,'product_id'=>9,'branch_id'=>$branch])]);
         DB::table('inventory_movements')->insert(['id'=>$id+100,'company_id'=>$company,'product_id'=>9,'branch_id'=>$branch,'reference_type'=>'di_invoice_item','reference_id'=>$id,'notes'=>'PRIVATE-DO-NOT-EXPORT']);
         DB::table('di_invoice_inventory_postings')->insert(['id'=>$id,'company_id'=>$company,'invoice_id'=>$id,'invoice_item_id'=>$id,'movement_id'=>$id+100,'product_id'=>9,'branch_id'=>$branch,'created_at'=>'2026-11-15 10:00:00']);
     }
@@ -106,6 +106,21 @@ class DiRetainedStockEvidenceTest extends TestCase
         Schema::drop('inventory_movements');
         $this->assertSame('UNAVAILABLE',$service->capture(1,'di.stock_postings','2026-11-15',(string)\Illuminate\Support\Str::uuid()));
         $this->travelBack();
+    }
+
+    public function test_matching_forged_posting_and_movement_cannot_override_frozen_item_product(): void
+    {
+        DB::table('di_invoice_inventory_postings')->where('id',1)->update(['product_id'=>999]);
+        DB::table('inventory_movements')->where('id',101)->update(['product_id'=>999]);
+        $this->assertSame('INCONSISTENT_RETAINED_LINKS',$this->bill()['status']);
+        $this->assertSame('INCONSISTENT_RETAINED_LINKS',$this->source()['status']);
+    }
+    public function test_missing_or_foreign_frozen_identity_is_unknown_not_current_catalogue_inference(): void
+    {
+        DB::table('invoice_items')->where('id',1)->update(['inventory_snapshot'=>null]);
+        $this->assertSame('INCONSISTENT_RETAINED_LINKS',$this->bill()['status']);
+        DB::table('invoice_items')->where('id',1)->update(['inventory_snapshot'=>json_encode(['version'=>1,'company_id'=>2,'product_id'=>9,'branch_id'=>null])]);
+        $this->assertSame('INCONSISTENT_RETAINED_LINKS',$this->bill()['status']);
     }
 
 }

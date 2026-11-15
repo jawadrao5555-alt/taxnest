@@ -124,6 +124,7 @@ concurrency(){
     grep -Fqx "PASS: native local School/Hospital bin and restore preserve exact snapshots; purge rollback restores all rows and audited purge removes target only" "$EVIDENCE_DIR/local-collection-lifecycle.log" || fail local-collection-lifecycle-missing-proof
     grep -Fqx "PASS: native school duplicate collection and close remain single; collect-close race serializes cash; post-close replay preserved and fresh payment rejected" "$EVIDENCE_DIR/school-fee-concurrency.log" || fail school-fee-concurrency-missing-success-proof
     clean_php php "$ROOT/tests/native/rc_di_invoice_inventory.php" | tee "$EVIDENCE_DIR/di-invoice-inventory.log"
+    grep -Fqx "PASS: native DI retained stock diagnostic links exact scoped pagination forged tenant and branch rejected rollback preserved" "$EVIDENCE_DIR/di-invoice-inventory.log" || fail di-stock-diagnostics-missing-proof
     grep -Fqx "PASS: native DI frozen inventory duplicate acceptance posts once concurrent overreturn refused exact four decimals and rollback preserved" "$EVIDENCE_DIR/di-invoice-inventory.log" || fail di-invoice-inventory-missing-proof
     clean_php php "$ROOT/tests/native/rc_di_billing_packing.php" | tee "$EVIDENCE_DIR/di-billing-packing.log"
     clean_php php "$ROOT/tests/native/rc_paid_renewal.php" | tee "$EVIDENCE_DIR/paid-renewal.log"

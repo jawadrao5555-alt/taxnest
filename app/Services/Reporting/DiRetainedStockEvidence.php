@@ -14,7 +14,7 @@ final class DiRetainedStockEvidence
         foreach ([
             'di_invoice_inventory_postings' => ['id','company_id','invoice_id','invoice_item_id','movement_id','product_id','branch_id','created_at'],
             'invoices' => ['id','company_id','branch_id'],
-            'invoice_items' => ['id','invoice_id'],
+            'invoice_items' => ['id','invoice_id','inventory_snapshot'],
             'inventory_movements' => ['id','company_id','product_id','branch_id','reference_type','reference_id'],
             'branches' => ['id','company_id'],
         ] as $table => $columns) {
@@ -37,6 +37,14 @@ final class DiRetainedStockEvidence
                     ->where('m.reference_type','=','di_invoice_item');
             })
             ->where('p.company_id',$companyId)->where('i.company_id',$companyId)
+            ->where('line.inventory_snapshot->version',1)
+            ->whereJsonContainsKey('line.inventory_snapshot->branch_id')
+            ->whereColumn('line.inventory_snapshot->company_id','p.company_id')
+            ->whereColumn('line.inventory_snapshot->product_id','p.product_id')
+            ->where(function ($q) {
+                $q->whereColumn('line.inventory_snapshot->branch_id','p.branch_id')
+                    ->orWhere(function ($n) { $n->whereNull('p.branch_id')->whereNull('line.inventory_snapshot->branch_id'); });
+            })
             ->whereRaw('(m.branch_id = p.branch_id OR (m.branch_id IS NULL AND p.branch_id IS NULL))')
             ->whereRaw('(i.branch_id = p.branch_id OR (i.branch_id IS NULL AND p.branch_id IS NULL))')
             ->where(function ($q) use ($companyId) {

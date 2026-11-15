@@ -77,4 +77,6 @@ $receiveSale=$make('0.0001');$receiveItem=$receiveSale->items()->sole();$receive
 invProof(invRace([$receiveSale->id,$receiveSale->id],$socket,['worker','receive-worker'])===['200','200'],'Generic receiving versus first DI posting failed');
 invProof(DB::table('inventory_stocks')->where('company_id',$company->id)->where('product_id',$receiveProduct->id)->count()===1,'Receiving race duplicated NULL-branch stock');
 invProof((string)DB::table('inventory_stocks')->where('company_id',$company->id)->where('product_id',$receiveProduct->id)->value('quantity')==='0.9999','Receiving race lost a fractional mutation');
+require __DIR__.'/rc_di_retained_stock_diagnostics.php';
+proveDiRetainedStockDiagnostics($company,$sale);
 echo "PASS: native DI frozen inventory duplicate acceptance posts once concurrent overreturn refused exact four decimals and rollback preserved\n";

@@ -1,3 +1,4 @@
+import { madadgarReadWorkflow } from './lib/madadgar-read-browser.mjs';
 import { greetingTutorialWorkflow } from './lib/greeting-tutorial-browser.mjs';
 import { diInventoryWorkflow } from './lib/di-inventory-browser.mjs';
 import { reviewedDeviceProofWorkflow } from './lib/reviewed-device-proof-browser.mjs';
@@ -1504,6 +1505,7 @@ async function deliveryContactSearchWorkflow(page,t,v) {
 }
 
 async function workflow(page,t,v,diagnostics) {
+  if(t.madadgarReadCases)return madadgarReadWorkflow(page,t,v,{baseUrl,login,loopback,saveEvidenceScreenshot,pass});
   if(t.greetingCases)return greetingTutorialWorkflow(page,t,v,{baseUrl,saveEvidenceScreenshot,pass});
   if(t.diInventoryCases)return diInventoryWorkflow(page,t,v,{baseUrl,saveEvidenceScreenshot,pass});
   if(t.restoreSessionBoundary)return restoreSessionBoundaryWorkflow(page,t,v,{baseUrl,login,saveEvidenceScreenshot,pass});
@@ -2411,6 +2413,7 @@ async function customerBulkNavigation(page,t,v) {
  pass(t.name+'/'+v.width+': dashboard card totals match their detail; Sales, Tax and Day Close share the dashboard reporting layout');
 }
 async function one(browser,label,v,t) {
+  if(t.madadgarReadCases)t={...t,login:t.madadgarReadCases[v.width].login};
   if(t.greetingCases)t={...t,login:t.greetingCases[v.width].login};
   if(t.diInventoryCases)t={...t,login:t.diInventoryCases[v.width].login};
   if(t.taxIntegrations)t={...t,login:t.taxIntegrations[v.width].login};

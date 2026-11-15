@@ -306,7 +306,7 @@ jobs:
           RC_MARIADB_PORT: '33117'
           RC_BROWSER_PORT: '5911'
           RC_BROWSER_STATE_ROOT: /tmp/taxnest-rc-browser-${{ github.run_id }}-${{ github.job }}
-        run: RC_BROWSER_ONLY=di-inventory-projection,opt-in-greetings-tutorials,school-fees,hospital-collections,cashier-online-payment-policy,delivery-credit,reviewed-device-proof bash scripts/rc-browser-fixture.sh run
+        run: RC_BROWSER_ONLY=madadgar-company-reads,di-inventory-projection,opt-in-greetings-tutorials,school-fees,hospital-collections,cashier-online-payment-policy,delivery-credit,reviewed-device-proof bash scripts/rc-browser-fixture.sh run
       - name: Verify Tax Integrations at desktop and 390px mobile
         env:
           RC_MARIADB_PORT: '33117'

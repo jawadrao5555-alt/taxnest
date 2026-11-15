@@ -26,3 +26,9 @@ A read and its tenant/user/campus/intent/date/source/result-hash audit are one t
 Synthetic tests cover two companies, current role changes, unauthorized campus, injection, source/date, retained audit/history isolation, School saved close versus later receipts, tax classification unknowns, numeric-only stock/recipe output, no stock mutation, missing schema/audit, and fake provider isolation. Existing Madadgar guard tests remain required.
 
 This does not complete the whole AI programme: arbitrary question understanding, cashier-specific reads, ERP reads, broad operational tooling, issue deduplication, issue-to-PR execution, live rollout and hosted desktop/mobile/native acceptance remain outside this bounded increment. No real provider request or live company read was used for development.
+
+
+## Hosted UI acceptance added (execution pending)
+`madadgar-company-reads` runs actual existing support UI at desktop and390px with isolated synthetic School owner/cashier/campus fixtures. The read campus contains one123.45 cash receipt; a different campus contains999.99 and individual student-reference canaries must not appear. It checks exact collection/count, source tables, report date, audited provenance, fiscal/write capabilitiesOFF and School fiscalOFF display. An arbitrary foreign-company question and a cashier's owner-read request must return no private numeric answer. Screenshots capture answer/source and cashier denial.
+
+The disposable fixture selects local-only assistant mode and leaves credentials untouched; existing loopback network guards remain. School/Hospital layouts now expose the existing support component with CSRF metadata inside a no-print wrapper. This does not authorize a live message, provider request, fiscal action or deployed rollout. Hosted result and six-theme/physical accessibility proof remain separate.

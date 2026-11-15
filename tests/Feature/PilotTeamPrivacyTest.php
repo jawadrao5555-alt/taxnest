@@ -32,6 +32,9 @@ class PilotTeamPrivacyTest extends TestCase
             $response=app(PilotTeamController::class)->index();$html=$response->getContent();
             foreach(['SYNTHETIC-PLAINTEXT-CANARY','HASH-CANARY','HASH-OWNER-CANARY','TOKEN-CANARY',$cipher,'FOREIGN-MEMBER-CANARY','pos_counterpart_user_id','teamPasswords','show_password'] as $secret)$this->assertStringNotContainsString($secret,$html);
             $this->assertStringContainsString('Safe member',$html);
+            $this->assertStringContainsString('name="csrf-token"', $html);
+            $this->assertStringContainsString('Madadgar Support', $html);
+            $this->assertStringContainsString('/fbr-pos/madadgar', str_replace('\\/', '/', $html));
             $this->assertStringContainsString('type="password" name="password"',$html);
             $this->assertStringNotContainsString('type="text" name="password"',$html);
             $this->assertStringContainsString('no-store',$response->headers->get('Cache-Control'));

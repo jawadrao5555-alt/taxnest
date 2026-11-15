@@ -1118,6 +1118,28 @@ foreach([1366=>390,390=>1366] as $width=>$other) {
     $diInventoryCases[$width]['foreignProduct']=$diInventoryCases[$other]['product'];
 }
 
+// Deterministic company-read acceptance. Provider mode is local; credentials untouched.
+\App\Models\SystemSetting::set('madadgar_enabled','1');
+\App\Models\SystemSetting::set('madadgar_mode','local');
+$madadgarReadCases=[];
+foreach ([1366,390] as $width) {
+    $readSchool=$company('Synthetic scoped school '.$width,'read-school-'.$width.'@rc-browser.invalid','RCREAD'.$width,'fbrpos',['business_category'=>'education','pos_type'=>'education','fbr_pos_enabled'=>true,'fbr_reporting_enabled'=>false,'fbr_pos_environment'=>'sandbox','pos_setup_completed'=>true,'feature_flags'=>PosFeatureService::defaultsForCategory('education')]);
+    \App\Models\Subscription::create(['company_id'=>$readSchool->id,'active'=>true,'override_type'=>'lifetime','start_date'=>$now,'end_date'=>now()->addYear()]);
+    $readOwner=$user($readSchool,'Synthetic scoped owner','read-owner-'.$width.'@rc-browser.invalid','company_admin','pos_admin');
+    $readCashier=$user($readSchool,'Synthetic scoped cashier','read-cashier-'.$width.'@rc-browser.invalid','user','pos_cashier');
+    $readCampuses=[];
+    foreach (['A'=>12345,'B'=>99999] as $label=>$amount) {
+        $branch=DB::table('branches')->insertGetId(['company_id'=>$readSchool->id,'name'=>'Synthetic Read Campus '.$label,'is_active'=>true,'is_head_office'=>$label==='A','created_at'=>$now,'updated_at'=>$now]);
+        $readCampuses[$label]=$branch;
+        DB::table('school_fee_receipts')->insert(['company_id'=>$readSchool->id,'branch_id'=>$branch,'collected_by'=>$readOwner->id,'request_key'=>(string)\Illuminate\Support\Str::uuid(),'student_reference'=>'SYNTHETIC-PRIVATE-READ-'.$label,'fee_head'=>'tuition','amount_paisa'=>$amount,'payment_method'=>'cash','collected_at'=>$now,'created_at'=>$now,'updated_at'=>$now]);
+    }
+    $readOwner->forceFill(['default_branch_id'=>$readCampuses['A']])->save();
+    $readCashier->forceFill(['default_branch_id'=>$readCampuses['A']])->save();
+    DB::table('branch_user')->insert(['user_id'=>$readCashier->id,'branch_id'=>$readCampuses['A'],'access_level'=>'full','created_at'=>$now,'updated_at'=>$now]);
+    $madadgarReadCases[$width]=['login'=>$readOwner->email,'cashier'=>$readCashier->email,'campus'=>$readCampuses['A'],'otherCampus'=>$readCampuses['B'],'company'=>$readSchool->id,'date'=>now()->toDateString()];
+}
+foreach([1366=>390,390=>1366] as $width=>$other)$madadgarReadCases[$width]['foreignCompany']=$madadgarReadCases[$other]['company'];
+
 $billingSelectionCases = [];
 foreach ([1366,390] as $width) {
     $billingCompany = $company('Synthetic Billing Selection '.$width, 'billing-selection-'.$width.'@rc-browser.invalid', 'RCBILLSEL'.$width, 'di',
@@ -1188,6 +1210,7 @@ $fixture = [
         ['name' => 'service-work-orders-denied', 'login' => $serviceDenied->email, 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/work-orders', '/pos/work-orders/report.csv'], 'denied' => true],
     ], $categoryJourneys, $optionalArchiveJourneys),
     'transactionalJourneys' => [
+        ['name'=>'madadgar-company-reads','manualOnly'=>true,'login'=>$madadgarReadCases[1366]['login'],'password'=>$password,'loginPath'=>'/fbr-pos/login','paths'=>[],'madadgarReadCases'=>$madadgarReadCases],
         ['name'=>'opt-in-greetings-tutorials','manualOnly'=>true,'login'=>$greetingCases[1366]['login'],'password'=>$password,'loginPath'=>'/login','paths'=>[],'greetingCases'=>$greetingCases],
         ['name'=>'di-inventory-projection','manualOnly'=>true,'login'=>$diInventoryCases[1366]['login'],'password'=>$password,'loginPath'=>'/login','paths'=>[],'diInventoryCases'=>$diInventoryCases],
         ['name'=>'delivery-credit','login'=>$deliveryCreditCases[1366]['login'],'password'=>$password,'loginPath'=>'/pos/login','paths'=>['/pos/delivery-accounts'],'markers'=>['Synthetic credit customer'],'deliveryCredit'=>$deliveryCreditCases,'manualOnly'=>true],

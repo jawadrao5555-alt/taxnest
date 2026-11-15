@@ -30,7 +30,8 @@ async function signupFormsWorkflow(existingPage,t,v,{baseUrl,saveEvidenceScreens
     await context.route('**/*',r=>new URL(r.request().url()).origin===new URL(baseUrl).origin?r.continue():r.abort('blockedbyclient'));
     try {
       const page=await context.newPage();
-      await page.goto(baseUrl+path,{waitUntil:'domcontentloaded'});
+      const entry=await page.goto(baseUrl+path,{waitUntil:'domcontentloaded'});
+      if(!entry?.ok()||new URL(page.url()).pathname!==path)throw Error(product+' synthetic signup entry unavailable: HTTP '+entry?.status()+' path '+new URL(page.url()).pathname);
       const form=page.locator('form[method="POST"]').filter({has:page.locator('input[name="company_name"]')});
       const picker=form.locator(product==='fbrpos'?'#requested-plan':'#required-signup-package');
       if(!await picker.evaluate(el=>el.required))throw Error(product+' signup package is not required');

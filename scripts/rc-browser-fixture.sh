@@ -230,12 +230,14 @@ start_server() {
   assert_no_symlink "$SERVER_PID" 'PHP server PID target'
   rm -f "$SERVER_PID"
   browser_port_is_free || fail 'exact loopback browser port is already occupied'
+  # Healthcare registration is enabled only in this guarded disposable loopback server.
+  # Production remains closed by default; public signup tests must exercise its open pilot configuration.
   # Explicit exec makes the recorded PID the guarded Artisan process, not a
   # background shell-function wrapper. Its TERM handler stops the PHP child.
   (
     exec "$ROOT/scripts/rc-safe-run" --browser --runtime "$SAFE_RUNTIME" --mariadb-root "$LAB_ROOT" \
       --playwright-browsers-path "$PLAYWRIGHT_BROWSERS_PATH" --browser-tmpdir "$BROWSER_TMPDIR" -- \
-      env FEATURE_SMART_DI_IMPORT_SAFEGUARDS=1 FEATURE_SMART_DI_IMPORT_MAPPING=1 APP_URL="http://127.0.0.1:$BROWSER_PORT" \
+      env HEALTH_REGISTRATION_OPEN=1 FEATURE_SMART_DI_IMPORT_SAFEGUARDS=1 FEATURE_SMART_DI_IMPORT_MAPPING=1 APP_URL="http://127.0.0.1:$BROWSER_PORT" \
       REPORTING_OAUTH_REDIRECT_URIS="http://127.0.0.1:$BROWSER_PORT/admin/reporting/connections" \
       php artisan serve --host=127.0.0.1 --port="$BROWSER_PORT" --tries=1 --no-reload
   ) </dev/null >"$SERVER_LOG" 2>&1 & echo "$!" >"$SERVER_PID"

@@ -99,6 +99,9 @@ concurrency(){
     clean_php php "$ROOT/tests/native/rc_school_fee_concurrency.php" | tee "$EVIDENCE_DIR/school-fee-concurrency.log"
     clean_php php "$ROOT/tests/native/rc_delivery_credit_concurrency.php" | tee "$EVIDENCE_DIR/delivery-credit-concurrency.log"
     clean_php php "$ROOT/tests/native/rc_hospital_collection_concurrency.php" | tee "$EVIDENCE_DIR/hospital-collection-concurrency.log"
+    clean_php php "$ROOT/tests/native/rc_reviewed_device_proof.php" | tee "$EVIDENCE_DIR/reviewed-device-proof.log"
+    grep -Fqx "PASS: native reviewed proof exact collation scope default HOLD stale authority and concurrent append-only revocation" "$EVIDENCE_DIR/reviewed-device-proof.log" || fail reviewed-device-proof-missing-success-proof
+    grep -Fqx "PASS: native standalone duplicate reviewed callbacks preserve one fiscal identity and frozen environment refuses dispatch" "$EVIDENCE_DIR/reviewed-device-proof.log" || fail reviewed-device-proof-callback-missing-success-proof
     clean_php php "$ROOT/tests/native/rc_cashier_online_policy.php" | tee "$EVIDENCE_DIR/cashier-online-policy.log"
     grep -Fqx "PASS: native cashier policy schema default OFF owner-only settings current-session enforcement and tenant isolation" "$EVIDENCE_DIR/cashier-online-policy.log" || fail cashier-policy-missing-proof
     clean_php php "$ROOT/tests/native/rc_local_collection_lifecycle.php" | tee "$EVIDENCE_DIR/local-collection-lifecycle.log"

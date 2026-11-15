@@ -14,11 +14,13 @@
 <button class="border rounded p-2">Record reviewed proof</button>
 </form>
 @foreach($proofs as $proof)
+@php $currentProof = \App\Services\ReviewedDeviceProof::reviewedProof((int)$company->id,$proof->device_uid,$proof->pos_id,$proof->environment); @endphp
 <article class="border rounded p-3 break-words" data-proof-id="{{ $proof->id }}">
+<p data-proof-current-state>{{ $currentProof ? 'Reviewed evidence recorded; not central verification' : 'HOLD: no current reviewed evidence' }}</p>
 <p>#{{ $proof->id }} · {{ $proof->action }} · {{ $proof->device_uid }} · POS {{ $proof->pos_id }} · {{ $proof->environment }}</p>
 <p>Reviewer #{{ $proof->actor_id }} · {{ $proof->created_at }}</p>
 <p>{{ $proof->evidence_reference }} · {{ $proof->evidence_sha256 }}</p><p>{{ $proof->review_note }}</p>
-@if($proof->action==='approve')
+@if($proof->action==='approve' && $currentProof && $currentProof->id===$proof->id)
 <form method="POST" action="{{ route('saas.admin.device-proofs.revoke',[$company->id,$proof->id]) }}">@csrf
 <label>Revocation reason<input name="reason" required minlength="10" maxlength="2000" class="block bg-gray-800 p-2 w-full"></label>
 <button class="border rounded p-2">Revoke proof</button></form>

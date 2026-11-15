@@ -1,3 +1,4 @@
+import { reviewedDeviceProofWorkflow } from './lib/reviewed-device-proof-browser.mjs';
 import { deliveryCreditWorkflow } from './lib/delivery-credit-browser.mjs';
 import { cashierPolicyWorkflow } from './lib/cashier-policy-browser.mjs';
 import { hospitalWorkflow } from './lib/hospital-browser.mjs';
@@ -1643,6 +1644,7 @@ async function workflow(page,t,v,diagnostics) {
   }
   if(t.b02Deal)return b02DealWorkflow(page,t,v,{baseUrl,waitForOperationalSurface,dismiss,saveEvidenceScreenshot,pass});
   if(t.deliveryCredit)return deliveryCreditWorkflow(page,t,v,{baseUrl,login,dismiss,waitForOperationalSurface,saveEvidenceScreenshot,pass,loopback});
+  if(t.reviewedDeviceProof)return reviewedDeviceProofWorkflow(page,t,v,{baseUrl,login,waitForOperationalSurface,saveEvidenceScreenshot,pass,loopback});
   if(t.cashierPolicy)return cashierPolicyWorkflow(page,t,v,{baseUrl,login,dismiss,waitForOperationalSurface,saveEvidenceScreenshot,pass,loopback});
   if(t.staffDiscount)return staffDiscountWorkflow(page,t,v,{baseUrl,login,dismiss,waitForOperationalSurface,saveEvidenceScreenshot,pass,loopback});
   if(t.hospitalCollection)return hospitalWorkflow(page,t,v,{baseUrl,saveEvidenceScreenshot,pass});
@@ -2406,6 +2408,7 @@ async function customerBulkNavigation(page,t,v) {
 }
 async function one(browser,label,v,t) {
   if(t.taxIntegrations)t={...t,login:t.taxIntegrations[v.width].login};
+  if(t.reviewedDeviceProof)t={...t,login:t.reviewedDeviceProof[v.width].login};
   if(t.cashierPolicy)t={...t,login:t.cashierPolicy[v.width].cashier};
   if(t.deliveryCredit)t={...t,login:t.deliveryCredit[v.width].login};
   if(t.staffDiscount)t={...t,login:t.staffDiscount[v.width].cashier};

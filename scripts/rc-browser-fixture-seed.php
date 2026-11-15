@@ -978,6 +978,15 @@ foreach([1366,390] as $width){
         'portal'=>['id'=>$portalRecord->id,'usin'=>$portalPayload['USIN'],'date'=>substr($portalPayload['DateTime'],0,10),
             'reference'=>'SYN-PORTAL-'.$width]];
 }
+$reviewedDeviceProofCases=[];
+foreach ([1366,390] as $proofWidth) {
+    $proofCompany=$company('Synthetic Device Review '.$proofWidth,'proof-company-'.$proofWidth.'@rc-browser.invalid','RCPROOF'.$proofWidth,'pos',['pra_reporting_enabled'=>false,'pos_setup_completed'=>true]);
+    $proofReviewer=AdminUser::create(['name'=>'Synthetic Proof Reviewer '.$proofWidth,'email'=>'proof-reviewer-'.$proofWidth.'@rc-browser.invalid','password'=>$password,'role'=>'super_admin']);
+    $proofSupport=AdminUser::create(['name'=>'Synthetic Proof Support '.$proofWidth,'email'=>'proof-support-'.$proofWidth.'@rc-browser.invalid','password'=>$password,'role'=>'support']);
+    $reviewedDeviceProofCases[$proofWidth]=['companyId'=>$proofCompany->id,'login'=>$proofReviewer->email,'support'=>$proofSupport->email];
+}
+$reviewedDeviceProofCases[1366]['foreignCompanyId']=$reviewedDeviceProofCases[390]['companyId'];
+$reviewedDeviceProofCases[390]['foreignCompanyId']=$reviewedDeviceProofCases[1366]['companyId'];
 $cashierPolicyCases=[];
 foreach ([1366,390] as $policyWidth) {
     $policyCompany=$company('Synthetic Cashier Policy '.$policyWidth,'policy-company-'.$policyWidth.'@rc-browser.invalid','RCPOLICY'.$policyWidth,'pos',[
@@ -1154,6 +1163,7 @@ $fixture = [
         ['name'=>'billing-package-selection','login'=>$billingSelectionCases[1366]['login'],'password'=>$password,'loginPath'=>'/login',
             'paths'=>[], 'billingSelection'=>$billingSelectionCases],
         ['name'=>'kot-note-visibility','login'=>$kotNoteOwner->email,'password'=>$password,'loginPath'=>'/pos/login','paths'=>['/pos/invoice/create'],'markers'=>['Current Order'],'kotNoteVisibility'=>['orderId'=>$kotNoteOrder->id]],
+        ['name'=>'reviewed-device-proof','manualOnly'=>true,'login'=>$reviewedDeviceProofCases[1366]['login'],'password'=>$password,'loginPath'=>'/admin/login','paths'=>['/admin/companies'],'markers'=>[],'reviewedDeviceProof'=>$reviewedDeviceProofCases],
         ['name'=>'cashier-online-payment-policy','manualOnly'=>true,'login'=>$cashierPolicyCases[1366]['cashier'],'password'=>$password,'loginPath'=>'/pos/login','paths'=>['/pos/invoice/create'],'markers'=>[],'cashierPolicy'=>$cashierPolicyCases],
         ['name'=>'staff-discount-approval','login'=>$staffCases[1366]['cashier'],'password'=>$password,'loginPath'=>'/pos/login','paths'=>['/pos/staff-discounts'],'markers'=>['Staff / family discount requests'],'staffDiscount'=>$staffCases],
         ...$surveyJourneys,

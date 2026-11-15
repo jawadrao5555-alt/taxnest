@@ -53,6 +53,20 @@ class MadadgarExpandedReadTest extends MadadgarCompanyReadToolsTest
         $c->update(['product_type'=>'pos']);
         try{$controller->show(Request::create('/madadgar/di-read','GET'));$this->fail('wrong product permitted');}catch(\Symfony\Component\HttpKernel\Exception\HttpException $e){$this->assertSame(403,$e->getStatusCode());}
     }
+    public function test_di_navigation_is_translated_and_uses_persisted_owner_membership():void {
+        [$c,$u]=$this->context('di');
+        foreach(['en','ur','rur'] as$locale){app()->setLocale($locale);$html=\Illuminate\Support\Facades\Blade::render('<x-di-madadgar-read-link />');
+            $this->assertStringContainsString('data-di-read-link',$html);
+            $this->assertStringContainsString(e(__('madadgar_di.link')),$html);
+            foreach(['title','scope','report','billing','tax','payments','read','audit','evidence','caution'] as$key)$this->assertNotSame('madadgar_di.'.$key,__('madadgar_di.'.$key));
+        }
+        DB::table('users')->where('id',$u->id)->update(['pos_role'=>'pos_cashier']);
+        $this->assertStringNotContainsString('data-di-read-link',\Illuminate\Support\Facades\Blade::render('<x-di-madadgar-read-link />'));
+        DB::table('users')->where('id',$u->id)->update(['pos_role'=>'pos_admin','company_id'=>$c->id+1]);
+        $this->assertStringNotContainsString('data-di-read-link',\Illuminate\Support\Facades\Blade::render('<x-di-madadgar-read-link />'));
+        DB::table('users')->where('id',$u->id)->update(['company_id'=>$c->id,'is_active'=>false]);
+        $this->assertStringNotContainsString('data-di-read-link',\Illuminate\Support\Facades\Blade::render('<x-di-madadgar-read-link />'));
+    }
     public function test_recipe_cost_reuses_waste_arithmetic_and_capacity_never_falls_back_from_campus():void {
         [$c,$u]=$this->context();
         Schema::create('pos_products',function(Blueprint $t){$t->id();$t->unsignedBigInteger('company_id');$t->boolean('is_active')->default(true);});
@@ -67,6 +81,20 @@ class MadadgarExpandedReadTest extends MadadgarCompanyReadToolsTest
         DB::table('ingredient_stocks')->insert(['company_id'=>$c->id,'ingredient_id'=>$i,'branch_id'=>$a,'quantity'=>4.4]);
         $this->assertStringContainsString('recorded-stock servings: 2',$this->read('recipe cost and servings',$c,$u)['text']);
         DB::table('ingredients')->where('id',$i)->update(['company_id'=>$c->id+1]);
-        $r=$this->read('recipe cost and servings',$c,$u);$this->assertStringContainsString('estimated ingredient cost PKR: unknown',$r['text']);$this->assertStringContainsString('recorded-stock servings: unknown',$r['text']);Http::assertNothingSent();
+        $r=$this->read('recipe cost and servings',$c,$u);$this->assertStringContainsString('estimated ingredient cost PKR: unknown',$r['text']);$this->assertStringContainsString('recorded-stock servings: unknown',$r['text']);
+        DB::table('ingredients')->where('id',$i)->update(['company_id'=>$c->id]);session()->forget('active_branch_id');
+        // The request does not expand into an unbounded catalogue or recipe graph.
+        for($n=0;$n<25;$n++){
+            $id=DB::table('pos_products')->insertGetId(['company_id'=>$c->id]);
+            DB::table('product_recipes')->insert(['company_id'=>$c->id,'product_id'=>$id,'ingredient_id'=>$i,'quantity_needed'=>2,'waste_percent'=>10]);
+        }
+        $r=$this->read('recipe cost and servings',$c,$u);
+        $this->assertSame(1,$r['read_evidence']['values']['has_more']);
+        $this->assertArrayNotHasKey('product_'.$id.'_cost',$r['read_evidence']['values']);
+        for($n=0;$n<500;$n++)DB::table('product_recipes')->insert(['company_id'=>$c->id,'product_id'=>$p,'ingredient_id'=>$i,'quantity_needed'=>2,'waste_percent'=>10]);
+        $r=$this->read('recipe cost and servings',$c,$u);
+        $this->assertNull($r['read_evidence']['values']['product_'.$p.'_cost']);
+        $this->assertNull($r['read_evidence']['values']['product_'.$p.'_servings']);
+        Http::assertNothingSent();
     }
 }

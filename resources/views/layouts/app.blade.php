@@ -555,9 +555,6 @@
         <x-pwa-update color="emerald" />
         <x-trial-lock-modal />
         <x-subscription-expiry-popup />
-        @if(auth('web')->user()?->role === 'company_admin' && auth('web')->user()?->company?->product_type === 'di')
-            <a href="{{ route('di.madadgar.read') }}" class="fixed bottom-20 left-4 z-40 rounded-lg bg-emerald-700 text-white px-3 py-2 text-sm">Madadgar: recorded totals</a>
-        @endif
         <x-whatsapp-support />
         <script src="{{ asset('js/wheel-scroll.js?v=1') }}" defer></script>
         @if($diUpdateState)

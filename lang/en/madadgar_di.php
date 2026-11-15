@@ -1,0 +1,2 @@
+<?php
+return ['link'=>'Madadgar: recorded totals','title'=>'Madadgar: DI recorded totals','scope'=>'Owner-only, current company and authorized branch. Stored records only. No external AI, billing changes or fiscal submission.','report'=>"Today's report",'billing'=>'Billing','tax'=>'Stored tax breakdown','payments'=>'Recorded payment fields','read'=>'Read records','audit'=>'Audit','evidence'=>'Evidence','caution'=>'Missing fields mean unknown, not zero. DI locked billing can include sandbox records and is not proof of production revenue or received cash.'];

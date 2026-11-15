@@ -73,7 +73,7 @@
                         @endif
                         <h3 class="text-lg font-bold text-gray-900 dark:text-gray-100">{{ $plan->name }}</h3>
 
-                        @include('billing._configured-cycle-quote', ['plan' => $plan, 'company' => $company])
+                        @include('billing._configured-cycle-quote', ['plan' => $plan, 'company' => $company, 'quoteCheckoutRoute' => 'pos.package-checkout'])
 
                         @php
                             $prevPlan = $loop->index > 0 ? ($plans[$loop->index - 1] ?? null) : null;

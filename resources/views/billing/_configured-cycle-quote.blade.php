@@ -15,6 +15,9 @@
     <p class="text-xs text-gray-500">Only configured periods are offered. Selecting a period here does not activate or renew a subscription.</p>
     @if(!empty($signupRoute))
     <a class="block mt-3 font-semibold text-blue-700" :href="@js(route($signupRoute, ['plan' => $plan->name], false)) + '&amp;billing_cycle=' + encodeURIComponent(cycle)">Choose {{ $plan->name }} and continue registration</a>
+    @elseif(!empty($company))
+    @php($checkoutName = $quoteCheckoutRoute ?? ($company->product_type === 'fbrpos' ? 'fbrpos.package-checkout' : ($company->product_type === 'pos' ? 'pos.package-checkout' : 'billing.package-checkout')))
+    <a class="block mt-3 font-semibold text-blue-700" :href="@js(route($checkoutName, ['plan_id' => $plan->id], false)) + '&amp;billing_cycle=' + encodeURIComponent(cycle)">Review this package and period</a>
     @else
     <p class="text-xs text-gray-500">For a package change or renewal, send the selected package, period and payable total to your account administrator for review. No payment is collected here.</p>
     @endif

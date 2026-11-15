@@ -44,7 +44,7 @@
                         @endif
                         <h3 class="text-lg font-bold text-gray-900 dark:text-gray-100">{{ $plan->name }}</h3>
 
-                        @include('billing._configured-cycle-quote', ['plan' => $plan, 'company' => $company])
+                        @include('billing._configured-cycle-quote', ['plan' => $plan, 'company' => $company, 'quoteCheckoutRoute' => 'fbrpos.package-checkout'])
 
                         <div class="mt-4 pt-4 border-t border-gray-100 dark:border-gray-800 space-y-2 text-sm text-gray-600 dark:text-gray-400">
                             @if($company->isSchoolFeePilot())<p>{{ __('school_workspace.school_billing_note') }}</p>@elseif(!empty($planFeatures))

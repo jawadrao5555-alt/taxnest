@@ -374,6 +374,10 @@ jobs:
           cp "$RC_BROWSER_STATE_ROOT/safe-runtime/browser-state/tutorial-videos/"*.webm "$RUNNER_TEMP/tutorial-preview/"
           cp "$RC_BROWSER_STATE_ROOT/safe-runtime/browser-state/tutorial-videos/recording-manifest.json" "$RUNNER_TEMP/tutorial-preview/"
           echo "preview_dir=$(realpath "$RUNNER_TEMP/tutorial-preview")" >> "$GITHUB_OUTPUT"
+      - name: Verify dedicated Hospital ERP demo role access at desktop and 390px
+        env:
+          RC_BROWSER_STATE_ROOT: /tmp/taxnest-rc-browser-${{ github.run_id }}-${{ github.job }}
+        run: bash scripts/check-erp-demo-browser.sh "$RC_BROWSER_STATE_ROOT/playwright-cache"
       - name: Check real table controls and receipt typography components
         env:
           RC_BROWSER_STATE_ROOT: /tmp/taxnest-rc-browser-${{ github.run_id }}-${{ github.job }}

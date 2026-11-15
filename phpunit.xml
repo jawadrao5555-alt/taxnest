@@ -18,8 +18,8 @@
         </include>
     </source>
     <php>
-        <!-- Full suite peaks ~256M; the default CLI limit (128M) aborts the run
-             mid-suite with repeated "Allowed memory size exhausted" errors. -->
+        <!-- Keep the existing 1GiB ceiling. TestCase collects unreachable request
+             and PDF cycles after teardown; increasing this cap is not the fix. -->
         <ini name="memory_limit" value="1G"/>
         <env name="APP_ENV" value="testing" force="true"/>
         <env name="APP_KEY" value="base64:2fl+KTVYFIEjblwNh83EzNpx7dLTs7jK7dbRbUYx21E=" force="true"/>

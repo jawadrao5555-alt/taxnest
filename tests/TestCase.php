@@ -50,6 +50,31 @@ abstract class TestCase extends BaseTestCase
         $this->assertTestEnvironmentIsIsolated();
     }
 
+    /** Release unreachable request/render graphs at the test isolation boundary. */
+    protected function tearDown(): void
+    {
+        try {
+            parent::tearDown();
+        } finally {
+            // Dompdf frame/canvas graphs and Laravel request mocks contain cycles.
+            // PHP's adaptive automatic threshold can defer reclaiming these across
+            // thousands of tests. Keep automatic GC enabled, but also collect after
+            // Laravel has released the application and Mockery has verified itself.
+            // No test, PDF assertion, per-test state or memory limit is removed.
+            $before = memory_get_usage();
+            $cycles = gc_collect_cycles();
+            $after = memory_get_usage();
+            // Bounded, content-free evidence for long aggregate runs. At most one
+            // line per class when retained pressure or reclaimed cycles are large.
+            static $lastProfiledClass = null;
+            if (($before >= 512 * 1024 * 1024 || $before - $after >= 32 * 1024 * 1024)
+                && $lastProfiledClass !== static::class) {
+                $lastProfiledClass = static::class;
+                fwrite(STDERR, sprintf("PHPUnit cycle cleanup: class=%s before=%d after=%d peak=%d reclaimed=%d collected=%d\n", static::class, $before, $after, memory_get_peak_usage(), $before - $after, $cycles));
+            }
+        }
+    }
+
     private function assertTestEnvironmentIsIsolated(): void
     {
         $problems = [];

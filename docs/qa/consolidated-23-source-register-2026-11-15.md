@@ -1,5 +1,42 @@
 # TaxNest 23-source reconciliation inventory
 
+## Independent remaining-scope checkpoint: local 6101cf0
+
+Inspected current implementation, not just earlier plans. The previous gaps
+in profile validation, backup metadata and AI telemetry now have code; the
+historical tables below must not be quoted as today's missing-code list.
+
+| Source | Current implemented slice | Actual remaining acceptance or action |
+|---|---|---|
+| #301/#321 profiles | Generic personal optional DOB/phone validation, private serialization, product-scoped uniqueness, current-membership locking; business CNIC/phone formatting; real profile form and browser fixture | Verify final-head rendered form and aggregate results. Other product-specific forms retain separate rules. Format validation is not identity verification; no greeting enrollment inferred. |
+| #321 AI observations | `MadadgarUsage`/policy services and owner/admin UI record scoped provider reservations, observed latency, known tokens/cost, error and escalation metadata; explicitly configured rates/caps, unknowns preserved, locked allowance before HTTP and uncertain spend retained. Forward-only migration preserves caps/history | Native race and exact-head browser/admin styling acceptance must finish. No real provider billing reconciliation or aggregated OCR/other-AI cost claim. Existing provider configuration unchanged. |
+| #319 backup sources | `TenantBackupEvidence` authenticates default-OFF source enrollment and explicit tenant grants, bounded metadata only, immutable replay/conflict handling, scoped retained-source reporting and truthful PARTIAL/empty states | Actual authorized producer enrollment, tenant manifest and elapsed collection remain external/operator work. Metadata receipt does not prove backup bytes, restoration, RPO/RTO or seven-day all-source completeness. |
+| #377 isolated Hospital ERP | Expanded nine-role synthetic fixture plus `check-erp-demo-acceptance.sh`, role/module/tenant checks and native/browser journey | Worker reports274tests/1675assertions locally for the selected Health suites. Dedicated final native/browser execution and per-scenario evidence still required; not full HMIS/production certification. |
+| #301/#321 issue intake retry | **Remaining concrete code gap at this checkpoint:** `MadadgarController::escalate` validates session/title/summary/kind then independently creates `FeatureSuggestion` and confirmation message, with no stable request identity or transaction; count/check is not serialized | Implement same-company/user/session request identity, content fingerprint, atomic suggestion+confirmation and same-ID same-ref replay; changed payload conflict; race and lost-response tests. Preserve legacy callers and explicit confirmation. This is not permission for fuzzy cross-customer merging or automatic external issue creation. |
+
+The issue-intake gap is a genuine actionable correction, not an external hold.
+Parent implementation worker has been notified; this register does not claim it
+fixed. Bounded assistant commands still intentionally exclude unsupported DI,
+cashier and arbitrary-record queries; the full original scoped-assistant and
+issue-to-PR programme is not certified by these slices. Existing support-case
+linking/reopen features are distinct from retry-safe assistant escalation.
+
+Latest reported evidence must remain separated: remote87e tree7358d69 native
+PASS is not a PASS for later local6101cf0; local aggregate6435tests/54659assertions
+had one translated-link failure subsequently corrected, while fresh hosted full
+and browser results were still pending. Earlier readable receipt detail images
+do not prove every UI: AI admin styling/overlay fixes and final visual review
+remain in progress. Exact current commit/run links are supplied by the release
+coordinator only after verification. No all23 completion claim is justified.
+
+Focused ports389/375/381, landing376, configured cycles374, reviewed fiscal373,
+Udhaar328, optional cashier237, CCI evidence228 and School/Hospital workflows
+remain implemented slices requiring final integrated acceptance. Source228
+actual workbook/batch approval, physical printer/signed installation, fiscal
+route/sandbox/central evidence, real backup/field soak and owner price activation
+are external holds; full School ERP/future-industry314/378 remain future scope.
+Original47unchecked requirements below are preserved, not silently checked off.
+
 ## Updated implementation checkpoint: local 9222f62
 
 This supersedes the earlier f274ef1 checkpoint only for the rows below. Source

@@ -917,6 +917,9 @@ class PosFeatureService
         if (!$company) {
             return 'general';
         }
+        // Standalone aliases share the same dedicated workspace profile.
+        if ($company->isSchoolFeePilot()) return 'education';
+        if ($company->isHospitalCollectionPilot()) return 'clinic';
         $known = self::allCategoryDefaults();
         $stored = $company->business_category;
         if (is_string($stored) && isset($known[$stored]) && PosCategoryProfiles::has($stored)) {

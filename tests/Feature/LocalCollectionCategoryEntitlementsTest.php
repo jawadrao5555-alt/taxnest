@@ -43,4 +43,14 @@ class LocalCollectionCategoryEntitlementsTest extends TestCase
             // still refuses retail mutating routes (SchoolWorkspaceSecurityTest).
         }
     }
+    public function test_legacy_standalone_hospital_alias_does_not_fall_back_to_general_retail(): void
+    {
+        $company = new Company(['product_type' => 'fbrpos', 'business_category' => 'hospital', 'pos_type' => 'hospital']);
+        $company->id = 999;
+        $this->assertSame('clinic', PosFeatureService::profileCategory($company));
+        $this->assertSame('hospital_collection_desk', PosFeatureService::profile($company)['landing']);
+        $this->assertFalse(PosFeatureService::moduleRelevant($company, 'service_jobs'));
+        $this->assertFalse(PosFeatureService::moduleRelevant($company, 'kot'));
+    }
+
 }

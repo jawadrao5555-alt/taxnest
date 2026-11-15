@@ -38,9 +38,19 @@ class MadadgarController extends Controller
         return $request->is('fbr-pos/*') ? 'fbrpos' : 'pos';
     }
 
+    private function currentActor(Request $request): \App\Models\User
+    {
+        $product=$this->panelProduct($request);
+        $session=auth($product)->user();
+        $company=$session ? Company::find($session->company_id) : null;
+        $actor=\App\Services\MadadgarAnswerScope::actor($session,$company);
+        abort_unless($actor && $company && $company->product_type===$product,403);
+        return $actor;
+    }
+
     public function history(Request $request)
     {
-        $user = auth($this->panelProduct($request))->user();
+        $user = $this->currentActor($request);
         $sessionId = $this->sessionId($request);
 
         $messages = MadadgarMessage::where('user_id', $user->id)
@@ -48,7 +58,7 @@ class MadadgarController extends Controller
             ->where('session_id', $sessionId)
             ->orderBy('id')
             ->limit(60)
-            ->get(['role', 'content', 'escalation_id', 'created_at']);
+            ->get(array_merge(['role', 'content', 'escalation_id', 'created_at'], \Illuminate\Support\Facades\Schema::hasColumn('madadgar_messages','answer_provenance') ? ['answer_provenance'] : []));
 
         return response()->json([
             'enabled' => MadadgarService::enabled(),
@@ -56,6 +66,7 @@ class MadadgarController extends Controller
                 'role' => $m->role,
                 'content' => $m->content,
                 'escalated' => (bool) $m->escalation_id,
+                'provenance' => $m->answer_provenance,
             ])->values(),
             'remaining' => max(0, self::DAILY_MESSAGE_CAP - $this->todayCount($user->id)),
         ]);
@@ -64,7 +75,7 @@ class MadadgarController extends Controller
     public function message(Request $request)
     {
         $product = $this->panelProduct($request);
-        $user = auth($product)->user();
+        $user = $this->currentActor($request);
 
         if (!MadadgarService::enabled()) {
             return response()->json(['error' => 'Madadgar abhi dastyab nahi — WhatsApp par rabta karein.'], 503);
@@ -103,7 +114,7 @@ class MadadgarController extends Controller
         $company = Company::find($user->company_id);
 
         try {
-            $result = MadadgarService::respond($history, $question, $product, $company);
+            $result = MadadgarService::respond($history, $question, $product, $company, $user);
         } catch (\Throwable $e) {
             // Sirf-OpenAI mode only (hybrid/local degrade internally): failed
             // turn must not eat the daily cap or leave a reply-less row.
@@ -153,10 +164,11 @@ class MadadgarController extends Controller
             'role' => 'assistant',
             'content' => $result['text'],
             'source' => $result['source'],
-        ]);
+        ] + (\Illuminate\Support\Facades\Schema::hasColumn('madadgar_messages','answer_provenance') ? ['answer_provenance'=>$result['provenance'] ?? null] : []));
 
         return response()->json([
             'reply' => $result['text'],
+            'provenance' => $result['provenance'] ?? null,
             'escalation' => $result['escalation'], // null | {title, summary, kind} => confirm card
             'remaining' => max(0, self::DAILY_MESSAGE_CAP - $this->todayCount($user->id)),
         ]);
@@ -165,7 +177,7 @@ class MadadgarController extends Controller
     public function escalate(Request $request)
     {
         $product = $this->panelProduct($request);
-        $user = auth($product)->user();
+        $user = $this->currentActor($request);
 
         if (!MadadgarService::enabled()) {
             return response()->json(['error' => 'Madadgar abhi dastyab nahi — WhatsApp par rabta karein.'], 503);

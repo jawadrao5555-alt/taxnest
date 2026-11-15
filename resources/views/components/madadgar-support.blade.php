@@ -101,8 +101,17 @@
                         <div :class="m.role === 'user'
                                 ? '{{ $mUserBubble }}'
                                 : (m.error ? 'bg-red-50 text-red-700 border border-red-200 rounded-2xl rounded-bl-md' : 'bg-white text-gray-800 border border-gray-200 rounded-2xl rounded-bl-md')"
-                             class="px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap break-words shadow-sm"
-                             style="max-width: 85%;" x-text="m.content"></div>
+                             class="px-3.5 py-2.5 text-sm leading-relaxed break-words shadow-sm"
+                             style="max-width: 85%;">
+                            <span class="whitespace-pre-wrap" x-text="m.content"></span>
+                            <template x-if="m.role === 'assistant' && m.provenance">
+                                <div class="mt-2 pt-2 border-t border-gray-200 text-xs text-gray-600" data-madadgar-provenance>
+                                    <p>{{ __('madadgar_scope.guide_only') }}</p>
+                                    <p>{{ __('madadgar_scope.review_unknown') }}</p>
+                                    <p>{{ __('madadgar_scope.answered') }} <time x-text="new Date(m.provenance.answered_at).toLocaleString()"></time></p>
+                                </div>
+                            </template>
+                        </div>
                     </div>
                 </template>
 
@@ -228,7 +237,7 @@ function tnMadadgar(aiEnabled, waNumber, base, storeKey) {
                     return d;
                 })
                 .then(d => {
-                    this.messages.push({ role: 'assistant', content: d.reply });
+                    this.messages.push({ role: 'assistant', content: d.reply, provenance: d.provenance || null });
                     this.pending = d.escalation || null;
                     this.remaining = d.remaining;
                 })

@@ -79,6 +79,7 @@ final class ProspectiveSubscriptionPolicy
             if ($paid && count($paid) !== 3) {
                 return null;
             }
+            if ($paid && (empty($s['first_paid_starts_at']) || CarbonImmutable::parse($s['first_paid_starts_at'])->lessThan(CarbonImmutable::parse($s['trial_ends_at'])) || CarbonImmutable::parse($s['first_paid_starts_at'])->greaterThan(CarbonImmutable::parse($s['paid_starts_at'])))) return null;
             if ($paid && (! CarbonImmutable::parse($s['paid_ends_at'])->greaterThan(CarbonImmutable::parse($s['paid_starts_at'])) || CarbonImmutable::parse($s['paid_ends_at'])->addDays(7)->notEqualTo(CarbonImmutable::parse($s['grace_ends_at'])))) {
                 return null;
             }
@@ -145,7 +146,7 @@ final class ProspectiveSubscriptionPolicy
     {
         $s = self::snapshot($previous);
         if (! $s) {
-            if ($previous->lifecycle_snapshot !== null) {
+            if ($previous->hasLifecycleSnapshot()) {
                 throw ValidationException::withMessages(['pricing_plan_id' => 'Stored subscription policy requires review.']);
             }
 
@@ -167,6 +168,8 @@ final class ProspectiveSubscriptionPolicy
                 $start = $paidEnd;
             }
         }
+        // Even a second verified selection cannot activate paid features during the trial.
+        $start = $start->max(CarbonImmutable::parse($s['trial_ends_at']));
         // Preserve only periods before the new effective term. A paid plan change
         // starts now, so it must not keep the old package's future entitlements.
         $periods = $s['prior_entitlement_periods'] ?? [];
@@ -181,7 +184,7 @@ final class ProspectiveSubscriptionPolicy
         }
         $end = $start->addMonthsNoOverflow($months);
 
-        return array_merge($s, ['paid_starts_at' => $start->toIso8601String(), 'paid_ends_at' => $end->toIso8601String(), 'grace_ends_at' => $end->addDays(7)->toIso8601String()]);
+        return array_merge($s, ['first_paid_starts_at' => $s['first_paid_starts_at'] ?? $start->toIso8601String(), 'paid_starts_at' => $start->toIso8601String(), 'paid_ends_at' => $end->toIso8601String(), 'grace_ends_at' => $end->addDays(7)->toIso8601String()]);
     }
 
     public static function display(?Subscription $sub): ?array

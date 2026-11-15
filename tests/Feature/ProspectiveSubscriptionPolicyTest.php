@@ -213,6 +213,22 @@ class ProspectiveSubscriptionPolicyTest extends TestCase
         self::assertFalse(SubscriptionAccessService::hasAccess($c)['allowed']);
     }
 
+    public function test_json_null_is_invalid_evidence_not_legacy_sql_null(): void
+    {
+        [$c,$p,$s] = $this->fixture('pos');
+        \Illuminate\Support\Facades\DB::table('subscriptions')->where('id',$s->id)->update(['lifecycle_snapshot'=>'null','override_type'=>'lifetime']);
+        $fresh=$s->fresh();
+        self::assertTrue($fresh->hasLifecycleSnapshot());
+        self::assertNull(Policy::snapshot($fresh));
+        self::assertFalse(SubscriptionAccessService::hasAccess($c)['allowed']);
+        self::assertNull($fresh->entitlementPlan());
+        PosFeatureService::flushGateCaches();
+        self::assertFalse(PosFeatureService::planAllows($c, 'caller_id_enabled'));
+        $inventory = new \ReflectionMethod(\App\Http\Controllers\FbrPosController::class, 'fbrInventoryPlanAllowed');
+        self::assertFalse($inventory->invoke(app(\App\Http\Controllers\FbrPosController::class), $c->id));
+        self::assertSame([], \App\Services\HealthModuleService::planModules($c));
+    }
+
     public function test_policy_snapshot_is_immutable_and_malformed_evidence_fails_closed(): void
     {
         [$c,$p,$s] = $this->fixture();

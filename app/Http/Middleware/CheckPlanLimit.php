@@ -177,7 +177,7 @@ class CheckPlanLimit
                 }
                 // Active trial evaluates everything (owner rule) — only paid
                 // plans without the inventory feature are blocked.
-                if (!$plan->inventory_enabled && (!$plan->is_trial || ($subscription->lifecycle_snapshot !== null))) {
+                if (!$plan->inventory_enabled && (!$plan->is_trial || ($subscription->hasLifecycleSnapshot()))) {
                     $exceeded = true;
                     $limitName = 'inventory (not included in your plan)';
                     $limitKey = 'inventory';

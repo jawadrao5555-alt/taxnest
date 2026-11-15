@@ -1255,7 +1255,7 @@ class PosFeatureService
             if ($sub->entitlementPlan() && !empty($sub->entitlementPlan()->pharmacy_enabled)) {
                 return $sub->hasActiveOverride() ? 'override' : 'plan';
             }
-            if ($sub->isTrialActive() && ($sub->lifecycle_snapshot === null)) {
+            if ($sub->isTrialActive() && (!$sub->hasLifecycleSnapshot())) {
                 return 'trial';
             }
         }
@@ -1318,7 +1318,7 @@ class PosFeatureService
             if ($sub->hasActiveOverride()) {
                 return null;
             }
-            if ($sub->isTrialActive() && ($sub->lifecycle_snapshot === null)) {
+            if ($sub->isTrialActive() && (!$sub->hasLifecycleSnapshot())) {
                 // Owner decision (Jul 2026): active-trial companies get the
                 // Restaurant module so they can evaluate it before buying.
                 // When the trial expires the mask returns automatically —
@@ -1342,7 +1342,7 @@ class PosFeatureService
     {
         $plan = $sub->entitlementPlan();
 
-        return ($sub->lifecycle_snapshot === null) && (!$plan || (bool) $plan->is_trial);
+        return (!$sub->hasLifecycleSnapshot()) && (!$plan || (bool) $plan->is_trial);
     }
 
     /** Is this gate sold ONLY as a paid add-on, i.e. in no package at all? */
@@ -1405,6 +1405,7 @@ class PosFeatureService
             try {
                 $sub = \App\Services\PlanLimitService::getActiveSubscription($company->id);
                 if ($sub) {
+                    if ($sub->hasLifecycleSnapshot() && !ProspectiveSubscriptionPolicy::snapshot($sub)) return self::$planGateCache[$company->id][$planColumn] = false;
                     if ($sub->hasActiveOverride()) {
                         // An override waives the PAYMENT, not the package.
                         // Owner rule (Aug 2026): the shop gets exactly the
@@ -1424,17 +1425,17 @@ class PosFeatureService
                         $allowed = self::overrideGrantsEverything($sub)
                             // (null product_type = a legacy PRA row; FBR/DI
                             // companies always carry their own type)
-                            || ($sub->lifecycle_snapshot === null && ($company->product_type ?? 'pos') === 'pos' && self::isAddonOnlyGate($planColumn))
-                            || !\Illuminate\Support\Facades\Schema::hasColumn('pricing_plans', $planColumn)
+                            || (!$sub->hasLifecycleSnapshot() && ($company->product_type ?? 'pos') === 'pos' && self::isAddonOnlyGate($planColumn))
+                            || (!$sub->hasLifecycleSnapshot() && !\Illuminate\Support\Facades\Schema::hasColumn('pricing_plans', $planColumn))
                             || !empty($sub->entitlementPlan()->{$planColumn});
                     } elseif ($sub->entitlementPlan()) {
                         if (!\Illuminate\Support\Facades\Schema::hasColumn('pricing_plans', $planColumn)) {
-                            $allowed = true; // fail open until migration lands
+                            $allowed = !$sub->hasLifecycleSnapshot(); // legacy schema-lag behavior only
                         } elseif (!empty($sub->entitlementPlan()->{$planColumn})) {
                             $allowed = true;
                         }
                     }
-                    if (!$allowed && $sub->isTrialActive() && ($sub->lifecycle_snapshot === null)) {
+                    if (!$allowed && $sub->isTrialActive() && (!$sub->hasLifecycleSnapshot())) {
                         $allowed = true; // trial companies evaluate everything
                     }
                 }

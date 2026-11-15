@@ -52,6 +52,12 @@ class Subscription extends Model
         });
     }
 
+    /** SQL NULL alone is legacy; JSON null or malformed evidence is not. */
+    public function hasLifecycleSnapshot(): bool
+    {
+        return array_key_exists('lifecycle_snapshot', $this->attributes) && $this->attributes['lifecycle_snapshot'] !== null;
+    }
+
     public function hasActiveOverride(): bool
     {
         $type = $this->override_type ?? 'none';
@@ -77,14 +83,14 @@ class Subscription extends Model
 
     public function isTrialActive(): bool
     {
-        if ($this->lifecycle_snapshot !== null && !\App\Services\ProspectiveSubscriptionPolicy::snapshot($this)) return false;
+        if ($this->hasLifecycleSnapshot() && !\App\Services\ProspectiveSubscriptionPolicy::snapshot($this)) return false;
         if ($policy = \App\Services\ProspectiveSubscriptionPolicy::display($this)) return $policy['phase'] === 'trial';
         return $this->trial_ends_at && $this->trial_ends_at->isFuture();
     }
 
     public function isTrialExpired(): bool
     {
-        if ($this->lifecycle_snapshot !== null && !\App\Services\ProspectiveSubscriptionPolicy::snapshot($this)) return true;
+        if ($this->hasLifecycleSnapshot() && !\App\Services\ProspectiveSubscriptionPolicy::snapshot($this)) return true;
         if ($this->hasActiveOverride()) {
             return false;
         }
@@ -94,7 +100,7 @@ class Subscription extends Model
 
     public function isExpired(): bool
     {
-        if ($this->lifecycle_snapshot !== null && !\App\Services\ProspectiveSubscriptionPolicy::snapshot($this)) return true;
+        if ($this->hasLifecycleSnapshot() && !\App\Services\ProspectiveSubscriptionPolicy::snapshot($this)) return true;
         if ($this->hasActiveOverride()) {
             return false;
         }
@@ -110,7 +116,7 @@ class Subscription extends Model
     /** A read-only plan view for access checks; quotes still use the catalogue. */
     public function entitlementPlan(): ?PricingPlan
     {
-        if ($this->lifecycle_snapshot !== null && !\App\Services\ProspectiveSubscriptionPolicy::snapshot($this)) return null;
+        if ($this->hasLifecycleSnapshot() && !\App\Services\ProspectiveSubscriptionPolicy::snapshot($this)) return null;
         $plan = $this->pricingPlan;
         $snapshot = \App\Services\ProspectiveSubscriptionPolicy::effectivePurchase($this) ?? $this->purchase_snapshot;
         if (!is_array($snapshot) || ($snapshot['version'] ?? null) !== 1
@@ -122,7 +128,7 @@ class Subscription extends Model
 
         // Missing legacy fields retain their existing catalogue meaning. Never
         // mutate the related catalogue model or overlay price/campaign fields.
-        $view = $this->lifecycle_snapshot !== null ? new PricingPlan() : ($plan ? clone $plan : new PricingPlan());
+        $view = $this->hasLifecycleSnapshot() ? new PricingPlan() : ($plan ? clone $plan : new PricingPlan());
         $fields = ['id', 'name', 'product_type', 'erps_vertical', 'is_trial', 'features', 'health_modules',
             'invoice_limit', 'user_limit', 'branch_limit', 'max_terminals', 'max_users', 'max_products',
             'ai_page_limit', 'fair_use_limit', 'health_department_limit'];

@@ -9095,13 +9095,14 @@ class FbrPosController extends Controller
             return true;
         }
         $sub = \App\Services\PlanLimitService::getActiveSubscription($companyId);
+        if ($sub && $sub->hasLifecycleSnapshot() && !\App\Services\ProspectiveSubscriptionPolicy::snapshot($sub)) return false;
         if (!$sub || !$sub->entitlementPlan()) {
             return true;
         }
-        if ($sub->hasActiveOverride() && ($sub->lifecycle_snapshot === null)) {
+        if ($sub->hasActiveOverride() && (!$sub->hasLifecycleSnapshot())) {
             return true;
         }
-        return (bool) $sub->entitlementPlan()->inventory_enabled || ((bool) $sub->entitlementPlan()->is_trial && ($sub->lifecycle_snapshot === null));
+        return (bool) $sub->entitlementPlan()->inventory_enabled || ((bool) $sub->entitlementPlan()->is_trial && (!$sub->hasLifecycleSnapshot()));
     }
 
     /**

@@ -4894,6 +4894,7 @@ class PosController extends Controller
      */
     private function recordBillDeletionForQuota(PosTransaction $transaction, int $companyId): void
     {
+        \App\Services\ProspectiveQuotaRetention::capture(collect([$transaction]), 'single-delete', (int)$transaction->id);
         if ($transaction->status !== 'completed'
             || $transaction->invoice_mode === 'local'
             || ($transaction->transaction_type ?? 'sale') === 'return') {
@@ -9313,7 +9314,7 @@ class PosController extends Controller
             $deleted = PosTransaction::withoutGlobalScope('hide_archived')->whereIn('id', $ids)->delete();
 
             $thisMonth = $rows->filter($inThisMonth);
-            \App\Models\PosLocalSeriesReset::create([
+            $quotaReset = \App\Models\PosLocalSeriesReset::create([
                 'company_id' => $companyId,
                 'reset_date' => now()->toDateString(),
                 'deleted_final_count' => $thisMonth->reject($isProvisional)->count(),
@@ -9323,6 +9324,7 @@ class PosController extends Controller
                 'to_date' => $dates->last(),
                 'performed_by' => $user->id,
             ]);
+            \App\Services\ProspectiveQuotaRetention::capture($rows, 'archive-clear', (int)$quotaReset->id);
         });
 
         $next = $this->previewNextLocalNumber($companyId);
@@ -16733,6 +16735,7 @@ class PosController extends Controller
                         }
                     }
                     \App\Services\PosFinancialHistory::captureDeleted($deleteRows, (int) $report->id, 'day-close');
+                    \App\Services\ProspectiveQuotaRetention::capture($deleteRows, 'day-close', (int)$report->id);
                     foreach ($deleteRows as $archiveRow) {
                         app(\App\Services\OptionalLocalBillArchive::class)->capture($archiveRow, 'pos');
                     }

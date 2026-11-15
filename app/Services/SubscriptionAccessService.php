@@ -69,7 +69,7 @@ class SubscriptionAccessService
         // Settling an existing hospital invoice consumes no new bill quota.
         // Expiry, missing subscriptions and other access restrictions still apply.
         $existingHospitalBill = $existingHospitalBill && $company->isHospitalCollectionPilot();
-        if ($subscription->lifecycle_snapshot !== null && !ProspectiveSubscriptionPolicy::snapshot($subscription)) return ['allowed'=>false,'reason'=>'Subscription policy evidence requires review.','override'=>null];
+        if ($subscription->hasLifecycleSnapshot() && !ProspectiveSubscriptionPolicy::snapshot($subscription)) return ['allowed'=>false,'reason'=>'Subscription policy evidence requires review.','override'=>null];
         $type = $subscription->override_type ?? 'none';
 
         // 1. Lifetime

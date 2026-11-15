@@ -401,6 +401,7 @@ Route::middleware(['pos.auth'])->prefix('pos/local-bills')->group(function () {
 Route::middleware('web')->post('/branch/switch', [BranchSwitchController::class, 'switch'])->name('branch.switch');
 
 Route::middleware(['auth', 'company', 'rate_limit_company', 'company.approval'])->group(function () {
+    Route::match(['get','post'], '/madadgar/di-read', [\App\Http\Controllers\DiMadadgarReadController::class, 'show'])->name('di.madadgar.read')->middleware('throttle:20,1');
     Route::post('/survey/{id}/respond', [\App\Http\Controllers\PosSurveyController::class, 'respond'])->defaults('survey_guard', 'web')->name('di.survey.respond');
     Route::post('/survey/{id}/dismiss', [\App\Http\Controllers\PosSurveyController::class, 'dismiss'])->defaults('survey_guard', 'web')->name('di.survey.dismiss');
 

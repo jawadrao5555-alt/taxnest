@@ -14,6 +14,10 @@ $target=Company::create(['name'=>'Synthetic local lifecycle target','ntn'=>'LC'.
 $other=Company::create(['name'=>'Synthetic local lifecycle control','ntn'=>'LO'.$suffix,'product_type'=>'fbrpos','pos_type'=>'clinic','fbr_reporting_enabled'=>false]);
 $seed=function(Company $company):void {
  $base=['company_id'=>$company->id,'created_at'=>now(),'updated_at'=>now()];
+ // Seed the exact tenant-bound retained facts too: purge assertions must cover
+ // real evidence rows, not silently accept zero for newly retained tables.
+ DB::table('prospective_pos_quota_retention')->insert(['company_id'=>$company->id,'transaction_id'=>1,'sold_at'=>now(),'business_date'=>today()->toDateString(),'quota_counted'=>true,'aggregate_final'=>true,'source'=>'single-delete','source_id'=>1,'captured_at'=>now()]);
+ DB::table('prospective_fbr_quota_retention')->insert(['company_id'=>$company->id,'transaction_id'=>1,'sold_at'=>now(),'quota_counted'=>true,'source'=>'single-delete','captured_at'=>now()]);
  $account=DB::table('school_fee_accounts')->insertGetId($base+['branch_id'=>null,'student_reference'=>'SYN-LIFE','fee_period'=>now()->format('Y-m'),'fee_lines'=>'[]','payable_paisa'=>20000,'paid_paisa'=>10000]);
  DB::table('school_fee_receipts')->insert($base+['branch_id'=>null,'account_id'=>$account,'collected_by'=>1,'request_key'=>(string)Str::uuid(),'student_reference'=>'SYN-LIFE','fee_head'=>'tuition','amount_paisa'=>10000,'payment_method'=>'cash','balance_paisa'=>10000,'collected_at'=>now()]);
  DB::table('school_fee_heads')->insert($base+['code'=>'life','label'=>'Synthetic fee','active'=>true]);

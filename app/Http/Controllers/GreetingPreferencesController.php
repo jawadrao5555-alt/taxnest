@@ -10,9 +10,14 @@ class GreetingPreferencesController extends Controller
 {
     private function owner(Request $request): int
     {
-        abort_unless($request->user()?->role === 'company_admin' && $request->user()->company_id, 403);
+        $actor = $request->user();
+        $current = $actor ? \App\Models\User::find($actor->id) : null;
+        // Generic auth/session-generation middleware does not refresh role or membership.
+        abort_unless($current && $current->is_active && $current->role === 'company_admin'
+            && $current->company_id && (int) $current->company_id === (int) $actor->company_id
+            && DB::table('companies')->where('id', $current->company_id)->exists(), 403);
 
-        return (int) $request->user()->company_id;
+        return (int) $current->company_id;
     }
 
     public function index(Request $request)
@@ -46,7 +51,7 @@ class GreetingPreferencesController extends Controller
             DB::table('greeting_recipients')->insert($data + ['company_id' => $id, 'created_at' => now()]);
         }
 
-return back();
+        return back();
     }
 
     public function preview(Request $request)

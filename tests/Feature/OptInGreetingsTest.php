@@ -36,6 +36,29 @@ class OptInGreetingsTest extends TestCase
         $this->assertTrue($service->due($birthday, CarbonImmutable::parse('2028-02-29', 'Asia/Karachi')));
     }
 
+    public function test_stale_owner_cannot_read_preview_or_mutate_after_role_active_or_membership_change(): void
+    {
+        [$company, $owner] = $this->seedConsent();
+        $other = Company::create(['name'=>'Synthetic moved company','ntn'=>'SYN-MOVED']);
+        foreach ([['role'=>'user'], ['is_active'=>false], ['company_id'=>$other->id]] as $change) {
+            DB::table('users')->where('id',$owner->id)->update(['role'=>'company_admin','is_active'=>true,'company_id'=>$company->id]);
+            $stale = $owner->fresh();
+            DB::table('users')->where('id',$owner->id)->update($change);
+            foreach (['index','preview','save','recipient'] as $action) {
+                $request = \Illuminate\Http\Request::create('/profile/greetings','POST',['template'=>'Hello {name}']);
+                $request->setUserResolver(fn () => $stale);
+                try {
+                    app(\App\Http\Controllers\GreetingPreferencesController::class)->{$action}($request);
+                    $this->fail('Stale owner retained '.$action.' access');
+                } catch (\Symfony\Component\HttpKernel\Exception\HttpException $error) {
+                    $this->assertSame(403,$error->getStatusCode());
+                }
+            }
+        }
+        $this->assertDatabaseCount('greeting_recipients',1);
+        $this->assertDatabaseCount('greeting_deliveries',0);
+    }
+
     public function test_default_release_gate_never_calls_transport(): void
     {
         $this->seedConsent();

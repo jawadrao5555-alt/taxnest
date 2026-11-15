@@ -17,4 +17,12 @@ return [
     'link' => 'Ikhtiyari greetings aur razamandi',
     'package_review' => 'Package aur billing review',
     'package_review_note' => 'Dastiyab muddat chunein aur adaigi ka saboot review ke liye dein.',
+    'notice' => 'Pehle se band hai. Sirf email. Wazeh razamandi ke baad chalayen. Mareez ki tareekh ya rabta import nahin hota. Ghair leap saal mein 29 February ka mauqa 28 February ko hota hai. Platform ki ijazat aur mail provider bhi zaroori hain.',
+    'placeholders' => 'Sirf {name} aur {company} istemal karein. Template badalne se bheja gaya paigham dobara nahin jata.',
+    'preview_label' => 'Template ka namoona',
+    'hold_notice' => 'Ghair wazeh ya rukay huay paighamat tasdeeq tak hold par rehte hain; andha dobara nahin bheja jata. Provider ki dastiyabi teen martaba check hoti hai.',
+    'welcome' => 'Khush aamdeed',
+    'birthday' => 'Salgirah',
+    'anniversary' => 'Saalana mauqa',
+    'template' => 'template',
 ];

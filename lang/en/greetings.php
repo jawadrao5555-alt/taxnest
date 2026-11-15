@@ -17,4 +17,12 @@ return [
     'link' => 'Optional customer greetings and consent',
     'package_review' => 'Package and billing review',
     'package_review_note' => 'Select a configured period and submit payment evidence for review.',
+    'notice' => 'Off by default. Email only. Enable only after recipients explicitly consent. No patient dates or contacts are imported. February 29 birthdays and anniversaries use February 28 in non-leap years. Delivery also requires the platform release gate and an available mail provider.',
+    'placeholders' => 'Allowed placeholders: {name}, {company}. Template changes never resend a completed greeting.',
+    'preview_label' => 'Preview template',
+    'hold_notice' => 'Unknown outcomes and interrupted sending remain on hold for reconciliation. They are never blindly retried. Provider-unavailable checks stop after three attempts for the occurrence.',
+    'welcome' => 'Welcome',
+    'birthday' => 'Birthday',
+    'anniversary' => 'Anniversary',
+    'template' => 'template',
 ];

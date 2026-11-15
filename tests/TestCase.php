@@ -64,13 +64,17 @@ abstract class TestCase extends BaseTestCase
             $before = memory_get_usage();
             $cycles = gc_collect_cycles();
             $after = memory_get_usage();
+            // Reclaim free Zend allocator pages too: collecting cycles alone
+            // can leave their storage in allocator caches until process exit.
+            // This touches only unused memory, not live application/test state.
+            $allocatorFreed = function_exists('gc_mem_caches') ? gc_mem_caches() : 0;
             // Bounded, content-free evidence for long aggregate runs. At most one
             // line per class when retained pressure or reclaimed cycles are large.
             static $lastProfiledClass = null;
             if (($before >= 512 * 1024 * 1024 || $before - $after >= 32 * 1024 * 1024)
                 && $lastProfiledClass !== static::class) {
                 $lastProfiledClass = static::class;
-                fwrite(STDERR, sprintf("PHPUnit cycle cleanup: class=%s before=%d after=%d peak=%d reclaimed=%d collected=%d\n", static::class, $before, $after, memory_get_peak_usage(), $before - $after, $cycles));
+                fwrite(STDERR, sprintf("PHPUnit cycle cleanup: class=%s before=%d after=%d peak=%d reclaimed=%d collected=%d allocator_freed=%d\n", static::class, $before, $after, memory_get_peak_usage(), $before - $after, $cycles, $allocatorFreed));
             }
         }
     }

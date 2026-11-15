@@ -35,3 +35,27 @@ The patch is a candidate long-process isolation correction with bounded numeric
 telemetry (at most one line per qualifying class) to verify the next full run.
 A persistent post-collection growth would require investigating retained roots;
 it is not permission to raise the limit or skip the failing PDF assertion.
+
+
+### Measured allocator-cache follow-up
+
+The full isolated exact tree7358d69 (remote87e896e) executed all6435 tests and
+54659 assertions without OOM, peaking at1003.50MB. It had one unrelated shared
+translation purity failure, separately corrected; it is not a green full-suite
+claim. Remaining headroom was too small to assume newly added tests would fit.
+
+On the same memory candidate base, the identical six-class real PDF aggregate
+with post-cycle `gc_mem_caches()` passed53 tests/265 assertions in3:07 at201MB,
+compared with219MB for the preceding cycle-only run. Temporary per-test numeric
+instrumentation measured209,027,072 bytes released from allocator free lists and
+33,554,432 bytes cumulative reduction in actual allocated pages (largest single
+release10,485,760 bytes). These totals are across tests, not a net resident-memory
+reduction or a prediction of final full-suite peak. All28 existing deprecations
+remained visible. No PDF or assertion changed.
+
+The follow-up calls the PHP builtin only when available, after Laravel teardown
+and cycle collection. It releases unused allocator caches, not live objects.
+The bounded class diagnostic includes allocator bytes freed, without document or
+request content. The1GiB limit remains unchanged. Final integrated-head full CI
+must validate the combined effect; no blanket migration-fixture rewrite or claim
+that retained roots have all been identified is made.

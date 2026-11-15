@@ -1,3 +1,4 @@
+import { aiUsageWorkflow } from './lib/ai-usage-browser.mjs';
 import { privateProfileWorkflow } from './lib/private-profile-browser.mjs';
 import { initializeSyntheticPixels } from './lib/synthetic-pixel-capture.mjs';
 import { madadgarReadWorkflow } from './lib/madadgar-read-browser.mjs';
@@ -1508,6 +1509,7 @@ async function deliveryContactSearchWorkflow(page,t,v) {
 
 async function workflow(page,t,v,diagnostics) {
   if(t.madadgarReadCases)return madadgarReadWorkflow(page,t,v,{baseUrl,login,loopback,saveEvidenceScreenshot,pass});
+  if(t.aiUsageCases)return aiUsageWorkflow(page,t,v,{baseUrl,login,loopback,saveEvidenceScreenshot,pass});
   if(t.privateProfileCases)return privateProfileWorkflow(page,t,v,{baseUrl,saveEvidenceScreenshot,pass});
   if(t.greetingCases)return greetingTutorialWorkflow(page,t,v,{baseUrl,saveEvidenceScreenshot,pass});
   if(t.diInventoryCases)return diInventoryWorkflow(page,t,v,{baseUrl,saveEvidenceScreenshot,pass});
@@ -2417,6 +2419,7 @@ async function customerBulkNavigation(page,t,v) {
 }
 async function one(browser,label,v,t) {
   if(t.madadgarReadCases)t={...t,login:t.madadgarReadCases[v.width].login};
+  if(t.aiUsageCases)t={...t,login:t.aiUsageCases[v.width].admin};
   if(t.privateProfileCases)t={...t,login:t.privateProfileCases[v.width].login};
   if(t.greetingCases)t={...t,login:t.greetingCases[v.width].login};
   if(t.diInventoryCases)t={...t,login:t.diInventoryCases[v.width].login};

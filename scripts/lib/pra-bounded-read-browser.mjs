@@ -3,8 +3,11 @@ export async function praBoundedReadWorkflow(page,t,v,{baseUrl,login,loopback,sa
  const root=p=>p.locator('[x-data^="tnMadadgar("]');
  const open=async p=>{await p.goto(baseUrl+'/pos/dashboard',{waitUntil:'domcontentloaded'});await waitForOperationalSurface(p);await dismiss(p);await root(p).getByRole('button',{name:'Madadgar Support',exact:true}).click();await root(p).getByRole('button',{name:/Ask Madadgar/}).click();};
  const composerBounds=async p=>{
+  // Alpine switches x-show after the menu click; do not measure its hidden pre-render frame.
+  await root(p).locator('input[name="madadgar_q_nofill"]').waitFor({state:'visible'});
+  await p.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
   const rects=await root(p).locator('input[name="madadgar_q_nofill"]').evaluate(input=>{const form=input.form,button=form.querySelector('button[type="submit"]');const rect=e=>{const r=e.getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height};};return {input:rect(input),button:rect(button),form:rect(form),width:innerWidth,height:innerHeight};});
-  for(const r of [rects.input,rects.button])check(r.width>20&&r.height>20&&r.left>=rects.form.left-1&&r.right<=rects.form.right+1&&r.left>=0&&r.right<=rects.width&&r.top>=0&&r.bottom<=rects.height,'PRA composer control clipped or outside its form/viewport');
+  for(const r of [rects.input,rects.button])check(r.width>20&&r.height>20&&r.left>=rects.form.left-1&&r.right<=rects.form.right+1&&r.left>=0&&r.right<=rects.width&&r.top>=0&&r.bottom<=rects.height,'PRA composer control clipped or outside its form/viewport: '+JSON.stringify(rects));
   check(rects.input.right<=rects.button.left,'PRA composer input overlaps send button');
   check(Math.abs(rects.button.width-40)<=1,'PRA inline send button stretched by global mobile form styling');
  };

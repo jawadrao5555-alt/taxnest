@@ -152,7 +152,7 @@
                     </button>
                 </form>
                 <div class="flex items-center justify-between mt-1.5 px-1">
-                    <button @click="newChat()" class="text-xs text-gray-400 {{ $mc['link'] }} transition cursor-pointer">{{ __('pos.madadgar_new_chat') }}</button>
+                    <button @click="newChat()" :disabled="busy" class="text-xs text-gray-400 {{ $mc['link'] }} transition cursor-pointer">{{ __('pos.madadgar_new_chat') }}</button>
                     <button @click="view = 'menu'" class="text-xs text-gray-400 {{ $mc['link'] }} transition cursor-pointer">{{ __('pos.madadgar_back') }}</button>
                     <span class="text-xs text-gray-400" x-show="remaining !== null && remaining <= 5" x-text="@js(__('pos.madadgar_remaining_prefix')) + remaining"></span>
                 </div>
@@ -294,6 +294,8 @@ function tnMadadgar(aiEnabled, waNumber, base, storeKey) {
             this.scrollDown();
         },
         newChat() {
+            // Do not discard a confirmation identity while its result is unknown.
+            if (this.busy) return;
             this.resetSid();
             this.messages = [];
             this.pending = null; this.savePending();

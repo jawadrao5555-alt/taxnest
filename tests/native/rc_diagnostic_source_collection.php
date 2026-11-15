@@ -218,6 +218,15 @@ try {
     }
     echo "PASS: native tenant backup source has no retained events without global attribution or health claim\n";
 
+    $backupColumns=DB::select("SELECT COLUMN_NAME AS column_name, DATA_TYPE AS data_type, IS_NULLABLE AS is_nullable, COLUMN_DEFAULT AS column_default, EXTRA AS extra FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='tenant_backup_evidence' AND column_name IN ('event_at','received_at','reported_retained_until','evidence_expires_at')");
+    if(count($backupColumns)!==4) throw new RuntimeException('Native backup time columns missing');
+    foreach($backupColumns as $column) {
+        $nullable=$column->column_name==='reported_retained_until';
+        if($column->data_type!=='datetime' || $column->is_nullable!==($nullable?'YES':'NO')
+            || !in_array($column->column_default,[null,'NULL'],true) || $column->extra!=='') {
+            throw new RuntimeException('Native backup time schema must require explicit DATETIME values without generated defaults');
+        }
+    }
     $backupSource=(string) Str::uuid();
     $backupToken=str_repeat('synthetic-producer-',3);
     config(['backup_evidence.sources'=>[$backupSource=>['enabled'=>true,'token_sha256'=>hash('sha256',$backupToken),'company_ids'=>[$company->id]]]]);
@@ -226,6 +235,19 @@ try {
         'reported_retained_until'=>now()->addDays(7)->toIso8601String()];
     $backupService=app(\App\Services\Reporting\TenantBackupEvidence::class);
     $firstBackup=$backupService->ingest($backupSource,$backupToken,$backupInput);
+    $storedBackup=DB::table('tenant_backup_evidence')->where('id',$firstBackup['id'])->first();
+    if($storedBackup->event_at!==$stamp || $storedBackup->received_at!==$firstBackup['received_at']
+        || $storedBackup->received_at===$storedBackup->event_at || str_starts_with($storedBackup->received_at,'0000-')) {
+        throw new RuntimeException('Native backup insert lost explicit original event/server receipt timestamps');
+    }
+    try {
+        DB::table('tenant_backup_evidence')->insert(['company_id'=>$company->id,'source_id'=>$backupSource,'event_id'=>(string)Str::uuid(),
+            'reported_status'=>'failed','event_at'=>$stamp,'evidence_expires_at'=>now()->addDays(90)->format('Y-m-d H:i:s'),'content_hash'=>str_repeat('0',64)]);
+        throw new RuntimeException('Native backup insert silently generated missing received_at');
+    } catch (\Illuminate\Database\QueryException $e) {
+        if((int)($e->errorInfo[1]??0)!==1364) throw $e;
+    }
+    echo "PASS: native backup DATETIME schema has no implicit defaults and requires explicit event/server receipt times\n";
     if ($firstBackup!==$backupService->ingest($backupSource,$backupToken,$backupInput)) throw new RuntimeException('Native backup receipt replay changed');
     try {
         $backupService->ingest($backupSource,$backupToken,array_replace($backupInput,['reported_status'=>'failed','reported_retained_until'=>null]));

@@ -180,4 +180,15 @@ class DiInvoiceInventoryTest extends TestCase {
   $this->travel(11)->minutes();$this->assertNull(DiFiscalSubmissionState::reserve($invoice->id,'sync','production'));$this->assertSame('pending_verification',$invoice->fresh()->status);Http::assertNothingSent();
  }
 
+ public function test_generic_di_receiving_deduction_and_purchase_reversal_preserve_four_decimal_balances():void {
+  \App\Services\InventoryService::addStock($this->company->id,$this->product->id,'999999999.1234','2.00','opening');
+  \App\Services\InventoryService::addStock($this->company->id,$this->product->id,'0.0001','2.00','purchase');
+  $this->assertSame('999999999.1235',$this->stock());
+  \App\Services\InventoryService::deductStock($this->company->id,$this->product->id,'0.0002','2.00','sale');
+  $this->assertSame('999999999.1233',$this->stock());
+  \App\Services\InventoryService::reversePurchase($this->company->id,$this->product->id,'0.0001','2.00');
+  $this->assertSame('999999999.1232',$this->stock());$this->assertSame(1,DB::table('inventory_stocks')->count());
+  $this->assertSame('999999999.1232',number_format((float)DB::table('inventory_movements')->orderByDesc('id')->value('balance_after'),4,'.',''));
+ }
+
 }

@@ -8,7 +8,7 @@ use Illuminate\Validation\ValidationException;
 
 /** Optional DI-only projection. Never reconstruct stock from historical invoices. */
 final class DiInvoiceInventory {
- public static function enabled(Company $company): bool {return ($company->product_type ?? 'di')==='di' && (bool)$company->inventory_enabled;}
+ public static function enabled(Company $company): bool {return $company->product_type==='di' && (bool)$company->inventory_enabled;}
  public static function eligibility(Company $company): array {
   return Schema::hasColumn('invoices','inventory_enabled_snapshot') ? ['inventory_enabled_snapshot'=>self::enabled($company)] : [];
  }
@@ -58,7 +58,7 @@ final class DiInvoiceInventory {
  /** Validate known snapshot/stock problems BEFORE any external fiscal dispatch. */
  public static function preflight(Invoice $invoice,?string $environment=null): void {
   if($invoice->inventory_enabled_snapshot!==true)return;
-  if((Company::find($invoice->company_id)?->product_type??'di')!=='di')self::reject('Frozen inventory projection is limited to Digital Invoicing.');
+  if(Company::find($invoice->company_id)?->product_type!=='di')self::reject('Frozen inventory projection is limited to Digital Invoicing.');
   if(!$invoice->inventory_environment_snapshot) {
    if(!in_array($environment,['sandbox','production'],true))self::reject('Select the original fiscal environment before inventory finalization.');
    $invoice->inventory_environment_snapshot=$environment;
@@ -149,7 +149,7 @@ final class DiInvoiceInventory {
  }
  private static function post(Invoice $invoice): void {
   $company=Company::findOrFail($invoice->company_id);
-  if(($company->product_type??'di')!=='di')self::reject('Inventory projection belongs to Digital Invoicing only.');
+  if($company->product_type!=='di')self::reject('Inventory projection belongs to Digital Invoicing only.');
   $postedIds=DB::table('di_invoice_inventory_postings')->where('company_id',$invoice->company_id)->where('invoice_id',$invoice->id)->pluck('invoice_item_id');
   $items=$invoice->items()->whereNotIn('id',$postedIds)->orderBy('id')->get();
   // Lock product rows in stable order, including empty/unassigned stock creation.

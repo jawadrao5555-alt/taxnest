@@ -7,14 +7,14 @@ use App\Models\{Company,Invoice,Product};use App\Services\{DiInvoiceInventory,Di
 Http::preventStrayRequests();
 function invProof(bool $ok,string $why):void{if(!$ok)throw new RuntimeException($why);}
 function invAccept(int $id):void{$invoice=Invoice::withoutGlobalScopes()->findOrFail($id);DiFiscalSubmissionState::accepted($invoice,'SYNTHETIC-STOCK-'.$id,'production','synthetic_native');DiInvoiceInventory::saveAccepted($invoice);}
-if(in_array(($argv[1]??''),['worker','reserve-worker'],true)){
+if(in_array(($argv[1]??''),['worker','reserve-worker','receive-worker'],true)){
  [$id,$barrier,$index]=array_slice($argv,2);invProof(str_starts_with($barrier,dirname($socket).'/di-stock-')&&ctype_digit($index),'Unsafe inventory barrier');
  file_put_contents($barrier.'.ready'.$index,'ready');$until=microtime(true)+20;while(!is_file($barrier)){if(microtime(true)>$until)throw new RuntimeException('Inventory barrier timeout');usleep(10000);}
- try{if($argv[1]==='reserve-worker'){invProof(DiFiscalSubmissionState::reserve((int)$id,'sync','production')!==null,'Reservation was unavailable');}else invAccept((int)$id);echo'200';}catch(\Illuminate\Validation\ValidationException){echo'422';}exit;
+ try{if($argv[1]==='receive-worker'){$receive=Invoice::withoutGlobalScopes()->findOrFail((int)$id);$productId=$receive->items()->sole()->inventory_snapshot['product_id'];\App\Services\InventoryService::addStock($receive->company_id,$productId,'1.0000','2.00','purchase');}elseif($argv[1]==='reserve-worker'){invProof(DiFiscalSubmissionState::reserve((int)$id,'sync','production')!==null,'Reservation was unavailable');}else invAccept((int)$id);echo'200';}catch(\Illuminate\Validation\ValidationException){echo'422';}exit;
 }
-function invRace(array $ids,string $socket,string $mode='worker'):array{
+function invRace(array $ids,string $socket,string|array $mode='worker'):array{
  $barrier=dirname($socket).'/di-stock-'.bin2hex(random_bytes(8));$workers=[];
- try{foreach($ids as $i=>$id){$p=new Process([PHP_BINARY,__FILE__,$mode,(string)$id,$barrier,(string)$i]);$p->setTimeout(30);$p->start();$workers[]=$p;}
+ try{foreach($ids as $i=>$id){$p=new Process([PHP_BINARY,__FILE__,is_array($mode)?$mode[$i]:$mode,(string)$id,$barrier,(string)$i]);$p->setTimeout(30);$p->start();$workers[]=$p;}
  $until=microtime(true)+20;foreach(array_keys($ids)as$i)while(!is_file($barrier.'.ready'.$i)){if(microtime(true)>$until)throw new RuntimeException('Stock worker startup timeout');usleep(10000);}file_put_contents($barrier,'go');
  $results=[];foreach($workers as$p){$p->wait();invProof($p->isSuccessful(),'Stock worker failed: '.$p->getErrorOutput());$results[]=trim($p->getOutput());}sort($results);return$results;
  }finally{foreach($workers as$p)if($p->isRunning())$p->stop();foreach(glob($barrier.'*')?:[]as$f)unlink($f);}
@@ -42,4 +42,9 @@ foreach([$emptyA,$emptyB]as$empty){$item=$empty->items()->sole();$snapshot=$item
 invProof(invRace([$emptyA->id,$emptyB->id],$socket)===['200','200'],'Independent empty stock creation failed');
 invProof(DB::table('inventory_stocks')->where('company_id',$company->id)->where('product_id',$emptyProduct->id)->count()===1,'Concurrent NULL-branch duplicate stock row');
 invProof((string)DB::table('inventory_stocks')->where('company_id',$company->id)->where('product_id',$emptyProduct->id)->value('quantity')==='-0.0002','Exact independent fractional deductions lost');
+$receiveProduct=Product::withoutGlobalScopes()->create(['company_id'=>$company->id,'name'=>'Synthetic receive race','hs_code'=>'33049900','uom'=>'KG','is_active'=>true]);
+$receiveSale=$make('0.0001');$receiveItem=$receiveSale->items()->sole();$receiveSnapshot=$receiveItem->inventory_snapshot;$receiveSnapshot['product_id']=$receiveProduct->id;$receiveItem->update(['inventory_snapshot'=>$receiveSnapshot]);
+invProof(invRace([$receiveSale->id,$receiveSale->id],$socket,['worker','receive-worker'])===['200','200'],'Generic receiving versus first DI posting failed');
+invProof(DB::table('inventory_stocks')->where('company_id',$company->id)->where('product_id',$receiveProduct->id)->count()===1,'Receiving race duplicated NULL-branch stock');
+invProof((string)DB::table('inventory_stocks')->where('company_id',$company->id)->where('product_id',$receiveProduct->id)->value('quantity')==='0.9999','Receiving race lost a fractional mutation');
 echo "PASS: native DI frozen inventory duplicate acceptance posts once concurrent overreturn refused exact four decimals and rollback preserved\n";

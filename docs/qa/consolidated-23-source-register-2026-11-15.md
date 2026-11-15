@@ -1,5 +1,23 @@
 # TaxNest 23-source reconciliation inventory
 
+## Implemented intake correction and visual follow-up (local 9639ed5)
+
+This update supersedes the **missing code** issue-intake row at checkpoint
+6101cf0 below, without changing the original source requirements.
+
+| Requirement | Current implementation | Evidence and remaining acceptance |
+|---|---|---|
+| #301/#321 explicit escalation retry | 7d7c6c3 adds company/user/session/product request UUID plus content fingerprint; current-user lock serializes cap and atomically saves suggestion, confirmation and original response. Same ID replays original ref; changed details return409. Client restores a pending card after refresh but never auto-confirms. Retained identities survive rollback; authorized tenant purge includes them | Integrated escalation/usage/shared-component tests34/209PASS. Native simultaneous same-ID/cap race requires its explicit success marker. Both-viewport browser response-loss/refresh/retry/conflict/history tests added in1402642. Hosted execution remains pending. No real support message or fuzzy cross-company dedup was performed. |
+| #321 visible AI observation UI | f6fb723 replaces admin CDN-only styling/runtime with locked same-origin Vite assets. Actual browser checks require visible unobstructed heading/grid and usable controls after real survey dismissal; exact scrolled-control captures added | Admin/usage regressions45/302PASS; final screenshot and browser proof pending. Earlier AI images were not accepted merely because hidden body text matched. |
+| Aggregate memory isolation | Explicit cycle collection and measured allocator-cache release preserve every test and the1GiB limit | Prior exact87e local run executed6435tests/54659assertions with only the subsequently fixed translation failure. Short53-PDF-test allocator experiment passed265assertions and reduced peak219MB→201MB; it does not prove a full final-head pass. Fresh aggregate result required. |
+
+Actual exact87e receipt/closing detail images were inspected at both widths;
+amounts, balances, campus/cashier and Print/Reprint were legible, with collection
+buttons and support overlap corrected. That does not certify later-head pixels,
+AI usage pages, ERP role screens, physical printing or regulator acceptance.
+All external/future holds and original47unchecked source lines below remain.
+
+
 ## Independent remaining-scope checkpoint: local 6101cf0
 
 Inspected current implementation, not just earlier plans. The previous gaps

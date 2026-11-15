@@ -1114,7 +1114,7 @@ foreach([1366,390] as $width){
  $o->forceFill(['default_branch_id'=>$branches['A']])->save();$cashier->forceFill(['default_branch_id'=>$branches['A']])->save();
  DB::table('branch_user')->insert(['user_id'=>$cashier->id,'branch_id'=>$branches['A'],'access_level'=>'full','created_at'=>$now,'updated_at'=>$now]);
  $product=\App\Models\PosProduct::forceCreate(['company_id'=>$c->id,'name'=>'SYNTHETIC-PRIVATE-RECIPE-'.$width,'price'=>100,'is_active'=>true,'is_tax_exempt'=>false]);
- $ingredient=DB::table('ingredients')->insertGetId(['company_id'=>$c->id,'name'=>'SYNTHETIC-PRIVATE-INGREDIENT','unit'=>'kg','base_unit'=>'kg','cost_per_unit'=>10,'current_stock'=>11,'is_active'=>true,'created_at'=>$now,'updated_at'=>$now]);
+ $ingredient=DB::table('ingredients')->insertGetId(['company_id'=>$c->id,'name'=>'SYNTHETIC-PRIVATE-INGREDIENT','unit'=>'kg','base_unit'=>'kg','cost_per_unit'=>10,'current_stock'=>11,'min_stock_level'=>0,'is_active'=>true,'created_at'=>$now,'updated_at'=>$now]);
  DB::table('product_recipes')->insert(['company_id'=>$c->id,'product_id'=>$product->id,'ingredient_id'=>$ingredient,'quantity_needed'=>2,'waste_percent'=>10,'is_active'=>true,'created_at'=>$now,'updated_at'=>$now]);
  DB::table('ingredient_stocks')->insert(['company_id'=>$c->id,'ingredient_id'=>$ingredient,'branch_id'=>$branches['A'],'quantity'=>4.4,'created_at'=>$now,'updated_at'=>$now]);
  DB::table('pos_day_close_reports')->insert(['company_id'=>$c->id,'branch_id'=>$branches['A'],'report_date'=>now(config('reporting_connector.timezone','Asia/Karachi'))->toDateString(),'report_number'=>'SYN-READ-'.$width,'cash_amount'=>123,'expected_cash'=>123,'counted_cash'=>120,'cash_variance'=>-3,'closed_by'=>$o->id,'created_at'=>$now,'updated_at'=>$now]);

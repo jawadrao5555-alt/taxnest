@@ -210,14 +210,36 @@ try {
     $backupGap = app(\App\Services\Reporting\DiagnosticSourceEvidence::class)->read([
         'company_name' => $company->name, 'source' => 'pos.backup_evidence', 'date_from' => $day,
     ], [$company->id]);
-    if ($backupGap['status'] !== 'UNAVAILABLE'
-        || $backupGap['availability_reason'] !== 'NO_TENANT_BOUND_RETAINED_SOURCE'
-        || $backupGap['collection_observation']['status'] !== 'UNAVAILABLE'
+    if ($backupGap['status'] !== 'NO_RETAINED_EVENTS'
+        || $backupGap['collection_observation']['status'] !== 'NO_RETAINED_EVENTS'
         || $backupGap['coverage']['complete'] !== false || $backupGap['coverage']['seven_day_complete'] !== false
         || $backupGap['rows'] !== [] || str_contains(strtolower(json_encode($backupGap)), 'healthy')) {
         throw new RuntimeException('Native backup evidence gap was not retained as explicit unavailable evidence');
     }
-    echo "PASS: native tenant backup evidence remains explicitly unavailable without global attribution or health claim\n";
+    echo "PASS: native tenant backup source has no retained events without global attribution or health claim\n";
+
+    $backupSource=(string) Str::uuid();
+    $backupToken=str_repeat('synthetic-producer-',3);
+    config(['backup_evidence.sources'=>[$backupSource=>['enabled'=>true,'token_sha256'=>hash('sha256',$backupToken),'company_ids'=>[$company->id]]]]);
+    $backupInput=['company_id'=>$company->id,'event_id'=>(string) Str::uuid(),'reported_status'=>'retained',
+        'event_at'=>\Illuminate\Support\Carbon::parse($stamp,config('app.timezone'))->toIso8601String(),
+        'reported_retained_until'=>now()->addDays(7)->toIso8601String()];
+    $backupService=app(\App\Services\Reporting\TenantBackupEvidence::class);
+    $firstBackup=$backupService->ingest($backupSource,$backupToken,$backupInput);
+    if ($firstBackup!==$backupService->ingest($backupSource,$backupToken,$backupInput)) throw new RuntimeException('Native backup receipt replay changed');
+    try {
+        $backupService->ingest($backupSource,$backupToken,array_replace($backupInput,['reported_status'=>'failed','reported_retained_until'=>null]));
+        throw new RuntimeException('Changed native backup event accepted');
+    } catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) {
+        if($e->getStatusCode()!==409) throw $e;
+    }
+    $backupReport=app(\App\Services\Reporting\DiagnosticSourceEvidence::class)->read([
+        'company_name'=>$company->name,'source'=>'pos.backup_evidence','date_from'=>$day,
+    ],[$company->id]);
+    if($backupReport['status']!=='PARTIAL' || count($backupReport['rows'])!==1
+        || $backupReport['coverage']['seven_day_complete']!==false || $backupReport['backup_evidence']['restore_verified']!==false
+        || str_contains(json_encode($backupReport),$backupToken)) throw new RuntimeException('Native backup metadata scope/truth/redaction failed');
+    echo "PASS: native tenant backup source deduplicates metadata, rejects changed replay and never claims restore/completeness\n";
 
     $branchIds = [
         'selected' => DB::table('branches')->insertGetId(['company_id' => $company->id, 'name' => 'Synthetic selected '.$suffix,

@@ -127,6 +127,9 @@ Route::get('/share/invoice/{uuid}', [ShareController::class, 'show']);
 Route::get('/share/invoice/{uuid}/pdf', [ShareController::class, 'pdf'])->name('share.invoice.pdf');
 
 // Meta WhatsApp Cloud API status webhook (per-company; public + CSRF-exempt).
+Route::post('/api/diagnostics/backup-evidence/{source}', [\App\Http\Controllers\Diagnostics\BackupEvidenceController::class, 'store'])
+    ->whereUuid('source')->middleware('throttle:60,1')->withoutMiddleware($statelessMachine);
+
 Route::get('/webhooks/whatsapp/{company}', [\App\Http\Controllers\WhatsAppWebhookController::class, 'verify'])->whereNumber('company')->withoutMiddleware($statelessMachine);
 Route::post('/webhooks/whatsapp/{company}', [\App\Http\Controllers\WhatsAppWebhookController::class, 'receive'])->whereNumber('company')->withoutMiddleware($statelessMachine);
 

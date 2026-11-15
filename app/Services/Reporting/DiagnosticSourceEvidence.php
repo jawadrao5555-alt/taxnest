@@ -10,7 +10,7 @@ use Illuminate\Validation\ValidationException;
 /** Registered, SELECT-only source metadata. Never returns stored payloads or unrestricted columns. */
 final class DiagnosticSourceEvidence
 {
-    public const REGISTRY_VERSION = 11;
+    public const REGISTRY_VERSION = 12;
 
     public const FIELD_CONTRACT_VERSION = 1;
 
@@ -65,13 +65,10 @@ final class DiagnosticSourceEvidence
         'health.support_cases' => ['erps', 'support_cases', 'updated_at'],
         'health.live_ops' => ['erps', 'live_ops_autonomous_requests', 'updated_at', [], null,
             ['status', 'operation', 'fix_commit', 'pull_request', 'deployment_sha']],
-        // No current table retains tenant-bound backup evidence. Register the
-        // gap explicitly so callers receive UNAVAILABLE instead of a false
-        // healthy/empty result or globally attributed infrastructure state.
-        'pos.backup_evidence' => ['pos', null, null, [], 'NO_TENANT_BOUND_RETAINED_SOURCE'],
-        'di.backup_evidence' => ['di', null, null, [], 'NO_TENANT_BOUND_RETAINED_SOURCE'],
-        'fbrpos.backup_evidence' => ['fbrpos', null, null, [], 'NO_TENANT_BOUND_RETAINED_SOURCE'],
-        'health.backup_evidence' => ['erps', null, null, [], 'NO_TENANT_BOUND_RETAINED_SOURCE'],
+        'pos.backup_evidence' => ['pos', 'tenant_backup_evidence', 'event_at', [], null, ['source_id', 'event_id', 'reported_status', 'provenance', 'received_at', 'reported_retained_until', 'evidence_expires_at']],
+        'di.backup_evidence' => ['di', 'tenant_backup_evidence', 'event_at', [], null, ['source_id', 'event_id', 'reported_status', 'provenance', 'received_at', 'reported_retained_until', 'evidence_expires_at']],
+        'fbrpos.backup_evidence' => ['fbrpos', 'tenant_backup_evidence', 'event_at', [], null, ['source_id', 'event_id', 'reported_status', 'provenance', 'received_at', 'reported_retained_until', 'evidence_expires_at']],
+        'health.backup_evidence' => ['erps', 'tenant_backup_evidence', 'event_at', [], null, ['source_id', 'event_id', 'reported_status', 'provenance', 'received_at', 'reported_retained_until', 'evidence_expires_at']],
         'di.import_batches' => ['di', 'invoice_import_batches', 'created_at'],
         'di.audit_exports' => ['di', 'audit_packs', 'created_at'],
         'health.prescriptions' => ['erps', 'health_prescriptions', 'created_at'],
@@ -162,6 +159,13 @@ final class DiagnosticSourceEvidence
         }
         if (str_ends_with($v['source'], '.live_ops')) {
             $meta['release_evidence_note'] = 'Stored status and identifiers only; they do not prove tests passed, deployment occurred, live verification succeeded or the company is healthy.';
+        }
+        if (str_ends_with($v['source'], '.backup_evidence')) {
+            $meta['backup_evidence'] = ['provenance' => 'authenticated_producer_report',
+                'backup_verified' => false, 'restore_verified' => false, 'rpo_rto_verified' => false,
+                'retention_basis' => 'Producer-reported artifact retention; evidence expiry is not proof of artifact survival or deletion.',
+                'completeness' => 'Missing producers, events, backup bytes and restore outcomes remain unknown.'];
+            if (!Schema::hasTable('tenant_backup_evidence')) $unavailableReason = 'NO_TENANT_BOUND_RETAINED_SOURCE';
         }
         if ($unavailableReason !== null) {
             return $meta + ['status' => 'UNAVAILABLE', 'availability_reason' => $unavailableReason,

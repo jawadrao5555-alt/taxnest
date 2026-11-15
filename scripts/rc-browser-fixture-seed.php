@@ -1206,6 +1206,14 @@ foreach ([1366,390] as $width) {
 }
 foreach([1366=>390,390=>1366] as $width=>$other)$madadgarReadCases[$width]['foreignCompany']=$madadgarReadCases[$other]['company'];
 
+$policyCases=[];
+foreach([1366,390] as $width){
+    $policyCompany=$company('Synthetic prospective policy '.$width,'policy-company-'.$width.'@rc-browser.invalid','RCPOLICY'.$width,'di',['is_internal_account'=>false,'onboarding_completed'=>true]);
+    $policyOwner=$user($policyCompany,'Synthetic policy owner','policy-owner-'.$width.'@rc-browser.invalid','company_admin');
+    $policyPlan=\App\Models\PricingPlan::create(['name'=>'Synthetic selected trial '.$width,'product_type'=>'di','price'=>1000,'invoice_limit'=>25,'is_trial'=>false,'is_public'=>true]);
+    $policySubscription=\App\Services\TrialSubscriptionService::ensureSelectedTrial($policyCompany->id,'di',$policyPlan->id);
+    $policyCases[$width]=['login'=>$policyOwner->email,'terms'=>\App\Services\ProspectiveSubscriptionPolicy::display($policySubscription),'plan'=>$policyPlan->name];
+}
 $billingSelectionCases = [];
 foreach ([1366,390] as $width) {
     $billingCompany = $company('Synthetic Billing Selection '.$width, 'billing-selection-'.$width.'@rc-browser.invalid', 'RCBILLSEL'.$width, 'di',
@@ -1218,6 +1226,13 @@ foreach ([1366,390] as $width) {
     $nextPlan = \App\Models\PricingPlan::create(['name' => 'Synthetic Selected '.$width, 'product_type' => 'di',
         'price' => 200, 'invoice_limit' => 50, 'is_trial' => false, 'is_public' => true]);
     $billingSelectionCases[$width] = ['login' => $billingOwner->email, 'planId' => $nextPlan->id, 'original' => $oldPlan->name];
+    $publicPlans=[];
+    foreach(['di','pos','fbrpos','erps'] as $signupProduct){
+        $signupPlan=\App\Models\PricingPlan::create(['name'=>'Synthetic Signup '.$signupProduct.' '.$width,'product_type'=>$signupProduct,'price'=>1000,'price_yearly'=>12000,'invoice_limit'=>25,'is_trial'=>false,'is_public'=>true]);
+        $publicPlans[$signupProduct]=['id'=>$signupPlan->id,'name'=>$signupPlan->name];
+    }
+    $billingSelectionCases[$width]['publicPlans']=$publicPlans;
+
 }
 \App\Models\GlobalHsMaster::updateOrCreate(['hs_code' => '99010000'], ['description' => 'Synthetic unreported packing fixture',
     'schedule_type' => 'standard', 'tax_rate' => 18, 'default_uom' => 'KG']);
@@ -1277,6 +1292,7 @@ $fixture = [
     ], $categoryJourneys, $optionalArchiveJourneys),
     'transactionalJourneys' => [
         ['name'=>'madadgar-company-reads','manualOnly'=>true,'login'=>$madadgarReadCases[1366]['login'],'password'=>$password,'loginPath'=>'/fbr-pos/login','paths'=>[],'madadgarReadCases'=>$madadgarReadCases],
+        ['name'=>'prospective-billing-policy','manualOnly'=>true,'login'=>$policyCases[1366]['login'],'password'=>$password,'loginPath'=>'/login','paths'=>[],'policyCases'=>$policyCases],
         ['name'=>'platform-expense-records','manualOnly'=>true,'login'=>$expenseCases[1366]['login'],'password'=>$password,'loginPath'=>'/admin/login','paths'=>[],'expenseCases'=>$expenseCases],
         ['name'=>'ai-usage-budget','manualOnly'=>true,'login'=>$aiUsageCases[1366]['admin'],'password'=>$password,'loginPath'=>'/admin/login','paths'=>[],'aiUsageCases'=>$aiUsageCases],
         ['name'=>'pra-bounded-reads','manualOnly'=>true,'login'=>$praReadCases[1366]['login'],'password'=>$password,'loginPath'=>'/pos/login','paths'=>[],'praReadCases'=>$praReadCases],

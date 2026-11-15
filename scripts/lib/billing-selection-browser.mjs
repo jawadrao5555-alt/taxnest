@@ -1,6 +1,9 @@
 export async function billingSelectionWorkflow(page, t, v, {baseUrl, saveEvidenceScreenshot, pass}) {
   const f=t.billingSelection[v.width];
   await page.goto(baseUrl+'/billing/plans',{waitUntil:'domcontentloaded'});
+  const legacy=page.locator('[data-billing-policy-summary][data-policy-version=legacy]');
+  await legacy.locator('[data-policy-legacy]').waitFor({state:'visible'});
+  if(await legacy.locator('time').count())throw Error('Legacy contract displays invented policy dates');
   const original='Current Plan: '+f.original;
   if(!(await page.locator('body').innerText()).includes(original))throw Error('Original paid package missing before selection');
   const select=page.locator('form[action="/billing/subscribe"]').filter({has:page.locator('input[name="plan_id"][value="'+f.planId+'"]')});
@@ -22,17 +25,22 @@ export async function billingSelectionWorkflow(page, t, v, {baseUrl, saveEvidenc
 }
 
 async function signupFormsWorkflow(existingPage,t,v,{baseUrl,saveEvidenceScreenshot,pass}) {
-  for(const [product,path] of [['di','/register'],['pos','/pos/register'],['fbrpos','/fbr-pos/register']]) {
-    const context=await existingPage.context().browser().newContext({viewport:{width:v.width,height:900}});
+  for(const [product,path] of [['di','/register'],['pos','/pos/register'],['fbrpos','/fbr-pos/register'],['erps','/health/register']]) {
+    const context=await existingPage.context().browser().newContext({viewport:v});
+    await context.route('**/*',r=>new URL(r.request().url()).origin===new URL(baseUrl).origin?r.continue():r.abort('blockedbyclient'));
     try {
       const page=await context.newPage();
       await page.goto(baseUrl+path,{waitUntil:'domcontentloaded'});
       const form=page.locator('form[method="POST"]').filter({has:page.locator('input[name="company_name"]')});
-      if(product==='fbrpos'){
-        if(await form.locator('#requested-plan').inputValue()!=='')throw Error('Unselected FBR signup must remain trial');
-        if(!await form.locator('button[type="submit"]').isEnabled())throw Error('FBR trial signup button incorrectly disabled');
-      }
-      if(product==='pos')await form.getByText('Starter',{exact:true}).click();
+      const picker=form.locator(product==='fbrpos'?'#requested-plan':'#required-signup-package');
+      if(!await picker.evaluate(el=>el.required))throw Error(product+' signup package is not required');
+      await picker.selectOption('');
+      if(await picker.evaluate(el=>el.checkValidity()))throw Error(product+' signup accepted missing package');
+      const chosen=t.billingSelection[v.width].publicPlans[product];
+      await picker.selectOption(product==='pos'?String(chosen.id):chosen.name);
+      if(!await picker.evaluate(el=>el.checkValidity()))throw Error(product+' selected package remains invalid');
+      await form.locator('[data-prospective-signup-policy]').waitFor({state:'visible'});
+      if(product==='fbrpos'&&!await form.locator('button[type="submit"]').isEnabled())throw Error('Quoted FBR package signup button incorrectly disabled');
       for(const [name,value] of Object.entries({company_name:'Fictional signup '+product+' '+v.width,
         company_ntn:'910'+String(v.width).padStart(4,'0'),name:'Fictional signup owner',
         email:'signup-'+product+'-'+v.width+'@rc-browser.invalid',password:t.password,password_confirmation:t.password})) {
@@ -48,7 +56,7 @@ async function signupFormsWorkflow(existingPage,t,v,{baseUrl,saveEvidenceScreens
         throw Error('Actual '+product+' signup did not complete at '+v.width);
       if(product==='di'&&new URL(page.url()).pathname!=='/login')throw Error('DI signup must retain pending-approval login flow');
       await saveEvidenceScreenshot(page,'signup-'+product+'-'+v.width);
-      pass('SIGNUP FORMS PASS: '+product+' '+v.width+': actual labelled registration and existing pending-approval redirect; trial/document invariants checked separately in HTTP/native probes');
+      pass('SIGNUP FORMS PASS: '+product+' '+v.width+': actual required package selection, labelled registration and existing pending-approval redirect; prospective trial/document invariants checked separately in HTTP/native probes');
     } finally { await context.close(); }
   }
 }

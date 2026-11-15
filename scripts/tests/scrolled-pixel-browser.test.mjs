@@ -31,11 +31,14 @@ test('mobile support offsets apply only to floating widgets, never the inline us
 test('expense history final rows and full right-hand audit columns fit fixed captures',async()=>{
  const {readFileSync}=await import('node:fs');
  const css=readFileSync(new URL('../../resources/views/saas-admin/platform-expenses.blade.php',import.meta.url),'utf8').match(/<style>([\s\S]*?)<\/style>/)[1];
+ const mobileCss=readFileSync(new URL('../../public/css/mobile.css',import.meta.url),'utf8');
  const {browser}=await launchLocalBrowser();
  try{for(const viewport of [{width:1366,height:900},{width:390,height:844}]){
   const p=await browser.newPage({viewport});
   const row=kind=>`<tr><td>2026-11-15 ${kind}</td><td>Synthetic reference</td><td>PKR 123.45</td><td>Synthetic Expense Owner 390 (#99)<br>2026-11-15 19:00:00<br>Request 12345678-1234-1234-1234-123456789abc</td><td>${kind==='reversal'?'Reverses #1':'Reversed (original retained)'}</td></tr>`;
-  await p.setContent(`<style>body{margin:0;font:16px sans-serif}main{height:100vh;overflow:auto}#platform-expenses{padding:24px;box-sizing:border-box}#expense-history{overflow-x:auto}table{border-collapse:collapse;width:100%;min-width:850px}td{height:90px}${css}</style><main><section id="platform-expenses"><div style="height:1200px">Synthetic forms</div><div id="expense-history"><table><thead><tr><th>Date</th><th>Reference</th><th>Recorded amount</th><th>Actor / audit</th><th>Correction</th></tr></thead><tbody>${row('reversal')}${row('expense')}</tbody></table></div></section></main>`);
+  await p.setContent(`<style>body{margin:0;font:16px sans-serif}main{height:100vh;overflow:auto}#platform-expenses{padding:24px;box-sizing:border-box}#expense-history{overflow-x:auto}table{border-collapse:collapse;width:100%;min-width:850px}td{height:90px}${mobileCss}${css}</style><main><section id="platform-expenses"><div style="height:1200px">Synthetic forms</div><div id="expense-history"><table class="table-static"><thead><tr><th>Date</th><th>Reference</th><th>Recorded amount</th><th>Actor / audit</th><th>Correction</th></tr></thead><tbody>${row('reversal')}${row('expense')}</tbody></table></div></section></main>`);
+  const aligned=await p.evaluate(()=>[3,4,5].every(c=>{const h=document.querySelector(`#expense-history th:nth-child(${c})`).getBoundingClientRect();const d=document.querySelector(`#expense-history tbody td:nth-child(${c})`).getBoundingClientRect();return Math.abs(h.x-d.x)<1&&Math.abs(h.width-d.width)<1;}));
+  assert.ok(aligned,'Expense header/body must share a native column grid');
   for(const col of [3,4,5])await scrolledPixelDetail(p,[`#expense-history th:nth-child(${col})`,`#expense-history tr:nth-child(1) td:nth-child(${col})`,`#expense-history tr:nth-child(2) td:nth-child(${col})`],'not-exported',async()=>{});
   await p.close();
  }}finally{await browser.close();}

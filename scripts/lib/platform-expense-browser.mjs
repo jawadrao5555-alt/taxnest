@@ -36,6 +36,7 @@ export async function platformExpenseWorkflow(page,t,v,{baseUrl,login,loopback,s
  await verifyExpenseThemes(page,v.width,pass);
  await scrolledPixelDetail(page,['#expense-totals'],'platform-expense-reconciled-'+v.width,saveEvidenceScreenshot);
  const history=page.locator('#expense-history'),originalLeft=await history.evaluate(e=>e.scrollLeft);
+ check(await history.evaluate(e=>[3,4,5].every(c=>{const h=e.querySelector(`th:nth-child(${c})`).getBoundingClientRect(),d=e.querySelector(`tbody td:nth-child(${c})`).getBoundingClientRect();return Math.abs(h.x-d.x)<1&&Math.abs(h.width-d.width)<1;})),'Expense header and body column grids do not align');
  try {
   for(const [column,name] of [[3,'amount'],[4,'audit'],[5,'correction']]) {
    await scrolledPixelDetail(page,[`#expense-history th:nth-child(${column})`,`#expense-history tbody tr:nth-child(1) td:nth-child(${column})`,`#expense-history tbody tr:nth-child(2) td:nth-child(${column})`],'platform-expense-history-'+name+'-'+v.width,saveEvidenceScreenshot);

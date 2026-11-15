@@ -30,7 +30,7 @@
 <button type="submit">Filter records</button>
 </form>
 <div id="expense-totals" class="my-4">Filtered recorded expenses: PKR {{ $totals['expenses'] }} · Reversals: PKR {{ $totals['reversals'] }} · Net recorded expenses: PKR {{ $totals['net'] }}. These are entry-date totals, not cash or bank balances.</div>
-<div id="expense-history" class="overflow-x-auto"><table class="w-full"><thead><tr><th>ID / date</th><th>Category / reference</th><th>Recorded amount</th><th>Actor / audit</th><th>Correction</th></tr></thead><tbody>
+<div id="expense-history" class="overflow-x-auto"><table class="table-static w-full"><thead><tr><th>ID / date</th><th>Category / reference</th><th>Recorded amount</th><th>Actor / audit</th><th>Correction</th></tr></thead><tbody>
 @foreach($entries as $entry)
 <tr data-expense-id="{{ $entry->id }}"><td>#{{ $entry->id }}<br>{{ $entry->entry_date }}<br>{{ $entry->kind }}</td><td>{{ $entry->category }}<br>{{ $entry->reference }}<br><span class="text-sm">{{ $entry->notes }}</span></td><td>PKR {{ \App\Services\PlatformExpenseLedger::money($entry->amount_paisa) }}</td><td>{{ $entry->actor_name }} (#{{ $entry->admin_id }})<br>{{ $entry->created_at }}<br><small>Request {{ $entry->request_id }}</small></td><td>
 @if($entry->kind==='reversal') Reverses #{{ $entry->reverses_id }}

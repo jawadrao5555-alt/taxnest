@@ -13,7 +13,7 @@ Http::preventStrayRequests();Mail::fake();Notification::fake();
 function quotaProof(bool $ok,string $reason):void{if(!$ok)throw new RuntimeException($reason);}
 function quotaClock(string $stamp):void{Carbon::setTestNow(Carbon::parse($stamp));CarbonImmutable::setTestNow(CarbonImmutable::parse($stamp));}
 function quotaDelete(int $company,int $id):void{DB::transaction(function()use($company,$id){$bill=PosTransaction::where('company_id',$company)->whereKey($id)->lockForUpdate()->first();if(!$bill)return;Retention::capture(collect([$bill]),'single-delete',$id);Retention::capture(collect([$bill]),'single-delete',$id);$bill->delete();},3);}
-function quotaBill(Company $company,array $extra=[]):PosTransaction{return PosTransaction::create($extra+['company_id'=>$company->id,'invoice_number'=>'NQ-'.bin2hex(random_bytes(8)),'status'=>'completed','invoice_mode'=>'pra','transaction_type'=>'sale','created_at'=>now(),'updated_at'=>now()]);}
+function quotaBill(Company $company,array $extra=[]):PosTransaction{$bill=new PosTransaction($extra+['company_id'=>$company->id,'invoice_number'=>'NQ-'.bin2hex(random_bytes(8)),'status'=>'completed','invoice_mode'=>'pra','transaction_type'=>'sale']);$bill->forceFill(['created_at'=>$extra['created_at']??now(),'updated_at'=>$extra['updated_at']??now()]);$bill->save();return $bill->refresh();}
 function quotaPay(Company $c,PricingPlan $p):Subscription{$quote=Assignment::computePrice($p,'annual',$c);return Assignment::assign($c->id,$p->id,'annual',paidRenewal:true,verifiedReceived:$quote['final_price']);}
 if(($argv[1]??'')==='worker'){
  [$company,$bill,$stamp,$barrier,$index]=array_slice($argv,2);
@@ -57,6 +57,7 @@ try{
  $backlog=quotaBill($scoped,['created_at'=>Carbon::parse('2028-03-31 12:00:00',config('app.timezone')),'business_date'=>'2028-03-31']);
  $april=quotaBill($scoped,['created_at'=>Carbon::parse('2028-04-20 12:00:00',config('app.timezone')),'business_date'=>'2028-04-20']);
  $midnight=quotaBill($scoped,['business_date'=>'2028-04-30']);$may=quotaBill($scoped,['business_date'=>'2028-05-01']);
+ quotaProof($backlog->created_at->format('Y-m-d H:i:s')==='2028-03-31 12:00:00'&&$april->created_at->format('Y-m-d H:i:s')==='2028-04-20 12:00:00','Historical fixture timestamps were not persisted');
  DB::transaction(function()use($scoped,$backlog,$april,$midnight,$may,$suffix){$id=DB::table('pos_day_close_reports')->insertGetId(['company_id'=>$scoped->id,'report_date'=>'2028-04-30','report_number'=>'NATIVE-'.$suffix,'deleted_final_count'=>2,'created_at'=>now(),'updated_at'=>now()]);$rows=PosTransaction::where('company_id',$scoped->id)->whereIn('id',[$backlog->id,$april->id,$midnight->id,$may->id])->lockForUpdate()->get();Retention::capture($rows,'day-close',$id);foreach($rows as$row)$row->delete();});
  quotaProof(Retention::deletedCount($scoped->id)===2,'Business-month report incorrectly changed May quota');
  $fact=DB::table('prospective_pos_quota_retention')->where('company_id',$scoped->id)->where('transaction_id',$midnight->id)->first();quotaProof($fact->business_date==='2028-04-30'&&$fact->sold_at==='2028-05-01 00:30:00','Business and creation stamps were conflated');

@@ -50,12 +50,13 @@ def verify(workspace, target, sha):
     require(names==set(images)|{n[:-4]+'.json' for n in images}, 'unpaired/unexpected files')
     require(not target.exists() and target.parent.resolve()==target.parent and not target.is_symlink(), 'unsafe/existing output')
     verified=[]; exports=[]; total=0
-    fields={'version','file','source_sha','fixture_sha256','origin','synthetic','server_marker_verified','browser_scope','mask_policy','width','height','bytes','sha256','review_status'}
+    fields={'version','fixture_kind','file','source_sha','fixture_sha256','origin','synthetic','server_marker_verified','browser_scope','mask_policy','width','height','bytes','sha256','review_status'}
     for name in images:
         envelope=json.loads(regular(source/(name[:-4]+'.json'),8192)); require(set(envelope)=={'payload','signature'},'envelope fields')
         payload=envelope['payload']; require(isinstance(payload,str) and isinstance(envelope['signature'],str),'envelope types')
         require(hmac.compare_digest(hmac.new(key,payload.encode(),hashlib.sha256).hexdigest(),envelope['signature']),'signature mismatch')
         r=json.loads(payload); require(set(r)==fields,'record fields'); v=ALLOWED[name]
+        require(r['fixture_kind']==('hospital-erp-demo' if name.startswith('erp-demo-') else 'standalone-browser'),'fixture kind/name')
         require(r['version']==1 and r['file']==name and r['source_sha']==sha and re.fullmatch('[0-9a-f]{64}',r['fixture_sha256']), 'record source')
         u=urlsplit(r['origin']); require(u.scheme=='http' and u.hostname in ('127.0.0.1','localhost','::1') and not u.username and not u.password and not u.path and not u.query and not u.fragment,'origin')
         require(r['synthetic'] is True and r['server_marker_verified'] is True and r['browser_scope']=='ephemeral-fixture-browser' and r['mask_policy']==POLICY['mask_policy'] and r['review_status']=='NOT_VISUALLY_REVIEWED','capture guards')
@@ -63,7 +64,7 @@ def verify(workspace, target, sha):
         data=regular(source/name,POLICY['max_file_bytes']); total+=len(data)
         require(total<=POLICY['max_total_bytes'] and r['bytes']==len(data) and r['sha256']==hashlib.sha256(data).hexdigest(),'hash/size')
         clean=png_checked(data,v['width'],v['height']); exports.append((name,clean))
-        verified.append({'file':name,'sha256':hashlib.sha256(clean).hexdigest(),'width':v['width'],'height':v['height'],'mask_policy':r['mask_policy'],'fixture_sha256':r['fixture_sha256']})
+        verified.append({'fixture_kind':r['fixture_kind'],'file':name,'sha256':hashlib.sha256(clean).hexdigest(),'width':v['width'],'height':v['height'],'mask_policy':r['mask_policy'],'fixture_sha256':r['fixture_sha256']})
     target.parent.mkdir(parents=True,exist_ok=True)
     staging=pathlib.Path(tempfile.mkdtemp(prefix='.verified-pixels-',dir=target.parent))
     try:

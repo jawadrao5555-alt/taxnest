@@ -6,7 +6,7 @@ class Pixels(unittest.TestCase):
   key=self.root/'.local/synthetic-pixel-private.key'; key.write_bytes(self.key); key.chmod(0o600)
   self.name='school-fee-cash-receipt-390.png'; self.sha='a'*40
   self.png=b'\x89PNG\r\n\x1a\n'+m.chunk(b'IHDR',struct.pack('!IIBBBBB',390,844,8,2,0,0,0))+m.chunk(b'IDAT',zlib.compress(bytes((390*3+1)*844)))+m.chunk(b'IEND',b'')
-  self.r=dict(version=1,file=self.name,source_sha=self.sha,fixture_sha256='b'*64,origin='http://127.0.0.1:1234',synthetic=True,server_marker_verified=True,browser_scope='ephemeral-fixture-browser',mask_policy=m.POLICY['mask_policy'],width=390,height=844,bytes=len(self.png),sha256=hashlib.sha256(self.png).hexdigest(),review_status='NOT_VISUALLY_REVIEWED'); self.save()
+  self.r=dict(version=1,fixture_kind='standalone-browser',file=self.name,source_sha=self.sha,fixture_sha256='b'*64,origin='http://127.0.0.1:1234',synthetic=True,server_marker_verified=True,browser_scope='ephemeral-fixture-browser',mask_policy=m.POLICY['mask_policy'],width=390,height=844,bytes=len(self.png),sha256=hashlib.sha256(self.png).hexdigest(),review_status='NOT_VISUALLY_REVIEWED'); self.save()
  def tearDown(self): self.tmp.cleanup()
  def save(self):
   (self.src/self.name).write_bytes(self.png); p=json.dumps(self.r); (self.src/(self.name[:-4]+'.json')).write_text(json.dumps(dict(payload=p,signature=hmac.new(self.key,p.encode(),hashlib.sha256).hexdigest())))
@@ -14,7 +14,7 @@ class Pixels(unittest.TestCase):
  def test_valid_and_no_key_export(self):
   self.assertEqual(len(self.run_verify()['files']),1); self.assertEqual(set(p.name for p in (self.root/'out').iterdir()),{self.name,'manifest.json','VERIFIED_SYNTHETIC_PIXELS'})
  def test_bad_records(self):
-  for key,val in [('origin','https://taxnest.pk'),('origin','http://u:p@localhost'),('source_sha','c'*40),('synthetic',False),('server_marker_verified',False),('mask_policy','none'),('width',1280),('fixture_sha256','x'),('review_status','PASS')]:
+  for key,val in [('fixture_kind','hospital-erp-demo'),('origin','https://taxnest.pk'),('origin','http://u:p@localhost'),('source_sha','c'*40),('synthetic',False),('server_marker_verified',False),('mask_policy','none'),('width',1280),('fixture_sha256','x'),('review_status','PASS')]:
    old=self.r[key]; self.r[key]=val; self.save()
    with self.subTest(key=key,val=val),self.assertRaises(ValueError): self.run_verify()
    self.r[key]=old

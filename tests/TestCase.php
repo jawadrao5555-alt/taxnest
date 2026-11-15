@@ -43,6 +43,9 @@ abstract class TestCase extends BaseTestCase
         // Admin DI review reads the full ledger schema; later tests build
         // legacy schemas without it. Do not reuse that per-process answer.
         \App\Services\AiPageCreditService::forgetLedgerProbe();
+        // Legacy fixtures may omit submitted_at; do not carry that answer into
+        // a new schema and miscount paid invoices by their old draft date.
+        \App\Services\PlanLimitService::forgetSchemaProbe();
         // Campaign pricing is memoized for one request. A long PHPUnit process
         // must not carry another test's active sale into a fresh database.
         \App\Models\SaleCampaign::clearActiveCache();

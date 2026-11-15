@@ -12,6 +12,8 @@ export async function madadgarEscalationRecovery(page,f,v,{baseUrl,root,open,ask
   await confirmButton().waitFor({state:'visible'});
   let postCount=0,firstPayload,saved,resolveCommit,rejectCommit;
   const committed=new Promise((resolve,reject)=>{resolveCommit=resolve;rejectCommit=reject;});
+  let releaseResponse;
+  const delayedResponse=new Promise(resolve=>{releaseResponse=resolve;});
   const drop=async route=>{
     postCount++;
     firstPayload=route.request().postDataJSON();
@@ -20,14 +22,25 @@ export async function madadgarEscalationRecovery(page,f,v,{baseUrl,root,open,ask
       check(response.ok(),'Synthetic first confirmation did not commit');
       saved=await response.json();
       check(Number.isInteger(saved.ref),'Saved escalation reference missing');
-      await route.abort('blockedbyclient');
       resolveCommit();
+      await delayedResponse;
+      await route.abort('blockedbyclient');
     } catch(error) {rejectCommit(error);await route.abort('blockedbyclient');}
   };
   const watch=request=>{if(new URL(request.url()).pathname===escalationPath&&request.method()==='POST')postCount++;};
   await page.route('**'+escalationPath,drop);
   await confirmButton().click();
   await committed;
+  try {
+    const newChat=root(page).locator('xpath=.//button[@*[name()="@click"]="newChat()"]');
+    check(await newChat.isDisabled(),'New Chat must be disabled while confirmation response is unknown');
+    const before=await root(page).evaluate(el=>{const state=window.Alpine.$data(el);return {busy:state.busy,sid:state.sid,requestId:state.pending?.request_id};});
+    check(before.busy&&before.sid===firstPayload.session_id&&before.requestId===firstPayload.request_id,'Delayed response lost pending identity');
+    // A physical click must not be possible; no forced click or state mutation.
+    await page.waitForTimeout(200);
+    const after=await root(page).evaluate(el=>{const state=window.Alpine.$data(el);return {sid:state.sid,requestId:state.pending?.request_id};});
+    check(after.sid===before.sid&&after.requestId===before.requestId,'Pending identity changed while response was delayed');
+  } finally { releaseResponse(); }
   await page.waitForFunction(()=>!window.Alpine.$data(document.querySelector('[x-data^="tnMadadgar("]')).busy);
   await page.unroute('**'+escalationPath,drop);
   page.on('request',watch);

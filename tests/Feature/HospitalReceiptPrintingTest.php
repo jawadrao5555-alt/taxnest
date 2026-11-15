@@ -93,6 +93,9 @@ class HospitalReceiptPrintingTest extends TestCase
         $preview=app(HospitalReceiptSettingsController::class)->preview();
         $html=$preview->getContent();
         $this->assertStringContainsString('SAMPLE PREVIEW',$html);
+        $this->assertStringNotContainsString('tnMadadgar(', $html);
+        $this->assertStringNotContainsString('/fbr-pos/madadgar', str_replace('\\/', '/', $html));
+        $this->assertStringNotContainsString('<svg', $html);
         $this->assertStringContainsString('HP-PREVIEW',$html);
         $this->assertStringContainsString('Bank (recorded)',$html);
         $this->assertStringContainsString('PKR 500.00',$html);
@@ -106,5 +109,8 @@ class HospitalReceiptPrintingTest extends TestCase
         $this->assertStringContainsString('PKR 749.50',$html);
         $this->assertStringContainsString('>Cash</dd>',$html);
         $this->assertStringNotContainsString('CERTIFIED',$html);
+        $this->assertStringNotContainsString('tnMadadgar(', $html);
+        $this->assertStringNotContainsString('/fbr-pos/madadgar', str_replace('\\/', '/', $html));
+        $this->assertStringNotContainsString('<svg', $html);
     }
 }

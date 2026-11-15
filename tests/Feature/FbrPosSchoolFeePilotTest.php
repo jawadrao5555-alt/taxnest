@@ -165,6 +165,7 @@ class FbrPosSchoolFeePilotTest extends TestCase
         $this->assertStringContainsString('1,250.50', $reprint);
         $this->assertStringNotContainsString('fbr_invoice_number', $reprint);
         $this->assertStringNotContainsString('<svg', $reprint);
+        $this->assertStringNotContainsString('tnMadadgar(', $reprint);
         Http::assertNothingSent();
     }
 
@@ -302,6 +303,7 @@ class FbrPosSchoolFeePilotTest extends TestCase
         app()->instance('request', $request);
         foreach ([$controller->dashboard(), $controller->index(), $controller->history($request), $controller->dayClose($request)] as $response) {
             $html = $response->getContent();
+            $this->assertStringContainsString('tnMadadgar(', $html);
             foreach (['products', 'stock', 'deals', 'loyalty', 'tax-reports', 'fail-queue', 'services', 'pharmacy', 'tables', 'kitchen'] as $retail) {
                 $this->assertDoesNotMatchRegularExpression('~href=["\'][^"\']*/fbr-pos/'.$retail.'(?:[/?#"\'])~i', $html);
             }

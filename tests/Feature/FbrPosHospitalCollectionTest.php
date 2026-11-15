@@ -152,6 +152,8 @@ class FbrPosHospitalCollectionTest extends TestCase
         $this->assertSame(1,DB::table('hospital_invoices')->count());$this->assertSame(3,DB::table('hospital_payments')->count());
         $this->assertSame(100000,(int)DB::table('hospital_payments')->sum('amount_paisa'));
         $html=app(FbrPosHospitalController::class)->receipt($id)->getContent();
+        $this->assertStringNotContainsString('tnMadadgar(', $html);
+        $this->assertStringNotContainsString('<svg', $html);
         foreach(['SYN-P-001','Consultation','400.00','600.00','Synthetic Cashier','Synthetic Hospital','LOCAL COLLECTION ONLY'] as $v)$this->assertStringContainsString($v,$html);
         Http::assertNothingSent();
     }
@@ -293,6 +295,8 @@ class FbrPosHospitalCollectionTest extends TestCase
         $this->assertSame('Synthetic scan',json_decode(DB::table('hospital_invoices')->first()->service_lines,true)[0]['label']);
         $this->conflict(fn()=>$this->collect(array_replace($payload,['request_key'=>(string)Str::uuid()])),'service_lines');
         $html=app(FbrPosHospitalController::class)->index()->getContent();
+        $this->assertStringContainsString('tnMadadgar(', $html);
+        $this->assertStringContainsString('tnMadadgar(', app(FbrPosHospitalController::class)->dashboard()->getContent());
         $this->assertStringContainsString('Synthetic Patient',$html);
     }
 

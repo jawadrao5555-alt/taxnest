@@ -1,4 +1,4 @@
-@extends('fbr-pos.school-fees.layout')
+@extends('fbr-pos.school-fees.layout', ['showInteractiveSupport' => false])
 @section('content')
 @php
     $print = \App\Support\SchoolReceiptPreferences::for($company);

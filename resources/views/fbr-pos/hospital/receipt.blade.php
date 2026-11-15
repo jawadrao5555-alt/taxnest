@@ -1,4 +1,4 @@
-@extends('fbr-pos.hospital.layout')
+@extends('fbr-pos.hospital.layout', ['showInteractiveSupport' => false])
 @section('content')
 @php
 $print = \App\Support\HospitalReceiptPreferences::for($company);

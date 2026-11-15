@@ -36,4 +36,4 @@
 // GET page; pending collection keys remain in sessionStorage for safe recovery.
 window.addEventListener('pageshow', function(event) { if(event.persisted) window.location.reload(); });
 </script>
-</main><div class="no-print"><x-madadgar-support product="fbrpos" /></div></body></html>
+</main>@if($showInteractiveSupport ?? true)<div class="no-print"><x-madadgar-support product="fbrpos" /></div>@endif</body></html>

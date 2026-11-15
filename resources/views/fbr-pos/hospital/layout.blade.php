@@ -22,4 +22,4 @@
 @if(isset($hospitalCampuses) && $hospitalCampuses->count()===1)<p class="muted">{{ __('hospital.campus') }}: {{ $hospitalCampuses->first()->name }}</p>@endif
 @if(isset($slot))<section class="hospital-shared-page">{{ $slot }}</section>@else @yield('content') @endif
 <script>window.addEventListener('pageshow',function(event){if(event.persisted)window.location.reload();});</script>
-</main><div class="no-print"><x-madadgar-support product="fbrpos" /></div></body></html>
+</main>@if($showInteractiveSupport ?? true)<div class="no-print"><x-madadgar-support product="fbrpos" /></div>@endif</body></html>

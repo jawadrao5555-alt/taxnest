@@ -23,6 +23,7 @@ class SchoolWorkspaceLayoutTest extends TestCase
     public function test_shared_pages_use_school_navigation_and_explicit_off_status(): void
     {
         $html = $this->renderWorkspace();
+        $this->assertStringContainsString('tnMadadgar(', $html);
         foreach (['school-fiscal-status', 'FBR OFF', '/fbr-pos/team', '/fbr-pos/school-fees/printing',
             '/fbr-pos/billing', '/fbr-pos/school-fees/legacy-retail', 'Shared page', 'school-language'] as $text) {
             $this->assertStringContainsString($text, $html);

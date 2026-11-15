@@ -1,4 +1,14 @@
 @php($t = fn($key) => \Illuminate\Support\Facades\Lang::get('ai_usage.'.$key, [], $admin ? 'en' : app()->getLocale()))
+<style>
+#ai-usage-content { min-width: 0; }
+#ai-usage-summary { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+#ai-usage-summary > * { min-width: 0; overflow-wrap: anywhere; }
+#ai-usage-events { max-width: 100%; overflow-x: auto; }
+#ai-usage-events table { min-width: 760px; width: 100%; border-collapse: collapse; }
+#ai-usage-events th, #ai-usage-events td { padding: .65rem .75rem; text-align: start; vertical-align: top; border-bottom: 1px solid #cbd5e1; }
+#ai-usage-events th { white-space: nowrap; }
+#ai-usage-content button[type="submit"] { padding: .6rem .9rem; border-radius: .5rem; background: #0e7078; color: white; font-weight: 600; }
+</style>
 <div id="ai-usage-content" class="p-4 max-w-5xl mx-auto space-y-5">
 <h1 id="ai-usage-heading" class="text-2xl font-bold">{{ $t('title') }}</h1>
 <p>{{ $company->name }} · {{ $t('privacy') }}</p>
@@ -13,6 +23,6 @@
 @endforeach
 <button type="submit">Save explicit rates / budget</button></form>
 @endif
-<h2 class="text-xl">{{ $t('latest') }}</h2><div class="overflow-x-auto"><table><thead><tr><th>{{ $t('time') }}</th><th>{{ $t('source') }}</th><th>{{ $t('state') }}</th><th>{{ $t('ms') }}</th><th>{{ $t('estimate') }}</th><th>{{ $t('reserved') }}</th><th>{{ $t('error') }}</th></tr></thead><tbody>@forelse($events as $event)<tr><td>{{ $event->created_at }}</td><td>{{ $event->source }}</td><td>{{ $event->state }}</td><td>{{ $event->latency_ms ?? 'Unknown' }}</td><td>{{ $event->estimated_cost ?? 'Unknown' }}</td><td>{{ $event->reserved_cost ?? 'Unknown' }}</td><td>{{ $event->error_code ?? 'None' }}</td></tr>@empty<tr><td colspan="7">{{ $t('empty') }}</td></tr>@endforelse</tbody></table></div>
+<h2 class="text-xl">{{ $t('latest') }}</h2><div id="ai-usage-events" class="overflow-x-auto" tabindex="0" role="region" aria-label="{{ $t('latest') }}"><table><thead><tr><th>{{ $t('time') }}</th><th>{{ $t('source') }}</th><th>{{ $t('state') }}</th><th>{{ $t('ms') }}</th><th>{{ $t('estimate') }}</th><th>{{ $t('reserved') }}</th><th>{{ $t('error') }}</th></tr></thead><tbody>@forelse($events as $event)<tr><td>{{ $event->created_at }}</td><td>{{ $event->source }}</td><td>{{ $event->state }}</td><td>{{ $event->latency_ms ?? 'Unknown' }}</td><td>{{ $event->estimated_cost ?? 'Unknown' }}</td><td>{{ $event->reserved_cost ?? 'Unknown' }}</td><td>{{ $event->error_code ?? 'None' }}</td></tr>@empty<tr><td colspan="7">{{ $t('empty') }}</td></tr>@endforelse</tbody></table></div>
 <h2 class="text-xl">{{ $t('escalations') }}</h2><ul>@forelse($escalations as $item)<li>Ref #{{ $item->id }} · {{ $item->status }} · {{ $item->created_at }} (updated {{ $item->updated_at }})</li>@empty<li>{{ $t('none') }}</li>@endforelse</ul>
 </div>

@@ -8,6 +8,10 @@
      never fire while typing in the chat (architect-mandated). --}}
 @props(['product' => 'pos', 'placement' => 'floating'])
 @php
+    // Usage summaries must remain readable: only this read-only route uses an in-flow dock.
+    if (request()->routeIs('pos.madadgar.usage', 'fbrpos.madadgar.usage')) {
+        $placement = 'inline';
+    }
     $mIsFbr = ($product ?? 'pos') === 'fbrpos';
     $mBase = $mIsFbr ? '/fbr-pos/madadgar' : '/pos/madadgar';
     $mStoreKey = $mIsFbr ? 'tn_madadgar_session_fbr' : 'tn_madadgar_session';

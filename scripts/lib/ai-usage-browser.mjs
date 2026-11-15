@@ -1,3 +1,4 @@
+import {scrolledPixelDetail} from './scrolled-pixel-detail.mjs';
 export async function aiUsageWorkflow(page,t,v,{baseUrl,login,loopback,dismiss,waitForOperationalSurface,saveEvidenceScreenshot,pass}) {
   const f=t.aiUsageCases[v.width];
   const check=(ok,message)=>{if(!ok)throw Error(message);};
@@ -15,6 +16,19 @@ export async function aiUsageWorkflow(page,t,v,{baseUrl,login,loopback,dismiss,w
     });
     check(shape.width>=120&&shape.height>=20&&shape.visible&&shape.uncovered,'Usage heading is clipped, covered, or outside viewport');
     check(await p.locator('#ai-usage-summary').evaluate(el=>getComputedStyle(el).display)==='grid','Usage CSS did not load');
+    const geometry=await p.evaluate(()=>{
+      const content=document.querySelector('#ai-usage-content').getBoundingClientRect();
+      const summary=document.querySelector('#ai-usage-summary').getBoundingClientRect();
+      const dock=document.querySelector('[data-madadgar-placement]');
+      const dr=dock?.getBoundingClientRect();
+      const table=document.querySelector('#ai-usage-events');
+      return {within:content.left>=0&&content.right<=innerWidth+1,
+        dockSafe:!dock||(dock.dataset.madadgarPlacement==='inline'&&dr.top>=summary.bottom),
+        scroll:getComputedStyle(table).overflowX==='auto'&&table.clientWidth<=innerWidth,
+        cellPadding:parseFloat(getComputedStyle(table.querySelector('td')).paddingLeft)>=10};
+    });
+    check(geometry.within&&geometry.dockSafe,'AI usage content or support dock overlaps/clips the summary');
+    check(geometry.scroll&&geometry.cellPadding,'Usage events need readable padded cells inside a bounded horizontal scroller');
     if(await p.locator('.tn-admin-sidebar').count()){
       check(await p.locator('.tn-admin-sidebar svg').first().evaluate(el=>el.getBoundingClientRect().width)<=40,'Admin navigation icons are unstyled');
     }
@@ -60,7 +74,7 @@ export async function aiUsageWorkflow(page,t,v,{baseUrl,login,loopback,dismiss,w
     await form.locator('#monthly_budget').click({trial:true});
     const budgetBox=await form.locator('#monthly_budget').boundingBox();
     check(budgetBox&&budgetBox.width>=100&&budgetBox.height>=30,'Budget input is not usable');
-    await saveEvidenceScreenshot(page,'ai-usage-controls-'+(c.prefix==='/pos'?'pos':'fbr')+'-'+v.width);
+    await scrolledPixelDetail(page,['#ai-usage-budget-form h2','#input_per_million','#output_per_million','#monthly_budget','#ai-usage-budget-form button[type=submit]'],'ai-usage-controls-'+(c.prefix==='/pos'?'pos':'fbr')+'-'+v.width,saveEvidenceScreenshot);
     const ctx=await context();
     try {
       const owner=await ctx.newPage();

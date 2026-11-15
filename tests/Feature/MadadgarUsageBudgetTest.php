@@ -20,11 +20,21 @@ class MadadgarUsageBudgetTest extends TestCase {
   $r->setLaravelSession(session()->driver());
   view()->share('errors',new \Illuminate\Support\ViewErrorBag());
   $html=$this->actingAs($admin,'admin')->get('/admin/companies/'.$this->company->id.'/ai-usage')->assertOk()->getContent();
-  foreach(['id="ai-usage-content"','id="ai-usage-heading"','id="ai-usage-summary"','id="ai-usage-budget-form"'] as $marker)$this->assertStringContainsString($marker,$html);
+  foreach(['id="ai-usage-content"','id="ai-usage-heading"','id="ai-usage-summary"','id="ai-usage-budget-form"','id="ai-usage-events"','role="region"'] as $marker)$this->assertStringContainsString($marker,$html);
   $this->assertStringNotContainsString('cdn.tailwindcss.com',$html);
   $this->assertStringNotContainsString('cdn.jsdelivr.net/npm/alpinejs',$html);
   $source=file_get_contents(resource_path('views/layouts/admin-app.blade.php'));
   $this->assertStringContainsString("@vite(['resources/css/app.css', 'resources/js/app.js'])",$source);
+  Http::assertNothingSent();
+ }
+ public function test_usage_support_dock_is_inline_only_on_usage_routes():void {
+  SystemSetting::set('madadgar_enabled','1');
+  foreach(['pos.madadgar.usage'=>'inline','fbrpos.madadgar.usage'=>'inline','pos.dashboard'=>'floating','fbrpos.dashboard'=>'floating'] as $name=>$placement){
+   $route=new \Illuminate\Routing\Route('GET','synthetic',fn()=>null);$route->name($name);
+   $request=Request::create('/synthetic');$request->setRouteResolver(fn()=>$route);$this->app->instance('request',$request);
+   $html=\Illuminate\Support\Facades\Blade::render('<x-madadgar-support />');
+   $this->assertStringContainsString('data-madadgar-placement="'.$placement.'"',$html);
+  }
   Http::assertNothingSent();
  }
  public function test_unknown_rates_and_usage_are_not_reported_as_zero_and_no_private_payload_is_stored():void {

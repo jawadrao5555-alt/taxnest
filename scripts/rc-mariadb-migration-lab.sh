@@ -144,6 +144,8 @@ concurrency(){
     grep -Fqx "PASS: native School Hospital old RR partial balance excludes overpayment; payment-close race and saved closing cash immutable on same-receipt retry and changed-data rejection" "$EVIDENCE_DIR/local-pilot-quota-concurrency.log" || fail local-pilot-quota-missing-close-proof
     clean_php php "$ROOT/tests/native/rc_di_quota_stock_lock_order.php" | tee "$EVIDENCE_DIR/di-quota-stock-lock-order.log"
     grep -Fqx "PASS: native DI quota reservation callback and receiving serialize company before invoice product; exact stock and duplicate ACK preserved including expired subscription without provider calls" "$EVIDENCE_DIR/di-quota-stock-lock-order.log" || fail di-quota-stock-lock-order-missing-proof
+    clean_php php "$ROOT/tests/native/rc_fbr_quota_stock_lock_order.php" | tee "$EVIDENCE_DIR/fbr-quota-stock-lock-order.log"
+    grep -Fqx "PASS: native FBR receiving overlaps actual last-slot sale with company-first locks exact stock movements and same UUID replay without fiscal calls" "$EVIDENCE_DIR/fbr-quota-stock-lock-order.log" || fail fbr-quota-stock-lock-order-missing-proof
     clean_php php "$ROOT/tests/native/rc_paid_renewal.php" | tee "$EVIDENCE_DIR/paid-renewal.log"
     clean_php php "$ROOT/tests/native/rc_trial_signup.php" | tee "$EVIDENCE_DIR/trial-signup.log"
     clean_php php "$ROOT/tests/native/rc_subscription_financial_adjustments.php" | tee "$EVIDENCE_DIR/subscription-financial-adjustments.log"

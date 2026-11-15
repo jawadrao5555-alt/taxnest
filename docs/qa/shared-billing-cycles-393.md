@@ -16,3 +16,9 @@ Not a blanket closure of #316/#337/#374. Customer/signup selector wiring, consol
 2. In staging set `BILLING_SHARED_CONFIGURED_CYCLES=true`, rebuild the application's config cache through the approved deployment process, and verify each affected product's visible selector and server-side forged-period rejection.
 3. Only when explicitly approved, set `BILLING_DISABLE_FRESH_MONTHLY=true` to stop new monthly quotes. Leave this false otherwise. Check pending frozen monthly proofs still approve with original terms.
 4. Production activation requires the owner's deploy approval and configured prices. Reverting the policy flags hides future options but does not rewrite issued subscriptions or frozen quotes. Normal permission checks remain mandatory.
+
+## #316 reviewed approval atomicity
+
+Found and fixed agent/franchise bookkeeping after the approval commit and swallowed consultant ledger errors during paid review. Reviewed approval now records subscription, proof, invoice/payment allocation, agent/franchise decision lines and company unlock in the same locked transaction; consultant ledger errors propagate on the paid-review path and consultant notification is deferred until commit. Other compatibility/backfill entry points retain best-effort behavior. Existing rates, annual eligibility and attribution-conflict decisions are unchanged.
+
+Failure injection on an agent commission insert proves pending proof/company access unchanged and zero new subscription/invoice/payment/commission rows after rollback. Retry plus repeated approval yields one of each. Focused approval/franchise/snapshot suites: 23 tests, 278 assertions. This does not yet cover every #316 suspension/grant/platform-finance acceptance row or native database concurrency.

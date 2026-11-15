@@ -234,7 +234,21 @@ class AdminPaymentProofController extends Controller
             }
             $locked->update($proofAttrs);
             \App\Services\VerifiedSubscriptionDocuments::record($locked, $sub, $netReceived);
+            \App\Services\AgentCommissionService::recordForProof($locked, atomic: true);
+            \App\Services\FranchiseCommissionService::recordForProof($locked, atomic: true);
 
+            // A verified payment must also unlock the company itself: mirror the
+            // admin grant flow (BOTH status columns), never reversing a deliberate
+            // suspension/rejection. Covers companies demoted to pending by the
+            // expired-grant reconciler before the admin got to this proof.
+            $company = $attributedCompany;
+            if ($company
+                && !in_array($company->status, ['suspended', 'rejected'], true)
+                && !in_array($company->company_status, ['suspended', 'rejected'], true)
+                && ($company->status !== 'approved' || $company->company_status !== 'active')) {
+                $company->update(['status' => 'approved', 'company_status' => 'active']);
+            }
+    
             return [
                 'outcome' => 'ok',
                 'subscription' => $sub,
@@ -257,22 +271,11 @@ class AdminPaymentProofController extends Controller
 
         $subscription = $result['subscription'];
 
-        // A verified payment must also unlock the company itself: mirror the
-        // admin grant flow (BOTH status columns), never reversing a deliberate
-        // suspension/rejection. Covers companies demoted to pending by the
-        // expired-grant reconciler before the admin got to this proof.
         $company = $company?->fresh();
-        if ($company
-            && !in_array($company->status, ['suspended', 'rejected'], true)
-            && !in_array($company->company_status, ['suspended', 'rejected'], true)
-            && ($company->status !== 'approved' || $company->company_status !== 'active')) {
-            $company->update(['status' => 'approved', 'company_status' => 'active']);
-        }
 
         // Agent commission: a verified proof is the "cleared payment" that
         // earns the introducing agent their Schedule A cut. Never breaks approval.
-        \App\Services\AgentCommissionService::recordForProof($proof->fresh());
-        \App\Services\FranchiseCommissionService::recordForProof($proof->fresh());
+        // Commission evidence was recorded in the locked approval transaction.
 
         AdminAuditLog::log(auth('admin')->id(), 'Payment proof approved', 'PaymentProof', $proof->id, array_filter([
             'company_id' => $proof->company_id,

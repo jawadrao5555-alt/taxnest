@@ -241,7 +241,7 @@ class SubscriptionAssignmentService
             // Affiliate program: every admin-recorded payment of a referred company
             // earns its consultant a commission. Internally duplicate-safe and
             // failure-safe (never blocks the assignment itself).
-            ConsultantService::recordCommissionForSubscription($subscription);
+            ConsultantService::recordCommissionForSubscription($subscription, atomic: $paidRenewal);
 
             return $subscription;
         });

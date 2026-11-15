@@ -71,6 +71,38 @@ class DistributorPaymentApprovalLifecycleTest extends TestCase
             ] + $extra);
     }
 
+    public function test_commission_failure_rolls_back_review_documents_access_and_retry_is_single(): void
+    {
+        [$agent,$company,$plan,$quote]=$this->fixture('atomic-commission');
+        $proof=$this->pendingProof($company,$plan,$quote);
+        $before=$company->fresh()->getAttributes();
+        $dispatcher=AgentCommission::getEventDispatcher();
+        AgentCommission::setEventDispatcher(clone $dispatcher);
+        AgentCommission::creating(function () { throw new \RuntimeException('Synthetic ledger failure'); });
+        $this->withoutExceptionHandling();
+        try {
+            $this->approve($proof,$plan,['verified_received_amount'=>$quote['net_quote']]);
+            $this->fail('Commission failure must roll back review.');
+        } catch (\RuntimeException $e) {
+            $this->assertSame('Synthetic ledger failure',$e->getMessage());
+        } finally {
+            AgentCommission::setEventDispatcher($dispatcher);
+            $this->withExceptionHandling();
+        }
+        $this->assertSame('pending',$proof->fresh()->status);
+        $this->assertSame($before,$company->fresh()->getAttributes());
+        $this->assertSame(0,Subscription::where('company_id',$company->id)->count());
+        $this->assertDatabaseCount('subscription_invoices',0);
+        $this->assertDatabaseCount('subscription_payments',0);
+        $this->assertDatabaseCount('agent_commissions',0);
+        $this->approve($proof,$plan,['verified_received_amount'=>$quote['net_quote']])->assertSessionHas('success');
+        $this->approve($proof,$plan,['verified_received_amount'=>$quote['net_quote']])->assertRedirect();
+        $this->assertDatabaseCount('subscription_invoices',1);
+        $this->assertDatabaseCount('subscription_payments',1);
+        $this->assertDatabaseCount('agent_commissions',1);
+        $this->assertSame(1,Subscription::where('company_id',$company->id)->count());
+    }
+
     public function test_snapshot_approval_requires_an_exact_independently_verified_amount(): void
     {
         [, $company, $plan, $snapshot] = $this->fixture('required');

@@ -212,16 +212,25 @@ class FbrPosTwoPackageLadderMigrationTest extends TestCase
         $this->assertSame(0.0, (float) $trial->price);
         $this->assertSame(10, (int) $trial->invoice_limit);
 
-        // ── Checkout sells only annual, even if retired rates remain stored ──
+        // Retired rates do not silently turn a forged short-period request into
+        // an annual purchase. Explicit activation uses the saved exact amount.
         foreach ([$starterId => 17999.0, $businessId => 27999.0] as $id => $annual) {
             $plan = PricingPlan::find($id);
-            foreach (['annual', 'quarterly', 'monthly'] as $cycle) {
-                $priced = SubscriptionAssignmentService::computePrice($plan, $cycle);
-                $this->assertSame('annual', $priced['cycle'], "{$plan->name}: only annual may be sold");
-                $this->assertSame($annual, (float) $priced['final_price'],
-                    "{$plan->name}: {$cycle} request must charge the annual total");
+            $priced = SubscriptionAssignmentService::computePrice($plan, 'annual');
+            $this->assertSame('annual', $priced['cycle']);
+            $this->assertSame($annual, (float) $priced['final_price']);
+            foreach (['quarterly', 'monthly'] as $cycle) {
+                try {
+                    SubscriptionAssignmentService::computePrice($plan, $cycle);
+                    $this->fail('Inactive short period must not silently become annual.');
+                } catch (\Illuminate\Validation\ValidationException $e) {
+                    $this->assertArrayHasKey('billing_cycle', $e->errors());
+                }
             }
         }
+        config(['billing.shared_configured_cycles' => true]);
+        $this->assertSame((float) $starter->price_quarterly,
+            (float) SubscriptionAssignmentService::computePrice(PricingPlan::find($starterId), 'quarterly')['final_price']);
 
         // ── Idempotent ───────────────────────────────────────────────────
         $this->runMigration();

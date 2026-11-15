@@ -121,6 +121,23 @@ class AdminPlanStorePostTest extends TestCase
         ], $overrides));
     }
 
+    public function test_explicit_shared_rate_configuration_prepares_prices_without_activating_them(): void
+    {
+        $this->actingAsAdmin()->post('/admin/plans', $this->validPayload([
+            'product_type' => 'fbrpos', 'configure_shared_cycle_rates' => '1',
+            'price_monthly' => 250, 'price_quarterly' => 700,
+        ]))->assertSessionHasNoErrors();
+        $plan = \App\Models\PricingPlan::where('name', 'Test Plan')->firstOrFail();
+        $this->assertEquals(250, $plan->price_monthly);
+        $this->assertEquals(700, $plan->price_quarterly);
+        $this->assertSame(['annual'], \App\Services\SubscriptionAssignmentService::cyclesForPlan($plan));
+        $this->actingAsAdmin()->put('/admin/plans/'.$plan->id, $this->validPayload([
+            'product_type' => 'fbrpos', 'price_monthly' => 1, 'price_quarterly' => 1,
+        ]))->assertSessionHasNoErrors();
+        $this->assertEquals(250, $plan->fresh()->price_monthly);
+        $this->assertEquals(700, $plan->fresh()->price_quarterly);
+    }
+
     // ── store ────────────────────────────────────────────────────────────
 
     /** Injected is_trial (and other stray fillable fields) must be ignored on create. */

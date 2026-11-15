@@ -121,7 +121,8 @@
                 <label class="text-[10px] text-gray-500 dark:text-gray-400 uppercase">Price (PKR{{ (in_array($plan->product_type, ['pos', 'fbrpos', 'standalone']) || \App\Support\NestErps::isProductType($plan->product_type ?? null)) ? '/yr' : '/mo' }})</label>
                 <input type="number" name="price" value="{{ intval($plan->price) }}" step="1" required class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-1.5 focus:ring-2 focus:ring-indigo-500">
             </div>
-            @foreach(['price_monthly' => 'Monthly total', 'price_quarterly' => 'Quarterly total', 'price_semi_annual' => 'Six-month total'] as $cycleField => $cycleLabel)
+            <label class="block text-xs text-gray-400"><input type="checkbox" name="configure_shared_cycle_rates" value="1"> Update configured POS/FBR/ERP period rates (unchecked preserves stored rates; does not enable selling)</label>
+                @foreach(['price_monthly' => 'Monthly total', 'price_quarterly' => 'Quarterly total', 'price_semi_annual' => 'Six-month total'] as $cycleField => $cycleLabel)
                 <div><label class="text-[10px] text-gray-500 uppercase">{{ $cycleLabel }} (PKR; blank = unavailable)</label>
                     <input type="number" name="{{ $cycleField }}" value="{{ $plan->getAttribute($cycleField) }}" min="0" step="0.01" class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-1.5">
                 </div>

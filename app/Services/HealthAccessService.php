@@ -240,7 +240,7 @@ class HealthAccessService
      * least privilege, and a delegated set that could tick it would be a way to
      * mint a login without going near the team screen.
      */
-    public const OWNER_ONLY = ['settings.manage.modules', 'staff.delegate', 'audit.manage', 'setup.import'];
+    public const OWNER_ONLY = ['settings.manage.modules', 'staff.delegate', 'audit.manage', 'setup.import', 'billing.manage'];
 
     public static function roleLabelKey(?string $role): string
     {
@@ -461,6 +461,7 @@ class HealthAccessService
      * (dashboard, profile, language, logout).
      */
     private const PATH_MAP = [
+        '#^health/package-(?:checkout|payment-proof)(?:/|$)#' => 'billing.manage',
         '#^health/settings/modules#'  => 'settings.manage.modules',
         '#^health/settings#'          => 'settings.manage',
         // Bulk setup import. Owner-only by capability, so the path gate is the

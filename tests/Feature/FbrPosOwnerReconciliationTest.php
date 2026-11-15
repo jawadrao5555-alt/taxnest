@@ -54,8 +54,34 @@ class FbrPosOwnerReconciliationTest extends TestCase
         $this->travel(4)->minutes();
         $this->assertTrue(FbrPosOwnerReconciliation::eligible($this->bill->fresh()));
         $this->assertSame([$this->bill->id],FbrPosOwnerReconciliation::recoveryQueue(91)->pluck('id')->all());
+        // The real confirmation form fingerprints a persisted GET row, not the
+        // earlier model used to arrange the pending-claim fixture.
+        $this->bill->refresh();
         app(FbrPosOwnerReconciliation::class)->resolve($this->owner,91,$this->bill->id,$this->data(['decision'=>'not_accepted','fiscal_number'=>null]));
         $this->assertSame('failed',$this->bill->fresh()->fbr_status);
+    }
+
+    public function test_persisted_fingerprint_is_stable_with_fractional_non_utc_clock_without_changing_claim(): void
+    {
+        $timezone=date_default_timezone_get();$appTimezone=config('app.timezone');
+        try {
+            date_default_timezone_set('Asia/Karachi');
+            config(['app.timezone'=>'Asia/Karachi']);
+            $this->travelTo(\Illuminate\Support\Carbon::parse('2026-11-15 13:01:02.123456','Asia/Karachi'));
+            $this->bill->forceFill(['fbr_status'=>'pending','fbr_submission_hash'=>'synthetic-fractional-claim',
+                'fbr_agent_claimed_at'=>null,'updated_at'=>now()->subMinutes(4)])->save();
+            $before=DB::table('fbr_pos_transactions')->where('id',$this->bill->id)->first();
+            $this->bill->refresh();
+            $request=$this->data(['decision'=>'not_accepted','fiscal_number'=>null]);
+            $this->assertTrue(FbrPosOwnerReconciliation::eligible($this->bill));
+            $this->assertSame(FbrPosOwnerReconciliation::fingerprint($this->bill->fresh()),$request['fingerprint']);
+            $this->assertSame('000000',$this->bill->updated_at->format('u'));
+            $this->assertSame(json_encode($before),json_encode(DB::table('fbr_pos_transactions')->where('id',$this->bill->id)->first()));
+            $this->assertSame('synthetic-fractional-claim',$this->bill->fbr_submission_hash);
+            $this->assertSame('FPOS-2026-00001',$this->bill->invoice_number);
+        } finally {
+            $this->travelBack();date_default_timezone_set($timezone);config(['app.timezone'=>$appTimezone]);
+        }
     }
 
     public function test_expired_exclusive_claim_requires_audited_rejection_before_same_usin_can_be_claimed_again(): void
@@ -157,6 +183,17 @@ class FbrPosOwnerReconciliationTest extends TestCase
         try { app(FbrPosOwnerReconciliation::class)->resolve($this->owner, 91, $this->bill->id, $data); $this->fail('Changed environment accepted'); }
         catch (ValidationException $e) { $this->assertNotEmpty($e->errors()); }
         $this->assertSame(0, DB::table('fbr_pos_owner_reconciliations')->count());
+    }
+
+    public function test_persisted_request_still_rejects_changed_amount_while_bill_remains_eligible(): void
+    {
+        $this->bill->refresh();$data=$this->data();
+        DB::table('fbr_pos_transactions')->where('id',$this->bill->id)->update(['total_amount'=>1181]);
+        $this->assertTrue(FbrPosOwnerReconciliation::eligible($this->bill->fresh()));
+        try { app(FbrPosOwnerReconciliation::class)->resolve($this->owner,91,$this->bill->id,$data);$this->fail('Stale fingerprint accepted'); }
+        catch (ValidationException $e) { $this->assertArrayHasKey('fingerprint',$e->errors()); }
+        $this->assertSame('1181.00',$this->bill->fresh()->total_amount);
+        $this->assertSame(0,DB::table('fbr_pos_owner_reconciliations')->count());
     }
 
     public function test_stale_form_does_not_overwrite_late_callback(): void

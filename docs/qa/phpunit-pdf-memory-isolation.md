@@ -59,3 +59,25 @@ The bounded class diagnostic includes allocator bytes freed, without document or
 request content. The1GiB limit remains unchanged. Final integrated-head full CI
 must validate the combined effect; no blanket migration-fixture rewrite or claim
 that retained roots have all been identified is made.
+
+## Separate reconciliation fixture investigation
+
+The immutable OPcache experiment at 26cf004 completed 6452 tests / 54767
+assertions with one legacy owner-reconciliation fingerprint error. That error
+was not reproduced in 200 focused repetitions, the surrounding seven classes
+(89 tests / 317 assertions), or the complete FbrPos filter (600 tests / 3644
+assertions; 27 existing deprecations, one skip). Sanitized temporary diagnostics
+showed equal persisted/in-memory fingerprints, zero timestamp delta and no
+changed field indices. No production timestamp defect has been established.
+
+The legacy fixture now refreshes its persisted row before constructing the
+browser-equivalent confirmation request, matching GET-to-POST semantics.
+Additional fractional Asia/Karachi clock coverage proves fingerprint reads keep
+claim and invoice identity unchanged; an eligible row changed after the GET
+still rejects the stale amount fingerprint. The existing late-callback rejection
+remains. No production fingerprint, eligibility or reconciliation guard changed.
+
+These focused results do not replace the failed aggregate or justify OPcache
+adoption. Run the full suite in a new immutable snapshot and record its exact
+head separately; do not edit the original comparison tree or reinterpret its
+memory/error measurements as a later-head pass.

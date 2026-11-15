@@ -51,3 +51,20 @@ before releasing the barrier, requires exactly one 200 and one 422, and requires
 one active reservation before synthetic acceptance. Unexpected worker exceptions
 exit nonzero, unexpected stdout fails, and status pairs are logged. Local SQLite
 coverage is not proof of InnoDB concurrency; hosted native rerun is required.
+
+The separate posted-return defense probe deliberately seeds inconsistent synthetic
+legacy/imported **consumed** reservations for two 7-of-10 returns. Healthy dispatch
+cannot create this fixture. Both workers establish old consistent snapshots before
+the barrier, then supply synthetic acknowledgements. Expected outcome is one stock
+posting and one reconciliation HOLD, both exact acknowledgements retained, no excess
+stock credit. This isolates the post-ack guard from the normal pre-dispatch race.
+
+Lock-order audit: return source rows are acquired in sorted source-item order;
+current-read reservation/posting rows are acquired by ascending id after that mutex.
+Product locks remain sorted, and generic DI receiving acquires only product/stock
+locks, not return-source locks. Same-source reservation/post races therefore share
+the source mutex. More complex overlapping multi-line edit/post transactions can
+still encounter InnoDB deadlocks; fatal concurrency exceptions must propagate,
+with durable fiscal lease/log recovery rather than an invented survived transaction.
+No assertion claims deadlocks are impossible or that these local tests replace
+native execution.

@@ -203,4 +203,20 @@ class DiInvoiceInventoryTest extends TestCase {
   $this->assertSame('999999999.1232',number_format((float)DB::table('inventory_movements')->orderByDesc('id')->value('balance_after'),4,'.',''));
  }
 
+ public function test_inconsistent_consumed_return_reservation_preserves_acknowledgement_but_holds_excess_projection():void {
+  $sale=$this->draft($this->payload('10',false));$this->accept($sale);
+  $source=DB::table('di_invoice_inventory_postings')->where('invoice_id',$sale->id)->sole();
+  $credits=[];
+  foreach([1,2]as$n){
+   $credit=$sale->replicate();$credit->forceFill(['invoice_number'=>'SYN-LEGACY-'.$n,'internal_invoice_number'=>'SYN-LEGACY-'.$n,'share_uuid'=>null,'client_reference'=>'legacy-'.$n,'document_type'=>'Credit Note','status'=>'draft','fbr_invoice_number'=>null,'integrity_hash'=>null]);$credit->save();
+   $item=$sale->items()->sole()->replicate();$snapshot=$item->inventory_snapshot;$snapshot['base_quantity']='7.0000';$snapshot['source_invoice_item_id']=$sale->items()->sole()->id;
+   $item->forceFill(['invoice_id'=>$credit->id,'quantity'=>'7.0000','inventory_snapshot'=>$snapshot]);$item->save();
+   DB::table('di_inventory_return_reservations')->insert(['company_id'=>$this->company->id,'invoice_id'=>$credit->id,'invoice_item_id'=>$item->id,'source_posting_id'=>$source->id,'base_quantity'=>'7.0000','state'=>'consumed','created_at'=>now(),'updated_at'=>now()]);
+   DiFiscalSubmissionState::accepted($credit,'SYNTHETIC-LEGACY-'.$n,'production','synthetic_test');DiInvoiceInventory::saveAccepted($credit);$credits[]=$credit->fresh();
+  }
+  $this->assertSame('posted',$credits[0]->inventory_posting_state);$this->assertSame('reconciliation_hold',$credits[1]->inventory_posting_state);
+  $this->assertSame('SYNTHETIC-LEGACY-2',$credits[1]->fbr_invoice_number);$this->assertSame('locked',$credits[1]->status);
+  $this->assertSame('-3.0000',$this->stock());$this->assertSame(1,DB::table('di_invoice_inventory_postings')->where('source_posting_id',$source->id)->count());Http::assertNothingSent();
+ }
+
 }

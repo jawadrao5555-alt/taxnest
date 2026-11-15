@@ -7,12 +7,12 @@ use App\Models\{Company,Invoice,Product};use App\Services\{DiInvoiceInventory,Di
 Http::preventStrayRequests();
 function invProof(bool $ok,string $why):void{if(!$ok)throw new RuntimeException($why);}
 function invAccept(int $id):void{$invoice=Invoice::withoutGlobalScopes()->findOrFail($id);DiFiscalSubmissionState::accepted($invoice,'SYNTHETIC-STOCK-'.$id,'production','synthetic_native');DiInvoiceInventory::saveAccepted($invoice);}
-if(in_array(($argv[1]??''),['worker','reserve-worker','receive-worker'],true)){
+if(in_array(($argv[1]??''),['worker','reserve-worker','receive-worker','post-worker'],true)){
  [$id,$barrier,$index]=array_slice($argv,2);invProof(str_starts_with($barrier,dirname($socket).'/di-stock-')&&ctype_digit($index),'Unsafe inventory barrier');
  // Force an older consistent snapshot in BOTH return workers before the mutex race.
- if($argv[1]==='reserve-worker'){DB::beginTransaction();DB::table('di_inventory_return_reservations')->count();}
+ if(in_array($argv[1],['reserve-worker','post-worker'],true)){DB::beginTransaction();DB::table('di_inventory_return_reservations')->count();}
  file_put_contents($barrier.'.ready'.$index,'ready');$until=microtime(true)+20;while(!is_file($barrier)){if(microtime(true)>$until)throw new RuntimeException('Inventory barrier timeout');usleep(10000);}
- try{if($argv[1]==='receive-worker'){$receive=Invoice::withoutGlobalScopes()->findOrFail((int)$id);$productId=$receive->items()->sole()->inventory_snapshot['product_id'];\App\Services\InventoryService::addStock($receive->company_id,$productId,'1.0000','2.00','purchase');}elseif($argv[1]==='reserve-worker'){invProof(DiFiscalSubmissionState::reserve((int)$id,'sync','production')!==null,'Reservation was unavailable');}else invAccept((int)$id);if($argv[1]==='reserve-worker')DB::commit();echo'200';}catch(\Illuminate\Validation\ValidationException){if(DB::transactionLevel())DB::rollBack();echo'422';}catch(\Throwable $e){if(DB::transactionLevel())DB::rollBack();fwrite(STDERR,'Stock worker exception: '.get_class($e).' code='.(string)$e->getCode().PHP_EOL);exit(1);}exit;
+ try{if($argv[1]==='receive-worker'){$receive=Invoice::withoutGlobalScopes()->findOrFail((int)$id);$productId=$receive->items()->sole()->inventory_snapshot['product_id'];\App\Services\InventoryService::addStock($receive->company_id,$productId,'1.0000','2.00','purchase');}elseif($argv[1]==='reserve-worker'){invProof(DiFiscalSubmissionState::reserve((int)$id,'sync','production')!==null,'Reservation was unavailable');}else invAccept((int)$id);if(in_array($argv[1],['reserve-worker','post-worker'],true))DB::commit();echo'200';}catch(\Illuminate\Validation\ValidationException){if(DB::transactionLevel())DB::rollBack();echo'422';}catch(\Throwable $e){if(DB::transactionLevel())DB::rollBack();fwrite(STDERR,'Stock worker exception: '.get_class($e).' code='.(string)$e->getCode().PHP_EOL);exit(1);}exit;
 }
 function invRace(array $ids,string $socket,string|array $mode='worker'):array{
  $barrier=dirname($socket).'/di-stock-'.bin2hex(random_bytes(8));$workers=[];
@@ -34,10 +34,36 @@ $a=$make('7.0000',$sale->items()->sole()->id);$b=$make('7.0000',$sale->items()->
 $returnStatuses=invRace([$a->id,$b->id],$socket,'reserve-worker');echo 'DI return reservation statuses: '.json_encode($returnStatuses).PHP_EOL;
 invProof($returnStatuses===['200','422'],'Concurrent overreturn reached dispatch reservation');
 invProof(DB::table('di_inventory_return_reservations')->where('company_id',$company->id)->where('state','reserved')->count()===1,'Concurrent overreturn created multiple active reservations');
-$winner=$a->fresh()->is_fbr_processing?$a:$b;invAccept($winner->id);
+$winner=$a->fresh()->is_fbr_processing?$a:$b;
+$beforeRetry=DB::table('di_inventory_return_reservations')->where('invoice_id',$winner->id)->get()->toJson();
+DB::transaction(function()use($winner){DiInvoiceInventory::reserveReturns($winner->fresh());DiInvoiceInventory::reserveReturns($winner->fresh());});
+invProof($beforeRetry===DB::table('di_inventory_return_reservations')->where('invoice_id',$winner->id)->get()->toJson(),'Retry duplicated or changed existing reservation');
+invAccept($winner->id);
 invProof(DB::table('di_inventory_return_reservations')->where('company_id',$company->id)->where('state','consumed')->count()===1,'Return reservation not consumed');
 invProof((string)DB::table('inventory_stocks')->where('company_id',$company->id)->value('quantity')==='-3.1234','Concurrent return changed stock incorrectly');
 invProof(DB::table('inventory_stocks')->where('company_id',$company->id)->count()===1,'Nullable branch produced duplicate stock rows');
+// Deliberately inconsistent imported/legacy consumed reservations isolate the POST
+// defense (healthy reserve API never permits these two 7-of-10 reservations).
+$postSale=$make('10.0000');invAccept($postSale->id);
+$postSource=DB::table('di_invoice_inventory_postings')->where('invoice_id',$postSale->id)->sole();
+$postA=$make('7.0000',$postSale->items()->sole()->id);$postB=$make('7.0000',$postSale->items()->sole()->id);
+foreach([$postA,$postB]as$credit)DB::table('di_inventory_return_reservations')->insert(['company_id'=>$company->id,'invoice_id'=>$credit->id,'invoice_item_id'=>$credit->items()->sole()->id,'source_posting_id'=>$postSource->id,'base_quantity'=>'7.0000','state'=>'consumed','created_at'=>now(),'updated_at'=>now()]);
+$postStatuses=invRace([$postA->id,$postB->id],$socket,'post-worker');
+echo 'DI posted-return worker statuses: '.json_encode($postStatuses).PHP_EOL;
+invProof($postStatuses===['200','200'],'Acknowledged return recovery failed');
+$states=[$postA->fresh()->inventory_posting_state,$postB->fresh()->inventory_posting_state];sort($states);
+invProof($states===['posted','reconciliation_hold'],'Posted-return defense did not hold excess projection');
+foreach([$postA,$postB]as$credit){$credit->refresh();invProof($credit->status==='locked'&&$credit->fbr_invoice_number==='SYNTHETIC-STOCK-'.$credit->id,'Posted return lost acknowledged identity');}
+invProof(DB::table('di_invoice_inventory_postings')->where('source_posting_id',$postSource->id)->count()===1,'Concurrent posted returns exceeded original quantity');
+invProof((string)DB::table('inventory_stocks')->where('company_id',$company->id)->value('quantity')==='-6.1234','Posted-return race overcredited stock');
+$postingsBeforeRetry=DB::table('di_invoice_inventory_postings')->where('source_posting_id',$postSource->id)->get()->toJson();
+$reservationsBeforeRetry=DB::table('di_inventory_return_reservations')->where('source_posting_id',$postSource->id)->orderBy('id')->get()->toJson();
+invProof(invRace([$postA->id,$postB->id],$socket,'post-worker')===['200','200'],'Posted-return retry failed');
+invProof($postingsBeforeRetry===DB::table('di_invoice_inventory_postings')->where('source_posting_id',$postSource->id)->get()->toJson(),'Retry duplicated or rewrote posting identity');
+invProof($reservationsBeforeRetry===DB::table('di_inventory_return_reservations')->where('source_posting_id',$postSource->id)->orderBy('id')->get()->toJson(),'Retry changed consumed reservation identities');
+invProof((string)DB::table('inventory_stocks')->where('company_id',$company->id)->value('quantity')==='-6.1234','Posted retry changed exact stock');
+invProof(\Brick\Math\BigDecimal::of((string)DB::table('di_invoice_inventory_postings')->where('source_posting_id',$postSource->id)->sum('base_quantity'))->isLessThanOrEqualTo($postSource->base_quantity),'Total returned quantity exceeds original sale');
+
 $rollback=$make('0.0001');try{DB::transaction(function()use($rollback){invAccept($rollback->id);throw new RuntimeException('Synthetic rollback');});}catch(RuntimeException){}
 invProof($rollback->fresh()->status==='draft'&&!DB::table('di_invoice_inventory_postings')->where('invoice_id',$rollback->id)->exists(),'Atomic finalization rollback failed');
 $emptyProduct=Product::withoutGlobalScopes()->create(['company_id'=>$company->id,'name'=>'Synthetic empty row race','hs_code'=>'33049900','uom'=>'KG','is_active'=>true]);

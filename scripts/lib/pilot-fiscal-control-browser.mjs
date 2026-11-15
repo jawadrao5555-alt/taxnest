@@ -1,5 +1,15 @@
+import {scrolledPixelDetail} from './scrolled-pixel-detail.mjs';
 export async function pilotFiscalControlWorkflow(page,t,v,{baseUrl,login,loopback,saveEvidenceScreenshot,pass}){
  const f=t.pilotFiscalCases[v.width],check=(v,m)=>{if(!v)throw Error(m);};
+ const snapshots=new Map();
+ const companySnapshot=async c=>{
+  await page.goto(baseUrl+'/admin/companies/'+c.id,{waitUntil:'domcontentloaded'});
+  const raw=await page.getByText('FBR Reporting',{exact:true}).locator('..').innerText();
+  check(raw.includes('Disabled')&&!raw.includes('Enabled'),'Raw FBR reporting flag is not OFF');
+  const history={};for(const label of ['Transactions','Total Revenue']){const rows=page.getByText(label,{exact:true});check(await rows.count()>0,'Rendered company history metric missing: '+label);history[label]=await rows.evaluateAll(nodes=>nodes.map(n=>n.parentElement.innerText));}
+  return {raw,history};
+ };
+ for(const c of f.companies)snapshots.set(c.id,await companySnapshot(c));
  const url=id=>baseUrl+'/admin/companies/'+id+'/pilot-fiscal-control';
  for(const c of f.companies){
   await page.goto(url(c.id),{waitUntil:'domcontentloaded'});
@@ -18,6 +28,7 @@ export async function pilotFiscalControlWorkflow(page,t,v,{baseUrl,login,loopbac
   const other=f.companies.find(x=>x.id!==c.id);const sibling=await page.request.get(url(other.id),{headers:{Accept:'application/json'}});
   check((await sibling.json()).company_id===other.id,'Company-specific control lost target scope');
   await saveEvidenceScreenshot(page,'pilot-fiscal-control-'+c.category+'-'+v.width);
+  await scrolledPixelDetail(page,['#pilot-fiscal-off','#pilot-fiscal-on','#pilot-fiscal-blocker'],'pilot-fiscal-control-'+c.category+'-controls-'+v.width,saveEvidenceScreenshot);
  }
  for(const denied of [{login:f.support,loginPath:'/admin/login',expected:403},{login:f.companies[0].owner,loginPath:'/fbr-pos/login',expected:302}]){
   const ctx=await page.context().browser().newContext({viewport:v,serviceWorkers:'block'});
@@ -32,6 +43,11 @@ export async function pilotFiscalControlWorkflow(page,t,v,{baseUrl,login,loopbac
    for(const c of f.companies){const r=await ctx.request.get(url(c.id),{headers:{Accept:'application/json'},maxRedirects:0});await assertDenied(r,'Unauthorized fiscal GET company '+c.id);
     const write=await ctx.request.post(url(c.id),{headers:{Accept:'application/json','X-CSRF-TOKEN':deniedToken},data:{enabled:true},maxRedirects:0});await assertDenied(write,'Unauthorized fiscal POST company '+c.id);}
   }finally{await ctx.close();}
+ }
+ for(const c of f.companies){
+  const state=await page.request.get(url(c.id),{headers:{Accept:'application/json'}});const data=await state.json();
+  check(state.status()===200&&data.company_id===c.id&&data.enabled===false&&data.historical_submission===false,'Forbidden probe changed effective fiscal state');
+  check(JSON.stringify(await companySnapshot(c))===JSON.stringify(snapshots.get(c.id)),'Forbidden probe changed raw flag or rendered history totals');
  }
  pass('PILOT FISCAL CONTROL PASS: '+v.width+': school/hospital effective OFF, disabled ON, direct ON422 unchanged state, explicit targeted OFF, tenant/support denied; no bill or fiscal dispatch');
 }

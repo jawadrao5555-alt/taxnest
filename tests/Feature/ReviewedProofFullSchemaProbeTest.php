@@ -16,6 +16,13 @@ class ReviewedProofFullSchemaProbeTest extends TestCase {
   ReviewedDeviceProof::approve($company->id,['device_uid'=>'Device-A','pos_id'=>'654321','environment'=>'production','evidence_reference'=>'Synthetic','evidence_sha256'=>str_repeat('a',64),'review_note'=>'Synthetic fixture review only','independent_evidence_reviewed'=>true]);
   $claim=bin2hex(random_bytes(32));$id=DB::table('fbr_pos_transactions')->insertGetId(['company_id'=>$company->id,'invoice_number'=>'SYNTHETIC-ACK-'.bin2hex(random_bytes(4)),'invoice_mode'=>'fbr','fbr_status'=>'pending','fbr_pos_id_snapshot'=>'654321','fbr_device_uid_snapshot'=>'Device-A','fbr_requested_environment_snapshot'=>'production','fbr_identity_captured_at'=>now(),'fbr_agent_claimed_at'=>now(),'fbr_submission_hash'=>$claim,'total_amount'=>100,'created_at'=>now(),'updated_at'=>now()]);
   $bill=FbrPosTransaction::findOrFail($id);app(FbrPosSubmissionEvidenceService::class)->recordDispatch($company,$bill,'synthetic','Device-A',$claim);
+  $dispatch=DB::table('fbr_pos_submission_evidence')->where('transaction_id',$id)->first();
+  $this->assertNotNull($dispatch);
+  $this->assertSame('reviewed_device_evidence',$dispatch->local_environment_proof);
+  $before=(array)$dispatch;
+  $migration=require database_path('migrations/2026_12_24_010000_widen_reviewed_device_evidence_state.php');
+  $migration->up(); $migration->up(); $migration->down();
+  $this->assertSame($before,(array)DB::table('fbr_pos_submission_evidence')->where('transaction_id',$id)->first());
   $r=\Illuminate\Http\Request::create('/api/agent/submit-result','POST',['transaction_id'=>$id,'success'=>false,'outcome_unknown'=>true,'device_uid'=>'Device-A','submission_claim'=>$claim,'pra_invoice_number'=>'654321ABC20260001','response'=>['FBRInvoiceNumber'=>'654321ABC20260001'],'ims_diagnostic'=>'response_received','ims_response_fields'=>['FBRInvoiceNumber:string']]);
   $r->attributes->set('agent_company',Company::findOrFail($company->id));
   $response=app(\App\Http\Controllers\AgentController::class)->submitResult($r);

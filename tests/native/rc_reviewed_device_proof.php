@@ -63,10 +63,19 @@ try{
 DB::table('admin_users')->where('id',$admin->id)->update(['role'=>'super_admin']);
 $company->forceFill(['product_type'=>'fbrpos','fbr_pos_enabled'=>true,'fbr_reporting_enabled'=>true,'agent_enabled'=>true,'fbr_connection_mode'=>'fiscal_device','fbr_pos_environment'=>'production','fbr_pos_id'=>'654321'])->save();
 ReviewedDeviceProof::approve($company->id,array_merge($data,['pos_id'=>'654321','environment'=>'production']));
+$column=DB::selectOne('SELECT CHARACTER_MAXIMUM_LENGTH AS width, COLUMN_DEFAULT AS default_value FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?',[$db,'fbr_pos_submission_evidence','local_environment_proof']);
+proof($column && (int)$column->width>=strlen('reviewed_device_evidence'),'Native reviewed evidence column too narrow');
+proof(trim((string)$column->default_value, "'") === 'unknown','Native reviewed evidence default changed');
 $claim=bin2hex(random_bytes(32));
 $billId=DB::table('fbr_pos_transactions')->insertGetId(['company_id'=>$company->id,'invoice_number'=>'SYNTHETIC-ACK-'.bin2hex(random_bytes(4)),'invoice_mode'=>'fbr','fbr_status'=>'pending','fbr_pos_id_snapshot'=>'654321','fbr_device_uid_snapshot'=>'Device-A','fbr_requested_environment_snapshot'=>'production','fbr_identity_captured_at'=>now(),'fbr_agent_claimed_at'=>now(),'fbr_submission_hash'=>$claim,'total_amount'=>100,'created_at'=>now(),'updated_at'=>now()]);
 $bill=\App\Models\FbrPosTransaction::findOrFail($billId);
 app(\App\Services\FbrPosSubmissionEvidenceService::class)->recordDispatch($company,$bill,'synthetic','Device-A',$claim);
+$dispatch=DB::table('fbr_pos_submission_evidence')->where('transaction_id',$billId)->first();
+$review=ReviewedDeviceProof::reviewedProof($company->id,'Device-A','654321','production');
+proof($dispatch && $review && (int)$dispatch->reviewed_device_proof_id===(int)$review->id
+ && $dispatch->local_environment_proof==='reviewed_device_evidence' && $dispatch->device_uid==='Device-A'
+ && $dispatch->requested_environment==='production' && hash_equals(hash('sha256',$claim),(string)$dispatch->submission_claim_hash),
+ 'Native dispatch failed to persist exact reviewed proof and claim binding before callback race');
 $barrier=dirname($socket).'/proof-callback-'.bin2hex(random_bytes(8));$workers=[];
 try {
  foreach([0,1] as $i){$p=new Process([PHP_BINARY,__FILE__,'callback-worker',(string)$company->id,(string)$billId,$claim,$barrier,(string)$i]);$p->setTimeout(30);$p->start();$workers[]=$p;}

@@ -43,3 +43,19 @@ test('expense history final rows and full right-hand audit columns fit fixed cap
   await p.close();
  }}finally{await browser.close();}
 });
+
+test('actual Madadgar composer opts out of mobile full-width submit without clipping input',async()=>{
+ const {readFileSync}=await import('node:fs');
+ const view=readFileSync(new URL('../../resources/views/components/madadgar-support.blade.php',import.meta.url),'utf8');
+ const form=view.match(/<form @submit\.prevent="send\(\)"[\s\S]*?<\/form>/)[0];
+ assert.match(form,/class="min-w-0 flex-1/);assert.match(form,/class="btn-inline w-10 h-10/);
+ const css=readFileSync(new URL('../../public/css/mobile.css',import.meta.url),'utf8');
+ const {browser}=await launchLocalBrowser();
+ try{for(const viewport of [{width:1366,height:900},{width:390,height:844}]){
+  const p=await browser.newPage({viewport});
+  await p.setContent(`<style>*{box-sizing:border-box}body{margin:0}.panel{width:356px;margin:11px;padding:10px}.flex{display:flex}.items-center{align-items:center}.gap-2{gap:8px}.flex-1{flex:1 1 0%}.min-w-0{min-width:0}.w-10{width:40px}.h-10{height:40px}.flex-shrink-0{flex-shrink:0}${css}</style><div class="panel">${form}</div>`);
+  const r=await p.locator('form').evaluate(f=>{const i=f.querySelector('input').getBoundingClientRect(),b=f.querySelector('button').getBoundingClientRect(),r=f.getBoundingClientRect();return {inputLeft:i.left,inputRight:i.right,buttonLeft:b.left,buttonRight:b.right,buttonWidth:b.width,left:r.left,right:r.right};});
+  assert.equal(r.buttonWidth,40);assert.ok(r.inputLeft>=r.left&&r.inputRight<=r.buttonLeft&&r.buttonRight<=r.right&&r.buttonRight<=viewport.width);
+  await p.close();
+ }}finally{await browser.close();}
+});

@@ -149,9 +149,9 @@
                     <input x-ref="minput" x-model="draft" type="text" maxlength="1000"
                            placeholder="{{ __('pos.madadgar_placeholder') }}"
                            autocomplete="off" name="madadgar_q_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
-                           class="flex-1 rounded-xl border-gray-300 text-sm {{ $mc['input'] }}">
+                           class="min-w-0 flex-1 rounded-xl border-gray-300 text-sm {{ $mc['input'] }}">
                     <button type="submit" :disabled="busy || !draft.trim()"
-                            class="w-10 h-10 rounded-xl {{ $mc['primary'] }} text-white flex items-center justify-center transition cursor-pointer disabled:opacity-40 flex-shrink-0" aria-label="{{ __('pos.madadgar_send') }}">
+                            class="btn-inline w-10 h-10 rounded-xl {{ $mc['primary'] }} text-white flex items-center justify-center transition cursor-pointer disabled:opacity-40 flex-shrink-0" aria-label="{{ __('pos.madadgar_send') }}">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 19V5m0 0l-6 6m6-6l6 6"/></svg>
                     </button>
                 </form>

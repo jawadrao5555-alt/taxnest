@@ -1103,6 +1103,17 @@ foreach ([1366,390] as $width) {
         $aiUsageCases[$width]['panels'][]=['companyId'=>$c->id,'companyName'=>$c->name,'login'=>$owner->email,'cashier'=>$cashier->email,'prefix'=>$product==='pos'?'/pos':'/fbr-pos'];
     }
 }
+$diReadCases=[];
+foreach([1366,390] as $width){
+    $readCompany=$company('Synthetic DI read '.$width,'di-read-company-'.$width.'@rc-browser.invalid','RCDIREAD'.$width,'di');
+    $readOwner=$user($readCompany,'Synthetic DI read owner','di-read-owner-'.$width.'@rc-browser.invalid','company_admin');
+    $readCashier=$user($readCompany,'Synthetic DI read cashier','di-read-cashier-'.$width.'@rc-browser.invalid','user','pos_cashier');
+    foreach(['locked'=>$width===1366?321:654,'draft'=>999] as $status=>$total){
+        \App\Models\Invoice::withoutEvents(fn()=>\App\Models\Invoice::withoutGlobalScopes()->create(['company_id'=>$readCompany->id,'invoice_number'=>'SYN-READ-'.$width.'-'.$status,'buyer_name'=>'SYNTHETIC-PRIVATE-BUYER-'.$width,'buyer_ntn'=>'','buyer_address'=>'Synthetic address','status'=>$status,'total_amount'=>$total,'total_value_excluding_st'=>$total,'total_sales_tax'=>0,'document_type'=>'Sale Invoice','created_at'=>$now,'updated_at'=>$now]));
+    }
+    $diReadCases[$width]=['login'=>$readOwner->email,'cashier'=>$readCashier->email,'company'=>$readCompany->id,'total'=>$width===1366?'321.00':'654.00','foreignTotal'=>$width===1366?'654.00':'321.00'];
+}
+foreach([1366=>390,390=>1366] as $width=>$other)$diReadCases[$width]['foreignCompany']=$diReadCases[$other]['company'];
 $privateProfileCases = [];
 foreach ([1366, 390] as $width) {
     $profileCompany = $company('Synthetic private profile '.$width, 'private-profile-'.$width.'@rc-browser.invalid', 'RCPROFILE'.$width, 'di');
@@ -1242,6 +1253,7 @@ $fixture = [
     'transactionalJourneys' => [
         ['name'=>'madadgar-company-reads','manualOnly'=>true,'login'=>$madadgarReadCases[1366]['login'],'password'=>$password,'loginPath'=>'/fbr-pos/login','paths'=>[],'madadgarReadCases'=>$madadgarReadCases],
         ['name'=>'ai-usage-budget','manualOnly'=>true,'login'=>$aiUsageCases[1366]['admin'],'password'=>$password,'loginPath'=>'/admin/login','paths'=>[],'aiUsageCases'=>$aiUsageCases],
+        ['name'=>'di-bounded-reads','manualOnly'=>true,'login'=>$diReadCases[1366]['login'],'password'=>$password,'loginPath'=>'/login','paths'=>[],'diReadCases'=>$diReadCases],
         ['name'=>'private-profile-fields','manualOnly'=>true,'login'=>$privateProfileCases[1366]['login'],'password'=>$password,'loginPath'=>'/login','paths'=>[],'privateProfileCases'=>$privateProfileCases],
         ['name'=>'opt-in-greetings-tutorials','manualOnly'=>true,'login'=>$greetingCases[1366]['login'],'password'=>$password,'loginPath'=>'/login','paths'=>[],'greetingCases'=>$greetingCases],
         ['name'=>'di-inventory-projection','manualOnly'=>true,'login'=>$diInventoryCases[1366]['login'],'password'=>$password,'loginPath'=>'/login','paths'=>[],'diInventoryCases'=>$diInventoryCases],

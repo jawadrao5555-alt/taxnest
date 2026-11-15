@@ -12,6 +12,21 @@ class MadadgarUsageBudgetTest extends TestCase {
  private Company $company;
  protected function setUp():void{parent::setUp();Http::preventStrayRequests();$this->company=Company::create(['name'=>'Synthetic AI company','ntn'=>'AI-TEST','product_type'=>'pos','status'=>'approved']);}
  private function policy(?string $budget='0.001000',?string $input='1.000000',?string $output='1.000000'):void{DB::table('madadgar_budget_policies')->insert(['company_id'=>$this->company->id,'model'=>MadadgarUsage::MODEL,'currency'=>'USD','input_per_million'=>$input,'output_per_million'=>$output,'monthly_budget'=>$budget,'configured_by'=>1,'created_at'=>now(),'updated_at'=>now()]);}
+ public function test_admin_usage_uses_local_assets_and_targetable_operational_content():void {
+  $this->withoutVite();
+  $admin=AdminUser::create(['name'=>'Synthetic admin','email'=>'usage-layout@example.test','password'=>'synthetic','role'=>'super_admin']);
+  auth('admin')->setUser($admin);
+  $r=Request::create('/admin/companies/'.$this->company->id.'/ai-usage','GET');
+  $r->setLaravelSession(session()->driver());
+  view()->share('errors',new \Illuminate\Support\ViewErrorBag());
+  $html=$this->actingAs($admin,'admin')->get('/admin/companies/'.$this->company->id.'/ai-usage')->assertOk()->getContent();
+  foreach(['id="ai-usage-content"','id="ai-usage-heading"','id="ai-usage-summary"','id="ai-usage-budget-form"'] as $marker)$this->assertStringContainsString($marker,$html);
+  $this->assertStringNotContainsString('cdn.tailwindcss.com',$html);
+  $this->assertStringNotContainsString('cdn.jsdelivr.net/npm/alpinejs',$html);
+  $source=file_get_contents(resource_path('views/layouts/admin-app.blade.php'));
+  $this->assertStringContainsString("@vite(['resources/css/app.css', 'resources/js/app.js'])",$source);
+  Http::assertNothingSent();
+ }
  public function test_unknown_rates_and_usage_are_not_reported_as_zero_and_no_private_payload_is_stored():void {
   $id=MadadgarUsage::begin($this->company,100,600);MadadgarUsage::finish($id,21,null,'provider_transport_error');$event=DB::table('madadgar_usage_events')->find($id);
   $this->assertNull($event->estimated_cost);$this->assertNull($event->input_tokens);$this->assertNull($event->reserved_cost);$this->assertSame('error',$event->state);

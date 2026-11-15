@@ -1,7 +1,26 @@
-export async function aiUsageWorkflow(page,t,v,{baseUrl,login,loopback,saveEvidenceScreenshot,pass}) {
+export async function aiUsageWorkflow(page,t,v,{baseUrl,login,loopback,dismiss,waitForOperationalSurface,saveEvidenceScreenshot,pass}) {
   const f=t.aiUsageCases[v.width];
   const check=(ok,message)=>{if(!ok)throw Error(message);};
+  const visibleSurface=async p=>{
+    await waitForOperationalSurface(p);
+    await p.waitForFunction(()=>window.__alpineStarted===true || Boolean(window.Alpine));
+    await dismiss(p);
+    const heading=p.locator('#ai-usage-heading');
+    await heading.scrollIntoViewIfNeeded();
+    check(await heading.isVisible(),'AI usage heading must be visible');
+    await p.locator('#usage-month').click({trial:true});
+    const shape=await heading.evaluate(el=>{
+      const r=el.getBoundingClientRect(); const hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);
+      return {width:r.width,height:r.height,visible:r.top>=0&&r.bottom<=innerHeight,uncovered:hit===el||el.contains(hit)};
+    });
+    check(shape.width>=120&&shape.height>=20&&shape.visible&&shape.uncovered,'Usage heading is clipped, covered, or outside viewport');
+    check(await p.locator('#ai-usage-summary').evaluate(el=>getComputedStyle(el).display)==='grid','Usage CSS did not load');
+    if(await p.locator('.tn-admin-sidebar').count()){
+      check(await p.locator('.tn-admin-sidebar svg').first().evaluate(el=>el.getBoundingClientRect().width)<=40,'Admin navigation icons are unstyled');
+    }
+  };
   const verify=async(p,company)=>{
+    await visibleSurface(p);
     await p.getByRole('heading',{name:'AI usage and budget',exact:true}).waitFor();
     const dl=p.locator('dl').filter({has:p.locator('dt',{hasText:'Known estimated cost (USD)'})});
     const value=label=>dl.locator('dt').filter({hasText:label}).locator('xpath=following-sibling::dd[1]').innerText();
@@ -35,7 +54,13 @@ export async function aiUsageWorkflow(page,t,v,{baseUrl,login,loopback,saveEvide
     const token=await form.locator('input[name="_token"]').inputValue();
     const bad=await page.context().request.post(baseUrl+'/admin/companies/'+c.companyId+'/ai-usage',{form:{_token:token,input_per_million:'-1'},headers:{Accept:'application/json'},maxRedirects:0});
     check(bad.status()===422,'Negative rate accepted');
+    await visibleSurface(page);
     await saveEvidenceScreenshot(page,'ai-usage-admin-'+(c.prefix==='/pos'?'pos':'fbr')+'-'+v.width);
+    await page.locator('#ai-usage-budget-form').scrollIntoViewIfNeeded();
+    await form.locator('#monthly_budget').click({trial:true});
+    const budgetBox=await form.locator('#monthly_budget').boundingBox();
+    check(budgetBox&&budgetBox.width>=100&&budgetBox.height>=30,'Budget input is not usable');
+    await saveEvidenceScreenshot(page,'ai-usage-controls-'+(c.prefix==='/pos'?'pos':'fbr')+'-'+v.width);
     const ctx=await context();
     try {
       const owner=await ctx.newPage();

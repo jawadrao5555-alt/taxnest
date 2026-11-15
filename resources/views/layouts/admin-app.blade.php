@@ -9,9 +9,9 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="stylesheet" href="{{ asset('css/mobile.css?v=2.7') }}">
     <title>{{ $title ?? 'Admin Panel' }} - TaxNest Admin</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    {{-- Same-origin, locked assets: admin must stay usable without public CDNs. --}}
+    @vite(['resources/css/app.css', 'resources/js/app.js'])
     <link rel="stylesheet" href="{{ asset('css/taxnest-ui.css?v=1.1') }}">
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <script src="/vendor/chart.umd.min.js?v=4.4.0"></script>
     <script>
         var adminThemes = {

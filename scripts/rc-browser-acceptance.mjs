@@ -1509,7 +1509,7 @@ async function deliveryContactSearchWorkflow(page,t,v) {
 
 async function workflow(page,t,v,diagnostics) {
   if(t.madadgarReadCases)return madadgarReadWorkflow(page,t,v,{baseUrl,login,loopback,saveEvidenceScreenshot,pass});
-  if(t.aiUsageCases)return aiUsageWorkflow(page,t,v,{baseUrl,login,loopback,saveEvidenceScreenshot,pass});
+  if(t.aiUsageCases)return aiUsageWorkflow(page,t,v,{baseUrl,login,loopback,dismiss,waitForOperationalSurface,saveEvidenceScreenshot,pass});
   if(t.privateProfileCases)return privateProfileWorkflow(page,t,v,{baseUrl,saveEvidenceScreenshot,pass});
   if(t.greetingCases)return greetingTutorialWorkflow(page,t,v,{baseUrl,saveEvidenceScreenshot,pass});
   if(t.diInventoryCases)return diInventoryWorkflow(page,t,v,{baseUrl,saveEvidenceScreenshot,pass});

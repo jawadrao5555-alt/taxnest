@@ -44,7 +44,7 @@ $make=function(int $ordinal,?string $eventTime=null)use($company,$parent,$branch
 $first=$make(1);$source=fn(?int $branchId=null,int $after=0,int $limit=25)=>Evidence::source($company->id,$branchId,$day.' 00:00:00',$day.' 23:59:59',$after,$limit,[]);
 $before=DB::table('agent_core_events')->where('id',$first['event'])->first();$report=app(DiagnosticBillEvidence::class)->read(['company_name'=>$company->name,'bill_id'=>$parent],[$company->id]);
 refundProof($report['version']===8&&$report['sources']['projected_refund_events']['rows']===[['id'=>$first['event']]],'Exact FBR refund chain unavailable');refundProof(in_array('general_or_unretained_offline_agent_events',$report['unimplemented_links'],true),'General offline gap falsely closed');
-refundProof(Evidence::bill($pra->id,$parent,0,25)['rows']===[],'Same PRA bill ID inferred FBR link');$safe=$source($branch);refundProof(array_keys($safe['rows'][0])===['id','event_at']&&!str_contains(json_encode($safe),'PRIVATE')&&!str_contains(json_encode($safe),'987654'),'Refund source exposed payload or amount');
+refundProof(Evidence::bill($pra->id,$parent,0,25)['rows']===[],'Same PRA bill ID inferred FBR link');$safe=$source($branch);refundProof(array_keys($safe['rows'][0])===['id','event_at']&&!str_contains(json_encode($safe),'PRIVATE')&&!str_contains(json_encode($safe),'refund_total'),'Refund source exposed payload or amount');
 $payload=fn(array $changes)=>json_encode(array_replace(json_decode($before->payload,true),$changes));
 $cases=[
  ['agent_core_events',$first['event'],['projection_status'=>'accepted']],

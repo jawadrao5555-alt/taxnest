@@ -1,5 +1,29 @@
 # TaxNest 23-source reconciliation inventory
 
+## Updated implementation checkpoint: local 9222f62
+
+This supersedes the earlier f274ef1 checkpoint only for the rows below. Source
+and test inspection performed; no fresh hosted PASS is inferred. Remote
+`6127` run [43699005351](https://github.com/jawadrao5555-alt/taxnest/actions/runs/43699005351)
+failed the preservation comparator before reaching later native race proofs.
+The listed fixes require publication and a new exact-head run. Full SHA and
+final checks must be refreshed from GitHub, not copied from an earlier tree.
+
+| Requirement | Newly inspected implementation | Focused evidence | Remaining proof / scope |
+|---|---|---|---|
+| #301/#321 authorized company read answers | `MadadgarCompanyReadTools` (8efc69e/418a341) supplies fixed-command, owner-only, same-guard/company/campus billing/payment/tax/stock/recipe/closing adapters. Persisted active owner checked under lock; output numeric allow-list, source/date/timezone/result hash and atomic audit. Missing schema/audit fails closed; no provider forwarding of prior private history | Implementation worker reports combined21tests/158assertionsPASS; inspected tests and source include foreign campus, role change, missing-source and tax precision/provenance cases | **Bounded read gap now implemented**, unlike previous no-live-tool snapshot. DI/other guards, cashier data reads, arbitrary questions/identifiers/date ranges and full issue-to-PR programme remain unsupported. Exact-head hosted acceptance pending. |
+| Actual School/Hospital support UI | 2bea394 adds existing support component and CSRF metadata inside no-print wrappers. `madadgar-read-browser.mjs` exercises real UI with one authorized123.45 receipt, foreign-campus999.99 canary and cashier denial at desktop/390px | Browser journey and safe screenshots are implemented, not an observed hosted result | Hosted rendering, privacy/source/audit assertions and mobile acceptance pending; no live company/provider reads used. School/Hospital fiscal OFF guard remains. |
+| #266 DI stock safety | 7a48b3b makes generic DI receiving/deduction/reversal and invoice posting share Product-row locking before stock lookup/creation; exact four-decimal writes preserve large balances, unassigned branch concurrency and frozen quantity | Worker reports15tests/107assertionsPASS; independent receive-versus-first-post native race added | Final hosted concurrency, recovery, original return reservations and UI proof still required. Fatal transaction loss is rethrown, not reported as accepted-stock success; fiscal acknowledgement reconciliation remains distinct. No historical backfill or real regulator acceptance. |
+| Upgrade value preservation | bfac73f compares widened decimal values exactly without floating point; 0797f74 records downloaded synthetic before/after evidence and adds information_schema capture | Prior mismatch was17.00→17.0000 and29.00→29.0000 for stock/movement/balance, with only previously allowed package backfill differences. Original numeric values were preserved in that artifact | Prior artifact did not record physical column types. Exact DECIMAL(15,2)→DECIMAL(18,4) assertions and new native run pending. Canonical scale comparison does not permit changed numeric amounts, omitted rows or relaxed financial invariants. |
+| #373 reviewed callback state width | 9222f62 adds a forward migration widening reviewed evidence state to40 characters, preserves historical strings and adds full-schema/native width assertions | Schema/test correction inspected; strict mode retained | Native callback race confirmation pending. Prior preservation abort cannot count as a callback pass. No truncated state aliases or bypass of reviewed proof/environment guards. |
+
+Source evidence: `docs/qa/madadgar-bounded-company-reads-393.md`,
+`docs/qa/di-invoice-inventory.md`, `docs/qa/native-upgrade-decimal-evidence.md`.
+These are implementation increments, not acceptance of all23sourcePRs or the
+whole47itemmaster. Seven-day field collection, full programmes and previously
+listed external/future holds remain explicit. Original unchecked source text
+is unchanged. No production actions or fiscal submission occurred here.
+
 ## Updated implementation checkpoint: local f274ef1
 
 This section supersedes the **initial inventory** below where it said runtime

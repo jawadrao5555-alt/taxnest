@@ -192,8 +192,12 @@ export async function securityOnboardingWorkflow(page,t,v,{baseUrl,login,saveEvi
     await adminPage.goto(baseUrl+'/admin/companies/'+viewerFixture.companyId,{waitUntil:'domcontentloaded'});
     const editForm=adminPage.locator('form[x-show="edit"][action$="/local-viewer/'+viewerFixture.userId+'"]');
     await editForm.waitFor({state:'attached'});
+    // Real Alpine now starts from locked local assets. Editing is intentionally
+    // hidden until this row's actual Edit control is used.
+    await editForm.locator('xpath=..').getByRole('button',{name:'Edit',exact:true}).click();
+    await editForm.waitFor({state:'visible'});
     await editForm.locator('input[name="password"]').fill(viewerFixture.newPassword);
-    await Promise.all([adminPage.waitForNavigation(),editForm.evaluate(form=>form.requestSubmit())]);
+    await Promise.all([adminPage.waitForNavigation(),editForm.getByRole('button',{name:'Save',exact:true}).click()]);
 
     await viewerPage.goto(baseUrl+'/pos/local-bills',{waitUntil:'domcontentloaded'});
     if(new URL(viewerPage.url()).pathname!=='/pos/login')throw Error('Old Local Bills Viewer browser survived an administrator password reset');

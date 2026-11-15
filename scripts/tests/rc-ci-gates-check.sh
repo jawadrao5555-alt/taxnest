@@ -33,6 +33,9 @@ function contract(doc,label){
   for(const n of expected)if(!validateRun.includes(`needs.${n}.result`)||!validateRun.includes('success'))throw Error(`${label}: validate does not require ${n} success`);
   for(const [name,needles] of Object.entries(mandatoryCommands)){
     const steps=jobs[name].steps||[];
+    const exactCheckout=steps.find(s=>s.uses==='actions/checkout@v7');
+    if(exactCheckout?.with?.ref!=='${{ github.event.pull_request.head.sha }}')throw Error(`${label}: ${name} must test exact PR head, not inferred merge commit`);
+
     const text=steps.map(s=>s.run||'').join('\n');
     for(const needle of needles)if(!text.includes(needle))throw Error(`${label}: ${name} lacks mandatory command: ${needle}`);
     const artifacts=steps.filter(s=>s.uses==='actions/upload-artifact@v4');
@@ -158,6 +161,13 @@ for(const change of ['remove','optional','conditional','different-command','diff
  let rejected=false;try{contract(mutated,`negative-erp-${change}`);}catch{rejected=true;}
  if(!rejected)throw Error(`Validator accepted unsafe ERP role lane ${change}`);
 }
+for(const name of Object.keys(mandatoryCommands)) {
+ const mutated=structuredClone(activeDoc),checkout=mutated.jobs[name].steps.find(s=>s.uses==='actions/checkout@v7');
+ delete checkout.with.ref;
+ let rejected=false;try{contract(mutated,`negative-exact-head-${name}`);}catch{rejected=true;}
+ if(!rejected)throw Error(`Validator accepted inferred checkout in ${name}`);
+}
+console.log('PASS: seven non-exact-head checkout mutations rejected');
 console.log('PASS: five negative isolated ERP role gate mutations rejected');
 console.log('PASS: ten negative synthetic pixel gate mutations rejected');
 console.log('PASS: eight negative native preservation/callback gate mutations rejected');

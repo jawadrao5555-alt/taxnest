@@ -20,6 +20,8 @@ jobs:
           mkdir -p "$evidence/logs"
           printf 'lane=%s\nphase=prebootstrap\n' "$GITHUB_JOB" >"$evidence/logs/prebootstrap.log"
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
       - uses: actions/setup-node@v4
         with:
           node-version: '22.23.2'
@@ -72,6 +74,8 @@ jobs:
           mkdir -p "$evidence/logs"
           printf 'lane=%s\nphase=prebootstrap\n' "$GITHUB_JOB" >"$evidence/logs/prebootstrap.log"
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
       - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.4'
@@ -106,6 +110,8 @@ jobs:
           mkdir -p "$evidence/logs"
           printf 'lane=%s\nphase=prebootstrap\n' "$GITHUB_JOB" >"$evidence/logs/prebootstrap.log"
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
       - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.4'
@@ -157,6 +163,7 @@ jobs:
           apt-get install -y --no-install-recommends bash ca-certificates git sudo
       - uses: actions/checkout@v7
         with:
+          ref: ${{ github.event.pull_request.head.sha }}
           set-safe-directory: false
       - name: Install isolated MariaDB-container build prerequisites
         run: bash scripts/ci-mariadb-provision.sh install
@@ -231,6 +238,7 @@ jobs:
           apt-get install -y --no-install-recommends bash ca-certificates git sudo
       - uses: actions/checkout@v7
         with:
+          ref: ${{ github.event.pull_request.head.sha }}
           set-safe-directory: false
       - name: Install isolated MariaDB-container build prerequisites
         run: bash scripts/ci-mariadb-provision.sh install
@@ -307,6 +315,8 @@ jobs:
           mkdir -p "$evidence/logs"
           printf 'lane=%s\nphase=prebootstrap\n' "$GITHUB_JOB" >"$evidence/logs/prebootstrap.log"
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
       - uses: actions/setup-node@v4
         with:
           node-version: '22.23.2'
@@ -348,6 +358,8 @@ jobs:
           mkdir -p "$evidence/logs"
           printf 'lane=%s\nphase=prebootstrap\n' "$GITHUB_JOB" >"$evidence/logs/prebootstrap.log"
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
       - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.4'

@@ -1,5 +1,29 @@
 # B01 #316 / #301 workstream 3 reconciliation (read-only audit)
 
+## Owner decision: prospective selected-package policy (15 November 2026)
+
+The owner selected a NEW-registration policy, not a rewrite of legacy contracts.
+Implementation and acceptance are in progress; this section supersedes the
+unresolved-choice wording in the historical audit below.
+
+- New public registration explicitly selects a valid same-product package.
+  Freeze 72 hours of trial with unlimited **bill count only**. Other feature,
+  branch, user, add-on and fiscal permissions remain the selected package's
+  verified limits; School/Hospital fiscal stays blocked.
+- Verified full payment during trial confirms the purchase, with paid time
+  starting at the frozen trial end. Payment after trial starts paid time at
+  verified activation, never backdated. Do not grant future paid features early.
+- Seven days of grace only follows paid expiry. After grace, new billing is
+  blocked while authorized history, receipts and reprint remain available.
+- Renewal preserves remaining paid time; explicitly test dates during and after
+  grace. Duplicate approval creates no duplicate receipt or term.
+- Existing customers retain legacy terms, caps, grants and entitlements. Preserve
+  #362 renewal behavior and #363 immutable snapshots for existing contracts.
+- Signup, checkout, customer and admin pages show policy version and frozen
+  trial/paid/grace dates. Boundary, retry, renewal and regression tests are required.
+
+No live settings, commercial price changes or data migration have been performed.
+
 Inspected current main after local allocator full run. These are source-to-code/test mappings, not new acceptance executions. Historical source remains planning; passing selected suites is not whole-programme acceptance.
 
 | Original scenarios | Concrete implemented evidence | Remaining gap |

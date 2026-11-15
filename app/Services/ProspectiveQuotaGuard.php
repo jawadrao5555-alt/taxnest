@@ -6,10 +6,20 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 /** v1-only current-read capacity check, inside the same transaction as claim/write. */
 final class ProspectiveQuotaGuard {
+ /** Lock ordering only: recording a real acknowledgement must not depend on access/cap status. */
+ public static function lockCompanyForWrite(int $companyId): bool {
+  if(!ProspectiveSubscriptionPolicy::available())return false;
+  $hint=Subscription::where('company_id',$companyId)->latest('id')->first();
+  if(!$hint || !$hint->hasLifecycleSnapshot())return false;
+  if(DB::transactionLevel()<1)throw new \LogicException('Invoice lock ordering requires a transaction.');
+  Company::withoutGlobalScopes()->whereKey($companyId)->lockForUpdate()->firstOrFail();
+  return true;
+ }
+ public static function lockCompanyForInvoiceWork(int $companyId): void {self::lockCompanyForWrite($companyId);}
  public static function context(int $companyId, bool $requireAccess=true): ?array {
   if(DB::transactionLevel()<1) throw new \LogicException('Quota guard requires the write transaction.');
   if(!ProspectiveSubscriptionPolicy::available())return null;
-  $hint=Subscription::where('company_id',$companyId)->where('active',true)->latest('id')->first();
+  $hint=Subscription::where('company_id',$companyId)->where('active',true)->latest('id')->first() ?? Subscription::where('company_id',$companyId)->latest('id')->first();
   if(!$hint || !$hint->hasLifecycleSnapshot()) return null; // SQL NULL legacy stays unchanged.
   $company=Company::whereKey($companyId)->lockForUpdate()->firstOrFail();
   $sub=Subscription::where('company_id',$companyId)->where('active',true)->latest('id')->lockForUpdate()->first();

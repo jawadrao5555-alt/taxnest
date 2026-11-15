@@ -384,6 +384,7 @@ class InvoiceController extends Controller
 
         DB::beginTransaction();
         try {
+            \App\Services\ProspectiveQuotaGuard::lockCompanyForInvoiceWork((int)$companyId);
             \App\Services\DiSellingPacking::validateReturns($request->items, (int) $companyId, isset($invoice) ? (int) $invoice->id : null);
             \App\Services\DiInvoiceInventory::validateReturns($request->items,(int)$companyId,isset($invoice)?(int)$invoice->id:null);
             $totals = \App\Services\DiInvoiceMath::totals($request->items);
@@ -682,6 +683,7 @@ class InvoiceController extends Controller
 
         DB::beginTransaction();
         try {
+            \App\Services\ProspectiveQuotaGuard::lockCompanyForInvoiceWork((int)$companyId);
             // An FBR submit can claim the record after the edit form renders.
             // Re-check under the same row lock used for the item replacement.
             $lockedInvoice = Invoice::where('id', $invoice->id)->lockForUpdate()->firstOrFail();
@@ -1149,6 +1151,7 @@ class InvoiceController extends Controller
 
             $claimed = DiFiscalSubmissionState::reserve($invoice->id, 'direct_mis', $fbrEnvironment);
             $locked = $claimed && DB::transaction(function () use ($claimed, $request) {
+                \App\Services\ProspectiveQuotaGuard::lockCompanyForInvoiceWork((int)$claimed->company_id);
                 $lockedInvoice = Invoice::whereKey($claimed->id)->lockForUpdate()->first();
                 if (!$lockedInvoice || !$lockedInvoice->is_fbr_processing) {
                     return false;
@@ -1353,6 +1356,7 @@ class InvoiceController extends Controller
         }
 
         $dispatched = \DB::transaction(function () use ($invoice) {
+            \App\Services\ProspectiveQuotaGuard::lockCompanyForInvoiceWork((int)$invoice->company_id);
             $locked = Invoice::where('id', $invoice->id)->lockForUpdate()->first();
             if (!in_array($locked->status, ['draft', 'failed']) || $locked->is_fbr_processing) {
                 return false;
@@ -1603,6 +1607,7 @@ class InvoiceController extends Controller
             ]);
             $fbrInvoiceNumber = trim((string) $request->input('fbr_invoice_number'));
             $confirmed = DB::transaction(function () use ($invoice, $fbrInvoiceNumber, $request, $user) {
+                \App\Services\ProspectiveQuotaGuard::lockCompanyForInvoiceWork((int)$invoice->company_id);
                 $locked = Invoice::withoutGlobalScopes()->whereKey($invoice->id)->lockForUpdate()->first();
                 if (!$locked || $locked->status !== 'pending_verification') {
                     return null;
@@ -1661,6 +1666,7 @@ class InvoiceController extends Controller
         if ($action === 'reject') {
             $request->validate(['verification_reason' => 'required|string|min:10|max:500']);
             $rejected = DB::transaction(function () use ($invoice) {
+                \App\Services\ProspectiveQuotaGuard::lockCompanyForInvoiceWork((int)$invoice->company_id);
                 $locked = Invoice::withoutGlobalScopes()->whereKey($invoice->id)->lockForUpdate()->first();
                 if (!$locked || $locked->status !== 'pending_verification') {
                     return null;
@@ -1735,6 +1741,7 @@ class InvoiceController extends Controller
         try {
             $overrideEvidence = null;
             $invoice = DB::transaction(function () use ($invoice, $newNumber, $user, $request, &$overrideEvidence) {
+                \App\Services\ProspectiveQuotaGuard::lockCompanyForInvoiceWork((int)$invoice->company_id);
                 $locked = Invoice::withoutGlobalScopes()->whereKey($invoice->id)->lockForUpdate()->firstOrFail();
                 $isPending = $locked->status === 'pending_verification';
                 $isLockedCorrection = $user->role === 'super_admin' && $locked->status === 'locked';
@@ -2422,6 +2429,7 @@ class InvoiceController extends Controller
 
         DB::beginTransaction();
         try {
+            \App\Services\ProspectiveQuotaGuard::lockCompanyForInvoiceWork((int)$companyId);
             \App\Services\DiSellingPacking::validateReturns($invoice->items->map(fn ($item) => $item->toArray())->all(), (int) $companyId);
             $inventoryLines = \App\Services\DiInvoiceInventory::normalize($invoice->items->map(fn($i)=>$i->toArray()+['product_id'=>$i->inventory_snapshot['product_id']??null,'source_invoice_item_id'=>$i->inventory_snapshot['source_invoice_item_id']??null])->all(), $invoice->company, $invoice->branch_id, $invoice->document_type, null, $invoice->reference_invoice_number);
             \App\Services\DiInvoiceInventory::validateReturns($inventoryLines,(int)$companyId);
@@ -2523,6 +2531,7 @@ class InvoiceController extends Controller
 
         DB::beginTransaction();
         try {
+            \App\Services\ProspectiveQuotaGuard::lockCompanyForInvoiceWork((int)$companyId);
             $lockedInvoice = Invoice::where('id', $invoice->id)->lockForUpdate()->firstOrFail();
             if (!in_array($lockedInvoice->status, ['draft', 'failed'], true) || $lockedInvoice->is_fbr_processing) {
                 throw new \RuntimeException('Invoice cannot be deleted after fiscal submission has started.');
@@ -2644,6 +2653,7 @@ class InvoiceController extends Controller
                         ];
                     }
                     $invoice = DB::transaction(function () use ($invoice, $fbrNum, $environment, $successLog) {
+                        \App\Services\ProspectiveQuotaGuard::lockCompanyForInvoiceWork((int)$invoice->company_id);
                         $locked = Invoice::withoutGlobalScopes()->whereKey($invoice->id)->lockForUpdate()->firstOrFail();
                         DiFiscalSubmissionState::accepted($locked, $fbrNum, $environment, 'recovered_authoritative_fbr_log');
                         $locked->fbr_submission_date = $successLog->created_at;
@@ -2751,6 +2761,7 @@ class InvoiceController extends Controller
             // this point, but can never leave a locked invoice without ledger
             // and required audit evidence.
             $invoice = DB::transaction(function () use ($invoice, $fbrNum, $environment, $response, $executionMs) {
+                \App\Services\ProspectiveQuotaGuard::lockCompanyForInvoiceWork((int)$invoice->company_id);
                 $locked = Invoice::withoutGlobalScopes()->whereKey($invoice->id)->lockForUpdate()->firstOrFail();
                 DiFiscalSubmissionState::accepted(
                     $locked,

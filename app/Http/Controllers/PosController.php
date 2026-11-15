@@ -5959,6 +5959,7 @@ class PosController extends Controller
 
         $company = Company::find($companyId);
         return DB::transaction(function () use ($companyId, $company, $id) {
+            \App\Services\ProspectiveQuotaGuard::lockCompanyForWrite((int)$companyId);
             $tx = PosTransaction::where('company_id', $companyId)->where('id', $id)
                 ->lockForUpdate()->first();
             if (!$tx) {
@@ -11625,6 +11626,7 @@ class PosController extends Controller
             && $newStockQty !== null && (int) $newStockQty !== (int) ($oldStockQty ?? PHP_INT_MIN)
         ) {
             \DB::transaction(function () use ($companyId, $product, $newStockQty, $stockBranchId, &$data) {
+            \App\Services\ProspectiveQuotaGuard::lockCompanyForWrite((int)$companyId);
                 $branchId = \App\Services\BranchStockService::writeBranchId($companyId, $stockBranchId);
                 $stockRow = \App\Models\InventoryStock::firstOrCreate(
                     ['company_id' => $companyId, 'product_id' => $product->id, 'branch_id' => $branchId],
@@ -11671,6 +11673,7 @@ class PosController extends Controller
         }
 
         \DB::transaction(function () use ($product, $data, $companyId, $preparedRecipeRows) {
+            \App\Services\ProspectiveQuotaGuard::lockCompanyForWrite((int)$companyId);
             $product->update($data);
             if ($preparedRecipeRows !== null) {
                 \App\Services\ProductRecipeEditor::sync(

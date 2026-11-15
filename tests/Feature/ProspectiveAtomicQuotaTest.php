@@ -80,6 +80,21 @@ class ProspectiveAtomicQuotaTest extends TestCase {
   self::assertSame(1,\App\Services\PlanLimitService::canCreatePosBill($c->id)['remaining']);
   Http::assertNothingSent();
  }
+ public function test_expired_access_never_blocks_recording_real_acknowledgement_or_stock_receiving(): void {
+  $c=$this->buyer();$c->forceFill(['inventory_enabled'=>true])->save();
+  $product=\App\Models\Product::withoutGlobalScopes()->create(['company_id'=>$c->id,'name'=>'Synthetic lock order','hs_code'=>'33049900','uom'=>'KG','is_active'=>true]);
+  $invoice=$this->draft($c);$invoice->forceFill(['document_type'=>'Sale Invoice','inventory_enabled_snapshot'=>true,'inventory_environment_snapshot'=>'production'])->save();
+  $invoice->items()->create(['hs_code'=>'33049900','description'=>'Synthetic','quantity'=>'1.0000','price'=>100,'tax'=>0,'default_uom'=>'KG','inventory_snapshot'=>['version'=>1,'company_id'=>$c->id,'product_id'=>$product->id,'branch_id'=>null,'base_uom'=>'KG','base_quantity'=>'1.0000','source_invoice_item_id'=>null]]);
+  $claim=Fiscal::reserve($invoice->id,'synthetic','production');
+  $sub=\App\Models\Subscription::where('company_id',$c->id)->where('active',true)->first();
+  $this->travelTo(Carbon::parse($sub->lifecycle_snapshot['grace_ends_at'])->addDay());
+  self::assertFalse(\App\Services\SubscriptionAccessService::hasAccess($c)['allowed']);
+  Fiscal::accepted($claim,'SYNTHETIC-ACK-EXPIRED','production','synthetic_test');\App\Services\DiInvoiceInventory::saveAccepted($claim);
+  self::assertSame('locked',$claim->fresh()->status);self::assertSame('posted',$claim->fresh()->inventory_posting_state);
+  \App\Services\InventoryService::addStock($c->id,$product->id,'2.0000','2.00','purchase');
+  self::assertEquals('1.0000',number_format((float)DB::table('inventory_stocks')->where('company_id',$c->id)->value('quantity'),4,'.',''));
+  self::assertSame(2,DB::table('inventory_movements')->where('company_id',$c->id)->count());Http::assertNothingSent();
+ }
  public function test_actual_pra_checkout_rechecks_a_raced_last_slot_before_persisting(): void {
   $c=$this->buyer('pos');$owner=User::factory()->create(['company_id'=>$c->id,'role'=>'company_admin','is_active'=>true]);
   $injected=false;$baseline=DB::transactionLevel();

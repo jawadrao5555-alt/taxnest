@@ -52,6 +52,7 @@ class InventoryService
         ?int $branchId = null,
         ?int $userId = null
     ): array {
+        ProspectiveQuotaGuard::lockCompanyForWrite($companyId);
         $company = \App\Models\Company::find($companyId);
         if (!$company || !$company->inventory_enabled) {
             return ['skipped' => true, 'restored' => []];
@@ -276,6 +277,7 @@ class InventoryService
         int $companyId, int $branchId, array $sale, int $transactionId,
         string $invoiceNumber, ?int $userId = null
     ): array {
+        ProspectiveQuotaGuard::lockCompanyForWrite($companyId);
         $consumptions = self::canonicalConsumptions($companyId, $sale);
         if (InventoryMovement::where('company_id', $companyId)
             ->where('reference_type', 'pos_transaction')->where('reference_id', $transactionId)
@@ -448,6 +450,7 @@ class InventoryService
     public static function addStock($companyId, $productId, $quantity, $unitPrice, $type, $branchId = null, $reference = [], $notes = null, $userId = null, array $batchMeta = [])
     {
         return DB::transaction(function () use ($companyId, $productId, $quantity, $unitPrice, $type, $branchId, $reference, $notes, $userId, $batchMeta) {
+            ProspectiveQuotaGuard::lockCompanyForInvoiceWork((int)$companyId);
             $di = self::lockDiStockProduct($companyId, $productId);
             $stock = InventoryStock::lockForUpdate()->firstOrCreate(
                 ['company_id' => $companyId, 'product_id' => $productId, 'branch_id' => $branchId],
@@ -536,6 +539,7 @@ class InventoryService
     public static function reversePurchase($companyId, $productId, $quantity, $unitPrice, $branchId = null, $reference = [], $notes = null, $userId = null, $fallbackLastPrice = null)
     {
         return DB::transaction(function () use ($companyId, $productId, $quantity, $unitPrice, $branchId, $reference, $notes, $userId, $fallbackLastPrice) {
+            ProspectiveQuotaGuard::lockCompanyForInvoiceWork((int)$companyId);
             $di = self::lockDiStockProduct($companyId, $productId);
             $stock = InventoryStock::lockForUpdate()->firstOrCreate(
                 ['company_id' => $companyId, 'product_id' => $productId, 'branch_id' => $branchId],
@@ -591,6 +595,7 @@ class InventoryService
     public static function deductStock($companyId, $productId, $quantity, $unitPrice, $type, $branchId = null, $reference = [], $notes = null, $userId = null, array $batchMeta = [])
     {
         return DB::transaction(function () use ($companyId, $productId, $quantity, $unitPrice, $type, $branchId, $reference, $notes, $userId, $batchMeta) {
+            ProspectiveQuotaGuard::lockCompanyForInvoiceWork((int)$companyId);
             $di = self::lockDiStockProduct($companyId, $productId);
             $stock = InventoryStock::lockForUpdate()->firstOrCreate(
                 ['company_id' => $companyId, 'product_id' => $productId, 'branch_id' => $branchId],

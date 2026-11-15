@@ -114,6 +114,7 @@ final class DiInvoiceInventory {
  /** Fiscal acceptance is external and cannot be rolled back. Stock failure holds only the projection. */
  public static function saveAccepted(Invoice $invoice): void {
   DB::transaction(function() use($invoice){
+   ProspectiveQuotaGuard::lockCompanyForInvoiceWork((int)$invoice->company_id);
    $locked=Invoice::withoutGlobalScopes()->where('company_id',$invoice->company_id)->whereKey($invoice->id)->lockForUpdate()->firstOrFail();
    $locked->forceFill($invoice->getDirty());
    if($locked->inventory_enabled_snapshot===true && !$locked->integrity_hash)$locked->integrity_hash=IntegrityHashService::generate($locked);
@@ -146,6 +147,7 @@ final class DiInvoiceInventory {
  /** Explicit local-only repair: never invokes or reserves fiscal submission. */
  public static function retryStock(Invoice $invoice): void {
   DB::transaction(function()use($invoice){
+   ProspectiveQuotaGuard::lockCompanyForInvoiceWork((int)$invoice->company_id);
    $locked=Invoice::withoutGlobalScopes()->where('company_id',$invoice->company_id)->whereKey($invoice->id)->lockForUpdate()->firstOrFail();
    if($locked->status!=='locked' || !$locked->fbr_invoice_number || $locked->inventory_enabled_snapshot!==true)self::reject('Only an acknowledged invoice can retry its local stock projection.');
    if($locked->inventory_environment_snapshot!=='production' || $locked->fiscal_submission_environment!=='production' || $locked->inventory_posting_state==='sandbox_no_stock')self::reject('Only the original production invoice can recover physical stock; sandbox or unknown environments cannot be relabelled.');

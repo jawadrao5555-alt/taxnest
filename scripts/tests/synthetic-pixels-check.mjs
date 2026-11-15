@@ -71,3 +71,8 @@ test('PRA answer-start captures remain exact bounded intent names',()=>{
  for(const intent of ['closing','recipe','campus-unknown'])for(const width of [1366,390])assert.equal(pixelName(`madadgar-pra-${intent}-answer-${width}`),`madadgar-pra-${intent}-answer-${width}.png`);
  for(const name of ['madadgar-pra-custom-answer-390','madadgar-pra-closing-answer-1280','madadgar-pra-recipe-answer-390.png','../madadgar-pra-closing-answer-390'])assert.throws(()=>pixelName(name));
 });
+
+test('pilot fiscal controls allow only two named synthetic OFF screens',()=>{
+ for(const category of ['school','hospital'])for(const width of [1366,390])assert.equal(pixelName(`pilot-fiscal-control-${category}-${width}`),`pilot-fiscal-control-${category}-${width}.png`);
+ for(const name of ['pilot-fiscal-control-custom-390','pilot-fiscal-control-school-1280','pilot-fiscal-control-hospital-390.png','../pilot-fiscal-control-school-390'])assert.throws(()=>pixelName(name));
+});

@@ -112,6 +112,10 @@
                        keeps saying "coming soon" rather than offering a dead link. */
                     $builtModules = [
                         'opd' => ['route' => 'health.appointments', 'cap' => 'appointments.manage', 'alt' => ['health.clinical' => 'clinical.view']],
+                        'pharmacy' => ['route' => 'health.pharmacy', 'cap' => 'pharmacy.view'],
+                        'ipd' => ['route' => 'health.ipd', 'cap' => 'ipd.view'],
+                        'accounts' => ['route' => 'health.accounts', 'cap' => 'accounts.view'],
+                        'hr' => ['route' => 'health.hr', 'cap' => 'hr.view'],
                     ];
                     $anyPending = false;
                 @endphp
@@ -131,7 +135,7 @@
                             }
                             if (!$entry) { $anyPending = true; }
                         @endphp
-                        <div class="tn-health-module rounded-xl border border-gray-200 dark:border-gray-700 p-4">
+                        <div data-health-module="{{ $module }}" class="tn-health-module rounded-xl border border-gray-200 dark:border-gray-700 p-4">
                             <div class="flex items-center gap-2">
                                 <span class="text-lg leading-none">{{ HealthModuleService::MODULE_META[$module]['icon'] ?? '•' }}</span>
                                 <span class="text-sm font-black">{{ __(HealthModuleService::moduleLabelKey($module)) }}</span>

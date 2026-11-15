@@ -8,6 +8,7 @@
  */
 
 return [
+    'nav_my_duty' => 'Meri duty',
 
     /* ─── Product ─── */
     // Nest ERPS product hai; Healthcare us ke andar ka vertical hai.

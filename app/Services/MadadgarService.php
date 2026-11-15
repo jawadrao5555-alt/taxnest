@@ -88,7 +88,7 @@ class MadadgarService
         $usageStarted=microtime(true);
         $result=MadadgarAnswerScope::answer($question,$product,$company,$actor)
             ?? self::respondWithinScope(MadadgarAnswerScope::history($history),$question,$product,$company);
-        if (($result['source']??null)!=='openai') MadadgarUsage::local($company,(string)($result['source']??'scoped'),(int)round((microtime(true)-$usageStarted)*1000));
+        if (($result['source']??null)!=='openai') $result['usage_observation']=MadadgarUsage::local($company,(string)($result['source']??'scoped'),(int)round((microtime(true)-$usageStarted)*1000))?'recorded':'unavailable';
         $result['provenance']=MadadgarAnswerScope::metadata($result,$product,$company,$actor);
         return $result;
     }

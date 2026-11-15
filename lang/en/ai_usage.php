@@ -4,7 +4,7 @@ return [
     'month' => 'Month (UTC)',
     'view' => 'View month',
     'events' => 'Recorded events',
-    'calls' => 'Provider attempts',
+    'calls' => 'Provider reservations (dispatch not inferred)',
     'blocked' => 'Blocked by budget',
     'errors' => 'Provider errors',
     'tokens' => 'Reported input / output tokens',

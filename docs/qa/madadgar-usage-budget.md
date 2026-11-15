@@ -6,7 +6,7 @@ Existing local-first behaviour, bounded read scopes and escalation confirmation
 remain unchanged. Other AI products (invoice OCR etc.) retain their separate
 credit ledgers; this page does not claim to aggregate their costs.
 
-The UTC monthly page shows provider attempts, errors, blocked requests, reported
+The UTC monthly page shows provider reservations (not inferred dispatches), errors, blocked requests, reported
 tokens, observed latency, known estimated USD cost, committed allowance and bounded
 latest events. It reuses actual confirmed escalation IDs/status/timestamps without
 copying titles or private conversations. An assistant answer never marks solved.
@@ -48,3 +48,9 @@ failure retains allowance; no provider request occurs. Native and desktop/mobile
 execution must be separately evidenced on the final CI head; source tests alone
 are not native/browser completion. Operational rollback must preserve usage and
 budget evidence, not drop tables after recorded spend.
+
+Partial schema loss after feature installation fails closed before provider HTTP,
+including a surviving policy table or migration ledger with missing events table.
+Local/scoped answer telemetry failure returns usage_observation=unavailable and a
+fixed safe log notice; it never destroys the computed answer or bypasses provider
+budget gating. A reservation is not proof of dispatch and is labelled accordingly.

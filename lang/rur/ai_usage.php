@@ -4,7 +4,7 @@ return [
     'month' => 'Mahina (UTC)',
     'view' => 'Mahina dekhein',
     'events' => 'Record shuda waqiat',
-    'calls' => 'Provider ko bhejne ki koshish',
+    'calls' => 'Provider allowance reserve (bhejna tasdeeq nahin)',
     'blocked' => 'Budget ki wajah se roki gayi',
     'errors' => 'Provider ki ghaltiyan',
     'tokens' => 'Report shuda input / output tokens',

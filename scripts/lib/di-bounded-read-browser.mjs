@@ -2,6 +2,7 @@ export async function diBoundedReadWorkflow(page,t,v,{baseUrl,login,loopback,sav
  const f=t.diReadCases[v.width],path='/madadgar/di-read';
  const check=(ok,message)=>{if(!ok)throw Error(message);};
  await page.goto(baseUrl+'/dashboard',{waitUntil:'domcontentloaded'});
+ if(v.width<1024) await page.locator('button[onclick="toggleSidebar()"]').click();
  const link=page.getByRole('link',{name:'Madadgar: recorded totals',exact:true});
  await link.click();
  check(new URL(page.url()).pathname===path,'DI owner link did not open the bounded read page');

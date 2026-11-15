@@ -54,3 +54,7 @@ including a surviving policy table or migration ledger with missing events table
 Local/scoped answer telemetry failure returns usage_observation=unavailable and a
 fixed safe log notice; it never destroys the computed answer or bypasses provider
 budget gating. A reservation is not proof of dispatch and is labelled accordingly.
+
+The migration is forward-only: down() intentionally preserves both tables, all
+configured caps and uncertain reservations. Reapplication is idempotent and never
+resets data. Code rollback is not permission to delete billing evidence.

@@ -84,4 +84,12 @@ class MadadgarUsageBudgetTest extends TestCase {
   $this->assertSame('reserved',DB::table('madadgar_usage_events')->sole()->state);
  }
 
+ public function test_migration_rollback_preserves_policy_and_unknown_reservations_and_reapply_is_idempotent():void {
+  $this->policy('0.001000');$id=MadadgarUsage::begin($this->company,100,600);MadadgarUsage::finish($id,12,null,'provider_transport_error');
+  $beforePolicy=DB::table('madadgar_budget_policies')->get()->toJson();$beforeEvents=DB::table('madadgar_usage_events')->get()->toJson();
+  $migration=require database_path('migrations/2026_12_24_000000_create_madadgar_usage_budget.php');$migration->down();$migration->up();
+  $this->assertSame($beforePolicy,DB::table('madadgar_budget_policies')->get()->toJson());$this->assertSame($beforeEvents,DB::table('madadgar_usage_events')->get()->toJson());
+  $this->expectException(\RuntimeException::class);MadadgarUsage::begin($this->company,100,600);
+ }
+
 }

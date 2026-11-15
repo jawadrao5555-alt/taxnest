@@ -91,7 +91,7 @@
                             );
                         }
                     @endphp
-                    <form method="POST" action="/pos/register" class="px-6 pb-6 pt-4 space-y-4" x-data="{ posType: '{{ old('pos_type', 'restaurant') }}', planId: '{{ old('pricing_plan_id', $preselectedPlanId ?? '') }}', cycle: @js(old('billing_cycle', 'annual')), prices: @js($planPrices ?? []), perLabels: @js($cyclePerLabels ?? []), addonCodes: @js($signupAddonQuote['codes']), addonAllowed: @js($signupAllowedByPlan), addonPrices: @js($signupAddonPrices), billableAddons() { return this.addonCodes.filter(code => (this.addonAllowed[this.planId] || []).includes(code)); }, addonTotal() { return this.billableAddons().reduce((sum, code) => sum + Number(this.addonPrices[code] || 0), 0); }, btFilter: '', btTerms: @js($praBusinessTypeTerms), btMatch(k) { const q = (this.btFilter || '').trim().toLowerCase(); if (! q) return true; const hay = this.btTerms[k] || ''; return q.split(/\s+/).every(w => hay.includes(w)); }, btGroupHas(keys) { return keys.some(k => this.btMatch(k)); }, get btAnyMatch() { return Object.keys(this.btTerms).some(k => this.btMatch(k)); }, priceOf(id) { const row = this.prices[id] || {}; const v = row[this.cycle]; return v === undefined ? '' : Number(v).toLocaleString('en-US'); }, get perLabel() { return this.perLabels[this.cycle] || ''; } }">
+                    <form method="POST" action="/pos/register" class="px-6 pb-6 pt-4 space-y-4" x-data="{ posType: '{{ old('pos_type', 'restaurant') }}', planId: '{{ old('pricing_plan_id', $preselectedPlanId ?? '') }}', cycle: @js(old('billing_cycle', request('billing_cycle', 'annual'))), prices: @js($planPrices ?? []), perLabels: @js($cyclePerLabels ?? []), addonCodes: @js($signupAddonQuote['codes']), addonAllowed: @js($signupAllowedByPlan), addonPrices: @js($signupAddonPrices), billableAddons() { return this.addonCodes.filter(code => (this.addonAllowed[this.planId] || []).includes(code)); }, addonTotal() { return this.billableAddons().reduce((sum, code) => sum + Number(this.addonPrices[code] || 0), 0); }, btFilter: '', btTerms: @js($praBusinessTypeTerms), btMatch(k) { const q = (this.btFilter || '').trim().toLowerCase(); if (! q) return true; const hay = this.btTerms[k] || ''; return q.split(/\s+/).every(w => hay.includes(w)); }, btGroupHas(keys) { return keys.some(k => this.btMatch(k)); }, get btAnyMatch() { return Object.keys(this.btTerms).some(k => this.btMatch(k)); }, priceOf(id) { const row = this.prices[id] || {}; const v = row[this.cycle]; return v === undefined ? 'Unavailable' : Number(v).toLocaleString('en-US'); }, get perLabel() { return this.perLabels[this.cycle] || ''; } }">
                         @csrf
 
                         {{-- Package picker (owner rule Jul 2026): shop selects its plan at
@@ -162,7 +162,7 @@
 
                         <p data-signup-quote-total x-show="planId" class="text-sm font-semibold text-white" aria-live="polite">
                             {{ __('pos.addons_grand_total') }}: PKR
-                            <span x-text="(Number((prices[planId] || {})[cycle] || 0) + addonTotal()).toLocaleString('en-US')"></span>
+                            <span x-text="(prices[planId] || {})[cycle] === undefined ? 'Unavailable' : (Number(prices[planId][cycle]) + addonTotal()).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})"></span>
                             <span x-text="perLabel"></span>
                         </p>
 
@@ -286,7 +286,7 @@
                             <input id="password_confirmation" type="password" name="password_confirmation" required autocomplete="new-password" placeholder="{{ __('pos.auth_ph_reenter') }}" class="w-full rounded-xl text-sm text-white placeholder-purple-300/30 transition" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); padding: 11px 14px; outline: none;" onfocus="this.style.borderColor='rgba(139,92,246,0.5)'; this.style.boxShadow='0 0 0 3px rgba(139,92,246,0.15)';" onblur="this.style.borderColor='rgba(255,255,255,0.12)'; this.style.boxShadow='none';">
                         </div>
 
-                        <button type="submit" class="w-full py-3 rounded-xl text-sm font-bold text-white transition-all duration-200" style="background: linear-gradient(135deg, #7c3aed, #a855f7); box-shadow: 0 4px 20px rgba(124, 58, 237, 0.4);" onmouseover="this.style.boxShadow='0 6px 28px rgba(124, 58, 237, 0.55)'; this.style.transform='translateY(-1px)';" onmouseout="this.style.boxShadow='0 4px 20px rgba(124, 58, 237, 0.4)'; this.style.transform='translateY(0)';">
+                        <button :disabled="planId &amp;&amp; (prices[planId] || {})[cycle] === undefined" type="submit" class="w-full py-3 rounded-xl text-sm font-bold text-white transition-all duration-200" style="background: linear-gradient(135deg, #7c3aed, #a855f7); box-shadow: 0 4px 20px rgba(124, 58, 237, 0.4);" onmouseover="this.style.boxShadow='0 6px 28px rgba(124, 58, 237, 0.55)'; this.style.transform='translateY(-1px)';" onmouseout="this.style.boxShadow='0 4px 20px rgba(124, 58, 237, 0.4)'; this.style.transform='translateY(0)';">
                             {{ __('pos.auth_create_account') }}
                         </button>
 

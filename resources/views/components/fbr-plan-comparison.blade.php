@@ -42,7 +42,7 @@
     popular-label="Popular"
     current-label="Your plan"
     tick-label="Included"
-    note="Every package is billed annually at the full-year price shown. Every package bills to FBR in real time from day one."
+    note="The table shows annual package prices. Additional configured periods appear below when available. Fiscal reporting depends on category, approved integration and verification; School and Hospital fiscal submission remains disabled."
     tip="Scroll sideways to see all packages."
     included-title="Included in every package"
     included-sub="These never depend on which package you pick."
@@ -50,3 +50,14 @@
     :surface="$surface"
     :show-heading="$showHeading"
 />
+
+@if($surface === 'landing' && config('billing.shared_configured_cycles', false))
+<section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 my-6" aria-label="Configured billing periods">
+    @foreach($fcmpPlans as $plan)
+    <article class="rounded-xl border p-4 bg-white text-gray-900">
+        <h3 class="font-bold">{{ $plan->name }}</h3>
+        @include('billing._configured-cycle-quote', ['plan' => $plan, 'company' => null, 'signupRoute' => 'fbrpos.register'])
+    </article>
+    @endforeach
+</section>
+@endif

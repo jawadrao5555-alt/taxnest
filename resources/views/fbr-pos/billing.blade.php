@@ -7,7 +7,7 @@
             </a>
             <div class="text-center mb-8">@if($company->isSchoolFeePilot())<p class="notice">{{ __('school_workspace.school_billing_note') }}</p>@endif
                 <h2 class="text-2xl font-bold text-gray-900 dark:text-gray-100">{{ $company->isSchoolFeePilot() ? __('school_workspace.school_plans') : __('pos.fbr_pos_plans') }}</h2>
-                <p class="text-gray-500 dark:text-gray-400 mt-2">{{ __('pos.simple_annual_billing') }}</p>
+                <p class="text-gray-500 dark:text-gray-400 mt-2">Choose an available billing period and review the exact total.</p>
             </div>
 
             @if($currentSubscription && $currentSubscription->entitlementPlan())
@@ -28,16 +28,9 @@
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
                 @foreach($plans as $plan)
                 @php
-                    // 23 Aug 2026: FBR POS prices the YEAR (price = annual rate)
-                    // and the year is the ONLY cycle sold. Never re-derive —
-                    // SubscriptionAssignmentService charges this very column.
-                    $yearlyTotal = (int) round($plan->sale_price);
-                    $perMonth = (int) round($yearlyTotal / 12);
-                    $hasOffer = ($plan->sale_percent ?? 0) > 0;
-                    $compareYearly = $hasOffer ? (int) round($plan->price) : 0;
                     $isCurrent = $currentSubscription && $currentSubscription->pricing_plan_id === $plan->id;
                     $isPopular = $plan->name === 'Business';
-                    $planFeatures = is_array($plan->features) ? $plan->features : (is_string($plan->features) ? json_decode($plan->features, true) : []);
+                    $planFeatures = \App\Services\FbrPosPlanComparisonService::cardHighlights($plan);
                 @endphp
                 <div class="relative rounded-2xl overflow-hidden transition duration-300 hover:-translate-y-1 {{ $isPopular ? 'ring-2 ring-blue-500' : '' }} shadow-sm">
                     @if($isPopular)
@@ -51,23 +44,14 @@
                         @endif
                         <h3 class="text-lg font-bold text-gray-900 dark:text-gray-100">{{ $plan->name }}</h3>
 
-                        <div class="mt-4 mb-1">
-                            @if($hasOffer)
-                            <div class="mb-1.5"><span class="inline-block px-2 py-0.5 bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300 rounded-full text-[11px] font-bold">{{ $plan->sale_badge }}</span></div>
-                            <span class="text-base text-gray-400 line-through mr-1">PKR {{ number_format($compareYearly) }}</span>
-                            @endif
-                            <span class="text-3xl font-black text-gray-900 dark:text-gray-100">PKR {{ number_format($yearlyTotal) }}</span>
-                            <span class="text-gray-400 text-sm">{{ __('pos.per_year') }}</span>
-                        </div>
-                        <p class="text-xs text-gray-400">{{ __('pos.pkr_per_mo_effective', ['amount' => number_format($perMonth)]) }}</p>
-                        @if($hasOffer)<p class="text-xs text-blue-600 font-medium mt-0.5">{{ __('pos.save_pkr', ['amount' => number_format($compareYearly - $yearlyTotal)]) }}</p>@endif
+                        @include('billing._configured-cycle-quote', ['plan' => $plan, 'company' => $company])
 
                         <div class="mt-4 pt-4 border-t border-gray-100 dark:border-gray-800 space-y-2 text-sm text-gray-600 dark:text-gray-400">
                             @if($company->isSchoolFeePilot())<p>{{ __('school_workspace.school_billing_note') }}</p>@elseif(!empty($planFeatures))
                                 @foreach($planFeatures as $feature)
                                 <div class="flex items-center gap-2">
                                     <svg class="w-4 h-4 text-blue-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                                    {{ $feature }}
+                                    {{ $feature['label'] }}
                                 </div>
                                 @endforeach
                             @endif
@@ -98,7 +82,7 @@
                     </span>
                     <span class="flex items-center gap-1.5">
                         <span class="text-xs font-bold text-blue-400">PKR</span>
-                        {{ __('pos.annual_savings_6') }}
+                        Configured package pricing
                     </span>
                     <span class="flex items-center gap-1.5">
                         <svg class="w-4 h-4 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>

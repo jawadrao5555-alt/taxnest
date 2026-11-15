@@ -58,10 +58,6 @@
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
                 @foreach($plans as $plan)
                 @php
-                    $yearlyTotal = round($plan->sale_price);
-                    $perMonth = round($plan->sale_price / 12);
-                    $hasOffer = $plan->sale_percent > 0;
-                    $compareYearly = $hasOffer ? round($plan->price) : 0;
                     $isCurrent = $currentSubscription && $currentSubscription->pricing_plan_id === $plan->id;
                     $isPopular = $plan->name === 'Business';
                 @endphp
@@ -77,16 +73,7 @@
                         @endif
                         <h3 class="text-lg font-bold text-gray-900 dark:text-gray-100">{{ $plan->name }}</h3>
 
-                        <div class="mt-4 mb-1">
-                            @if($hasOffer)
-                            <div class="mb-1.5"><span class="inline-block px-2 py-0.5 bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300 rounded-full text-[11px] font-bold">{{ $plan->sale_badge }}</span></div>
-                            <span class="text-base text-gray-400 line-through mr-1">PKR {{ number_format($compareYearly) }}</span>
-                            @endif
-                            <span class="text-3xl font-black text-gray-900 dark:text-gray-100">PKR {{ number_format($yearlyTotal) }}</span>
-                            <span class="text-gray-400 text-sm">/year</span>
-                        </div>
-                        <p class="text-xs text-gray-400">PKR {{ number_format($perMonth) }}/mo effective</p>
-                        @if($hasOffer)<p class="text-xs text-purple-600 font-medium mt-0.5">Save PKR {{ number_format($compareYearly - $yearlyTotal) }}</p>@endif
+                        @include('billing._configured-cycle-quote', ['plan' => $plan, 'company' => $company])
 
                         @php
                             $prevPlan = $loop->index > 0 ? ($plans[$loop->index - 1] ?? null) : null;

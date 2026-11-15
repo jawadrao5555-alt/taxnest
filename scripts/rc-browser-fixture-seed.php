@@ -1091,6 +1091,32 @@ File::ensureDirectoryExists(public_path('videos'));
 File::put(public_path('videos/rc-onboarding-synthetic.mp4'), 'synthetic file placeholder; never played');
 File::put(public_path('videos/rc-onboarding-synthetic.vtt'), "WEBVTT\n\n00:00.000 --> 00:01.000\nSynthetic caption fixture\n");
 \App\Models\TutorialVideo::create(['slug'=>'rc-onboarding-synthetic','product'=>'di','title'=>'Synthetic searchable guide','description'=>'Synthetic accessibility acceptance only','video_url'=>'/videos/rc-onboarding-synthetic.mp4','category'=>'shuruat','is_published'=>true,'show_public'=>true,'controls_applied'=>true,'caption_path'=>'/videos/rc-onboarding-synthetic.vtt','caption_language'=>'en','transcript'=>'Synthetic transcript only','release_version'=>'synthetic-build','reviewed_on'=>'2026-01-01']);
+// Synthetic state fixtures only: no fiscal transport is invoked or configured.
+$diInventoryCases=[];
+foreach ([1366,390] as $width) {
+    $stockCompany=$company('Synthetic DI stock '.$width,'di-stock-'.$width.'@rc-browser.invalid','RCDISTOCK'.$width,'di',['inventory_enabled'=>true]);
+    $stockOwner=$user($stockCompany,'Synthetic stock owner','di-stock-owner-'.$width.'@rc-browser.invalid','company_admin');
+    $stockProduct=\App\Models\Product::withoutGlobalScopes()->create(['company_id'=>$stockCompany->id,'name'=>'Synthetic DI KG stock '.$width,'hs_code'=>'33049900','uom'=>'KG','is_active'=>true,'default_price'=>100,'default_tax_rate'=>0]);
+    DB::table('inventory_stocks')->insert(['company_id'=>$stockCompany->id,'product_id'=>$stockProduct->id,'branch_id'=>null,'quantity'=>'100.0000','min_stock_level'=>0,'avg_purchase_price'=>0,'last_purchase_price'=>0,'created_at'=>$now,'updated_at'=>$now]);
+    $stockCases=[];
+    foreach (['posted'=>['50.0000','production'],'sandbox'=>['25.0000','sandbox'],'hold'=>['10.1234','production']] as $kind=>[$quantity,$environment]) {
+        $invoice=\App\Models\Invoice::withoutGlobalScopes()->create(['company_id'=>$stockCompany->id,'invoice_number'=>'SYN-DI-STOCK-'.$width.'-'.$kind,'buyer_name'=>'Synthetic stock buyer','buyer_ntn'=>'','buyer_address'=>'Synthetic address','total_amount'=>round((float)$quantity*100,2),'total_value_excluding_st'=>round((float)$quantity*100,2),'total_sales_tax'=>0,'status'=>'draft','document_type'=>'Sale Invoice','inventory_enabled_snapshot'=>true,'inventory_environment_snapshot'=>$environment]);
+        $invoice->items()->create(['hs_code'=>'33049900','description'=>'Synthetic stock line','quantity'=>$quantity,'price'=>100,'tax'=>0,'default_uom'=>'KG','inventory_snapshot'=>['version'=>1,'company_id'=>$stockCompany->id,'product_id'=>$stockProduct->id,'branch_id'=>null,'base_uom'=>'KG','base_quantity'=>$quantity,'source_invoice_item_id'=>null]]);
+        \App\Services\DiFiscalSubmissionState::accepted($invoice,'SYNTHETIC-NOT-REGULATOR-'.$width.'-'.$kind,$environment,'synthetic_browser_fixture');
+        if($kind==='hold') {
+            // Simulate an acknowledged fixture whose local projection has not completed.
+            $invoice->inventory_posting_state='reconciliation_hold';
+            $invoice->integrity_hash=\App\Services\IntegrityHashService::generate($invoice);
+            $invoice->save();
+        } else \App\Services\DiInvoiceInventory::saveAccepted($invoice);
+        $stockCases[$kind]=['id'=>$invoice->id,'reference'=>$invoice->internal_invoice_number??$invoice->invoice_number,'ack'=>$invoice->fbr_invoice_number];
+    }
+    $diInventoryCases[$width]=['login'=>$stockOwner->email,'product'=>$stockProduct->id,'invoices'=>$stockCases];
+}
+foreach([1366=>390,390=>1366] as $width=>$other) {
+    $diInventoryCases[$width]['foreignInvoice']=$diInventoryCases[$other]['invoices']['posted']['id'];
+    $diInventoryCases[$width]['foreignProduct']=$diInventoryCases[$other]['product'];
+}
 
 $billingSelectionCases = [];
 foreach ([1366,390] as $width) {
@@ -1163,6 +1189,7 @@ $fixture = [
     ], $categoryJourneys, $optionalArchiveJourneys),
     'transactionalJourneys' => [
         ['name'=>'opt-in-greetings-tutorials','manualOnly'=>true,'login'=>$greetingCases[1366]['login'],'password'=>$password,'loginPath'=>'/login','paths'=>[],'greetingCases'=>$greetingCases],
+        ['name'=>'di-inventory-projection','manualOnly'=>true,'login'=>$diInventoryCases[1366]['login'],'password'=>$password,'loginPath'=>'/login','paths'=>[],'diInventoryCases'=>$diInventoryCases],
         ['name'=>'delivery-credit','login'=>$deliveryCreditCases[1366]['login'],'password'=>$password,'loginPath'=>'/pos/login','paths'=>['/pos/delivery-accounts'],'markers'=>['Synthetic credit customer'],'deliveryCredit'=>$deliveryCreditCases,'manualOnly'=>true],
         ['name'=>'hospital-collections','login'=>$hospitalCases[1366],'mobileLogin'=>$hospitalCases[390],'password'=>$password,'loginPath'=>'/fbr-pos/login',
             'paths'=>['/fbr-pos/hospital'],'markers'=>['Hospital'],'hospitalCollection'=>true,'manualOnly'=>true],

@@ -281,6 +281,10 @@ jobs:
         run: |
           composer install --no-interaction --prefer-dist --no-progress --no-ansi --no-scripts
           bash scripts/npm-bootstrap-pinned.sh ci --ignore-scripts --no-audit --no-fund
+          # Browser acceptance must render this checkout's classes, not an
+          # older committed Vite bundle. Keep the responsive assertions strict.
+          npm run build
+          node scripts/tests/landing-asset-contract.mjs
           RC_BROWSER_STATE_ROOT=/tmp/taxnest-rc-browser-${{ github.run_id }}-${{ github.job }} \
             bash scripts/rc-playwright-install.sh
           node scripts/tests/local-browser-discovery-check.mjs

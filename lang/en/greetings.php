@@ -15,4 +15,6 @@ return [
     'add' => 'Add recipient',
     'revoke' => 'Save or revoke consent',
     'link' => 'Optional customer greetings and consent',
+    'package_review' => 'Package and billing review',
+    'package_review_note' => 'Select a configured period and submit payment evidence for review.',
 ];

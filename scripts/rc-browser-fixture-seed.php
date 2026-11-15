@@ -1081,6 +1081,17 @@ foreach ([1366,390] as $securityWidth) {
         }
     }
 }
+$greetingCases = [];
+foreach ([1366, 390] as $width) {
+    $greetCompany = $company('Synthetic greeting workspace '.$width, 'greeting-'.$width.'@rc-browser.invalid', 'RCGREET'.$width, 'di');
+    $greetOwner = $user($greetCompany, 'Synthetic greeting owner', 'greeting-owner-'.$width.'@rc-browser.invalid', 'company_admin');
+    $greetingCases[$width] = ['login'=>$greetOwner->email];
+}
+File::ensureDirectoryExists(public_path('videos'));
+File::put(public_path('videos/rc-onboarding-synthetic.mp4'), 'synthetic file placeholder; never played');
+File::put(public_path('videos/rc-onboarding-synthetic.vtt'), "WEBVTT\n\n00:00.000 --> 00:01.000\nSynthetic caption fixture\n");
+\App\Models\TutorialVideo::create(['slug'=>'rc-onboarding-synthetic','product'=>'di','title'=>'Synthetic searchable guide','description'=>'Synthetic accessibility acceptance only','video_url'=>'/videos/rc-onboarding-synthetic.mp4','category'=>'shuruat','is_published'=>true,'show_public'=>true,'controls_applied'=>true,'caption_path'=>'/videos/rc-onboarding-synthetic.vtt','caption_language'=>'en','transcript'=>'Synthetic transcript only','release_version'=>'synthetic-build','reviewed_on'=>'2026-01-01']);
+
 $billingSelectionCases = [];
 foreach ([1366,390] as $width) {
     $billingCompany = $company('Synthetic Billing Selection '.$width, 'billing-selection-'.$width.'@rc-browser.invalid', 'RCBILLSEL'.$width, 'di',
@@ -1151,6 +1162,7 @@ $fixture = [
         ['name' => 'service-work-orders-denied', 'login' => $serviceDenied->email, 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/work-orders', '/pos/work-orders/report.csv'], 'denied' => true],
     ], $categoryJourneys, $optionalArchiveJourneys),
     'transactionalJourneys' => [
+        ['name'=>'opt-in-greetings-tutorials','manualOnly'=>true,'login'=>$greetingCases[1366]['login'],'password'=>$password,'loginPath'=>'/login','paths'=>[],'greetingCases'=>$greetingCases],
         ['name'=>'delivery-credit','login'=>$deliveryCreditCases[1366]['login'],'password'=>$password,'loginPath'=>'/pos/login','paths'=>['/pos/delivery-accounts'],'markers'=>['Synthetic credit customer'],'deliveryCredit'=>$deliveryCreditCases,'manualOnly'=>true],
         ['name'=>'hospital-collections','login'=>$hospitalCases[1366],'mobileLogin'=>$hospitalCases[390],'password'=>$password,'loginPath'=>'/fbr-pos/login',
             'paths'=>['/fbr-pos/hospital'],'markers'=>['Hospital'],'hospitalCollection'=>true,'manualOnly'=>true],

@@ -15,4 +15,6 @@ return [
     'add' => 'Wasool karne wala shamil karein',
     'revoke' => 'Mehfooz karein ya razamandi wapas lein',
     'link' => 'Ikhtiyari greetings aur razamandi',
+    'package_review' => 'Package aur billing review',
+    'package_review_note' => 'Dastiyab muddat chunein aur adaigi ka saboot review ke liye dein.',
 ];

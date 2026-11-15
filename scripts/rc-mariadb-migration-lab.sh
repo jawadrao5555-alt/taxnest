@@ -97,6 +97,7 @@ concurrency(){
     clean_php php "$ROOT/tests/native/rc_notification_concurrency.php"
     clean_php php "$ROOT/tests/native/rc_staff_discount_concurrency.php"
     clean_php php "$ROOT/tests/native/rc_school_fee_concurrency.php" | tee "$EVIDENCE_DIR/school-fee-concurrency.log"
+    clean_php php "$ROOT/tests/native/rc_greetings_concurrency.php" | tee "$EVIDENCE_DIR/greetings-concurrency.log"
     clean_php php "$ROOT/tests/native/rc_delivery_credit_concurrency.php" | tee "$EVIDENCE_DIR/delivery-credit-concurrency.log"
     clean_php php "$ROOT/tests/native/rc_hospital_collection_concurrency.php" | tee "$EVIDENCE_DIR/hospital-collection-concurrency.log"
     clean_php php "$ROOT/tests/native/rc_reviewed_device_proof.php" | tee "$EVIDENCE_DIR/reviewed-device-proof.log"

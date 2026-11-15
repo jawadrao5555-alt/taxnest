@@ -22,3 +22,9 @@ Implementation only, not activation or delivery authority. No real recipients, m
 
 ## Remaining proof
 Hosted desktop/390px keyboard and six-theme checks, native concurrent dispatch proof and actual supplied/verified caption content remain pending. Fake-provider unit/feature acceptance does not demonstrate real delivery, screen-reader certification or a complete #321 implementation. Activation, live messaging and deployment require separate owner decisions.
+
+## Added hosted acceptance (pending execution)
+- `rc_greetings_concurrency.php` uses only the guarded disposable MariaDB socket and fake transport. Two processes race the same occurrence; one synthetic send is required. A second race simulates delivery then response loss and requires one HOLD row and no repeat send.
+- `opt-in-greetings-tutorials` browser journey runs desktop and 390px with synthetic owner/recipient/video-caption fixtures. Preferences remain OFF throughout. It checks error focus, preview `sent=false`, consent persistence/revocation, keyboard tutorial search/transcript, captions/version metadata and saves sanitized screenshots.
+- Healthcare settings includes the owner-only package review link when the authenticated health checkout route is available.
+- These are test implementations, not recorded passing browser/native outcomes until hosted CI runs. No six-theme or physical screen-reader completion is asserted.

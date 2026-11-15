@@ -30,4 +30,5 @@
 <p>Unknown outcomes and interrupted sending remain on hold for reconciliation. They are never blindly retried. Provider-unavailable checks stop after three attempts for the occurrence.</p>
 <ul>@foreach($deliveries as $delivery)<li>{{ $delivery->occurrence }} · {{ $delivery->event }} · {{ $delivery->status }} · {{ $delivery->reason }} · attempts {{ $delivery->attempts }}</li>@endforeach</ul>
 </main>
+<script>document.querySelector('[role="alert"]')?.focus();</script>
 </x-app-layout>

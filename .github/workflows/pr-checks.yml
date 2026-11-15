@@ -39,6 +39,8 @@ jobs:
           bash scripts/tests/approval-dispatch-check.sh
           bash scripts/tests/npm-lock-portability-test.sh
           bash scripts/tests/ci-sanitize-evidence-check.sh
+          node --test scripts/tests/synthetic-pixels-check.mjs
+          python3 scripts/tests/synthetic-pixels-check.py
           bash scripts/tests/rc-failure-observability-check.sh
       - name: Mandatory PR-check DAG contract
         run: bash scripts/tests/rc-ci-gates-check.sh
@@ -258,6 +260,7 @@ jobs:
       options: --user root
     env:
       RC_MARIADB_VERSION: '10.6.23'
+      RC_SYNTHETIC_PIXEL_EVIDENCE: '1'
     steps:
       - name: Bootstrap pinned MariaDB container before checkout
         shell: bash
@@ -391,6 +394,21 @@ jobs:
           RC_BROWSER_PORT: '5911'
           RC_BROWSER_STATE_ROOT: /tmp/taxnest-rc-browser-${{ github.run_id }}-${{ github.job }}
         run: bash scripts/rc-browser-fixture.sh stop
+      - name: Verify guarded synthetic screenshot pixels
+        id: synthetic_pixels
+        if: always()
+        run: |
+          mkdir -p "$RUNNER_TEMP/taxnest-synthetic-pixels"
+          python3 scripts/lib/verify-synthetic-pixels.py "$RUNNER_TEMP/taxnest-synthetic-pixels/$GITHUB_JOB"
+          test -f "$RUNNER_TEMP/taxnest-synthetic-pixels/$GITHUB_JOB/VERIFIED_SYNTHETIC_PIXELS"
+      - name: Upload verified synthetic screenshots for visual review
+        if: always() && steps.synthetic_pixels.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: synthetic-visual-review-${{ github.run_id }}
+          path: ${{ runner.temp }}/taxnest-synthetic-pixels/${{ github.job }}
+          if-no-files-found: error
+          retention-days: 14
       - name: Sanitize CI evidence
         id: sanitize_evidence
         if: always()

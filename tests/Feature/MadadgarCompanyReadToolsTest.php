@@ -67,10 +67,22 @@ class MadadgarCompanyReadToolsTest extends TestCase
     public function test_stored_tax_classification_never_infers_exempt_from_zero_rate():void
     {
         [$c,$u]=$this->owner();$id=$this->sale($c,100);
-        foreach([[0,null],[0,true],[0,false],[5,false]] as [$rate,$exempt])DB::table('pos_transaction_items')->insert(['transaction_id'=>$id,'quantity'=>1,'tax_amount'=>0,'tax_rate'=>$rate,'is_tax_exempt'=>$exempt]);
+        foreach([[0,null],[0,true],[0,false],[5,false]] as [$rate,$exempt])DB::table('pos_transaction_items')->insert(['transaction_id'=>$id,'quantity'=>1,'tax_amount'=>$rate>0?12.34:0,'tax_rate'=>$rate,'is_tax_exempt'=>$exempt]);
         $r=$this->answer('today tax breakdown',$c,$u);
         foreach(['unknown item rows: 1','exempt item rows: 1','zero_rate item rows: 1','taxable item rows: 1'] as $text)$this->assertStringContainsString($text,$r['text']);
+        $this->assertStringContainsString('taxable net item tax PKR: 12.34',$r['text']);
         $this->assertStringContainsString('not current tax/legal advice',$r['text']);Http::assertNothingSent();
+    }
+    public function test_missing_tax_snapshot_reports_exact_source_table_and_di_stays_unsupported():void
+    {
+        Schema::drop('pos_transaction_items');
+        foreach(['pos'=>'pos_transaction_items','fbrpos'=>'fbr_pos_transaction_items'] as $product=>$table){
+            [$c,$u]=$this->owner($product);$r=$this->answer('today tax breakdown',$c,$u);
+            $this->assertSame($table,$r['provenance']['source_reference']);
+            $this->assertSame('unavailable',$r['provenance']['outcome']);
+        }
+        [$c,$u]=$this->owner();$r=MadadgarService::respond([],'today tax breakdown','di',$c,$u);
+        $this->assertSame('unsupported_product',$r['scope_reason']);Http::assertNothingSent();
     }
     public function test_missing_source_and_audit_fail_closed_not_zero_and_injection_no_read():void
     {

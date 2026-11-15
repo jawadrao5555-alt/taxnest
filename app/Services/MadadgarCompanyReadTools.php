@@ -83,11 +83,11 @@ final class MadadgarCompanyReadTools
             $r=$reports->summary($args,[$company->id]);
             if ($intent==='billing') return self::numericAnswer(array_intersect_key($r['totals'],array_flip(['completed_documents','sales_documents','return_documents','sales_total','return_credit_note_total','net_billing','net_tax','tax_unknown_documents'])),
                 ['completed_documents'=>'Completed documents','sales_documents'=>'Sales documents','return_documents'=>'Returns','sales_total'=>'Billed sales PKR','return_credit_note_total'=>'Return billing PKR','net_billing'=>'Net billed PKR','net_tax'=>'Stored net tax PKR','tax_unknown_documents'=>'Unknown tax documents'],[$table],'Billing is invoice value, not collected money. Returns subtracted once.');
-            if (!($r['tax_items']['available']??false)) return $unknown('Stored item tax/exempt classifications unavailable; zero rate ko exempt assume nahin kiya gaya.',[$table.'_items']);
+            if (!($r['tax_items']['available']??false)) return $unknown('Stored item tax/exempt classifications unavailable; zero rate ko exempt assume nahin kiya gaya.',[$company->product_type==='pos'?'pos_transaction_items':'fbr_pos_transaction_items']);
             $values=[];$labels=[];
             foreach($r['tax_items']['groups'] as $group) {
                 if(!in_array($group->classification,['taxable','exempt','zero_rate','unknown'],true)) continue;
-                foreach(['item_rows','net_item_tax','tax_unknown_rows'] as $key){$name=$group->classification.'_'.$key;$values[$name]=$group->$key;$labels[$name]=$group->classification.' '.str_replace('_',' ',$key);}
+                foreach(['item_rows','net_item_tax','tax_unknown_rows'] as $key){$name=$group->classification.'_'.$key;$values[$name]=$group->$key;$labels[$name]=$group->classification.' '.str_replace('_',' ',$key).($key==='net_item_tax'?' PKR':'');}
             }
             return self::numericAnswer($values,$labels,[$company->product_type==='pos'?'pos_transaction_items':'fbr_pos_transaction_items'],'Stored sale-time classifications only, not current tax/legal advice. Empty rows do not prove exemption.');
         }

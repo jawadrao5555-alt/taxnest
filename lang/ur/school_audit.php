@@ -20,6 +20,8 @@ return [
     'student_ledger' => 'طالب علم کی فیس کا حساب',
     'current_due' => 'موجودہ ماہ کی بقایا فیس',
     'past_due' => 'پچھلے مہینوں کے بقایاجات',
+    'outstanding_fees' => 'بقایا فیسیں',
+    'total_outstanding' => 'کل بقایا فیس',
     'payment_history' => 'ادائیگیوں کی تاریخ',
     'reference_search' => 'طالب علم کے ریفرنس سے تلاش کریں',
     'no_accounts' => 'اس ریفرنس کا کوئی فیس اکاؤنٹ نہیں ملا۔',

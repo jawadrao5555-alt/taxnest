@@ -22,8 +22,11 @@ final class PilotFiscalControlController extends Controller
             throw \Illuminate\Validation\ValidationException::withMessages(['route'=>'Route and enabled selection conflict.']);
         }
         $state=PilotFiscalControl::update($companyId,$on,$route);
-        if($request->expectsJson())return response()->json($state,$on?422:200)->header('Cache-Control','private, no-store');
-        if($on)return response()->view('saas-admin.pilot-fiscal-control',PilotFiscalControl::read($companyId)+['rejected'=>true],422)->header('Cache-Control','private, no-store');
-        return redirect()->route('saas.admin.pilot-fiscal-control',$companyId)->with('success','Fiscal submission remains OFF. Existing records are unchanged.');
+        $status=$on&&!$state['enabled']?422:200;
+        if($request->expectsJson())return response()->json($state,$status)->header('Cache-Control','private, no-store');
+        if($status===422)return response()->view('saas-admin.pilot-fiscal-control',PilotFiscalControl::read($companyId)+['rejected'=>true],422)->header('Cache-Control','private, no-store');
+        return redirect()->route('saas.admin.pilot-fiscal-control',$companyId)->with('success',$on
+            ? 'FBR IMS reporting is ON for new finalized receipts only.'
+            : 'Fiscal submission is OFF. Existing records are unchanged.');
     }
 }

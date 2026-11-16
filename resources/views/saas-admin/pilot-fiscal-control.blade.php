@@ -2,18 +2,18 @@
 <section id="pilot-fiscal-control" class="p-4 sm:p-6 max-w-3xl mx-auto space-y-4">
 <h1 class="text-2xl font-bold">{{ ucfirst($state['category']) }} fiscal control</h1>
 <p>{{ $company->name }} (#{{ $company->id }})</p>
-<p data-pilot-fiscal-status class="font-bold">OFF — blocked: official category reporting route and sandbox verification are unavailable.</p>
-@if($rejected ?? false)<p role="alert">ON was rejected. Nothing is armed for later submission.</p>@endif
-<p>This is not retail FBR POS or PRA approval. No bill will be submitted through automatic dispatch, manual retry or background queues. Existing receipts, payments, saved closings and acknowledgements are unchanged.</p>
-<h2 class="text-lg font-bold">Required before functional ON can be implemented</h2>
+<p data-pilot-fiscal-status class="font-bold">{{ $state['enabled'] ? 'FBR IMS ON — new finalized receipts only' : 'Fiscal OFF — local billing only' }}</p>
+@if($rejected ?? false)<p role="alert">IMS ON was not saved because this company’s POS ID or Desktop Agent setup is incomplete.</p>@endif
+<p>School/Hospital internal dues and balances remain local. When ON, only a newly finalized received-payment receipt is queued through the existing standalone FBR POS Desktop Agent IMS flow. Historical OFF receipts are never backfilled.</p>
+<h2 class="text-lg font-bold">Setup / acceptance position</h2>
 <ul class="list-disc pl-6">@foreach($state['required_evidence'] as $requirement)<li>{{ $requirement }}</li>@endforeach</ul>
 <details data-pilot-fiscal-readiness>
 <summary class="font-semibold cursor-pointer">{{ ucfirst($state['readiness']['category']) }} verification checklist</summary>
-<p>IMS and DI are independent candidates. Verification for another route, category or company cannot activate this company.</p>
+<p>IMS is the active candidate. DI remains a separate future option. Authorized sandbox acceptance is evidence outside synthetic CI.</p>
 @foreach($state['readiness']['routes'] as $candidate)
-<p>{{ strtoupper($candidate['route']) }}: blocked; adapter and company/category sandbox acceptance unverified.</p>
+<p>{{ strtoupper($candidate['route']) }}: {{ $candidate['route']==='ims' ? 'standalone Agent transport available; company acceptance still to be tested' : 'not part of this release' }}.</p>
 @endforeach
-<p>This checklist reports missing evidence. It cannot approve or enable an integration.</p>
+<p>This checklist reports evidence; it does not claim a real FBR acknowledgement before an authorized test receipt succeeds.</p>
 <dl class="space-y-3">
 @foreach($state['readiness']['requirements'] as $requirement)
 <div><dt class="font-semibold">{{ $requirement['id'] }}: {{ $requirement['status'] }}</dt><dd>{{ $requirement['description'] }}</dd></div>
@@ -25,13 +25,12 @@
 <form method="post" action="{{ route('saas.admin.pilot-fiscal-control.update',$company->id) }}">@csrf
 <label for="pilot-fiscal-route">Reporting route</label>
 <select id="pilot-fiscal-route" name="route" class="block w-full rounded border p-2" aria-describedby="pilot-fiscal-blocker">
-<option value="off" selected>OFF — local billing only</option>
-<option value="ims" disabled>IMS — unverified and unavailable</option>
-<option value="di" disabled>DI — unverified and unavailable</option>
+<option value="off" @selected(!$state['enabled'])>OFF — local billing only</option>
+<option value="ims" @selected($state['enabled'])>IMS — standalone FBR POS Desktop Agent</option>
+<option value="di" disabled>DI — future option</option>
 </select>
-<button id="pilot-fiscal-off" class="p-3 rounded bg-slate-700 text-white" type="submit">Confirm OFF for this company</button>
+<button id="pilot-fiscal-off" class="p-3 rounded bg-slate-700 text-white" type="submit">Save fiscal route</button>
 </form>
-<button id="pilot-fiscal-on" class="p-3 rounded border opacity-60" type="button" disabled aria-describedby="pilot-fiscal-blocker">ON unavailable</button>
-<p id="pilot-fiscal-blocker">The server also rejects direct ON requests. No requested-ON preference is stored.</p>
+<p id="pilot-fiscal-blocker">IMS ON requires this company’s FBR POS ID and enabled Desktop Agent. Production submissions remain owner-controlled.</p>
 </section>
 </x-admin-layout>

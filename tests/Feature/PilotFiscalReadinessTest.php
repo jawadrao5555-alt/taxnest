@@ -21,19 +21,19 @@ class PilotFiscalReadinessTest extends TestCase
             $url = '/admin/companies/'.$company->id.'/pilot-fiscal-control';
             $before = DB::table('companies')->find($company->id);
             $state = $this->getJson($url)->assertOk()->assertJsonPath('readiness.category',$label)
-                ->assertJsonPath('readiness.integration_implemented',false)
+                ->assertJsonPath('readiness.integration_implemented',$label==='school')
                 ->assertJsonPath('readiness.activation_available',false)
                 ->assertJsonPath('readiness.sandbox_verified',false)
                 ->assertJsonPath('readiness.historical_backfill_allowed',false)->json('readiness');
             $this->assertSame(['applicability','reportable_event','transport','authentication','tax_mapping','sandbox','acknowledgement','uncertain_recovery','implementation'],array_column($state['requirements'],'id'));
-            $this->assertSame(['unverified','unverified','unverified','unverified','unverified','unverified','unverified','unverified','pending'],array_column($state['requirements'],'status'));
+            $this->assertSame(['unverified','unverified','unverified','unverified','unverified','unverified','unverified','unverified',$label==='school'?'implemented':'pending'],array_column($state['requirements'],'status'));
             $this->assertSame($company->id, $state['company_id']);
             $this->assertFalse($state['evidence_transfer_allowed']);
             foreach ($state['requirements'] as $requirement) {
                 $this->assertSame($company->id, $requirement['company_id']);
                 $this->assertSame($label, $requirement['category']);
             }
-            $this->get($url)->assertOk()->assertSee(ucfirst($label).' verification checklist')->assertSee('ON unavailable');
+            $this->get($url)->assertOk()->assertSee(ucfirst($label).' verification checklist')->assertSee('Save fiscal route');
             $this->postJson($url,['enabled'=>true,'readiness'=>['sandbox_verified'=>true,'activation_available'=>true],'route_verified'=>true,'sandbox_token'=>'synthetic-never-store'])
                 ->assertStatus(422)->assertJsonPath('readiness',$state)->assertJsonPath('enabled',false);
             $this->assertEquals($before, DB::table('companies')->find($company->id));
@@ -82,7 +82,7 @@ class PilotFiscalReadinessTest extends TestCase
                 $this->assertSame($company->id,$candidate['company_id']);
                 $this->assertSame($label,$candidate['category']);
                 $this->assertFalse($candidate['eligible']);
-                $this->assertFalse($candidate['adapter_implemented']);
+                $this->assertSame($label==='school'&&$candidate['route']==='ims',$candidate['adapter_implemented']);
                 $this->assertFalse($candidate['sandbox_verified']);
                 foreach ($candidate['requirements'] as $requirement) {
                     $this->assertSame($candidate['route'],$requirement['route']);
@@ -99,7 +99,7 @@ class PilotFiscalReadinessTest extends TestCase
             $this->assertEquals($before,DB::table('companies')->find($company->id));
             $this->postJson($url,['route'=>'off'])->assertOk()->assertJsonPath('selected_route','off');
             $this->assertFalse($company->fresh()->fbr_reporting_enabled);
-            $this->get($url)->assertOk()->assertSee('Reporting route')->assertSee('IMS — unverified and unavailable')->assertSee('DI — unverified and unavailable');
+            $this->get($url)->assertOk()->assertSee('Reporting route')->assertSee('IMS — standalone FBR POS Desktop Agent')->assertSee('DI — future option');
         }
         Http::assertNothingSent();
     }

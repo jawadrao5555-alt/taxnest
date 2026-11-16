@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Facades\Log;
 
 /** A local cash receipt ledger, deliberately separate from retail fiscal invoices. */
 class FbrPosSchoolFeeController extends Controller
@@ -106,6 +107,24 @@ class FbrPosSchoolFeeController extends Controller
         return response()->view('fbr-pos.school-fees.student-ledger', compact(
             'company', 'reference', 'accounts', 'payments', 'currentDue', 'pastDue'
         ))->header('Cache-Control', 'private, no-store');
+    }
+
+    public function outstanding(Request $request)
+    {
+        $company = $this->company();
+        $data = $request->validate(['search' => 'nullable|string|max:100']);
+        $search = trim($data['search'] ?? '');
+        $accounts = DB::table('school_fee_accounts')
+            ->where('company_id', $company->id)->where('branch_id', $this->branchId())
+            ->whereRaw('payable_paisa > paid_paisa')
+            ->when($search !== '', fn ($q) => $q->where(fn ($s) => $s
+                ->where('student_reference', 'like', '%'.$search.'%')
+                ->orWhere('student_name', 'like', '%'.$search.'%')))
+            ->orderBy('student_reference')->orderBy('fee_period')
+            ->paginate(30)->withQueryString();
+        $totalOutstanding = (int) $accounts->getCollection()->sum(fn ($row) => (int)$row->payable_paisa - (int)$row->paid_paisa);
+        return response()->view('fbr-pos.school-fees.outstanding', compact('company','accounts','search','totalOutstanding'))
+            ->header('Cache-Control', 'private, no-store');
     }
 
     public function dashboard()
@@ -410,6 +429,20 @@ class FbrPosSchoolFeeController extends Controller
                 'collected_at' => $collectedAt, 'created_at' => $collectedAt, 'updated_at' => $collectedAt,
             ]);
         }, 3);
+
+        // The receipt is already durable at this point. Queue its received
+        // amount through the existing standalone FBR POS Agent transport when
+        // this company was explicitly enabled for IMS. Exact request retries
+        // reuse the same receipt and mirror.
+        try {
+            \App\Services\SchoolFeeImsService::queueFinalizedReceipt((int) $company->id, (int) $id);
+        } catch (\Throwable $e) {
+            Log::warning('School receipt could not be queued for FBR IMS', [
+                'company_id' => $company->id,
+                'receipt_id' => $id,
+                'exception' => class_basename($e),
+            ]);
+        }
         $url = '/fbr-pos/school-fees/'.$id.'/receipt';
         return $request->expectsJson()
             ? response()->json(['success' => true, 'receipt_id' => $id, 'receipt_url' => $url])
@@ -619,6 +652,7 @@ class FbrPosSchoolFeeController extends Controller
     public function receipt(int $id)
     {
         $company = $this->company();
+        \App\Services\SchoolFeeImsService::reconcileReceipt((int) $company->id, $id);
         $receipt = $this->historyScope($company, request())->where('id', $id)->first();
         abort_unless($receipt, 404);
         return response()->view('fbr-pos.school-fees.receipt', compact('company', 'receipt'))

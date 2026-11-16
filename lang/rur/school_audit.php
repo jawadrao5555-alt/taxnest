@@ -20,6 +20,8 @@ return [
     'student_ledger' => 'Student Fee Ledger',
     'current_due' => 'Is mahinay ki baqi fee',
     'past_due' => 'Purani baqi fees',
+    'outstanding_fees' => 'Outstanding Fees',
+    'total_outstanding' => 'Kul baqi fee',
     'payment_history' => 'Payment History',
     'reference_search' => 'Student reference se talash karein',
     'no_accounts' => 'Is reference ka koi fee account nahi mila.',

@@ -171,7 +171,7 @@ class FbrPosSchoolFeePilotTest extends TestCase
             $this->assertStringNotContainsString($marker, $reprint);
         }
         $this->assertStringContainsString(__('pos.school_local_receipt'), $reprint);
-        $this->assertStringContainsString('FBR OFF', $reprint);
+        $this->assertStringContainsString('Fiscal OFF', $reprint);
         $this->assertFalse($this->school->fresh()->fbr_reporting_enabled);
         // Even stray fiscal-shaped properties must never become a school identifier or QR.
         $canary = clone $row;
@@ -747,7 +747,7 @@ class FbrPosSchoolFeePilotTest extends TestCase
     {
         DB::table('companies')->where('id', $this->school->id)->update(['fbr_reporting_enabled' => true]);
         $school = $this->school->fresh();
-        $this->assertFalse($school->fbr_reporting_enabled);
+        $this->assertTrue($school->fbr_reporting_enabled);
         $this->assertFalse($school->fbrPosIntegrationConfigured());
         $transaction = new FbrPosTransaction(['company_id' => $school->id]);
         $transaction->setRelation('company', $school);

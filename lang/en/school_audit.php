@@ -20,6 +20,8 @@ return [
     'student_ledger' => 'Student Fee Ledger',
     'current_due' => 'Current month due',
     'past_due' => 'Past month arrears',
+    'outstanding_fees' => 'Outstanding Fees',
+    'total_outstanding' => 'Total outstanding',
     'payment_history' => 'Payment History',
     'reference_search' => 'Search by student reference',
     'no_accounts' => 'No saved fee accounts for this reference.',

@@ -11,19 +11,29 @@ class PilotFiscalControlTest extends TestCase
     private function owner():AdminUser{$a=AdminUser::create(['name'=>'Synthetic owner','email'=>uniqid().'@example.test','password'=>'Synthetic-only-123','role'=>'super_admin']);$this->actingAs($a,'admin');return $a;}
     private function company(string $category='education'):Company{return Company::create(['name'=>'Synthetic pilot','ntn'=>uniqid(),'product_type'=>'fbrpos','pos_type'=>$category,'business_category'=>$category,'fbr_reporting_enabled'=>true]);}
     private function url(Company $c):string{return '/admin/companies/'.$c->id.'/pilot-fiscal-control';}
-    public function test_both_categories_default_effectively_off_reject_on_and_keep_all_company_data():void
+    public function test_incomplete_school_and_hospital_setup_stays_effectively_off():void
     {
         $this->owner();Http::preventStrayRequests();
         foreach(['education','hospital'] as $category){$c=$this->company($category);$before=DB::table('companies')->find($c->id);
-            $this->getJson($this->url($c))->assertOk()->assertJsonPath('enabled',false)->assertJsonPath('status','blocked')->assertJsonPath('historical_submission',false);
-            $this->get($this->url($c))->assertOk()->assertSee('ON unavailable');
-            $this->postJson($this->url($c),['enabled'=>true])->assertStatus(422)->assertJsonPath('enabled',false)->assertJsonPath('reason','category_route_unverified');
-            $this->assertEquals($before,DB::table('companies')->find($c->id));
+            $this->getJson($this->url($c))->assertOk()->assertJsonPath('enabled',false)->assertJsonPath('status','setup_pending')->assertJsonPath('historical_submission',false);
+            $this->get($this->url($c))->assertOk()->assertSee('Save fiscal route');
+            $this->postJson($this->url($c),['enabled'=>true])->assertStatus(422)->assertJsonPath('enabled',false)->assertJsonPath('reason','ims_setup_incomplete');
+            $after=(array)DB::table('companies')->find($c->id);$expected=(array)$before;unset($after['updated_at'],$expected['updated_at']);$expected['fbr_reporting_enabled']=0;$this->assertEquals($expected,$after);
             $this->assertFalse($c->fresh()->fbr_reporting_enabled);
             $result=app(FbrService::class)->submitPosDiPayload([],'synthetic-no-token','production',$c->id,true);
             $this->assertSame('blocked',$result['state']);
         }
         $this->assertSame(2,AdminAuditLog::where('action','Pilot fiscal ON rejected')->count());Http::assertNothingSent();
+    }
+    public function test_configured_school_can_enable_ims_for_new_receipts_but_hospital_waits_for_397():void
+    {
+        $this->owner();
+        $school=$this->company();$school->update(['fbr_reporting_enabled'=>false,'fbr_pos_enabled'=>true,'fbr_pos_id'=>'123456','fbr_connection_mode'=>'fiscal_device','agent_enabled'=>true]);
+        $this->postJson($this->url($school),['route'=>'ims'])->assertOk()->assertJsonPath('enabled',true)->assertJsonPath('selected_route','ims');
+        $this->assertTrue($school->fresh()->fbr_reporting_enabled);
+        $hospital=$this->company('hospital');$hospital->update(['fbr_reporting_enabled'=>false,'fbr_pos_enabled'=>true,'fbr_pos_id'=>'654321','fbr_connection_mode'=>'fiscal_device','agent_enabled'=>true]);
+        $this->postJson($this->url($hospital),['route'=>'ims'])->assertStatus(422)->assertJsonPath('enabled',false);
+        $this->assertFalse($hospital->fresh()->fbr_reporting_enabled);
     }
     public function test_off_only_updates_selected_flag_and_preserves_other_tenant_and_history():void
     {

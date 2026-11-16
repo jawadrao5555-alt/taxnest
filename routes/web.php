@@ -2661,6 +2661,7 @@ Route::prefix('fbr-pos')->middleware(['fbrpos.auth', 'company.approval', \App\Ht
     Route::post('/school-fees/settings/fee-head', [\App\Http\Controllers\FbrPosSchoolFeeController::class, 'saveFeeHead'])->name('fbrpos.school-fees.fee-head');
     Route::post('/school-fees/settings/campus', [\App\Http\Controllers\FbrPosSchoolFeeController::class, 'addCampus'])->name('fbrpos.school-fees.add-campus');
     Route::get('/school-fees/student-ledger', [\App\Http\Controllers\FbrPosSchoolFeeController::class, 'studentLedger'])->name('fbrpos.school-fees.student-ledger');
+    Route::get('/school-fees/outstanding', [\App\Http\Controllers\FbrPosSchoolFeeController::class, 'outstanding'])->name('fbrpos.school-fees.outstanding');
     Route::get('/school-fees', [\App\Http\Controllers\FbrPosSchoolFeeController::class, 'index'])->name('fbrpos.school-fees.index');
     Route::post('/school-fees', [\App\Http\Controllers\FbrPosSchoolFeeController::class, 'store'])->name('fbrpos.school-fees.store')->middleware('plan.limit:invoices');
     Route::post('/school-fees/campus', [\App\Http\Controllers\FbrPosSchoolFeeController::class, 'switchCampus'])->name('fbrpos.school-fees.campus');

@@ -3,13 +3,19 @@
 <h1>{{ __('school_audit.student_ledger') }}</h1>
 <form class="card" method="get" action="{{ route('fbrpos.school-fees.student-ledger') }}">
     <label for="ledger-reference">{{ __('school_audit.reference_search') }}</label>
-    <input id="ledger-reference" name="student_reference" maxlength="100" value="{{ $reference }}" required>
+    <input id="ledger-reference" name="student_reference" maxlength="100" value="{{ $reference }}" placeholder="Search student by name or student ID" required>
     <div class="actions"><button type="submit">{{ __('pos.search') }}</button></div>
 </form>
 @if($accounts !== null)
+    @php $student = $accounts->first(); $totalOutstanding = $currentDue + $pastDue; @endphp
+    <section class="card" style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap">
+        <h2 style="margin:0">{{ $student->student_name ?? $reference }} <span class="muted">· {{ $reference }}</span></h2>
+        <a class="button" href="{{ route('fbrpos.school-fees.index',['student_search'=>$reference]) }}">{{ __('pos.school_nav_collect') }}</a>
+    </section>
     <div class="metrics">
         <section class="card"><h2>{{ __('school_audit.current_due') }}</h2><p class="metric-value">PKR {{ number_format($currentDue / 100, 2) }}</p></section>
         <section class="card"><h2>{{ __('school_audit.past_due') }}</h2><p class="metric-value">PKR {{ number_format($pastDue / 100, 2) }}</p></section>
+        <section class="card"><h2>{{ __('school_audit.total_outstanding') }}</h2><p class="metric-value">PKR {{ number_format($totalOutstanding / 100, 2) }}</p></section>
     </div>
     <section class="card scroll">
         <h2>{{ __('school_audit.student_ledger') }}</h2>

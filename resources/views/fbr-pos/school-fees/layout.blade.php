@@ -9,13 +9,13 @@
         .school-shell{display:grid;grid-template-columns:240px minmax(0,1fr);min-height:100vh}
         .school-shell main{width:100%;max-width:1280px;min-width:0}
         .school-sidebar{display:flex;flex-direction:column;gap:20px;background:#101e32;color:white;padding:24px 18px}
-        .school-sidebar a{color:inherit}.school-identity{font-size:20px;font-weight:750;overflow-wrap:anywhere}
+        .school-sidebar a{color:inherit}.school-identity{font-size:20px;font-weight:800;line-height:1.18;overflow-wrap:anywhere;text-decoration:none}
         .school-sidebar-nav{display:grid;gap:6px}.school-sidebar-nav a{padding:8px 10px;border-radius:8px}
-        .school-sidebar-nav a:hover,.school-sidebar-nav a:focus-visible{background:#294458}
+        .school-sidebar-nav a:hover,.school-sidebar-nav a:focus-visible,.school-sidebar-nav a.active{background:#147f72;color:white}
         .school-sidebar p{margin:0}.school-sidebar-brand{display:grid;gap:2px;margin-top:auto;padding-top:16px;border-top:1px solid #3a4a5d}
         .school-sidebar-brand a{color:#92eed4;text-decoration:underline}
-        .school-topbar{justify-content:flex-end;margin-bottom:16px}
-        @media(max-width:760px){.school-shell{display:block}.school-sidebar{gap:10px;padding:16px}.school-sidebar-nav{display:flex;flex-wrap:wrap}.school-sidebar-brand{padding-top:8px}}
+        .school-topbar{background:#fff;border-bottom:1px solid #d9e2ec;margin:-32px -20px 24px;padding:20px;align-items:center}.school-topbar h1{font-size:24px}.school-topbar-tools{display:flex;align-items:center;justify-content:flex-end;gap:10px;flex-wrap:wrap}.school-topbar-tools form{margin:0}.school-topbar-tools select{min-width:180px}.fiscal-badge{display:inline-flex;align-items:center;border-radius:8px;padding:9px 13px;font-weight:800;font-size:13px;background:#f2d49b;color:#70450b}.fiscal-badge.on{background:#d7f3e8;color:#0b664f}
+        @media(max-width:760px){.school-shell{display:block}.school-sidebar{gap:10px;padding:16px}.school-sidebar-nav{display:flex;flex-wrap:wrap}.school-sidebar-brand{padding-top:8px}.school-topbar{margin:-18px -20px 18px}.school-topbar h1{font-size:20px}.school-topbar-tools{justify-content:flex-start}}
         @media print{.school-shell{display:block}.school-shell main{max-width:80mm}}
     </style>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
@@ -25,29 +25,38 @@
 <body>
 <div class="school-shell">
     <aside class="school-sidebar no-print">
-        <a class="school-identity" href="/fbr-pos/dashboard">{{ $company->name }}</a>
-        <nav class="school-sidebar-nav" aria-label="{{ __('pos.school_navigation') }}"><a href="/fbr-pos/dashboard">{{ __('pos.school_dashboard') }}</a><a href="/fbr-pos/school-fees">{{ __('pos.school_nav_collect') }}</a><a href="{{ route('fbrpos.school-fees.student-ledger') }}">{{ __('school_audit.student_ledger') }}</a><a href="/fbr-pos/transactions">{{ __('pos.school_nav_receipts') }}</a>@if(\App\Services\PosAccessService::dayCloseAllowed(Auth::guard('fbrpos')->user(), $company))<a href="/fbr-pos/day-close">{{ __('pos.school_nav_close') }}</a>@endif</nav>
-@if($schoolCanConfigure ?? false)<p class="no-print"><a href="/fbr-pos/school-fees/settings">{{ __('school.settings') }}</a></p>@endif
+        <a class="school-identity" href="/fbr-pos/dashboard">TaxNest<br>School POS</a>
+        <nav class="school-sidebar-nav" aria-label="{{ __('pos.school_navigation') }}">
+            <a @class(['active'=>request()->is('fbr-pos/dashboard')]) href="/fbr-pos/dashboard">{{ __('pos.school_dashboard') }}</a>
+            <a @class(['active'=>request()->is('fbr-pos/school-fees')]) href="/fbr-pos/school-fees">{{ __('pos.school_nav_collect') }}</a>
+            <a @class(['active'=>request()->routeIs('fbrpos.school-fees.student-ledger')]) href="{{ route('fbrpos.school-fees.student-ledger') }}">{{ __('school_audit.student_ledger') }}</a>
+            <a @class(['active'=>request()->routeIs('fbrpos.school-fees.outstanding')]) href="{{ route('fbrpos.school-fees.outstanding') }}">{{ __('school_audit.outstanding_fees') }}</a>
+            <a @class(['active'=>request()->is('fbr-pos/transactions*')]) href="/fbr-pos/transactions">{{ __('pos.school_nav_receipts') }}</a>
+            @if(\App\Services\PosAccessService::dayCloseAllowed(Auth::guard('fbrpos')->user(), $company))<a @class(['active'=>request()->is('fbr-pos/day-close*')]) href="/fbr-pos/day-close">{{ __('pos.school_nav_close') }}</a>@endif
+            @if($schoolCanConfigure ?? false)<a @class(['active'=>request()->is('fbr-pos/school-fees/settings*')]) href="/fbr-pos/school-fees/settings">{{ __('school.settings') }}</a>@endif
+        </nav>
         <div class="school-sidebar-brand">
             <strong>TaxNest POS</strong>
             <a href="https://taxnest.pk">taxnest.pk</a>
         </div>
     </aside>
     <main>
-<header class="school-topbar"><div class="actions no-print" style="margin-top:0"><a href="/fbr-pos/dashboard">{{ __('pos.school_dashboard') }}</a>@if(is_array(session('impersonation')))<form method="post" action="{{ route('saas.admin.impersonation.stop') }}">@csrf<button type="submit">{{ __('school_workspace.exit_company') }}</button></form>@else<form method="post" action="/fbr-pos/logout">@csrf<button type="submit">{{ __('pos.logout') }}</button></form>@endif</div></header>
+<header class="school-topbar"><h1>{{ $company->name }}</h1><div class="school-topbar-tools no-print">
 @if(isset($schoolCampuses) && $schoolCampuses->count() > 1)
-<form id="school-campus-switcher" class="no-print campus-switcher" method="post" action="/fbr-pos/school-fees/campus">
+<form id="school-campus-switcher" class="campus-switcher" method="post" action="/fbr-pos/school-fees/campus">
 @csrf
-<label for="school-campus">{{ __('pos.school_campus') }}</label><select id="school-campus" name="branch_id" onchange="this.form.requestSubmit()">
+<label class="sr-only" for="school-campus">{{ __('pos.school_campus') }}</label><select id="school-campus" name="branch_id" onchange="this.form.requestSubmit()">
 @foreach($schoolCampuses as $campus)<option value="{{ $campus->id }}" @selected((int) $schoolCampusId === (int) $campus->id)>{{ $campus->name }}</option>@endforeach
 </select><noscript><button type="submit">{{ __('pos.school_switch_campus') }}</button></noscript>
 </form>
 @elseif(isset($schoolCampuses) && $schoolCampuses->count() === 1)
-<p class="muted">{{ __('pos.school_campus') }}: {{ $schoolCampuses->first()->name }}</p>
+<span class="muted">{{ $schoolCampuses->first()->name }}</span>
 @else
-<p class="muted">{{ __('pos.school_campus') }}: {{ __('school.no_campus') }}</p>
+<span class="muted">{{ __('school.no_campus') }}</span>
 @endif
-<p class="notice no-print" id="school-fiscal-status" role="status">{{ __('school_workspace.fiscal_off') }} {{ __('pos.fbr_missing_school_route') }}</p>
+<span @class(['fiscal-badge','on'=>(bool)$company->fbr_reporting_enabled]) id="school-fiscal-status" role="status">{{ $company->fbr_reporting_enabled ? 'FBR IMS ON' : 'Fiscal OFF' }}</span>
+@if(is_array(session('impersonation')))<form method="post" action="{{ route('saas.admin.impersonation.stop') }}">@csrf<button type="submit">{{ __('school_workspace.exit_company') }}</button></form>@else<form method="post" action="/fbr-pos/logout">@csrf<button type="submit">{{ __('pos.logout') }}</button></form>@endif
+</div></header>
 <details class="no-print" id="school-workspace-menu"><summary>{{ __('school_workspace.workspace_menu') }}</summary><nav class="actions" aria-label="{{ __('school_workspace.workspace_menu') }}">
 @if($schoolCanConfigure ?? false)
 <a href="/fbr-pos/team">{{ __('school_workspace.team_access') }}</a><a href="/fbr-pos/school-fees/settings">{{ __('school.settings') }}</a><a href="/fbr-pos/school-fees/printing">{{ __('school_workspace.profile_printing') }}</a><a href="/fbr-pos/billing">{{ __('school_workspace.billing') }}</a><a href="/fbr-pos/school-fees/legacy-retail">{{ __('school_workspace.retail_archive') }}</a>

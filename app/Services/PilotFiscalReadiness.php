@@ -34,6 +34,15 @@ final class PilotFiscalReadiness
             'company_id' => $company->id,
             'category' => $category,
             'evidence_transfer_allowed' => false,
+            'selected_route' => 'off',
+            'routes' => array_map(static fn (string $route): array => [
+                'company_id' => $company->id, 'category' => $category, 'route' => $route,
+                'adapter_implemented' => false, 'sandbox_verified' => false, 'eligible' => false,
+                'requirements' => array_map(static fn (string $id): array => [
+                    'company_id' => $company->id, 'category' => $category, 'route' => $route,
+                    'id' => $id, 'status' => $id === 'implementation' ? 'pending' : 'unverified',
+                ], array_keys($requirements)),
+            ], ['ims', 'di']),
             'integration_implemented' => false,
             'activation_available' => false,
             'sandbox_verified' => false,

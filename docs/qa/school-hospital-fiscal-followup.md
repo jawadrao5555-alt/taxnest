@@ -90,3 +90,29 @@ in-flight requests or acknowledgements. Already uncertain requests must remain
 quarantined and be reconciled using the official recovery contract, not resent
 blindly or silently cancelled. This PR preserves those records but does not claim
 to implement that unavailable official reconciliation operation.
+
+## Four independent route candidates and immutable bill design
+
+| Category | IMS | DI |
+|---|---|---|
+| School | Contract/enrollment/adapter/sandbox unverified | Contract/enrollment/adapter/sandbox unverified |
+| Hospital | Contract/enrollment/adapter/sandbox unverified | Contract/enrollment/adapter/sandbox unverified |
+
+The admin selector offers OFF, IMS and DI, but IMS/DI stay disabled. Direct
+requests for either route are rejected and audited; no pending route selection
+is persisted. Each route has its own company/category-bound requirements. An
+IMS acknowledgement is not DI evidence, nor does School authorize Hospital.
+The existing PRA integration separation is an implementation reference only,
+not an applicability or tax contract for either pilot.
+
+After contracts and category/company sandbox acceptance exist, new-bill creation
+must atomically freeze route, adapter version, environment, identity and eligibility
+with the original receipt. OFF-era receipts remain local forever. Retry must use
+that frozen route, never current selector or a fallback route. An uncertain request
+must reconcile on its original route before any possible retry; OFF must not erase
+its identity or acknowledgement. A valid acknowledgement updates the same saved
+receipt with fiscal identity/QR; Agent printing is a separate verified step.
+
+Those active-route snapshots, actual adapters, official reconciliation and physical
+printing acceptance are **not implemented/verified by this blocked selector**.
+No schema backfill, migration, route transfer, or live company change is performed.

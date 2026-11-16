@@ -53,7 +53,7 @@ class PilotFiscalActivationBoundaryTest extends TestCase
                 'enabled' => true, 'company_id' => $company->id === $school->id ? $hospital->id : $school->id,
                 'category' => 'retail', 'verified' => true, 'sandbox_verified' => true,
                 'status' => 'verified', 'official_route_verified' => true,
-                'route' => 'https://synthetic.invalid/not-an-official-route',
+                'route' => 'ims', 'endpoint' => 'https://synthetic.invalid/not-an-official-route',
                 'fbr_invoice_number' => 'SYNTHETIC-FORGED-ACK', 'qr_code' => 'SYNTHETIC-FORGED-QR',
                 'historical_submission' => true,
             ])->assertStatus(422)->assertJsonPath('enabled', false)

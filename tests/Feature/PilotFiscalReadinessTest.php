@@ -68,4 +68,40 @@ class PilotFiscalReadinessTest extends TestCase
         Http::assertNothingSent();
     }
 
+    public function test_four_category_route_candidates_are_independent_and_selector_fails_closed(): void
+    {
+        $admin = AdminUser::create(['name'=>'Synthetic owner','email'=>'routes@example.test','password'=>'Synthetic-123','role'=>'super_admin']);
+        $this->actingAs($admin, 'admin');
+        Http::preventStrayRequests();
+        foreach (['education'=>'school','hospital'=>'hospital'] as $category=>$label) {
+            $company = Company::create(['name'=>'Synthetic route '.$label,'ntn'=>'SYN-ROUTE-'.$label,'product_type'=>'fbrpos','pos_type'=>$category,'business_category'=>$category]);
+            $url = '/admin/companies/'.$company->id.'/pilot-fiscal-control';
+            $state = $this->getJson($url)->assertOk()->assertJsonPath('selected_route','off')->json();
+            $this->assertSame(['ims','di'],array_column($state['readiness']['routes'],'route'));
+            foreach ($state['readiness']['routes'] as $candidate) {
+                $this->assertSame($company->id,$candidate['company_id']);
+                $this->assertSame($label,$candidate['category']);
+                $this->assertFalse($candidate['eligible']);
+                $this->assertFalse($candidate['adapter_implemented']);
+                $this->assertFalse($candidate['sandbox_verified']);
+                foreach ($candidate['requirements'] as $requirement) {
+                    $this->assertSame($candidate['route'],$requirement['route']);
+                    $this->assertSame($company->id,$requirement['company_id']);
+                    $this->assertSame($label,$requirement['category']);
+                }
+                $this->postJson($url,['route'=>$candidate['route'],'verified'=>true,'sandbox_verified'=>true])
+                    ->assertStatus(422)->assertJsonPath('selected_route','off')->assertJsonPath('readiness',$state['readiness']);
+            }
+            $before = DB::table('companies')->find($company->id);
+            $this->postJson($url,['route'=>'ims','enabled'=>false])->assertStatus(422);
+            $this->postJson($url,['route'=>'off','enabled'=>true])->assertStatus(422);
+            $this->postJson($url,['route'=>'pra'])->assertStatus(422);
+            $this->assertEquals($before,DB::table('companies')->find($company->id));
+            $this->postJson($url,['route'=>'off'])->assertOk()->assertJsonPath('selected_route','off');
+            $this->assertFalse($company->fresh()->fbr_reporting_enabled);
+            $this->get($url)->assertOk()->assertSee('Reporting route')->assertSee('IMS — unverified and unavailable')->assertSee('DI — unverified and unavailable');
+        }
+        Http::assertNothingSent();
+    }
+
 }

@@ -17,6 +17,8 @@ export async function pilotFiscalControlWorkflow(page,t,v,{baseUrl,login,loopbac
   const panel=page.locator('#pilot-fiscal-control');await panel.waitFor({state:'visible'});
   check((await panel.locator('[data-pilot-fiscal-status]').innerText()).includes('OFF'),'Pilot effective OFF absent');
   check(await panel.locator('#pilot-fiscal-on').isDisabled(),'Unverified ON control enabled');
+  check(await panel.locator('#pilot-fiscal-route').inputValue()==='off','Pilot route selector is not OFF');
+  for(const route of ['ims','di'])check(await panel.locator('#pilot-fiscal-route option[value='+route+']').isDisabled(),'Unverified route option enabled: '+route);
   const before=await page.request.get(url(c.id),{headers:{Accept:'application/json'}});check(before.status()===200,'Owner fiscal read failed');const initial=await before.json();
   check(initial.company_id===c.id&&initial.enabled===false&&initial.historical_submission===false,'Fiscal state company mismatch or armed');
   const token=await page.locator('meta[name=csrf-token]').getAttribute('content');

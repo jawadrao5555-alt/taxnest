@@ -428,7 +428,12 @@ class FbrPosSchoolFeeController extends Controller
             $code => ['code' => $code, 'label' => __('pos.school_head_'.$code), 'active' => true, 'default_amount_paisa' => null],
         ]);
         foreach (DB::table('school_fee_heads')->where('company_id', $company->id)->orderBy('id')->get() as $head) {
-            $heads->put($head->code, ['code' => $head->code, 'label' => $head->label, 'active' => (bool) $head->active, 'default_amount_paisa' => $head->default_amount_paisa ?? null]);
+            $heads->put($head->code, [
+                'code' => $head->code, 'label' => $head->label, 'active' => (bool) $head->active,
+                'default_amount_paisa' => $head->default_amount_paisa ?? null,
+                'ims_pct_code' => $head->ims_pct_code ?? null,
+                'ims_tax_rate' => $head->ims_tax_rate ?? null,
+            ]);
         }
         return $heads;
     }
@@ -447,6 +452,7 @@ class FbrPosSchoolFeeController extends Controller
         return response()->view('fbr-pos.school-fees.settings', [
             'company' => $company, 'feeHeads' => $this->feeHeads($company),
             'campuses' => \App\Models\Branch::where('company_id', $company->id)->orderBy('name')->get(),
+            'imsFeeHeadSettingsAvailable' => \Illuminate\Support\Facades\Schema::hasColumns('school_fee_heads', ['ims_pct_code', 'ims_tax_rate']),
         ])->header('Cache-Control', 'private, no-store');
     }
 
@@ -454,7 +460,17 @@ class FbrPosSchoolFeeController extends Controller
     {
         $company = $this->configurationCompany();
         abort_if((bool) $request->session()->get('impersonation.readonly'), 403);
-        $data = $request->validate(['code' => 'nullable|string|max:20', 'label' => 'required|string|max:80', 'active' => 'required|boolean', 'default_amount' => ['nullable', 'regex:/^\d{1,8}(?:\.\d{1,2})?$/']]);
+        if ($request->filled('ims_pct_code') && is_string($request->input('ims_pct_code'))) {
+            $request->merge(['ims_pct_code' => str_replace('.', '', trim($request->input('ims_pct_code')))]);
+        }
+        $data = $request->validate([
+            'code' => 'nullable|string|max:20',
+            'label' => 'required|string|max:80',
+            'active' => 'required|boolean',
+            'default_amount' => ['nullable', 'regex:/^\d{1,8}(?:\.\d{1,2})?$/'],
+            'ims_pct_code' => ['nullable', 'string', 'regex:/^[0-9]{8}$/D'],
+            'ims_tax_rate' => ['nullable', 'numeric', 'decimal:0,2', 'between:0,100'],
+        ]);
         $label = trim($data['label']);
         if ($label === '') throw ValidationException::withMessages(['label' => __('school.label_required')]);
         DB::transaction(function () use ($company, $data, $label) {
@@ -467,6 +483,12 @@ class FbrPosSchoolFeeController extends Controller
             // older clients. Explicit blank clears the future-only default.
             if (array_key_exists('default_amount', $data)) {
                 $rate['default_amount_paisa'] = ($data['default_amount'] ?? '') === '' ? null : $this->paisa($data['default_amount']);
+            }
+            foreach (['ims_pct_code', 'ims_tax_rate'] as $field) {
+                if (array_key_exists($field, $data)) {
+                    abort_unless(\Illuminate\Support\Facades\Schema::hasColumn('school_fee_heads', $field), 503);
+                    $rate[$field] = $data[$field] === '' ? null : $data[$field];
+                }
             }
             DB::table('school_fee_heads')->updateOrInsert(['company_id' => $company->id, 'code' => $code], $rate + [
                 'label' => $label, 'active' => (bool) $data['active'], 'updated_at' => now(),

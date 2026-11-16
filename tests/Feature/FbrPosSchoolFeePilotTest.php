@@ -1197,6 +1197,31 @@ class FbrPosSchoolFeePilotTest extends TestCase
         $this->assertStringContainsString('default_amount_paisa', app(FbrPosSchoolFeeController::class)->index()->getContent());
     }
 
+    public function test_owner_can_save_optional_ims_fields_without_rewriting_saved_receipts(): void
+    {
+        (require database_path('migrations/2027_01_01_000001_add_school_ims_fee_head_settings.php'))->up();
+        $id = $this->collect($this->payload())->getData(true)['receipt_id'];
+        $receipt = (array) DB::table('school_fee_receipts')->find($id);
+        $settings = ['code' => 'tuition', 'label' => 'Tuition', 'active' => 1];
+        $this->expectHttpStatus(403, fn () => $this->schoolSettingsPost('saveFeeHead', $settings + ['ims_pct_code' => '1234.5678']));
+
+        $this->cashier->role = 'company_admin';
+        $this->cashier->pos_role = 'pos_admin';
+        $this->actingAs($this->cashier, 'fbrpos');
+        $this->schoolSettingsPost('saveFeeHead', $settings + ['ims_pct_code' => '1234.5678', 'ims_tax_rate' => '0']);
+        $this->schoolSettingsPost('saveFeeHead', $settings);
+
+        $head = DB::table('school_fee_heads')->where('code', 'tuition')->first();
+        $this->assertSame('12345678', $head->ims_pct_code);
+        $this->assertNotNull($head->ims_tax_rate);
+        $this->assertEquals(0, $head->ims_tax_rate);
+        $this->schoolSettingsPost('saveFeeHead', $settings + ['ims_pct_code' => null, 'ims_tax_rate' => null]);
+        $head = DB::table('school_fee_heads')->where('code', 'tuition')->first();
+        $this->assertNull($head->ims_pct_code);
+        $this->assertNull($head->ims_tax_rate);
+        $this->assertSame($receipt, (array) DB::table('school_fee_receipts')->find($id));
+    }
+
     public function test_school_dashboard_separates_total_cash_non_cash_and_all_date_outstanding(): void
     {
         $this->collect($this->payload(['amount'=>'100']));

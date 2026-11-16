@@ -1,5 +1,7 @@
 <?php
 return [
+    'ims_pct_code' => 'IMS HS / PCT code (ikhtiyari)',
+    'ims_tax_rate' => 'IMS tax rate % (ikhtiyari)',
     'reference' => 'Payment ka reference',
     'reference_help' => 'Bank/card ki recorded payment ke liye transfer ya receipt ka reference zaroori hai. Card number ya security code kabhi darj na karein.',
     'reference_required' => 'Bank ya card payment ka reference darj karein.',

@@ -1,5 +1,7 @@
 <?php
 return [
+    'ims_pct_code' => 'IMS HS / PCT code (optional)',
+    'ims_tax_rate' => 'IMS tax rate % (optional)',
     'reference' => 'Payment reference',
     'reference_help' => 'Required for recorded bank/card payments. Enter the transfer or card receipt reference; never enter card numbers or security codes.',
     'reference_required' => 'Enter the bank or card payment reference.',

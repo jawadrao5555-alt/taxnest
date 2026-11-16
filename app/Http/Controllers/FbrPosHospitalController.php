@@ -126,7 +126,10 @@ class FbrPosHospitalController extends Controller
                 $paid=(int)$this->rows('hospital_payments',$company)->where('invoice_id',$invoiceId)->orderBy('id')->lockForUpdate()->get(['id','amount_paisa'])->sum('amount_paisa');
                 if ($amount>$total-$paid) $this->error('amount','overpayment');
             }
-            return DB::table('hospital_payments')->insertGetId(['company_id'=>$company->id,'branch_id'=>$this->branch(),'invoice_id'=>$invoiceId,
+            // Each finalized payment is a distinct event; never inherit a bill-era route.
+            $routeFields = \Illuminate\Support\Facades\Schema::hasColumn('hospital_payments', 'fiscal_route_snapshot')
+                ? ['fiscal_route_snapshot' => \App\Services\PilotFiscalRouteSnapshot::newHospitalPayment($company, (int) $invoiceId)] : [];
+            return DB::table('hospital_payments')->insertGetId($routeFields + ['company_id'=>$company->id,'branch_id'=>$this->branch(),'invoice_id'=>$invoiceId,
                 'request_key'=>$d['request_key'],'amount_paisa'=>$amount,'payment_reference'=>$d['payment_reference']?:null,'payment_method'=>$d['payment_method'],'balance_paisa'=>$total-$paid-$amount,
                 'collected_by'=>Auth::guard('fbrpos')->id(),'cashier_name'=>Auth::guard('fbrpos')->user()->name,'campus_name'=>$this->campus($company),
                 'collected_at'=>$at,'created_at'=>$at,'updated_at'=>$at]);

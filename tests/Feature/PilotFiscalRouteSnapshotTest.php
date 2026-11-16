@@ -133,4 +133,31 @@ class PilotFiscalRouteSnapshotTest extends TestCase
         Http::assertNothingSent();
     }
 
+
+    public function test_new_hospital_payment_route_is_independent_but_binds_exact_parent_and_tenant(): void
+    {
+        Http::fake();$company=$this->company('hospital');
+        $invoice=DB::table('hospital_invoices')->insertGetId(['company_id'=>$company->id,'request_key'=>(string)\Illuminate\Support\Str::uuid(),
+            'patient_reference'=>'SYN-P','service_head'=>'consultation','total_paisa'=>2000000,'created_by'=>1,'campus_name'=>'Synthetic']);
+        $raw=PilotFiscalRouteSnapshot::newHospitalPayment($company,$invoice);
+        $snapshot=json_decode($raw,true);$this->assertSame(2,$snapshot['version']);
+        $snapshot['route']='ims';$raw=json_encode($snapshot); // synthetic uncertainty, no authorization
+        $id=DB::table('hospital_payments')->insertGetId(['company_id'=>$company->id,'invoice_id'=>$invoice,'request_key'=>(string)\Illuminate\Support\Str::uuid(),
+            'amount_paisa'=>800000,'payment_method'=>'cash','balance_paisa'=>1200000,'collected_by'=>1,'cashier_name'=>'Synthetic','campus_name'=>'Synthetic',
+            'collected_at'=>now(),'fiscal_route_snapshot'=>$raw]);
+        $before=DB::table('hospital_payments')->find($id);
+        $plan=PilotFiscalRouteSnapshot::recoveryPlan($company->id,'hospital','hospital_payment',$id,'ims');
+        $this->assertSame('ims',$plan['route']);$this->assertSame('reconciliation_required',$plan['state']);
+        $this->assertFalse($plan['can_submit']);$this->assertFalse($plan['can_retry']);
+        $this->assertSame('route_mismatch',PilotFiscalRouteSnapshot::recoveryPlan($company->id,'hospital','hospital_payment',$id,'di')['reason']);
+        $this->assertEquals($before,DB::table('hospital_payments')->find($id));
+        // Parent link cannot be changed independently of the receipt's frozen provenance.
+        $snapshot['invoice_id']=$invoice+1;
+        DB::table('hospital_payments')->where('id',$id)->update(['fiscal_route_snapshot'=>json_encode($snapshot)]);
+        $this->assertSame('parent_snapshot_mismatch',PilotFiscalRouteSnapshot::recoveryPlan($company->id,'hospital','hospital_payment',$id)['reason']);
+        DB::table('hospital_payments')->where('id',$id)->update(['fiscal_route_snapshot'=>$raw]);
+        DB::table('hospital_invoices')->where('id',$invoice)->update(['company_id'=>$company->id+1]);
+        $this->assertSame('parent_snapshot_mismatch',PilotFiscalRouteSnapshot::recoveryPlan($company->id,'hospital','hospital_payment',$id)['reason']);
+        Http::assertNothingSent();
+    }
 }

@@ -72,6 +72,27 @@ foreach(['education','hospital']as$category){
  }
 
 }
+// Native proof for newly finalized Hospital receipt routes, independent of bill-era metadata.
+$hospital=$c; // the Hospital company created by the final iteration above
+pilotAssert($hospital->isHospitalCollectionPilot(),'Missing native Hospital fixture');
+$bill=DB::table('hospital_invoices')->insertGetId(['company_id'=>$hospital->id,'request_key'=>(string)\Illuminate\Support\Str::uuid(),
+ 'patient_reference'=>'SYN-PAYMENT-ROUTE','service_head'=>'consultation','total_paisa'=>2000000,'created_by'=>1,'campus_name'=>'Synthetic','created_at'=>now(),'updated_at'=>now()]);
+foreach(['off','ims','di'] as $route){
+ $raw=json_decode(\App\Services\PilotFiscalRouteSnapshot::newHospitalPayment($hospital,$bill),true);
+ pilotAssert($raw['version']===2&&$raw['source']==='hospital_payment'&&$raw['invoice_id']===$bill,'Wrong payment event scope');
+ $raw['route']=$route; // synthetic historical uncertainty, never an authorization
+ $id=DB::table('hospital_payments')->insertGetId(['company_id'=>$hospital->id,'invoice_id'=>$bill,'request_key'=>(string)\Illuminate\Support\Str::uuid(),
+  'amount_paisa'=>800000,'payment_method'=>'cash','balance_paisa'=>1200000,'collected_by'=>1,'cashier_name'=>'Synthetic','campus_name'=>'Synthetic',
+  'collected_at'=>now(),'fiscal_route_snapshot'=>json_encode($raw)]);
+ $before=(array)DB::table('hospital_payments')->find($id);
+ $plan=\App\Services\PilotFiscalRouteSnapshot::recoveryPlan((int)$hospital->id,'hospital','hospital_payment',$id,$route);
+ pilotAssert($plan['route']===$route&&!$plan['can_submit']&&!$plan['can_retry'],'Own payment route not held');
+ pilotAssert($plan['state']===($route==='off'?'local_only':'reconciliation_required'),'Wrong own-payment recovery state');
+ pilotAssert(\App\Services\PilotFiscalRouteSnapshot::recoveryPlan((int)$hospital->id,'hospital','hospital_payment',$id,$route==='ims'?'di':'ims')['reason']==='route_mismatch','Own payment crossed route');
+ pilotAssert($before===(array)DB::table('hospital_payments')->find($id),'Own payment route changed');
+ pilotAssert(DB::table('hospital_invoices')->where('id',$bill)->value('fiscal_route_snapshot')===null,'Internal bill route was backfilled');
+}
+echo "PASS: native Hospital per-payment route version2 independent of null bill route immutable same-route HOLD no backfill no provider calls\n";
 pilotAssert($foreignBefore===(array)DB::table('companies')->find($foreign->id),'Foreign retail company changed');Http::assertNothingSent();
 echo "PASS: native School Hospital concurrent OFF and rejected ON remain disabled with exact audit current actor denial atomic rollback and unchanged acknowledgements foreign tenant no provider calls\n";
 echo "PASS: native School Hospital OFF IMS DI snapshots survive concurrent control and same-route unknown recovery without mutation backfill or provider calls\n";

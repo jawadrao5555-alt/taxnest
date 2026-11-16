@@ -1159,6 +1159,10 @@ class FbrPosSchoolFeePilotTest extends TestCase
             $payload['payment_reference'] = 'SYN-'.strtoupper($method);
             $id = $this->collect($payload)->getData(true)['receipt_id'];
             $before = (array) DB::table('school_fee_receipts')->find($id);
+            $route = json_decode($before['fiscal_route_snapshot'], true, 512, JSON_THROW_ON_ERROR);
+            $this->assertSame('off', $route['route']);
+            $this->assertSame($this->school->id, $route['company_id']);
+            $this->assertFalse($route['eligible']);
             $account = (array) DB::table('school_fee_accounts')->find($before['account_id']);
             $this->assertSame($id, $this->collect($payload)->getData(true)['receipt_id']);
             try { $this->collect(array_replace($payload, ['payment_reference' => 'CHANGED'])); $this->fail('Changed reference accepted.'); }

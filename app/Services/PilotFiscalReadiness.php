@@ -17,8 +17,8 @@ final class PilotFiscalReadiness
         $requirements = [
             'applicability' => 'Current official category applicability and exclusions for this company.',
             'reportable_event' => $category === 'school'
-                ? 'Official fee receipt versus charge, period and adjustment reporting event.'
-                : 'Official service bill versus installment, payment and adjustment reporting event.',
+                ? 'Official validation of the intended School event: each finalized payment receipt reports only its received amount; no charge or private ledger submission.'
+                : 'Official validation of the intended Hospital event: each finalized payment receipt reports only its received amount; no service bill or private patient ledger submission.',
             'transport' => 'Applicable endpoint and versioned payload schema for this category.',
             'authentication' => 'Official authentication and enrollment bound to this company and category.',
             'tax_mapping' => $category === 'school'

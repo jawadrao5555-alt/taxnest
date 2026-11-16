@@ -7,6 +7,30 @@ import { randomUUID } from 'node:crypto';
 // Disposable loopback fixture only. Synthetic references are not health records.
 export async function hospitalWorkflow(page, t, v, { baseUrl, saveEvidenceScreenshot, pass }) {
   if (new URL(page.url()).pathname !== '/fbr-pos/hospital') throw new Error('Hospital login did not reach native collection desk');
+  // Category/package UI only: actual signup POST remains covered by feature tests.
+  const guest = await page.context().browser().newContext({ viewport: v });
+  await guest.route('**/*', route => ['127.0.0.1', 'localhost', '::1', '[::1]'].includes(new URL(route.request().url()).hostname)
+    ? route.continue() : route.abort('blockedbyclient'));
+  try {
+    const registration = await guest.newPage();
+    const opened = await registration.goto(baseUrl + '/fbr-pos/register', { waitUntil: 'domcontentloaded' });
+    if (!opened?.ok()) throw new Error('Hospital registration page did not load');
+    await registration.waitForFunction(() => document.querySelector('input[name="pos_type"]')?.value === 'retail');
+    await registration.getByText('Hospital / Clinic', { exact: true }).click();
+    await registration.waitForFunction(() => document.querySelector('input[name="pos_type"]')?.value === 'clinic');
+    const plan = registration.locator('#requested-plan');
+    const choices = await plan.locator('option').evaluateAll(options => options.filter(o => o.value && !o.disabled).map(o => o.value));
+    if (!choices.length) throw new Error('Hospital registration offers no explicit package');
+    await plan.selectOption(choices[0]);
+    await registration.locator('#signup-billing-cycle').waitFor({state:'visible'});
+    await registration.waitForFunction(() => document.querySelector('#signup-billing-cycle')?.options.length > 0);
+    const selected = await registration.locator('form[action="/fbr-pos/register"]').evaluate(form => {
+      const data = new FormData(form); return { category: data.get('pos_type'), package: data.get('requested_plan'), cycle: data.get('billing_cycle') };
+    });
+    if (selected.category !== 'clinic' || selected.package !== choices[0] || !selected.cycle) throw new Error('Hospital category/package/cycle selection did not reach signup form');
+    await registration.locator('#signup-package-choice').scrollIntoViewIfNeeded();
+    await saveEvidenceScreenshot(registration, 'hospital-registration-' + v.width);
+  } finally { await guest.close(); }
   await hospitalWorkspaceChecks(page, v, { baseUrl, saveEvidenceScreenshot });
   await collectionSharedWorkspaceChecks(page,'hospital',v,{baseUrl,saveEvidenceScreenshot});
   const configuredService=await hospitalRateChecks(page,v,{baseUrl,saveEvidenceScreenshot});
@@ -153,6 +177,19 @@ export async function hospitalWorkflow(page, t, v, { baseUrl, saveEvidenceScreen
   await page.goto(baseUrl+'/fbr-pos/hospital/receipts/'+partialSaved.receipt_id,{waitUntil:'domcontentloaded'});
   const partialInvoice=await page.locator('a[href*="/hospital/invoices/"]').first().getAttribute('href');
   await saveEvidenceScreenshot(page,'hospital-open-partial-before-close-'+v.width);
+  await page.goto(baseUrl + '/fbr-pos/dashboard', { waitUntil: 'domcontentloaded' });
+  for (const [selector, expected] of [['#hospital-outstanding',15000], ['#hospital-today-total',105000], ['#hospital-today-cash',40000], ['#hospital-today-card',30000], ['#hospital-today-bank',35000]]) {
+    const value = page.locator(selector);
+    await value.waitFor({state:'visible'});
+    if (Number(await value.getAttribute('data-paisa')) !== expected) throw new Error('Hospital dashboard amount incorrect: '+selector);
+  }
+  if (!(await page.locator('#hospital-active-campus').innerText()).includes('Synthetic RC Hospital '+v.width)) throw new Error('Hospital dashboard lost active unassigned-campus company identity');
+  if (await page.evaluate(() => Math.max(document.documentElement.scrollWidth, document.body.scrollWidth)) > v.width + 2) throw new Error('Hospital dashboard overflows viewport');
+  await page.locator('#hospital-outstanding').scrollIntoViewIfNeeded();
+  await saveEvidenceScreenshot(page, 'hospital-dashboard-' + v.width);
+  await page.getByRole('link', {name:'Review unpaid balances',exact:true}).click();
+  await page.waitForURL('**/fbr-pos/hospital/history?status=partial');
+  if (!(await page.locator('body').innerText()).includes('SYN-PARTIAL-'+v.width) || (await page.locator('body').innerText()).includes(reference)) throw new Error('Hospital dashboard outstanding link does not isolate unpaid invoices');
   await page.goto(baseUrl + '/fbr-pos/hospital/day-close', { waitUntil: 'domcontentloaded' });
   const totals = async () => ({ cash: Number(await page.locator('#hospital-cash-total').getAttribute('data-paisa')),
     card: Number(await page.locator('#hospital-card-total').getAttribute('data-paisa')),
@@ -179,7 +216,7 @@ export async function hospitalWorkflow(page, t, v, { baseUrl, saveEvidenceScreen
   await page.goto(new URL(partialInvoice,baseUrl).href,{waitUntil:'domcontentloaded'});
   if(Number(await page.locator('#hospital-balance').getAttribute('data-paisa'))!==15000) throw new Error('Closing changed outstanding partial invoice balance');
   await privateCollectionCacheCheck(page,{baseUrl,path:'/fbr-pos/hospital',screenshotName:'hospital-offline-private-cache-'+v.width,saveEvidenceScreenshot});
-  pass('HOSPITAL COLLECTION PASS: ' + v.width + ': initial and partial-payment lostresponse/refresh recovery, patient reference, consultation, cash/card/bank partial payments and zero balance, immutable receipt/reprint, conflict/overpay/idempotent retry, history and counted-cash day-close; fiscal remains disabled; synthetic only');
+  pass('HOSPITAL COLLECTION PASS: ' + v.width + ': category/package selection (not browser signup submission), scoped dashboard collections/outstanding/campus, initial and partial-payment lostresponse/refresh recovery, patient reference, consultation, cash/card/bank partial payments and zero balance, immutable receipt/reprint, conflict/overpay/idempotent retry, history and counted-cash day-close; fiscal remains disabled; synthetic only');
 }
 
 

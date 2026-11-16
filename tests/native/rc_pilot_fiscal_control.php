@@ -29,6 +29,20 @@ $foreign=Company::create(['name'=>'Synthetic unrelated retail','ntn'=>'PFR'.$suf
 foreach(['education','hospital']as$category){
  $c=Company::create(['name'=>'Synthetic '.$category,'ntn'=>$category.$suffix,'product_type'=>'fbrpos','pos_type'=>$category,'business_category'=>$category,'fbr_reporting_enabled'=>true]);
  $invoice=DB::table('fbr_pos_transactions')->insertGetId(['company_id'=>$c->id,'invoice_number'=>'SYN-ACK-'.$category.$suffix,'transaction_type'=>'sale','status'=>'completed','fbr_status'=>'success','fbr_invoice_number'=>'SYN-ACK-'.$suffix,'created_at'=>now(),'updated_at'=>now()]);$history=(array)DB::table('fbr_pos_transactions')->find($invoice);
+ // Synthetic local-source snapshots must survive the concurrent OFF/ON controls below.
+ $routeCategory=$category==='education'?'school':'hospital';
+ $routeSource=$routeCategory==='school'?'school_receipt':'hospital_invoice';
+ $routeTable=$routeCategory==='school'?'school_fee_receipts':'hospital_invoices';
+ $routeRecords=[];
+ foreach(['off','ims','di'] as $frozenRoute){
+  $snapshot=json_decode(\App\Services\PilotFiscalRouteSnapshot::newBill($c,$routeCategory,$routeSource),true);
+  $snapshot['route']=$frozenRoute; // synthetic uncertainty, never an authorization
+  $base=['company_id'=>$c->id,'request_key'=>(string)\Illuminate\Support\Str::uuid(),'created_at'=>now(),'updated_at'=>now(),'fiscal_route_snapshot'=>json_encode($snapshot)];
+  $fields=$routeCategory==='school'?['collected_by'=>1,'student_reference'=>'SYN-ROUTE','fee_head'=>'tuition','amount_paisa'=>10000,'collected_at'=>now()]
+   :['patient_reference'=>'SYN-ROUTE','service_head'=>'consultation','total_paisa'=>10000,'created_by'=>1,'campus_name'=>'Synthetic'];
+  $sourceId=DB::table($routeTable)->insertGetId($base+$fields);
+  $routeRecords[]=[$sourceId,$frozenRoute,(array)DB::table($routeTable)->find($sourceId)];
+ }
  $barrier=dirname($socket).'/pilot-fiscal-'.bin2hex(random_bytes(8));$workers=[];
  try{foreach([0,1]as$i){$p=new Process([PHP_BINARY,__FILE__,'worker',(string)$actors[$i]->id,(string)$c->id,(string)$i,$barrier,(string)$i]);$p->setTimeout(35);$p->start();$workers[]=$p;}
  $until=microtime(true)+20;foreach([0,1]as$i)while(!is_file($barrier.'.ready-'.$i)){if(microtime(true)>$until)throw new RuntimeException('Pilot startup timeout');usleep(10000);}file_put_contents($barrier,'go');
@@ -48,6 +62,16 @@ foreach(['education','hospital']as$category){
  try{PilotFiscalControl::update($c->id,false);throw new RuntimeException('Stale privileged actor accepted');}catch(\Symfony\Component\HttpKernel\Exception\HttpException $e){pilotAssert($e->getStatusCode()===403,'Wrong role denial');}
  DB::table('admin_users')->where('id',$actors[0]->id)->update(['role'=>'super_admin']);
  pilotAssert($history===(array)DB::table('fbr_pos_transactions')->find($invoice),'Rejected operations changed acknowledgement');
+ foreach($routeRecords as[$sourceId,$frozenRoute,$beforeSource]){
+  $plan=\App\Services\PilotFiscalRouteSnapshot::recoveryPlan((int)$c->id,$routeCategory,$routeSource,$sourceId,$frozenRoute);
+  pilotAssert($plan['route']===$frozenRoute&&!$plan['can_submit']&&!$plan['can_retry'],'Frozen route not held');
+  pilotAssert($plan['state']===($frozenRoute==='off'?'local_only':'reconciliation_required'),'Wrong recovery state');
+  $otherRoute=$frozenRoute==='ims'?'di':'ims';
+  pilotAssert(\App\Services\PilotFiscalRouteSnapshot::recoveryPlan((int)$c->id,$routeCategory,$routeSource,$sourceId,$otherRoute)['reason']==='route_mismatch','Cross-route retry allowed');
+  pilotAssert($beforeSource===(array)DB::table($routeTable)->find($sourceId),'Route snapshot/history changed');
+ }
+
 }
 pilotAssert($foreignBefore===(array)DB::table('companies')->find($foreign->id),'Foreign retail company changed');Http::assertNothingSent();
 echo "PASS: native School Hospital concurrent OFF and rejected ON remain disabled with exact audit current actor denial atomic rollback and unchanged acknowledgements foreign tenant no provider calls\n";
+echo "PASS: native School Hospital OFF IMS DI snapshots survive concurrent control and same-route unknown recovery without mutation backfill or provider calls\n";

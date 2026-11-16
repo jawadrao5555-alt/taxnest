@@ -58,7 +58,15 @@ class FbrPosHospitalController extends Controller
     }
     public function dashboard() {
         $company=$this->company(); $date=today()->toDateString(); $totals=$this->totals($company,$date); $closed=$this->closed($company,$date);
-        return response()->view('fbr-pos.hospital.dashboard',compact('company','date','totals','closed'))->header('Cache-Control','private, no-store');
+        // Scope both sides of the balance to this company and active campus.
+        // A payment linked to a foreign/corrupt invoice cannot reduce this balance.
+        $paid = DB::table('hospital_payments as hp')->selectRaw('COALESCE(SUM(hp.amount_paisa),0)')
+            ->whereColumn('hp.invoice_id','hospital_invoices.id')->whereColumn('hp.company_id','hospital_invoices.company_id')
+            ->whereRaw('(hp.branch_id = hospital_invoices.branch_id OR (hp.branch_id IS NULL AND hospital_invoices.branch_id IS NULL))');
+        $balances = $this->rows('hospital_invoices',$company)->select('total_paisa')->selectSub($paid,'paid_paisa')->get();
+        $outstanding = (int)$balances->sum(fn($invoice)=>max(0,(int)$invoice->total_paisa-(int)$invoice->paid_paisa));
+        $campusName = $this->campus($company);
+        return response()->view('fbr-pos.hospital.dashboard',compact('company','date','totals','closed','outstanding','campusName'))->header('Cache-Control','private, no-store');
     }
     public function switchCampus(Request $r) {
         $this->company(); $d=$r->validate(['branch_id'=>'required|integer|min:1']);
@@ -116,17 +124,19 @@ class FbrPosHospitalController extends Controller
                 $limit=\App\Services\PlanLimitService::canCreateFbrPosBill($company->id);
                 abort_unless($limit['allowed']??false,403,$limit['reason']??'Invoice limit reached.');
                 }
-                $invoiceId=DB::table('hospital_invoices')->insertGetId(['company_id'=>$company->id,'branch_id'=>$this->branch(),
+                $routeSnapshot=\App\Services\PilotFiscalRouteSnapshot::newBill($company,'hospital','hospital_invoice');
+                $invoiceId=DB::table('hospital_invoices')->insertGetId((\Illuminate\Support\Facades\Schema::hasColumn('hospital_invoices','fiscal_route_snapshot') ? ['fiscal_route_snapshot'=>$routeSnapshot] : []) + ['company_id'=>$company->id,'branch_id'=>$this->branch(),
                     'request_key'=>$d['request_key'],'patient_reference'=>$d['patient_reference'],'patient_name'=>$d['patient_name']?:null,'service_lines'=>json_encode($serviceLines),'service_head'=>$d['service_head'],
                     'total_paisa'=>$total,'created_by'=>Auth::guard('fbrpos')->id(),'campus_name'=>$this->campus($company),'created_at'=>$at,'updated_at'=>$at]);
                 $paid=0;
             } else {
                 $invoice=$this->rows('hospital_invoices',$company)->where('id',$invoiceId)->lockForUpdate()->first(); abort_unless($invoice,404);
+                $routeSnapshot=$invoice->fiscal_route_snapshot ?? null;
                 $total=(int)$invoice->total_paisa;
                 $paid=(int)$this->rows('hospital_payments',$company)->where('invoice_id',$invoiceId)->orderBy('id')->lockForUpdate()->get(['id','amount_paisa'])->sum('amount_paisa');
                 if ($amount>$total-$paid) $this->error('amount','overpayment');
             }
-            return DB::table('hospital_payments')->insertGetId(['company_id'=>$company->id,'branch_id'=>$this->branch(),'invoice_id'=>$invoiceId,
+            return DB::table('hospital_payments')->insertGetId((\Illuminate\Support\Facades\Schema::hasColumn('hospital_payments','fiscal_route_snapshot') ? ['fiscal_route_snapshot'=>$routeSnapshot] : []) + ['company_id'=>$company->id,'branch_id'=>$this->branch(),'invoice_id'=>$invoiceId,
                 'request_key'=>$d['request_key'],'amount_paisa'=>$amount,'payment_reference'=>$d['payment_reference']?:null,'payment_method'=>$d['payment_method'],'balance_paisa'=>$total-$paid-$amount,
                 'collected_by'=>Auth::guard('fbrpos')->id(),'cashier_name'=>Auth::guard('fbrpos')->user()->name,'campus_name'=>$this->campus($company),
                 'collected_at'=>$at,'created_at'=>$at,'updated_at'=>$at]);

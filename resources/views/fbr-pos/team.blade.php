@@ -1,4 +1,8 @@
 <x-fbr-pos-layout>
+@php
+    $teamCompany = Auth::guard('fbrpos')->user()?->company;
+    $unassignedLabel = $teamCompany?->isLocalCollectionPilot() ? __('collection_audit.unassigned_campus') : __('pos.main_branch');
+@endphp
 <div class="max-w-6xl mx-auto">
     @include('fbr-pos.partials.back-link')
     <div class="flex items-center justify-between mb-6">
@@ -27,7 +31,7 @@
             </select>
             @if($branches->isNotEmpty())
             <select name="default_branch_id" class="border rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white">
-                <option value="">{{ __('pos.main_branch') }}</option>
+                <option value="">{{ $unassignedLabel }}</option>
                 @foreach($branches as $b)
                 <option value="{{ $b->id }}">{{ $b->name }}</option>
                 @endforeach
@@ -60,7 +64,7 @@
                         @else{{ __('pos.role_cashier') }}@endif
                     </td>
                     @if($branches->isNotEmpty())
-                    <td class="dark:text-gray-300">{{ optional($branches->firstWhere('id', $member->default_branch_id))->name ?? __('pos.main_branch') }}</td>
+                    <td class="dark:text-gray-300">{{ optional($branches->firstWhere('id', $member->default_branch_id))->name ?? $unassignedLabel }}</td>
                     @endif
                     <td class="dark:text-gray-300">
                         @if(!$isAdminRow && isset($teamPasswords[$member->id]))
@@ -112,7 +116,7 @@
                             @endif
                             @if($branches->isNotEmpty())
                             <select name="default_branch_id" class="border rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white">
-                                <option value="">{{ __('pos.main_branch') }}</option>
+                                <option value="">{{ $unassignedLabel }}</option>
                                 @foreach($branches as $b)
                                 <option value="{{ $b->id }}" @selected((int) $member->default_branch_id === $b->id)>{{ $b->name }}</option>
                                 @endforeach

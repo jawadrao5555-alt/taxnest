@@ -60,7 +60,23 @@ class FbrService
             }
             $response = $request->post($url, $payload);
             if (!$response->successful() || !is_array($response->json())) return $unknown;
-            $data = $response->json();
+            return $this->interpretPosDiAcknowledgement($response->json(), count($payload['items']));
+        } catch (\Throwable $e) {
+            // Do not persist exception bodies, bearer tokens or untrusted response echoes.
+            return $unknown;
+        }
+    }
+
+    /**
+     * Pure classification of a DI response, not authorization or acknowledgement persistence.
+     * Callers must separately bind the response to an authorized route, company and dispatch.
+     * Unknown/partial replies remain held; this method never retries or contacts a regulator.
+     */
+    public function interpretPosDiAcknowledgement(array $data, int $expectedItemCount): array
+    {
+        $unknown = ['state' => 'verification_required', 'reference' => null, 'error_codes' => []];
+        if ($expectedItemCount < 1) return $unknown;
+        try {
             $validation = $data['validationResponse'] ?? null;
             if (!is_array($validation)) return $unknown;
             $statuses = $validation['invoiceStatuses'] ?? [];
@@ -69,14 +85,14 @@ class FbrService
                 if (!is_array($item)) return $unknown;
             }
             $parsed = $this->parseFbrResponse($data);
-            $allValid = count($statuses) === count($payload['items']);
+            $allValid = count($statuses) === $expectedItemCount;
             $seen = [];
             foreach ($statuses as $item) {
                 $serial = (string) ($item['itemSNo'] ?? '');
                 $serialNumber = (int) $serial;
                 $allValid = $allValid && ($item['statusCode'] ?? null) === '00'
                     && strtolower((string) ($item['status'] ?? '')) === 'valid'
-                    && ctype_digit($serial) && $serialNumber >= 1 && $serialNumber <= count($payload['items'])
+                    && ctype_digit($serial) && $serialNumber >= 1 && $serialNumber <= $expectedItemCount
                     && !isset($seen[$serialNumber]);
                 $seen[$serialNumber] = true;
             }
@@ -92,7 +108,6 @@ class FbrService
             }
             return $unknown;
         } catch (\Throwable $e) {
-            // Do not persist exception bodies, bearer tokens or untrusted response echoes.
             return $unknown;
         }
     }

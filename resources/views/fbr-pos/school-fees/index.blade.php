@@ -17,11 +17,12 @@
         <input type="hidden" name="expected_branch_key" value="{{ $schoolCampusId ?? 0 }}">
         <div class="grid">
             <div><label for="student_name">{{ __('school_ledger.student_name') }}</label><input id="student_name" name="student_name" maxlength="100" value="{{ old('student_name') }}"></div>
-            <div><label for="payment_method">{{ __('pos.school_payment') }}</label><select id="payment_method" name="payment_method"><option value="cash">{{ __('pos.school_cash') }}</option><option value="card">{{ __('school_ledger.card') }}</option><option value="bank">{{ __('school_ledger.bank') }}</option></select></div>
+            <div><label for="payment_method">{{ __('pos.school_payment') }}</label><select id="payment_method" name="payment_method"><option value="cash" @selected(old('payment_method', 'cash') === 'cash')>{{ __('pos.school_cash') }}</option><option value="card" @selected(old('payment_method') === 'card')>{{ __('school_ledger.card') }}</option><option value="bank" @selected(old('payment_method') === 'bank')>{{ __('school_ledger.bank') }}</option></select></div>
+            <div><label for="payment_reference">{{ __('school_audit.reference') }}</label><input id="payment_reference" name="payment_reference" maxlength="100" value="{{ old('payment_reference') }}"><p class="muted">{{ __('school_audit.reference_help') }}</p></div>
             <div><label for="student_reference">{{ __('pos.school_student_reference') }}</label><input id="student_reference" list="school-student-references" name="student_reference" value="{{ old('student_reference') }}" maxlength="100" required autocomplete="off"><datalist id="school-student-references">@foreach($studentReferences as $reference)<option value="{{ $reference }}">@endforeach</datalist><div class="muted">{{ __('pos.school_reference_hint') }} {{ __('school_ledger.legacy_lookup') }}</div></div>
-            <div><label for="fee_head">{{ __('pos.school_fee_head') }}</label><select id="fee_head" name="fee_head" required>@foreach($feeHeads as $head)<option value="{{ $head['code'] }}" @selected(old('fee_head', 'tuition') === $head['code'])>{{ $head['label'] }}</option>@endforeach</select></div>
+            <div id="school-single-head"><label for="fee_head">{{ __('pos.school_fee_head') }}</label><select id="fee_head" name="fee_head" required>@foreach($feeHeads as $head)<option value="{{ $head['code'] }}" @selected(old('fee_head', 'tuition') === $head['code'])>{{ $head['label'] }}</option>@endforeach</select></div>
             <div><label for="fee_period">{{ __('school.period') }}</label><input type="month" id="fee_period" name="fee_period" value="{{ old('fee_period', now()->format('Y-m')) }}" required><div class="muted">{{ __('school.default_month') }}</div></div>
-            <div><label for="amount">{{ __('pos.school_amount') }} (PKR)</label><input id="amount" name="amount" type="number" min="0.01" max="99999999.99" step="0.01" value="{{ old('amount') }}" required inputmode="decimal"></div>
+            <div><label for="amount">{{ __('school_print.this_payment') }} (PKR)</label><input id="amount" name="amount" type="number" min="0.01" max="99999999.99" step="0.01" value="{{ old('amount') }}" required inputmode="decimal"></div>
         </div>
         <fieldset id="school-multi-lines"><legend>{{ __('school_ledger.lines') }}</legend>
 <label><input style="width:auto" type="checkbox" id="school-multi-mode"> {{ __('school_ledger.itemized') }}</label>
@@ -35,7 +36,7 @@
 <form method="get"><label for="student-search">{{ __('school_ledger.lookup') }}</label><input id="student-search" name="student_search" maxlength="100" value="{{ request('student_search') }}"><button>{{ __('pos.school_view_report') }}</button></form>
 <div class="scroll"><table><thead><tr><th>{{ __('pos.school_student_reference') }}</th><th>{{ __('school.period') }}</th><th>{{ __('school_ledger.payable') }}</th><th>{{ __('school_ledger.paid') }}</th><th>{{ __('school_ledger.balance') }}</th><th></th></tr></thead><tbody>
 @foreach($accounts as $account)<tr><td>{{ $account->student_reference }} {{ $account->student_name }}</td><td>{{ $account->fee_period }}</td><td>{{ number_format($account->payable_paisa/100,2) }}</td><td>{{ number_format($account->paid_paisa/100,2) }}</td><td>{{ number_format(($account->payable_paisa-$account->paid_paisa)/100,2) }}</td><td>@if($account->paid_paisa < $account->payable_paisa)<button type="button" class="school-pay-balance" data-account="{{ json_encode($account) }}">{{ __('school_ledger.pay_balance') }}</button>@endif</td></tr>@endforeach
-</tbody></table></div></section>
+</tbody></table></div>{{ $accounts->links() }}</section>
 <section class="card" id="school-receipt-history"><h2>{{ __('pos.school_receipt_history') }}</h2><div class="scroll">
 <table><thead><tr><th>{{ __('pos.school_receipt') }}</th><th>{{ __('pos.school_student_reference') }}</th><th>{{ __('pos.school_fee_head') }}</th><th>PKR</th><th>{{ __('pos.school_collected_at') }}</th><th>{{ __('school.period') }}</th><th>{{ __('school.campus') }}</th><th>{{ __('school.cashier') }}</th></tr></thead><tbody>
 @forelse($receipts as $receipt)
@@ -57,16 +58,34 @@
     const editor = document.getElementById('school-line-editor');
     const lines = document.getElementById('school-lines');
     let loadedAccount = false;
-    const addLine = (head = heads[0]?.code, amount = '') => {
+    const rate = code => { const value = heads.find(h => h.code === code)?.default_amount_paisa; return value == null ? '' : (value / 100).toFixed(2); };
+    const singleHead = document.getElementById('fee_head');
+    const paidAmount = document.getElementById('amount');
+    if (!paidAmount.value) paidAmount.value = rate(singleHead.value);
+    singleHead.addEventListener('change', () => { if (!loadedAccount && !multi.checked) paidAmount.value = rate(singleHead.value); });
+    const method = document.getElementById('payment_method');
+    const reference = document.getElementById('payment_reference');
+    const updateReference = () => { reference.required = method.value !== 'cash'; };
+    method.addEventListener('change', updateReference); updateReference();
+    const setMode = () => { editor.hidden = !multi.checked; document.getElementById('school-single-head').hidden = multi.checked; singleHead.disabled = multi.checked; };
+    const showPayable = () => {
+        if (loadedAccount) return;
+        const total = [...lines.querySelectorAll('input')].reduce((sum, input) => sum + Math.round(Number(input.value || 0) * 100), 0);
+        document.getElementById('school-payable').textContent = @json(__('school_ledger.payable')) + ': PKR ' + (total / 100).toFixed(2);
+    };
+    const addLine = (head = heads[0]?.code, amount = null) => {
         const row = document.createElement('div'); row.className = 'grid school-line';
         const select = document.createElement('select'); select.className = 'school-line-head';
         heads.forEach(h => { const option = new Option(h.label, h.code); option.selected = h.code === head; select.add(option); });
         if (![...select.options].some(o => o.value === head)) select.add(new Option(head, head, true, true));
-        const input = document.createElement('input'); input.type = 'number'; input.min = '0.01'; input.max = '99999999.99'; input.step = '0.01'; input.className = 'school-line-amount'; input.value = amount;
-        const remove = document.createElement('button'); remove.type = 'button'; remove.textContent = @json(__('school_ledger.remove')); remove.onclick = () => { if (!loadedAccount) row.remove(); };
-        row.append(select, input, remove); lines.append(row);
+        const input = document.createElement('input'); input.type = 'number'; input.min = '0.01'; input.max = '99999999.99'; input.step = '0.01'; input.className = 'school-line-amount'; input.value = amount ?? rate(head);
+        select.addEventListener('change', () => { if (!loadedAccount) input.value = rate(select.value); showPayable(); });
+        select.setAttribute('aria-label', @json(__('pos.school_fee_head'))); input.setAttribute('aria-label', @json(__('school_ledger.payable')));
+        const remove = document.createElement('button'); remove.type = 'button'; remove.textContent = @json(__('school_ledger.remove')); remove.onclick = () => { if (!loadedAccount) { row.remove(); showPayable(); } };
+        input.addEventListener('input', showPayable);
+        row.append(select, input, remove); lines.append(row); showPayable();
     };
-    multi.onchange = () => { editor.hidden = !multi.checked; if (multi.checked && !lines.children.length) addLine(document.getElementById('fee_head').value, document.getElementById('amount').value); };
+    multi.onchange = () => { setMode(); if (multi.checked && !lines.children.length) addLine(document.getElementById('fee_head').value, document.getElementById('amount').value); };
     document.getElementById('school-add-line').onclick = () => { if (!loadedAccount && lines.children.length < 20) addLine(); };
     document.querySelectorAll('.school-pay-balance').forEach(b => b.onclick = () => {
         if (pending) { show(recoveryMessage); return; }
@@ -76,8 +95,10 @@
         document.getElementById('student_name').value = a.student_name || '';
         document.getElementById('fee_period').value = a.fee_period;
         document.getElementById('amount').value = ((a.payable_paisa-a.paid_paisa)/100).toFixed(2);
-        multi.checked = true; multi.disabled = true; editor.hidden = false; lines.replaceChildren();
+        multi.checked = true; multi.disabled = true; setMode(); lines.replaceChildren();
         JSON.parse(a.fee_lines).forEach(l => addLine(l.fee_head, (l.amount_paisa/100).toFixed(2)));
+        lines.querySelectorAll('select,input').forEach(input => input.disabled = true);
+        ['student_reference','student_name','fee_period'].forEach(id => document.getElementById(id).readOnly = true);
         document.getElementById('school-payable').textContent = @json(__('school_ledger.balance')) + ': PKR ' + ((a.payable_paisa-a.paid_paisa)/100).toFixed(2);
         form.scrollIntoView({behavior:'smooth'});
     });

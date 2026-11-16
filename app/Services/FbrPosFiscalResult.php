@@ -4,6 +4,26 @@ namespace App\Services;
 
 final class FbrPosFiscalResult
 {
+    /** Extract the existing IMS code aliases without inferring success from a number. */
+    public static function code(?array $response): ?string
+    {
+        foreach (['Code', 'response_code', 'code'] as $key) {
+            if (array_key_exists($key, $response ?? []) && $response[$key] !== null) {
+                $candidate = trim((string) $response[$key]);
+                if ($candidate !== '') return $candidate;
+            }
+        }
+        return null;
+    }
+
+    /** Pure interpretation only; device/claim/company binding remains the caller's duty. */
+    public static function explicitAcknowledgement(?array $response, bool $reportedSuccess, string $reportedNumber): ?string
+    {
+        $number = self::fromResponse($response);
+        return $reportedSuccess && self::code($response) === '100' && $number !== null
+            && hash_equals($number, $reportedNumber) ? $number : null;
+    }
+
     public static function number(mixed $value): ?string
     {
         if (!is_string($value)) return null;

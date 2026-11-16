@@ -135,13 +135,13 @@ class FbrPosPlanComparisonService
      * can never quietly become "not included".
      */
     public const INCLUDED_ROWS = [
-        'fbr_live'      => ['label' => 'Live FBR submission — fiscal invoice number and QR on every receipt'],
-        'inventory'     => ['column' => 'inventory_enabled', 'label' => 'Inventory, stock and purchase entry'],
-        'riders'        => ['column' => 'riders_enabled',    'label' => 'Delivery riders and rider khata'],
+        'fbr_live'      => ['label' => 'Retail fiscal reporting only after eligible setup and valid authority acknowledgement; School/Hospital reporting OFF'],
+        'inventory'     => ['column' => 'inventory_enabled', 'label' => 'Retail category: inventory, stock and purchase entry'],
+        'riders'        => ['column' => 'riders_enabled',    'label' => 'Eligible retail category: delivery riders and rider khata'],
         'hazri'         => ['column' => 'hazri_enabled',     'label' => 'Staff Hazri (attendance) tracking'],
         'whatsapp'      => ['column' => 'whatsapp_enabled',  'label' => 'Send the bill on WhatsApp'],
-        'thermal'       => ['label' => '80mm and 58mm thermal receipts with silent printing'],
-        'mobile_app'    => ['label' => 'Android app for the whole team'],
+        'thermal'       => ['label' => 'Receipt preview and browser printing; silent printing requires a supported configured Agent and device verification'],
+        'mobile_app'    => ['label' => 'Android access where supported by category, role and released app'],
         'languages'     => ['label' => 'English, Roman Urdu and Urdu'],
     ];
 

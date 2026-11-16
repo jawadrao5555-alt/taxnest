@@ -242,11 +242,11 @@
             
             <div class="fade-in-up">
                 <h1 class="text-5xl sm:text-6xl lg:text-7xl font-serif text-white leading-[1.1] mb-8">
-                    A fiscal register that<br>never blinks.
+                    The right counter for<br>your business.
                 </h1>
                 
                 <p class="text-xl text-white/80 mb-12 max-w-2xl mx-auto font-light leading-relaxed">
-                    Built exclusively for Tier-1 Pakistani retailers navigating the FBR POS regime. Bank-grade reporting, strict PIN controls, and a counter flow that holds up during Friday rush hour.
+                    Retail billing, School fee collection and Hospital service billing are separate category workspaces. Retail fiscal reporting requires eligible verified setup. School and Hospital local billing works with fiscal reporting OFF; no fiscal number or QR is promised.
                 </p>
                 
                 <div class="flex flex-col sm:flex-row justify-center gap-4">
@@ -330,21 +330,22 @@
                 </div>
                 
                 <div class="bg-gray-50 border border-gray-200 p-4 text-center">
-                    <div class="text-[10px] uppercase font-bold tracking-widest text-[#1d4ed8] mb-3">FBR Fiscal Invoice</div>
+                    <div class="text-[10px] uppercase font-bold tracking-widest text-[#1d4ed8] mb-3">Illustrative retail receipt only</div>
                     
                     <!-- CSS QR Code Placeholder -->
                     <div class="inline-block p-1 bg-white border border-gray-300 mb-3">
                         <div class="w-20 h-20 bg-grid-pattern opacity-60"></div>
                     </div>
                     
-                    <div class="font-bold text-sm tracking-wider">FBR-INV-2026-0034</div>
-                    <div class="text-[10px] mt-1 text-gray-500">Verify via Tax Asaan App</div>
+                    <div class="font-bold text-sm tracking-wider">DEMO-NOT-A-FISCAL-NUMBER</div>
+                    <div class="text-[10px] mt-1 text-gray-500">No authority acknowledgement; not valid for verification</div>
                 </div>
             </div>
             <div class="receipt-edge-bottom"></div>
         </div>
     </div>
 
+    <p class="max-w-3xl mx-auto px-4 py-6 text-sm text-gray-700">The receipt illustration and retail features below describe the retail category only. School and Hospital use separate local collection screens, not retail inventory, KOT or delivery controls.</p>
     <!-- Editorial Variety: Wide Stat Band -->
     <section class="py-16 bg-[#FDFBF7] border-y border-gray-200">
         <div class="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8">
@@ -400,7 +401,7 @@
                 <div class="lg:col-span-7 bg-[#FDFBF7] border border-gray-200 p-10 fade-in-up">
                     <h3 class="text-2xl font-serif font-bold text-[#052730] mb-4">Direct API Transmission</h3>
                     <p class="text-gray-700 leading-relaxed mb-6">
-                        No middleman middleware delaying your transactions. The moment a cashier confirms payment, the payload goes directly to FBR. If the connection fails, the sale is queued, the receipt prints normally, and the system securely retries in the background until successful.
+                        For eligible retail companies, reporting follows the configured integration and actual authority response. Failed or uncertain submissions need the supported recovery workflow. School and Hospital remain local-only with reporting OFF; their bills never enter the retail retry queue.
                     </p>
                     <ul class="space-y-3">
                         <li class="flex items-center text-sm font-medium text-gray-800">
@@ -500,7 +501,7 @@
                         <svg class="w-5 h-5 text-[#0A4D5C]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
                     </div>
                     <h4 class="text-lg font-bold text-[#052730] mb-2">Fiscal Device Local Mode</h4>
-                    <p class="text-gray-600 text-sm leading-relaxed">For POS IDs on FBR's fiscal-device regime, our Windows Desktop Agent fiscalizes bills through the local IMS service on your counter PC — the route FBR now requires for new registrations.</p>
+                    <p class="text-gray-600 text-sm leading-relaxed">Retail companies with an applicable fiscal-device configuration can use the supported Windows Agent and local IMS service. Confirm the official route for your registration and verify the device setup. This is not a School or Hospital reporting route.</p>
                 </div>
 
                 <!-- Delivery riders -->
@@ -518,7 +519,7 @@
                         <svg class="w-5 h-5 text-[#0A4D5C]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"/></svg>
                     </div>
                     <h4 class="text-lg font-bold text-[#052730] mb-2">Receipt Themes</h4>
-                    <p class="text-gray-600 text-sm leading-relaxed">Pick the receipt style that fits your shop — layout, logo and formatting options for both 80mm and 58mm thermal printers, with the FBR fiscal block always intact.</p>
+                    <p class="text-gray-600 text-sm leading-relaxed">Pick the receipt style that fits your shop — layout, logo and formatting options for both 80mm and 58mm thermal printers, with fiscal identifiers shown only for valid acknowledged fiscal bills. School and Hospital receipts remain local-only.</p>
                 </div>
 
                 <!-- Urdu -->
@@ -563,7 +564,7 @@
                         <svg class="w-5 h-5 text-[#0A4D5C]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
                     </div>
                     <h4 class="text-lg font-bold text-[#052730] mb-2">Offline Billing with Auto-Sync</h4>
-                    <p class="text-gray-600 text-sm leading-relaxed">Load shedding doesn't close your counter. Bills keep printing when the internet drops and sync to FBR automatically every couple of minutes once you're back online. Business plan onwards.</p>
+                    <p class="text-gray-600 text-sm leading-relaxed">Load shedding doesn't close your counter. Supported retail offline workflows depend on package and device setup. Review queued and uncertain submissions through the configured recovery process. School and Hospital local receipts are not backfilled to FBR.</p>
                 </div>
 
                 <!-- Analytics -->
@@ -658,7 +659,7 @@
                         <span class="font-bold text-[#052730]">Are bills really submitted to FBR in real time?</span>
                         <span class="text-gray-400 text-xl font-light" x-text="open === 1 ? '−' : '+'"></span>
                     </button>
-                    <div x-show="open === 1" x-collapse class="px-6 pb-6 text-gray-600 leading-relaxed text-sm">Yes. Each completed sale goes straight to FBR's POS service and the fiscal invoice number prints on the receipt. If FBR rejects a bill, it lands in a fail queue where you can fix the data and retry — nothing silently disappears.</div>
+                    <div x-show="open === 1" x-collapse class="px-6 pb-6 text-gray-600 leading-relaxed text-sm">Only eligible retail bills with enabled, verified integration are submitted. A fiscal number or QR appears after valid acknowledgement, not merely after payment. School and Hospital reporting is OFF and their receipts stay local. Rejected and uncertain retail requests must be resolved through the supported status/retry workflow.</div>
                 </div>
                 <div class="bg-white border border-gray-200 fade-in-up" style="transition-delay: 50ms;">
                     <button @click="open = (open === 2 ? null : 2)" class="w-full flex items-center justify-between p-6 text-left hover:bg-gray-50 transition-colors">
@@ -691,7 +692,7 @@
         <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative z-10 fade-in-up">
             <h2 class="text-4xl lg:text-5xl font-serif text-white mb-6">Install the terminal today.</h2>
             <p class="text-xl text-white/70 mb-10 font-light max-w-2xl mx-auto">
-                No credit card required. Experience strict, secure FBR compliance immediately.
+                No credit card required. Try the selected category workflow; registration is not fiscal approval.
             </p>
             <div class="flex flex-col sm:flex-row justify-center gap-4">
                 <a href="/fbr-pos/register" class="btn-solid btn-gold px-8 py-4 text-base">

@@ -86,6 +86,7 @@ class FbrPosSchoolFeePilotTest extends TestCase
         });
         (require database_path('migrations/2026_11_15_010000_extend_school_fee_collection_details.php'))->up();
         (require database_path('migrations/2026_11_15_030000_extend_school_collection_ledger.php'))->up();
+        (require database_path('migrations/2027_01_01_000000_add_pilot_fiscal_route_snapshots.php'))->up();
         $this->school = Company::withoutEvents(fn () => Company::create([
             'name' => 'Synthetic School', 'product_type' => 'fbrpos',
             'pos_type' => 'education', 'business_category' => 'education',
@@ -1128,4 +1129,22 @@ class FbrPosSchoolFeePilotTest extends TestCase
         $this->assertEquals(20,$data['archiveSummary']['tax']);
         $this->assertEquals(200,DB::table('fbr_pos_transactions')->where('id',$id)->value('total_amount'));
     }
+    public function test_new_school_route_is_frozen_off_and_replay_never_backfills_legacy(): void
+    {
+        $data=$this->payload(['fiscal_route'=>'ims','sandbox_verified'=>true]);
+        $id=$this->collect($data)->getData(true)['receipt_id'];
+        $original=DB::table('school_fee_receipts')->find($id);
+        $snapshot=json_decode($original->fiscal_route_snapshot,true);
+        $this->assertSame('off',$snapshot['route']);
+        $this->assertSame($this->school->id,$snapshot['company_id']);
+        $this->assertSame('school',$snapshot['category']);
+        $this->collect(array_replace($data,['fiscal_route'=>'di']));
+        $this->assertEquals($original,DB::table('school_fee_receipts')->find($id));
+        DB::table('school_fee_receipts')->where('id',$id)->update(['fiscal_route_snapshot'=>null]);
+        $legacy=DB::table('school_fee_receipts')->find($id);
+        $this->collect($data);
+        $this->assertEquals($legacy,DB::table('school_fee_receipts')->find($id));
+        Http::assertNothingSent();
+    }
+
 }

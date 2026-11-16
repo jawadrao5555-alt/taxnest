@@ -15,4 +15,11 @@ return [
     'support' => 'Contact support / send feedback',
     'cash_only' => 'Closing cash excludes recorded bank and card payments.',
     'all' => 'All',
+    'student_ledger' => 'Student Fee Ledger',
+    'current_due' => 'Current month due',
+    'past_due' => 'Past month arrears',
+    'payment_history' => 'Payment History',
+    'reference_search' => 'Search by student reference',
+    'no_accounts' => 'No saved fee accounts for this reference.',
+    'no_payments' => 'No saved payments for this reference.',
 ];

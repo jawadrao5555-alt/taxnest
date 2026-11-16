@@ -26,7 +26,7 @@
 <div class="school-shell">
     <aside class="school-sidebar no-print">
         <a class="school-identity" href="/fbr-pos/dashboard">{{ $company->name }}</a>
-        <nav class="school-sidebar-nav" aria-label="{{ __('pos.school_navigation') }}"><a href="/fbr-pos/dashboard">{{ __('pos.school_dashboard') }}</a><a href="/fbr-pos/school-fees">{{ __('pos.school_nav_collect') }}</a><a href="/fbr-pos/transactions">{{ __('pos.school_nav_receipts') }}</a>@if(\App\Services\PosAccessService::dayCloseAllowed(Auth::guard('fbrpos')->user(), $company))<a href="/fbr-pos/day-close">{{ __('pos.school_nav_close') }}</a>@endif</nav>
+        <nav class="school-sidebar-nav" aria-label="{{ __('pos.school_navigation') }}"><a href="/fbr-pos/dashboard">{{ __('pos.school_dashboard') }}</a><a href="/fbr-pos/school-fees">{{ __('pos.school_nav_collect') }}</a><a href="{{ route('fbrpos.school-fees.student-ledger') }}">{{ __('school_audit.student_ledger') }}</a><a href="/fbr-pos/transactions">{{ __('pos.school_nav_receipts') }}</a>@if(\App\Services\PosAccessService::dayCloseAllowed(Auth::guard('fbrpos')->user(), $company))<a href="/fbr-pos/day-close">{{ __('pos.school_nav_close') }}</a>@endif</nav>
 @if($schoolCanConfigure ?? false)<p class="no-print"><a href="/fbr-pos/school-fees/settings">{{ __('school.settings') }}</a></p>@endif
         <div class="school-sidebar-brand">
             <strong>TaxNest POS</strong>

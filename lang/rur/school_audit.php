@@ -15,4 +15,11 @@ return [
     'support' => 'Madad lein / raye bhejein',
     'cash_only' => 'Closing cash mein recorded bank aur card payments shamil nahi.',
     'all' => 'Sab',
+    'student_ledger' => 'Student Fee Ledger',
+    'current_due' => 'Is mahinay ki baqi fee',
+    'past_due' => 'Purani baqi fees',
+    'payment_history' => 'Payment History',
+    'reference_search' => 'Student reference se talash karein',
+    'no_accounts' => 'Is reference ka koi fee account nahi mila.',
+    'no_payments' => 'Is reference ki koi payment nahi mili.',
 ];

@@ -76,6 +76,38 @@ class FbrPosSchoolFeeController extends Controller
         ])->withHeaders(['Cache-Control' => 'no-store']);
     }
 
+    public function studentLedger(Request $request)
+    {
+        $company = $this->company();
+        $data = $request->validate(['student_reference' => 'nullable|string|max:100']);
+        $reference = trim($data['student_reference'] ?? '');
+        $period = today()->format('Y-m');
+        $accounts = null;
+        $payments = null;
+        $currentDue = 0;
+        $pastDue = 0;
+
+        if ($reference !== '') {
+            $scope = DB::table('school_fee_accounts')
+                ->where('company_id', $company->id)
+                ->where('branch_id', $this->branchId())
+                ->where('student_reference', $reference);
+
+            $currentDue = (int) (clone $scope)->where('fee_period', $period)
+                ->sum(DB::raw('payable_paisa - paid_paisa'));
+            $pastDue = (int) (clone $scope)->where('fee_period', '<', $period)
+                ->sum(DB::raw('payable_paisa - paid_paisa'));
+            $accounts = $scope->orderByDesc('fee_period')->orderByDesc('id')
+                ->paginate(20, ['*'], 'accounts_page')->withQueryString();
+            $payments = $this->receipts($company)->where('student_reference', $reference)
+                ->orderByDesc('id')->paginate(20, ['*'], 'payments_page')->withQueryString();
+        }
+
+        return response()->view('fbr-pos.school-fees.student-ledger', compact(
+            'company', 'reference', 'accounts', 'payments', 'currentDue', 'pastDue'
+        ))->header('Cache-Control', 'private, no-store');
+    }
+
     public function dashboard()
     {
         $company = $this->company();

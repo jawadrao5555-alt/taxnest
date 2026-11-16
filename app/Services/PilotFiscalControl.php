@@ -44,7 +44,7 @@ final class PilotFiscalControl
             $actor=self::actor(true);$company=self::company($id,true);
             if ($enabled) {
                 if ($company->isHospitalCollectionPilot()) {
-                    if ($company->fbr_reporting_enabled) {$company->fbr_reporting_enabled=false;$company->save();}
+                    if ((bool)$company->getRawOriginal('fbr_reporting_enabled')) {$company->fbr_reporting_enabled=false;$company->save();}
                     AdminAuditLog::log($actor->id,'Pilot fiscal ON rejected','Company',$id,
                         ['requested_route'=>$route ?? 'ims','requested_enabled'=>true,'effective_enabled'=>false,'reason'=>'hospital_release_pending','category'=>'hospital','historical_submission'=>false]);
                     return self::state($company);
@@ -56,7 +56,7 @@ final class PilotFiscalControl
                 }
                 $posId=preg_replace('/[^0-9]/','',(string)($company->fbr_pos_id ?? ''));
                 if ($posId==='' || (int)$posId===0 || !(bool)$company->agent_enabled) {
-                    if ($company->fbr_reporting_enabled) {$company->fbr_reporting_enabled=false;$company->save();}
+                    if ((bool)$company->getRawOriginal('fbr_reporting_enabled')) {$company->fbr_reporting_enabled=false;$company->save();}
                     AdminAuditLog::log($actor->id,'Pilot fiscal ON rejected','Company',$id,
                         ['requested_route'=>'ims','requested_enabled'=>true,'effective_enabled'=>false,'reason'=>'ims_setup_incomplete','category'=>self::state($company)['category'],'historical_submission'=>false]);
                     return self::state($company);

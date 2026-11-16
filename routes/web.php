@@ -1,3246 +1,1395 @@
-<?php
-
-use App\Http\Controllers\ProfileController;
-use App\Http\Controllers\Pos\OfflineQueueReportController;
-use Illuminate\Support\Facades\Route;
-
-// Exact-guard authorization lives in the controller so the challenge cannot
-// redirect back into its own protected middleware. All writes retain web CSRF.
-Route::prefix('security/two-step/{panel}')->where(['panel' => 'di|pos|fbrpos|health|admin'])
-    ->controller(\App\Http\Controllers\Auth\TwoStepController::class)->group(function () {
-        Route::get('/', 'settings')->name('two-step.settings');
-        Route::get('/challenge', 'challenge')->name('two-step.challenge');
-        foreach (['begin', 'confirm', 'verify', 'disable', 'logout'] as $action) {
-            Route::post('/'.$action, $action)->middleware('throttle:20,1')->name('two-step.'.$action);
-        }
-    });
-
-// â”€â”€ Stateless machine endpoints (Task 1090) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// Token/webhook-authenticated endpoints hit by machines (Desktop Agent every
-// 5-30s per shop, rider/caller apps, biometric devices, WA webhooks). They
-// live in routes/web.php so by default they get the FULL web group: cookies +
-// StartSession + session-dependent middleware. With SESSION_DRIVER=database on
-// live, every such request (axios keeps no cookies) did a sessions SELECT +
-// a brand-new sessions INSERT + gc-lottery DELETEs â€” thousands of garbage
-// session rows and 3 extra DB statements per poll. During the 17 Aug 2026
-// night rush this contributed to MySQL "Too many connections" (1040).
-// Stripping session/cookie middleware makes these requests session-free.
-// NOTE: the impersonation/consultant/locale middleware below call
-// $request->session() unguarded, so they MUST come off together with
-// StartSession or every request would 500.
-$statelessMachine = [
-    \App\Http\Middleware\CompanySessionGeneration::class,
-    \Illuminate\Cookie\Middleware\EncryptCookies::class,
-    \Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse::class,
-    \Illuminate\Session\Middleware\StartSession::class,
-    \Illuminate\View\Middleware\ShareErrorsFromSession::class,
-    \Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class,
-    \App\Http\Middleware\ReadOnlyImpersonation::class,
-    \App\Http\Middleware\LogImpersonatedWrites::class,
-    \App\Http\Middleware\ConsultantSwitchGuard::class,
-    \App\Http\Middleware\SetPosLocale::class,
-];
-use Illuminate\Support\Facades\Artisan;
-use App\Http\Controllers\InvoiceController;
-use App\Http\Controllers\AdminController;
-use App\Http\Controllers\BillingController;
-use App\Http\Controllers\DashboardController;
-use App\Http\Controllers\ComplianceCertificateController;
-use App\Http\Controllers\ComplianceController;
-use App\Http\Controllers\RiskReportController;
-use App\Http\Controllers\ProductController;
-use App\Http\Controllers\MISController;
-use App\Http\Controllers\HsMasterExportController;
-use App\Http\Controllers\GlobalHsMasterController;
-use App\Http\Controllers\SroReferenceController;
-use App\Http\Controllers\Admin\HsMasterController;
-use App\Http\Controllers\ShareController;
-use App\Http\Controllers\CompanyUserController;
-use App\Http\Controllers\CompanyConsultantController;
-use App\Http\Controllers\ConsultantConsoleController;
-use App\Http\Controllers\CompanySettingsController;
-use App\Http\Controllers\CustomerLedgerController;
-use App\Http\Controllers\PosController;
-use App\Http\Controllers\RestaurantPosController;
-use App\Http\Controllers\RestaurantTableController;
-use App\Http\Controllers\RestaurantKdsController;
-use App\Http\Controllers\IngredientController;
-use App\Http\Controllers\PosInventoryController;
-use App\Http\Controllers\PosInventoryMasterController;
-use App\Http\Controllers\PosStockCheckController;
-use App\Http\Controllers\PosStockInController;
-use App\Http\Controllers\HotelController;
-use App\Http\Controllers\PosAuthController;
-use App\Http\Controllers\HsCodeMappingController;
-use App\Http\Controllers\BranchController;
-use App\Http\Controllers\BranchSwitchController;
-use App\Http\Controllers\OnboardingController;
-use App\Http\Controllers\TaxOverrideController;
-use App\Http\Controllers\CustomerProfileController;
-use App\Http\Controllers\WhtReportController;
-use App\Http\Controllers\CsvImportController;
-use App\Http\Controllers\InvoiceImportController;
-use App\Http\Controllers\AiInvoiceReaderController;
-use App\Http\Controllers\FbrPosController;
-use App\Http\Controllers\FbrPosAuthController;
-use App\Http\Controllers\HealthController;
-use App\Http\Controllers\HealthAuthController;
-use App\Http\Controllers\HealthDepartmentController;
-use App\Http\Controllers\HealthAttendanceController;
-use App\Http\Controllers\HealthHrController;
-use App\Http\Controllers\HealthLeaveController;
-use App\Http\Controllers\HealthRosterController;
-use App\Http\Controllers\HealthSelfServiceController;
-use App\Http\Controllers\HealthTeamController;
-use App\Http\Controllers\Health\HealthAccountsController;
-use App\Http\Controllers\Health\HealthAuditController;
-use App\Http\Controllers\Health\HealthAccountsReportController;
-use App\Http\Controllers\Health\HealthDoctorShareController;
-use App\Http\Controllers\Health\HealthAdmissionController;
-use App\Http\Controllers\Health\HealthAppointmentController;
-use App\Http\Controllers\Health\HealthClinicalController;
-use App\Http\Controllers\Health\HealthDoctorController;
-use App\Http\Controllers\Health\HealthIpdReportController;
-use App\Http\Controllers\Health\HealthOpdReportController;
-use App\Http\Controllers\Health\HealthBillingController;
-use App\Http\Controllers\Health\HealthOperationController;
-use App\Http\Controllers\Health\HealthWardController;
-use App\Http\Controllers\Health\HealthPatientController;
-use App\Http\Controllers\Health\HealthSetupImportController;
-use App\Http\Controllers\HealthPharmacyController;
-use App\Http\Controllers\HealthPharmacyPurchaseController;
-use App\Http\Controllers\HealthPharmacyStockController;
-use App\Http\Controllers\HealthPharmacyPrescriptionController;
-use App\Http\Controllers\HealthPharmacySaleController;
-use App\Http\Controllers\HealthPharmacyReportController;
-use App\Http\Controllers\InventoryController;
-use App\Http\Controllers\SupplierController;
-use App\Http\Controllers\AnnouncementController;
-
-// Audit Pack ZIP via temporary signed URL from the "pack ready" email â€” no login
-// needed. 'signed' middleware 403s tampered/expired links (expiry = pack retention).
-Route::get('/compliance/audit-packs/{pack}/download-signed', [ComplianceController::class, 'downloadSigned'])
-    ->middleware('signed')
-    ->name('compliance.packs.download-signed');
-
-Route::get('/share/invoice/{uuid}', [ShareController::class, 'show']);
-Route::get('/share/invoice/{uuid}/pdf', [ShareController::class, 'pdf'])->name('share.invoice.pdf');
-
-// Meta WhatsApp Cloud API status webhook (per-company; public + CSRF-exempt).
-Route::post('/api/diagnostics/backup-evidence/{source}', [\App\Http\Controllers\Diagnostics\BackupEvidenceController::class, 'store'])
-    ->whereUuid('source')->middleware('throttle:60,1')->withoutMiddleware($statelessMachine);
-
-Route::get('/webhooks/whatsapp/{company}', [\App\Http\Controllers\WhatsAppWebhookController::class, 'verify'])->whereNumber('company')->withoutMiddleware($statelessMachine);
-Route::post('/webhooks/whatsapp/{company}', [\App\Http\Controllers\WhatsAppWebhookController::class, 'receive'])->whereNumber('company')->withoutMiddleware($statelessMachine);
-
-// Local-development convenience only. The controller fails closed (404) unless
-// APP_ENV=local AND DEMO_LOGIN_ENABLED=true; privileged roles are never offered.
-Route::get('/demo-login/{role}', [\App\Http\Controllers\Auth\AuthenticatedSessionController::class, 'demoLogin'])
-    ->where('role', 'company_admin|demo');
-
-// Infrastructure diagnostic. It used to sit on /health, which is wrong twice
-// over: that prefix now belongs to the Nest ERPS Healthcare panel, and the payload
-// (database host/user, session and cache drivers, a slice of the Replit DB
-// file) has no business being readable without signing in. Moved behind the
-// SaaS admin guard on its own path.
-Route::get('/__diag/infrastructure', function () {
-    $replitdbContent = '';
-    if (file_exists('/tmp/replitdb')) {
-        $raw = trim(file_get_contents('/tmp/replitdb'));
-        if (preg_match('/^(postgres(ql)?:\/\/[^:]+:[^@]+@)([^\/]+)(\/\S+)/', $raw, $m)) {
-            $replitdbContent = 'postgres_url_host=' . $m[3];
-        } else {
-            $replitdbContent = substr($raw, 0, 30) . '...';
-        }
-    }
-    $dbUrlGetenv = getenv('DATABASE_URL') ?: 'empty';
-    $dbUrlPhpEnv = $_ENV['DATABASE_URL'] ?? 'empty';
-    $dbUrlServer = $_SERVER['DATABASE_URL'] ?? 'empty';
-    $dbUrlLaravel = env('DATABASE_URL') ?: 'empty';
-    $dbUrlFile = file_exists('/tmp/prod_database_url') ? trim(file_get_contents('/tmp/prod_database_url')) : 'empty';
-    $dbUrlSources = [
-        'getenv' => ($dbUrlGetenv !== 'empty') ? 'set' : 'empty',
-        '_ENV' => ($dbUrlPhpEnv !== 'empty') ? 'set' : 'empty',
-        '_SERVER' => ($dbUrlServer !== 'empty') ? 'set' : 'empty',
-        'laravel_env' => ($dbUrlLaravel !== 'empty') ? 'set' : 'empty',
-        'file_dump' => ($dbUrlFile !== 'empty' && !empty($dbUrlFile)) ? 'set' : 'empty',
-    ];
-    $foundUrl = null;
-    foreach ([$dbUrlGetenv, $dbUrlPhpEnv, $dbUrlServer, $dbUrlLaravel] as $candidate) {
-        if ($candidate !== 'empty' && preg_match('/^postgres(ql)?:\/\//', $candidate)) {
-            $foundUrl = $candidate;
-            break;
-        }
-    }
-    $resolvedHost = 'none';
-    if ($foundUrl) {
-        $p = parse_url(preg_replace('/^postgres:\/\//', 'postgresql://', $foundUrl));
-        $resolvedHost = $p['host'] ?? 'parse_fail';
-    }
-    $info = [
-        'status' => 'ok',
-        'db_host' => config('database.connections.pgsql.host'),
-        'db_port' => config('database.connections.pgsql.port'),
-        'db_name' => config('database.connections.pgsql.database'),
-        'db_user' => config('database.connections.pgsql.username'),
-        'session_driver' => config('session.driver'),
-        'cache_driver' => config('cache.default'),
-        'config_cached' => file_exists(base_path('bootstrap/cache/config.php')),
-        'replitdb_exists' => file_exists('/tmp/replitdb'),
-        'replitdb_content' => $replitdbContent,
-        'database_url_sources' => $dbUrlSources,
-        'resolved_db_host' => $resolvedHost,
-        'pghost_getenv' => getenv('PGHOST') ?: 'not_set',
-        'db_host_getenv' => getenv('DB_HOST') ?: 'not_set',
-    ];
-    try {
-        $start = microtime(true);
-        \DB::connection()->getPdo();
-        $info['db'] = 'connected';
-        $info['db_time'] = round((microtime(true) - $start) * 1000) . 'ms';
-    } catch (\Exception $e) {
-        $info['db'] = 'failed';
-        $info['db_error'] = substr($e->getMessage(), 0, 300);
-    }
-    return response()->json($info);
-})->middleware('auth:admin');
-
-Route::get('/', function () {
-    // Perf (Jul 2026): these 4 COUNTs over big tables cost ~250ms on EVERY
-    // landing hit â€” cache 10 min (marketing stats don't need to be live).
-    try {
-        $stats = \Illuminate\Support\Facades\Cache::remember('landing_stats', 600, function () {
-            return [
-                'total_invoices' => \App\Models\Invoice::where('status', 'locked')->count()
-                    // PRA writes 'submitted' (never 'success'); FBR POS writes 'success'.
-                    + \App\Models\PosTransaction::whereIn('pra_status', ['submitted', 'success'])->count()
-                    + \App\Models\FbrPosTransaction::whereIn('fbr_status', ['submitted', 'success'])->count(),
-                'total_companies' => \App\Models\Company::where('status', 'approved')->count(),
-            ];
-        });
-    } catch (\Throwable $e) {
-        // DB down: show zeros for THIS request only â€” never cache zeros for 10 min.
-        \Log::warning('Landing stats unavailable: ' . $e->getMessage());
-        $stats = ['total_invoices' => 0, 'total_companies' => 0];
-    }
-
-    return view('landing', [
-        'showLogin' => false,
-        'stats' => $stats,
-    ]);
-});
-
-Route::get('/contact', fn () => view('contact'))->name('contact');
-Route::view('/product-guide', 'product-guide')->name('product-guide');
-
-// Public legal pages. Google Play in dono URLs ko listing mein maangta hai aur
-// yeh check karta hai ke woh bina login khulen (Task 1346) â€” is liye yeh guest
-// routes hain, kisi middleware ke andar nahi. /contact#privacy ka chhota
-// khulasa qaim hai; mukammal policy /privacy par hai.
-Route::get('/privacy', fn () => view('privacy'))->name('privacy');
-Route::get('/data-deletion', fn () => view('data-deletion'))->name('data-deletion');
-
-Route::get('/sitemap.xml', function () {
-    $urls = [
-        ['loc' => url('/'),                'priority' => '1.0', 'changefreq' => 'weekly'],
-        ['loc' => url('/pos'),             'priority' => '0.9', 'changefreq' => 'monthly'],
-        ['loc' => url('/fbr-pos-landing'), 'priority' => '0.9', 'changefreq' => 'monthly'],
-        ['loc' => url('/digital-invoice'), 'priority' => '0.9', 'changefreq' => 'monthly'],
-        ['loc' => url('/tutorials'),       'priority' => '0.8', 'changefreq' => 'weekly'],
-        ['loc' => url('/download'),        'priority' => '0.7', 'changefreq' => 'monthly'],
-        ['loc' => url('/contact'),         'priority' => '0.6', 'changefreq' => 'yearly'],
-        ['loc' => url('/privacy'),         'priority' => '0.5', 'changefreq' => 'yearly'],
-        ['loc' => url('/data-deletion'),   'priority' => '0.4', 'changefreq' => 'yearly'],
-    ];
-    return response()->view('sitemap', compact('urls'))
-        ->header('Content-Type', 'application/xml');
-})->name('sitemap');
-
-// Public downloads hub â€” /download (singular) on purpose: /downloads/ is a real
-// directory in public/ (APKs, agent zip) and Apache serves existing dirs
-// directly, so that path never reaches Laravel.
-Route::get('/download', fn () => view('downloads'))->name('downloads.page');
-
-// In-app update check for the Android shells (Task #443) â€” public, stateless
-// JSON. Each app calls this on launch with its own key and compares the
-// returned `latest` against its installed versionName; empty latest = no
-// update prompt (owner hasn't released / flipped the version yet).
-Route::get('/api/app-version', function () {
-    $map = [
-        'pos'    => ['setting' => 'pos_app_latest_version',    'apk' => 'downloads/taxnest-pos.apk'],
-        'fbrpos' => ['setting' => 'fbrpos_app_latest_version', 'apk' => 'downloads/taxnest-fbr-pos.apk'],
-        'waiter' => ['setting' => 'waiter_app_latest_version', 'apk' => 'downloads/taxnest-waiter.apk'],
-        'rider'  => ['setting' => 'rider_app_latest_version',  'apk' => 'downloads/taxnest-rider.apk'],
-        'di'     => ['setting' => 'di_app_latest_version',     'apk' => 'downloads/taxnest-di.apk'],
-        'caller' => ['setting' => 'caller_app_latest_version', 'apk' => 'downloads/taxnest-caller.apk'],
-        // Caller ID ki WhatsApp wali build (Task 1345) â€” alag record, alag APK,
-        // taake plus wale phone ko clean build ka update na chala jaye.
-        'caller_plus' => ['setting' => 'caller_app_plus_latest_version', 'apk' => 'downloads/taxnest-caller-plus.apk'],
-    ];
-    $app = (string) request()->query('app', '');
-    if (!isset($map[$app])) {
-        return response()->json(['ok' => false, 'error' => 'unknown app'], 404);
-    }
-    $latest = trim((string) \App\Models\SystemSetting::get($map[$app]['setting'], ''));
-    // Task 1413 â€” only advertise a version the HOSTED file actually contains,
-    // so a setting flipped before the upload never nags phones into installing
-    // the same old bytes. Fails open when the APK is not on disk (dev/CI).
-    $latest = \App\Services\ApkManifestReader::advertisedVersion($latest, public_path($map[$app]['apk']));
-    return response()->json([
-        'ok'     => true,
-        'app'    => $app,
-        'latest' => $latest,
-        'apk_url'=> url($map[$app]['apk']),
-    ]);
-})->name('api.app-version');
-Route::get('/download/agent', [\App\Http\Controllers\AgentManagementController::class, 'downloadAgent'])->name('public.agent.download');
-
-// Urdu tutorial video library (owner request, 2 Aug 2026) â€” public page,
-// linked from the marketing top nav. In-app twin lives at /pos/tutorials.
-Route::get('/tutorials', [\App\Http\Controllers\TutorialController::class, 'publicIndex'])->name('tutorials.page');
-
-Route::get('/digital-invoice', function () {
-    // Only the packages still on sale â€” retired plans keep their rows for
-    // existing subscriptions but must never be orderable from the landing.
-    $plans = \App\Services\DiPlanComparisonService::plans();
-    return view('di-landing', ['plans' => $plans]);
-})->name('di.landing');
-
-Route::redirect('/di', '/digital-invoice', 301);
-
-Route::get('/pos', function () {
-    $plans = \App\Services\PosPlanComparisonService::plans();
-    return view('pos.landing', ['plans' => $plans]);
-})->name('pos.landing');
-Route::get('/pos/login', [PosAuthController::class, 'showLogin'])->name('pos.login');
-Route::post('/pos/login', [PosAuthController::class, 'login']);
-Route::get('/pos/register', [PosAuthController::class, 'showRegister'])->name('pos.register');
-Route::post('/pos/register', [PosAuthController::class, 'register']);
-Route::post('/pos/logout', [PosAuthController::class, 'logout'])->name('pos.logout');
-// Guest language picker on login/register (Aug 2026): session-only choice â€”
-// SetPosLocale then follows it on all guest pages incl. root forgot/reset-password.
-Route::post('/pos/guest-language', function (\Illuminate\Http\Request $request) {
-    $lang = $request->input('language');
-    if (\App\Support\PosLocale::isValid($lang)) {
-        $request->session()->put(\App\Support\PosLocale::SESSION_KEY, $lang);
-    }
-    return back();
-})->name('pos.guest-language');
-
-Route::get('/pos/invoice/share/{token}', [PosController::class, 'publicInvoicePdf'])->name('pos.invoice.share');
-
-// Task 1271: FBR twin â€” PUBLIC tokened bill PDF for WhatsApp share (FBR
-// invoice number + Tax Asaan QR intact; provisional/expired tokens refuse).
-Route::get('/fbr-pos/invoice/share/{token}', [FbrPosController::class, 'publicInvoicePdf'])->name('fbrpos.invoice.share');
-
-// Customer live tracking (Task 1105) â€” PUBLIC tokenized "aapka rider yahan
-// hai" page + poll. Token = 48-char random tied to ONE bill; both endpoints
-// re-check the company's plan on every call (downgrade kills live links) and
-// flip to a read-only "Delivered" state once the bill closes. Throttled
-// per-IP (tokens stay unenumerable); stateless â€” no session-row churn from
-// customers' phones polling every 10s.
-Route::get('/track/{token}', [\App\Http\Controllers\PosRiderTrackingController::class, 'publicTrackPage'])
-    ->where('token', '[A-Za-z0-9]{20,64}')
-    ->middleware('throttle:60,1')->withoutMiddleware($statelessMachine)
-    ->name('pos.track.public');
-Route::get('/track/{token}/data', [\App\Http\Controllers\PosRiderTrackingController::class, 'publicTrackData'])
-    ->where('token', '[A-Za-z0-9]{20,64}')
-    ->middleware('throttle:60,1')->withoutMiddleware($statelessMachine)
-    ->name('pos.track.public.data');
-
-// Biometric ADMS push endpoint (4 Aug 2026) â€” PUBLIC, no POS auth.
-// ZKTeco and compatible devices call /bio-sync/{token}/iclock/cdata.
-// Token identifies + scopes the company; no session/CSRF needed.
-Route::get('/bio-sync/{token}/iclock/cdata', [\App\Http\Controllers\PosBiometricController::class, 'admsHandshake'])->name('pos.bio-sync.adms-get')->withoutMiddleware($statelessMachine);
-Route::post('/bio-sync/{token}/iclock/cdata', [\App\Http\Controllers\PosBiometricController::class, 'admsReceivePunches'])->name('pos.bio-sync.adms-post')->withoutMiddleware($statelessMachine);
-// Root ADMS endpoints (4 Aug 2026) â€” K50/K40-class firmware only accepts a bare
-// server address (no URL path), so those devices push to /iclock/cdata at the
-// domain root. Device is identified by ?SN= (must be pre-registered on /pos/bio-sync).
-// Throttled per-IP: devices poll every ~30-60s + push bursts; 120/min is generous
-// for real hardware but blocks SN-enumeration scans and punch-flood abuse.
-Route::middleware('throttle:120,1')->withoutMiddleware($statelessMachine)->group(function () {
-    Route::get('/iclock/cdata', [\App\Http\Controllers\PosBiometricController::class, 'admsHandshakeBySn'])->name('pos.bio-sync.adms-root-get');
-    Route::post('/iclock/cdata', [\App\Http\Controllers\PosBiometricController::class, 'admsReceivePunchesBySn'])->name('pos.bio-sync.adms-root-post');
-    Route::match(['get', 'post'], '/iclock/getrequest', [\App\Http\Controllers\PosBiometricController::class, 'admsNoCommand'])->name('pos.bio-sync.adms-getrequest');
-    Route::match(['get', 'post'], '/iclock/devicecmd', [\App\Http\Controllers\PosBiometricController::class, 'admsNoCommand'])->name('pos.bio-sync.adms-devicecmd');
-});
-
-// â•â•â• Local Bills Archive Portal â•â•â•
-// Isolated read-only portal for users with pos_role='archive_viewer'. Same /pos/login URL
-// (auto-detected). PosAuth middleware confines archive_viewer to /pos/archive/* and
-// blocks every other pos_role from these routes (404). Account created/managed only
-// by SaaS super-admin from /admin/companies/{id}.
-Route::middleware(['pos.auth'])->prefix('pos/archive')->group(function () {
-    Route::get('/', [\App\Http\Controllers\PosArchiveController::class, 'index'])->name('pos.archive.index');
-    Route::get('/export', [\App\Http\Controllers\PosArchiveController::class, 'exportCsv'])->name('pos.archive.export');
-    Route::get('/{id}', [\App\Http\Controllers\PosArchiveController::class, 'show'])->whereNumber('id')->name('pos.archive.show');
-});
-
-// â•â•â• Local Bills Portal â•â•â•
-// Isolated read-only portal for users with pos_role='local_viewer'. Same /pos/login URL
-// (auto-detected). PosAuth middleware confines local_viewer to /pos/local-bills/* and
-// blocks every other pos_role from these routes (404). This is the ONLY surface where
-// local (non-PRA) bills are visible. Accounts are created/managed by the SaaS
-// super-admin AND (Task 665) by the company OWNER himself from this portal.
-Route::middleware(['pos.auth'])->prefix('pos/local-bills')->group(function () {
-    Route::get('/', [\App\Http\Controllers\PosLocalBillsController::class, 'index'])->name('pos.local.index');
-    Route::get('/export', [\App\Http\Controllers\PosLocalBillsController::class, 'exportCsv'])->name('pos.local.export');
-
-    // Viewer-account self-service (Task 665) â€” OWNER ONLY. PosAuth lets every POS
-    // admin (incl. pos_manager) into this prefix, so each endpoint enforces
-    // role === 'company_admin' itself (403) â€” hiding the UI is never the gate.
-    Route::post('/viewers', [\App\Http\Controllers\PosLocalBillsController::class, 'storeViewer'])->name('pos.local.viewers.store');
-    Route::put('/viewers/{userId}', [\App\Http\Controllers\PosLocalBillsController::class, 'updateViewer'])->whereNumber('userId')->name('pos.local.viewers.update');
-    Route::post('/viewers/{userId}/toggle', [\App\Http\Controllers\PosLocalBillsController::class, 'toggleViewer'])->whereNumber('userId')->name('pos.local.viewers.toggle');
-    Route::delete('/viewers/{userId}', [\App\Http\Controllers\PosLocalBillsController::class, 'deleteViewer'])->whereNumber('userId')->name('pos.local.viewers.delete');
-
-    Route::get('/{id}', [\App\Http\Controllers\PosLocalBillsController::class, 'show'])->whereNumber('id')->name('pos.local.show');
-});
-
-// Branch switcher â€” accessible by ANY authenticated guard (web/pos/fbrpos)
-Route::middleware('web')->post('/branch/switch', [BranchSwitchController::class, 'switch'])->name('branch.switch');
-
-Route::middleware(['auth', 'company', 'rate_limit_company', 'company.approval'])->group(function () {
-    Route::match(['get','post'], '/madadgar/di-read', [\App\Http\Controllers\DiMadadgarReadController::class, 'show'])->name('di.madadgar.read')->middleware('throttle:20,1');
-    Route::post('/survey/{id}/respond', [\App\Http\Controllers\PosSurveyController::class, 'respond'])->defaults('survey_guard', 'web')->name('di.survey.respond');
-    Route::post('/survey/{id}/dismiss', [\App\Http\Controllers\PosSurveyController::class, 'dismiss'])->defaults('survey_guard', 'web')->name('di.survey.dismiss');
-
-    Route::get('/onboarding', [OnboardingController::class, 'index'])->name('onboarding');
-    Route::post('/onboarding/complete', [OnboardingController::class, 'complete']);
-    Route::post('/onboarding/skip', [OnboardingController::class, 'skip']);
-
-    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
-    Route::get('/whats-new/history', [\App\Http\Controllers\AppUpdateController::class, 'history'])->defaults('announcement_panel', 'di')->name('di.whats-new.history');
-    Route::post('/whats-new/seen', [\App\Http\Controllers\AppUpdateController::class, 'markSeen'])->name('di.whats-new.seen');
-
-    // â”€â”€ Tax Consultant Console (any DI web user can become a consultant) â”€â”€
-    // Linking is consent-based ONLY: redeem a client-generated invite code, or
-    // send a request the client admin must approve. Switch = audited login as
-    // the client's admin user, watched by ConsultantSwitchGuard middleware.
-    Route::prefix('consultant')->group(function () {
-        Route::get('/', [ConsultantConsoleController::class, 'index'])->name('consultant.console');
-        Route::get('/earnings', [ConsultantConsoleController::class, 'earnings'])->name('consultant.earnings');
-        Route::post('/payout-details', [ConsultantConsoleController::class, 'savePayoutDetails'])->name('consultant.payout-details');
-        Route::post('/join', [ConsultantConsoleController::class, 'join'])->name('consultant.join');
-        Route::post('/redeem', [ConsultantConsoleController::class, 'redeem'])->middleware('throttle:10,1')->name('consultant.redeem');
-        Route::post('/request', [ConsultantConsoleController::class, 'requestLink'])->middleware('throttle:10,1')->name('consultant.request');
-        Route::post('/links/{link}/cancel', [ConsultantConsoleController::class, 'cancel'])->name('consultant.cancel');
-        Route::post('/links/{link}/revoke', [ConsultantConsoleController::class, 'revoke'])->name('consultant.revoke');
-        Route::post('/switch/{company}', [ConsultantConsoleController::class, 'switchIn'])->name('consultant.switch');
-    });
-    Route::post('/notifications/{id}/dismiss', [DashboardController::class, 'dismissNotification'])->name('notifications.dismiss');
-    Route::post('/notifications/dismiss-all', [DashboardController::class, 'dismissAllNotifications'])->name('notifications.dismiss-all');
-
-    Route::get('/billing/checkout', [\App\Http\Controllers\PackageCheckoutController::class, 'index'])->name('billing.package-checkout');
-    Route::post('/billing/checkout', [\App\Http\Controllers\PackageCheckoutController::class, 'select'])->name('billing.package-checkout.select');
-    Route::get('/billing/plans', [BillingController::class, 'plans'])->name('billing.plans');
-    Route::get('/billing/documents/invoices/{invoice}', [\App\Http\Controllers\SubscriptionDocumentController::class, 'companyInvoice'])->whereNumber('invoice')->name('billing.documents.invoice');
-    Route::get('/billing/documents/receipts/{payment}', [\App\Http\Controllers\SubscriptionDocumentController::class, 'companyReceipt'])->whereNumber('payment')->name('billing.documents.receipt');
-    Route::post('/billing/subscribe', [BillingController::class, 'subscribe']);
-    Route::post('/api/billing/calculate', [BillingController::class, 'calculatePrice']);
-    // AI Reader page ledger â€” what was spent, refunded, bought or granted.
-    Route::get('/billing/ai-pages', [BillingController::class, 'aiPagesLedger'])->name('billing.ai-pages');
-    Route::get('/billing/custom-plan', [BillingController::class, 'customPlanBuilder']);
-    Route::post('/billing/calculate-custom', [BillingController::class, 'calculateCustomPlan']);
-    Route::post('/billing/subscribe-custom', [BillingController::class, 'subscribeCustomPlan']);
-
-    Route::get('/invoices', [InvoiceController::class, 'index'])->name('invoices.index');
-    Route::get('/invoices/return-items', [InvoiceController::class, 'returnItems'])->name('invoices.return-items');
-    Route::get('/invoices/unique-buyers', [InvoiceController::class, 'uniqueBuyers'])->name('invoices.unique-buyers');
-    Route::get('/invoices/bulk-pdf', [InvoiceController::class, 'bulkDownloadPdf'])->name('invoices.bulk-pdf');
-
-    // Background ZIP export â€” unlike bulk-pdf this has no 500 cap, covers
-    // DRAFT invoices too, and survives tens of thousands of PDFs by building
-    // in resumable chunks with a progress bar.
-    Route::post('/invoices/zip-exports', [\App\Http\Controllers\InvoiceZipExportController::class, 'store'])
-        ->name('invoices.zip-exports.store');
-    Route::get('/invoices/zip-exports/{export}/status', [\App\Http\Controllers\InvoiceZipExportController::class, 'status'])
-        ->name('invoices.zip-exports.status');
-    Route::get('/invoices/zip-exports/{export}/download', [\App\Http\Controllers\InvoiceZipExportController::class, 'download'])
-        ->name('invoices.zip-exports.download');
-    Route::delete('/invoices/zip-exports/{export}', [\App\Http\Controllers\InvoiceZipExportController::class, 'destroy'])
-        ->name('invoices.zip-exports.destroy');
-    // WHT on PDF is now per-invoice (rendered whenever the invoice has a WHT
-    // amount applied) â€” the old session-based toggle route was removed.
-
-    Route::middleware(['role:company_admin,employee'])->group(function () {
-        Route::get('/invoice/create', [InvoiceController::class, 'create'])->name('invoice.create');
-        Route::post('/invoice/store', [InvoiceController::class, 'store'])->middleware('plan.limit:invoices');
-        Route::get('/invoice/{invoice}/edit', [InvoiceController::class, 'edit']);
-        Route::put('/invoice/{invoice}', [InvoiceController::class, 'update']);
-        Route::post('/invoice/{invoice}/submit', [InvoiceController::class, 'submit']);
-        // Task 1245: bulk-submit selected draft invoices to FBR (queued).
-        Route::post('/invoices/bulk-submit', [InvoiceController::class, 'bulkSubmit'])->name('invoices.bulk-submit');
-        Route::get('/invoices/bulk-submit-status', [InvoiceController::class, 'bulkSubmitStatus'])->name('invoices.bulk-submit-status');
-        // A run can take hours, so the shop must be able to stop it, and to
-        // clear the finished summary it comes back to.
-        Route::post('/invoices/bulk-submit-cancel', [InvoiceController::class, 'bulkSubmitCancel'])->name('invoices.bulk-submit-cancel');
-        Route::post('/invoices/bulk-submit-ack', [InvoiceController::class, 'bulkSubmitAcknowledge'])->name('invoices.bulk-submit-ack');
-        Route::post('/invoice/{invoice}/retry', [InvoiceController::class, 'retry']);
-        Route::post('/invoice/{invoice}/resubmit-fbr', [InvoiceController::class, 'resubmitToFbr']);
-        Route::post('/invoice/{invoice}/validate', [InvoiceController::class, 'validateInvoice']);
-        Route::post('/invoice/{invoice}/validate-fbr', [InvoiceController::class, 'validateFbrPayload']);
-        Route::post('/invoice/{invoice}/confirm-fbr', [InvoiceController::class, 'confirmFbrStatus']);
-        Route::post('/invoice/{invoice}/retry-inventory', [\App\Http\Controllers\InvoiceInventoryController::class, 'retry'])->name('invoice.retry-inventory');
-        Route::post('/invoice/{invoice}/update-fbr-number', [InvoiceController::class, 'updateFbrNumber']);
-        Route::post('/invoice/{invoice}/duplicate', [InvoiceController::class, 'duplicate'])->name('invoice.duplicate');
-        Route::delete('/invoice/{invoice}', [InvoiceController::class, 'destroy'])->name('invoice.destroy');
-
-        // Buyer ko invoice bhejna (Email / WhatsApp wa.me) â€” sab plans, no premium gate.
-        Route::get('/invoice/{invoice}/send-info', [\App\Http\Controllers\InvoiceSendController::class, 'info'])->name('invoice.send-info');
-        Route::post('/invoice/{invoice}/send-email', [\App\Http\Controllers\InvoiceSendController::class, 'sendEmail'])->name('invoice.send-email')->middleware('throttle:12,1');
-        Route::post('/invoice/{invoice}/send-whatsapp', [\App\Http\Controllers\InvoiceSendController::class, 'sendWhatsApp'])->name('invoice.send-whatsapp')->middleware('throttle:30,1');
-
-        Route::get('/invoices/csv-template', [CsvImportController::class, 'template'])->name('invoices.csv-template');
-        Route::post('/invoices/csv-upload', [CsvImportController::class, 'upload'])->name('invoices.csv-upload');
-        Route::post('/invoices/csv-process', [CsvImportController::class, 'process'])->name('invoices.csv-process');
-
-        // Bulk import v2: .xlsx template + pre-validation + background processing.
-        Route::get('/invoices/import-template', [InvoiceImportController::class, 'template'])->name('invoices.import-template');
-        Route::post('/invoices/import-upload', [InvoiceImportController::class, 'upload'])->name('invoices.import-upload');
-        // DMS-export column mapping: apply a mapping/preset to a held upload + preset management.
-        Route::post('/invoices/import-apply-mapping', [InvoiceImportController::class, 'applyMapping'])->name('invoices.import-apply-mapping');
-        Route::get('/invoices/import-mappings/{id}/history', [InvoiceImportController::class, 'mappingHistory'])->name('invoices.import-mapping-history');
-        Route::post('/invoices/import-mappings/{id}/rename', [InvoiceImportController::class, 'renameMapping'])->name('invoices.import-mapping-rename');
-        Route::delete('/invoices/import-mappings/{id}', [InvoiceImportController::class, 'deleteMapping'])->name('invoices.import-mapping-delete');
-        Route::post('/invoices/import/{batchId}/process', [InvoiceImportController::class, 'process'])->middleware('plan.limit:invoices')->name('invoices.import-process');
-        // Batch review: the drafts a bulk upload produced, with FBR's own
-        // verdict per row, inline fixes and a "fix this everywhere" action.
-        // {type} = import (Excel/CSV batch id) | ai (AI photo batch uuid).
-        Route::get('/invoices/review/{type}/{ref}', [\App\Http\Controllers\BulkDraftReviewController::class, 'show'])
-            ->whereIn('type', ['import', 'ai'])->name('invoices.batch-review');
-        Route::get('/invoices/review/{type}/{ref}/rows', [\App\Http\Controllers\BulkDraftReviewController::class, 'rows'])
-            ->whereIn('type', ['import', 'ai'])->name('invoices.batch-review.rows');
-        Route::post('/invoices/review/{type}/{ref}/save', [\App\Http\Controllers\BulkDraftReviewController::class, 'save'])
-            ->whereIn('type', ['import', 'ai'])->name('invoices.batch-review.save');
-        Route::post('/invoices/review/{type}/{ref}/bulk-fix', [\App\Http\Controllers\BulkDraftReviewController::class, 'bulkFix'])
-            ->whereIn('type', ['import', 'ai'])->name('invoices.batch-review.bulk-fix');
-        Route::post('/invoices/review/{type}/{ref}/match-branches', [\App\Http\Controllers\BulkDraftReviewController::class, 'matchBranches'])
-            ->whereIn('type', ['import', 'ai'])->name('invoices.batch-review.match-branches');
-        Route::get('/invoices/review/{type}/{ref}/export', [\App\Http\Controllers\BulkDraftReviewController::class, 'export'])
-            ->whereIn('type', ['import', 'ai'])->name('invoices.batch-review.export');
-
-        Route::get('/invoices/import/{batchId}/source-review', [\App\Http\Controllers\SmartInvoiceImportController::class, 'show']);
-        Route::post('/invoices/import/{batchId}/source-review', [\App\Http\Controllers\SmartInvoiceImportController::class, 'review']);
-        Route::post('/invoices/import/{batchId}/verified-mapping', [\App\Http\Controllers\SmartInvoiceImportController::class, 'saveMapping']);
-        Route::get('/invoices/import-history', [InvoiceImportController::class, 'history'])->name('invoices.import-history');
-        Route::get('/invoices/import/{batchId}/status', [InvoiceImportController::class, 'status'])->name('invoices.import-status');
-        Route::get('/invoices/import/{batchId}/error-report', [InvoiceImportController::class, 'errorReport'])->name('invoices.import-error-report');
-
-        // Task 1238: AI assist for the bulk import â€” mapping suggestions on the
-        // mapping screen, per-row fix suggestions on the validation preview
-        // (both AI, throttled like the AI Reader), and the user-confirmed
-        // apply+revalidate step (deterministic, no AI).
-        Route::post('/invoices/import-ai-map', [InvoiceImportController::class, 'aiMapSuggest'])
-            ->middleware('throttle:6,1')
-            ->name('invoices.import-ai-map');
-        Route::post('/invoices/import/{batchId}/ai-fixes', [InvoiceImportController::class, 'aiRowFixes'])
-            ->middleware('throttle:6,1')
-            ->name('invoices.import-ai-fixes');
-        Route::post('/invoices/import/{batchId}/apply-fixes', [InvoiceImportController::class, 'applyRowFixes'])
-            ->name('invoices.import-apply-fixes');
-
-        // Task 142: AI Invoice Reader (Premium gate 'ai_reader') â€” upload old/supplier
-        // invoice (PDF/photo/Excel) -> AI extraction -> review -> save DRAFT only.
-        Route::get('/invoices/ai-reader', [AiInvoiceReaderController::class, 'show'])->name('invoices.ai-reader');
-        Route::post('/invoices/ai-reader/parse', [AiInvoiceReaderController::class, 'parse'])
-            ->middleware('throttle:6,1')
-            ->name('invoices.ai-reader.parse');
-        // One physical photo = one independently queued review draft. Chunks
-        // keep flaky mobile connections from forcing the full batch to restart.
-        Route::get('/invoices/ai-reader/bulk-images', [AiInvoiceReaderController::class, 'bulk'])
-            ->name('invoices.ai-reader.bulk');
-        // Past batches stay reachable after the tab is closed: the list, and
-        // ?batch= on the workspace above to reopen one.
-        Route::get('/invoices/ai-reader/bulk-images/history', [AiInvoiceReaderController::class, 'bulkHistory'])
-            ->name('invoices.ai-reader.bulk.history');
-        Route::post('/invoices/ai-reader/bulk-images/start', [AiInvoiceReaderController::class, 'bulkStart'])
-            ->middleware('throttle:10,1')->name('invoices.ai-reader.bulk.start');
-        Route::post('/invoices/ai-reader/bulk-images/{batchId}/annexure', [AiInvoiceReaderController::class, 'bulkAnnexureUpload'])
-            ->middleware('throttle:10,1')->name('invoices.ai-reader.bulk.annexure');
-        Route::post('/invoices/ai-reader/bulk-images/{batchId}/annexure/apply', [AiInvoiceReaderController::class, 'bulkAnnexureApply'])
-            ->name('invoices.ai-reader.bulk.annexure.apply');
-        Route::post('/invoices/ai-reader/bulk-images/{batchId}/annexure/catalog', [AiInvoiceReaderController::class, 'bulkAnnexureCatalogAction'])
-            ->name('invoices.ai-reader.bulk.annexure.catalog');
-        Route::post('/invoices/ai-reader/bulk-images/{batchId}/annexure/audits/{auditId}/reverse', [AiInvoiceReaderController::class, 'bulkAnnexureReverse'])
-            ->name('invoices.ai-reader.bulk.annexure.reverse');
-        Route::post('/invoices/ai-reader/bulk-images/{batchId}/items/{itemId}/chunk', [AiInvoiceReaderController::class, 'bulkChunk'])
-            ->middleware('throttle:120,1')->name('invoices.ai-reader.bulk.chunk');
-        Route::post('/invoices/ai-reader/bulk-images/{batchId}/items/{itemId}/complete', [AiInvoiceReaderController::class, 'bulkComplete'])
-            ->middleware('throttle:30,1')->name('invoices.ai-reader.bulk.complete');
-        Route::get('/invoices/ai-reader/bulk-images/{batchId}/status', [AiInvoiceReaderController::class, 'bulkStatus'])
-            ->name('invoices.ai-reader.bulk.status');
-        Route::post('/invoices/ai-reader/bulk-images/{batchId}/items/{itemId}/retry', [AiInvoiceReaderController::class, 'bulkRetry'])
-            ->middleware('throttle:10,1')->name('invoices.ai-reader.bulk.retry');
-        // Shareable review summary of one batch (?format=csv|pdf) â€” company
-        // scoped, and it never links or embeds the private source photo.
-        Route::get('/invoices/ai-reader/bulk-images/{batchId}/report', [AiInvoiceReaderController::class, 'bulkReport'])
-            ->middleware('throttle:20,1')->name('invoices.ai-reader.bulk.report');
-        // Task 1343: email that same PDF summary to another reviewer. Throttled
-        // per minute here; the per-company 24h cap lives in the controller.
-        Route::post('/invoices/ai-reader/bulk-images/{batchId}/report/email', [AiInvoiceReaderController::class, 'bulkReportEmail'])
-            ->middleware('throttle:5,1')->name('invoices.ai-reader.bulk.report.email');
-
-        Route::get('/customers', [CustomerLedgerController::class, 'index'])->name('customers.index');
-        Route::get('/customers/{ntn}/ledger', [CustomerLedgerController::class, 'show']);
-        Route::post('/customers/payment', [CustomerLedgerController::class, 'addPayment']);
-        Route::post('/customers/adjustment', [CustomerLedgerController::class, 'addAdjustment']);
-
-        Route::get('/sro-reference', [SroReferenceController::class, 'index'])->name('sro-reference');
-        Route::get('/api/sro-reference/search', [SroReferenceController::class, 'apiSearch'])->name('sro-reference.search');
-
-        Route::get('/products', [ProductController::class, 'index'])->name('products.index');
-        Route::get('/products/create', [ProductController::class, 'create'])->name('products.create');
-        Route::post('/products', [ProductController::class, 'store'])->name('products.store')->middleware('plan.limit:products');
-        Route::get('/products/{product}/edit', [ProductController::class, 'edit'])->name('products.edit');
-        Route::put('/products/{product}', [ProductController::class, 'update'])->name('products.update');
-        Route::post('/products/{product}/toggle', [ProductController::class, 'deactivate'])->name('products.toggle');
-        Route::delete('/products/{product}', [ProductController::class, 'destroy'])->name('products.destroy');
-        Route::get('/products/search', [ProductController::class, 'search'])->name('products.search');
-
-        Route::get('/customer-profiles', [CustomerProfileController::class, 'index'])->name('customer-profiles.index');
-        Route::get('/customer-profiles/create', [CustomerProfileController::class, 'create'])->name('customer-profiles.create');
-        Route::post('/customer-profiles', [CustomerProfileController::class, 'store'])->name('customer-profiles.store');
-        Route::get('/customer-profiles/{customerProfile}/edit', [CustomerProfileController::class, 'edit'])->name('customer-profiles.edit');
-        Route::put('/customer-profiles/{customerProfile}', [CustomerProfileController::class, 'update'])->name('customer-profiles.update');
-        Route::post('/customer-profiles/{customerProfile}/toggle', [CustomerProfileController::class, 'toggle'])->name('customer-profiles.toggle');
-    });
-
-
-    Route::middleware(['role:company_admin'])->group(function () {
-        // Client-side consultant consent: invites, approvals, revokes.
-        Route::get('/company/consultants', [CompanyConsultantController::class, 'index'])->name('company.consultants');
-        Route::post('/company/consultants/invite', [CompanyConsultantController::class, 'createInvite'])->name('company.consultants.invite');
-        Route::post('/company/consultants/invites/{invite}/revoke', [CompanyConsultantController::class, 'revokeInvite'])->name('company.consultants.invite-revoke');
-        Route::post('/company/consultants/links/{link}/approve', [CompanyConsultantController::class, 'approve'])->name('company.consultants.approve');
-        Route::post('/company/consultants/links/{link}/reject', [CompanyConsultantController::class, 'reject'])->name('company.consultants.reject');
-        Route::post('/company/consultants/links/{link}/revoke', [CompanyConsultantController::class, 'revokeLink'])->name('company.consultants.revoke');
-
-        Route::get('/compliance', [ComplianceController::class, 'index'])->name('compliance.index');
-        Route::post('/compliance/audit-packs', [ComplianceController::class, 'store'])->name('compliance.packs.store');
-        Route::get('/compliance/audit-packs/{pack}/status', [ComplianceController::class, 'status'])->name('compliance.packs.status');
-        Route::post('/compliance/audit-packs/{pack}/advance', [ComplianceController::class, 'advance'])->middleware('throttle:30,1')->name('compliance.packs.advance');
-        Route::get('/compliance/audit-packs/{pack}/download', [ComplianceController::class, 'download'])->name('compliance.packs.download');
-        Route::delete('/compliance/audit-packs/{pack}', [ComplianceController::class, 'destroy'])->name('compliance.packs.destroy');
-
-        Route::get('/company/users', [CompanyUserController::class, 'index']);
-        Route::post('/company/users', [CompanyUserController::class, 'store'])->middleware('plan.limit:users');
-        Route::patch('/company/users/{user}/role', [CompanyUserController::class, 'updateRole']);
-        Route::patch('/company/users/{user}/reset-password', [CompanyUserController::class, 'resetPassword']);
-        Route::patch('/company/users/{user}/toggle', [CompanyUserController::class, 'toggleActive']);
-
-        Route::get('/company/profile', [CompanySettingsController::class, 'profile']);
-        Route::put('/company/profile', [CompanySettingsController::class, 'updateProfile']);
-        Route::get('/company/fbr-settings', [CompanySettingsController::class, 'fbrSettings']);
-        Route::put('/company/fbr-settings', [CompanySettingsController::class, 'updateFbrSettings']);
-        // Task 140: DI Premium white-label branding (white_label plan gate enforced in-controller)
-        Route::get('/company/branding', [CompanySettingsController::class, 'branding'])->name('company.branding');
-        Route::put('/company/branding', [CompanySettingsController::class, 'updateBranding'])->name('company.branding.update');
-        Route::post('/company/fbr-settings-ajax', [CompanySettingsController::class, 'updateFbrSettingsAjax']);
-        // WhatsApp Business API (Phase 2) â€” server-side invoice send credentials
-        Route::get('/company/whatsapp-settings', [CompanySettingsController::class, 'whatsappSettings']);
-        Route::put('/company/whatsapp-settings', [CompanySettingsController::class, 'updateWhatsappSettings']);
-        // Task 1231: DI invoice push API â€” key management + integration docs
-        Route::get('/company/api-access', [\App\Http\Controllers\DiApiKeyController::class, 'index'])->name('company.api-access');
-        Route::post('/company/api-access/generate', [\App\Http\Controllers\DiApiKeyController::class, 'generate'])->name('company.api-access.generate');
-        Route::post('/company/api-access/revoke', [\App\Http\Controllers\DiApiKeyController::class, 'revoke'])->name('company.api-access.revoke');
-        Route::get('/company/api-docs', [\App\Http\Controllers\DiApiKeyController::class, 'docs'])->name('company.api-docs');
-        Route::post('/company/test-connection', [CompanySettingsController::class, 'testConnection']);
-        Route::post('/company/sandbox-test/{type}', [CompanySettingsController::class, 'sandboxTest']);
-
-        Route::get('/branches', [BranchController::class, 'index'])->name('branches.index');
-        Route::get('/branches/create', [BranchController::class, 'create'])->name('branches.create');
-        Route::post('/branches', [BranchController::class, 'store'])->name('branches.store');
-        Route::get('/branches/{branch}/edit', [BranchController::class, 'edit'])->name('branches.edit');
-        Route::put('/branches/{branch}', [BranchController::class, 'update'])->name('branches.update');
-        Route::delete('/branches/{branch}', [BranchController::class, 'destroy'])->name('branches.destroy');
-    });
-
-    Route::get('/api/products/search', [ProductController::class, 'search']);
-    Route::post('/api/products/quick-create', [ProductController::class, 'quickCreate']);
-    Route::get('/api/customer-profiles/search', [CustomerProfileController::class, 'search']);
-    Route::get('/api/schedule/config', function () {
-        return response()->json(\App\Services\ScheduleEngine::$scheduleTypes);
-    });
-    Route::get('/api/hs-lookup', [GlobalHsMasterController::class, 'apiLookup']);
-    Route::get('/api/hs-search', [GlobalHsMasterController::class, 'apiSearch']);
-    Route::get('/api/hs-mapping-suggestions/{hsCode}', [HsCodeMappingController::class, 'apiSuggestions']);
-    Route::post('/api/hs-mapping-response', [HsCodeMappingController::class, 'apiRecordResponse']);
-    Route::get('/api/sro-suggest', function (\Illuminate\Http\Request $request) {
-        $scheduleType = $request->get('schedule_type', 'standard');
-        $taxRate = $request->get('tax_rate') ? floatval($request->get('tax_rate')) : null;
-        $hsCode = $request->get('hs_code');
-        $companyId = app('currentCompanyId');
-        $company = \App\Models\Company::find($companyId);
-        $standardTaxRate = $company ? $company->getStandardTaxRateValue() : 18.0;
-        return response()->json(\App\Services\SroSuggestionService::getApiResponse($scheduleType, $taxRate, $hsCode, $standardTaxRate));
-    });
-    Route::get('/api/tax-resolve', function (\Illuminate\Http\Request $request) {
-        $companyId = app('currentCompanyId');
-        $hsCode = $request->get('hs_code', '');
-        $customerNtn = $request->get('customer_ntn');
-        return response()->json(\App\Services\TaxResolutionService::resolveForApi($hsCode, $companyId, $customerNtn));
-    });
-    Route::get('/api/invoice/{invoice}/risk-analysis', function (\Illuminate\Http\Request $request, \App\Models\Invoice $invoice) {
-        $companyId = app('currentCompanyId');
-        if ($invoice->company_id !== $companyId && auth()->user()->role !== 'super_admin') {
-            abort(403);
-        }
-        return response()->json(\App\Services\RiskIntelligenceEngine::analyzeInvoice($invoice));
-    });
-    Route::get('/api/hs-usage-suggestions/{hsCode}', function (string $hsCode) {
-        $suggestions = \App\Services\HsUsagePatternService::getSuggestions($hsCode);
-        if ($suggestions && count($suggestions) > 0) {
-            $best = $suggestions[0];
-            $best['hs_code'] = $hsCode;
-            $best['all_suggestions'] = $suggestions;
-            return response()->json($best);
-        }
-        return response()->json(['hs_code' => $hsCode]);
-    });
-
-    Route::get('/api/smart-tax-recommend', function (\Illuminate\Http\Request $request) {
-        $companyId = app('currentCompanyId');
-        $hsCode = $request->get('hs_code', '');
-        $province = $request->get('province');
-        $buyerRegType = $request->get('buyer_registration_type');
-        $sectorType = $request->get('sector_type');
-        return response()->json(\App\Services\SmartTaxEngine::recommend($hsCode, $province, $buyerRegType, $sectorType, $companyId));
-    });
-
-    Route::post('/api/rejection-probability', function (\Illuminate\Http\Request $request) {
-        $companyId = app('currentCompanyId');
-        return response()->json(\App\Services\RejectionProbabilityEngine::simulateFromRequest($request->all(), $companyId));
-    });
-
-    Route::get('/api/invoice/{invoice}/rejection-probability', function (\App\Models\Invoice $invoice) {
-        $companyId = app('currentCompanyId');
-        if ($invoice->company_id !== $companyId && auth()->user()->role !== 'super_admin') {
-            abort(403);
-        }
-        return response()->json(\App\Services\RejectionProbabilityEngine::simulate($invoice));
-    });
-
-    Route::get('/api/audit-probability', function () {
-        $companyId = app('currentCompanyId');
-        return response()->json(\App\Services\AuditProbabilityEngine::calculate($companyId));
-    });
-
-    Route::get('/api/risk-heatmap', [DashboardController::class, 'riskHeatmap']);
-
-    Route::get('/executive-dashboard', [DashboardController::class, 'executive'])->name('executive.dashboard');
-
-    Route::post('/toggle-dark-mode', function () {
-        $user = auth()->user();
-        $user->dark_mode = !$user->dark_mode;
-        $user->save();
-        return back();
-    })->name('toggle.dark-mode');
-
-    Route::post('/api/compliance/check', [InvoiceController::class, 'complianceCheck']);
-    Route::get('/api/enterprise/invoice/{invoice}/status', [InvoiceController::class, 'apiStatus']);
-    Route::get('/api/enterprise/company/compliance', [InvoiceController::class, 'apiComplianceStatus']);
-
-    Route::get('/invoice/{invoice}', [InvoiceController::class, 'show'])->name('invoice.show');
-    Route::get('/invoice/{invoice}/status-json', [InvoiceController::class, 'statusJson']);
-    Route::get('/invoice/{invoice}/preview', [InvoiceController::class, 'preview']);
-    Route::get('/invoice/{invoice}/pdf', [InvoiceController::class, 'pdf']);
-    Route::get('/invoice/{invoice}/pdf-bw-preview', [InvoiceController::class, 'pdfBwPreview'])->name('invoice.pdfBwPreview');
-    Route::get('/invoice/{invoice}/download', [InvoiceController::class, 'download']);
-    Route::post('/invoice/{invoice}/update-wht', [InvoiceController::class, 'updateWht'])->name('invoice.updateWht');
-    Route::post('/invoice/{invoice}/update-wht-ajax', [InvoiceController::class, 'updateWhtAjax'])->name('invoice.updateWhtAjax');
-    Route::post('/invoice/{invoice}/correct-wht-ajax', [InvoiceController::class, 'correctWhtAjax'])->name('invoice.correctWhtAjax');
-    Route::get('/wht-management', [InvoiceController::class, 'whtManagement'])->name('wht.management');
-    Route::post('/invoice/{invoice}/verify', [InvoiceController::class, 'verifyIntegrity'])->name('invoice.verify');
-
-    Route::get('/compliance/certificate', [ComplianceCertificateController::class, 'generate'])->name('compliance.certificate');
-    Route::get('/compliance/risk-report', [RiskReportController::class, 'show'])->name('compliance.risk-report');
-
-    Route::get('/reports/wht', [WhtReportController::class, 'index'])->name('reports.wht');
-    Route::get('/reports/wht/download', [WhtReportController::class, 'downloadWht'])->name('reports.wht.download');
-    Route::get('/reports/wht/pdf', [WhtReportController::class, 'pdfWht'])->name('reports.wht.pdf');
-    Route::get('/reports/tax-summary', [WhtReportController::class, 'taxSummary'])->name('reports.tax-summary');
-    Route::get('/reports/tax-summary/download', [WhtReportController::class, 'downloadTaxSummary'])->name('reports.tax-summary.download');
-    Route::get('/reports/tax-summary/pdf', [WhtReportController::class, 'pdfTaxSummary'])->name('reports.tax-summary.pdf');
-
-    Route::get('/mis', [MISController::class, 'index'])->name('mis.index');
-    Route::get('/mis/export', [MISController::class, 'exportCsv'])->name('mis.export');
-    Route::get('/mis/pdf', [MISController::class, 'exportPdf'])->name('mis.pdf');
-
-    Route::middleware(['role:company_admin,super_admin'])->group(function () {
-        Route::get('/tax-overrides', [TaxOverrideController::class, 'index'])->name('tax-overrides.index');
-        Route::post('/tax-overrides/customer', [TaxOverrideController::class, 'storeCustomerRule'])->name('tax-overrides.customer.store');
-        Route::put('/tax-overrides/customer/{id}', [TaxOverrideController::class, 'updateCustomerRule'])->name('tax-overrides.customer.update');
-        Route::delete('/tax-overrides/customer/{id}', [TaxOverrideController::class, 'deleteCustomerRule'])->name('tax-overrides.customer.delete');
-    });
-
-    Route::middleware(['role:super_admin'])->group(function () {
-        Route::post('/tax-overrides/sector', [TaxOverrideController::class, 'storeSectorRule'])->name('tax-overrides.sector.store');
-        Route::put('/tax-overrides/sector/{id}', [TaxOverrideController::class, 'updateSectorRule'])->name('tax-overrides.sector.update');
-        Route::delete('/tax-overrides/sector/{id}', [TaxOverrideController::class, 'deleteSectorRule'])->name('tax-overrides.sector.delete');
-        Route::post('/tax-overrides/province', [TaxOverrideController::class, 'storeProvinceRule'])->name('tax-overrides.province.store');
-        Route::put('/tax-overrides/province/{id}', [TaxOverrideController::class, 'updateProvinceRule'])->name('tax-overrides.province.update');
-        Route::delete('/tax-overrides/province/{id}', [TaxOverrideController::class, 'deleteProvinceRule'])->name('tax-overrides.province.delete');
-        Route::post('/tax-overrides/sro', [TaxOverrideController::class, 'storeSroRule'])->name('tax-overrides.sro.store');
-        Route::put('/tax-overrides/sro/{id}', [TaxOverrideController::class, 'updateSroRule'])->name('tax-overrides.sro.update');
-        Route::delete('/tax-overrides/sro/{id}', [TaxOverrideController::class, 'deleteSroRule'])->name('tax-overrides.sro.delete');
-        Route::get('/tax-overrides/analytics', [TaxOverrideController::class, 'overrideAnalytics'])->name('tax-overrides.analytics');
-
-    });
-});
-
-// Consultant exit: 'auth' ONLY (no company/approval gates) so leaving a client
-// session ALWAYS works, even if the client company got demoted mid-session.
-Route::middleware('auth')->post('/consultant/exit', [ConsultantConsoleController::class, 'exitSwitch'])->name('consultant.exit');
-
-Route::middleware('auth')->group(function () {
-    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
-    Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
-    Route::put('/profile/company', [ProfileController::class, 'updateCompany'])->name('profile.updateCompany');
-    Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
-});
-
-Route::middleware('auth')->group(function () {
-    Route::post('/announcements/{id}/dismiss', [AnnouncementController::class, 'dismiss'])->name('announcements.dismiss');
-
-    Route::get('/inventory', [InventoryController::class, 'index'])->name('inventory.index');
-    Route::get('/inventory/movements', [InventoryController::class, 'movements'])->name('inventory.movements');
-    Route::post('/inventory/adjust', [InventoryController::class, 'adjust'])->name('inventory.adjust');
-    Route::put('/inventory/stock/{id}/min-stock', [InventoryController::class, 'updateMinStock'])->name('inventory.update-min-stock');
-    Route::get('/inventory/product/{productId}/movements', [InventoryController::class, 'productMovements'])->name('inventory.product-movements');
-    Route::get('/api/inventory/stock/{productId}', [InventoryController::class, 'apiStockCheck'])->name('api.inventory.stock-check');
-
-    Route::get('/suppliers', [SupplierController::class, 'index'])->name('suppliers.index');
-    Route::post('/suppliers', [SupplierController::class, 'store'])->name('suppliers.store');
-    Route::put('/suppliers/{id}', [SupplierController::class, 'update'])->name('suppliers.update');
-    Route::delete('/suppliers/{id}', [SupplierController::class, 'destroy'])->name('suppliers.destroy');
-
-    Route::get('/purchase-orders', [SupplierController::class, 'purchaseOrders'])->name('purchase-orders.index');
-    Route::post('/purchase-orders', [SupplierController::class, 'storePurchaseOrder'])->name('purchase-orders.store');
-    Route::post('/purchase-orders/{id}/receive', [SupplierController::class, 'receivePurchaseOrder'])->name('purchase-orders.receive');
-    Route::post('/purchase-orders/{id}/cancel', [SupplierController::class, 'cancelPurchaseOrder'])->name('purchase-orders.cancel');
-
-    // Payment proof submission (locked / trial-ended DI company) â€” intentionally NOT behind plan.limit.
-    Route::post('/payment-proof', [\App\Http\Controllers\PaymentProofController::class, 'store'])
-        ->name('payment-proof.store')->middleware('throttle:6,1');
-});
-
-// Madadgar AI support bot (owner request 22 Jul 2026) â€” pos.auth ONLY, NO
-// company.approval: pending companies may chat (their POSTs would be 403'd
-// otherwise). ALL POS roles allowed, including cashiers (owner explicit).
-// POS shell-app FCM token registration (Task #1142) â€” pos.auth ONLY, no
-// company.approval (a pending shop's device registering is harmless; approval
-// gating on a fire-and-forget POST would only create silent retry noise).
-// The shell posts natively with the WebView session cookie; /pos/* is already
-// CSRF-exempt and the controller requires the X-TaxNest-App header instead.
-Route::middleware(['pos.auth'])->post('/pos/app/fcm-token', [\App\Http\Controllers\PosAppPushController::class, 'register'])
-    ->middleware('throttle:30,1')->name('pos.app.fcm-token');
-// Logout-time clear is STATELESS (session already destroyed when the shell
-// detects the login page) â€” authenticated by possession of the token itself.
-Route::post('/api/pos-app/fcm-token/clear', [\App\Http\Controllers\PosAppPushController::class, 'clear'])
-    ->middleware('throttle:30,1')->withoutMiddleware($statelessMachine)->name('pos.app.fcm-clear');
-
-Route::middleware(['pos.auth'])->prefix('pos/madadgar')->group(function () {
-    Route::get('/usage', [\App\Http\Controllers\MadadgarUsageController::class, 'show'])->name('pos.madadgar.usage');
-    Route::get('/history', [\App\Http\Controllers\MadadgarController::class, 'history'])->name('pos.madadgar.history');
-    Route::post('/message', [\App\Http\Controllers\MadadgarController::class, 'message'])->name('pos.madadgar.message')->middleware('throttle:20,1');
-    Route::post('/escalate', [\App\Http\Controllers\MadadgarController::class, 'escalate'])->name('pos.madadgar.escalate')->middleware('throttle:10,1');
-});
-
-// FBR POS twins (Task 1275) â€” same controllers detect the panel by URL prefix.
-// Push registration: fbrpos.auth ONLY (same rationale as PRA). /fbr-pos/* is
-// NOT in the platform CSRF-exempt list, so ValidateCsrfToken is dropped at
-// route level â€” the required X-TaxNest-App header stays the forgery guard.
-Route::middleware(['fbrpos.auth'])->post('/fbr-pos/app/fcm-token', [\App\Http\Controllers\PosAppPushController::class, 'registerFbr'])
-    ->middleware('throttle:30,1')
-    ->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class)
-    ->name('fbrpos.app.fcm-token');
-// Stateless logout-time clear â€” token possession IS the auth; clear() is
-// guard-agnostic (deletes by token_hash), so the FBR shell gets its own alias.
-Route::post('/api/fbr-pos-app/fcm-token/clear', [\App\Http\Controllers\PosAppPushController::class, 'clear'])
-    ->middleware('throttle:30,1')->withoutMiddleware($statelessMachine)->name('fbrpos.app.fcm-clear');
-
-// Madadgar for the FBR panel â€” fbrpos.auth ONLY, NO company.approval (pending
-// companies may chat), ALL roles. Same throttles as the PRA group.
-Route::middleware(['fbrpos.auth'])->prefix('fbr-pos/madadgar')->group(function () {
-    Route::get('/usage', [\App\Http\Controllers\MadadgarUsageController::class, 'show'])->name('fbrpos.madadgar.usage');
-    Route::get('/history', [\App\Http\Controllers\MadadgarController::class, 'history'])->name('fbrpos.madadgar.history');
-    Route::post('/message', [\App\Http\Controllers\MadadgarController::class, 'message'])->name('fbrpos.madadgar.message')->middleware('throttle:20,1');
-    Route::post('/escalate', [\App\Http\Controllers\MadadgarController::class, 'escalate'])->name('fbrpos.madadgar.escalate')->middleware('throttle:10,1');
-});
-
-// Tutorial videos inside the POS login (owner request, 2 Aug 2026) â€” pos.auth
-// ONLY, NO company.approval: pending companies may watch and learn while they
-// wait (same precedent as Madadgar). All roles allowed; path is unmapped in
-// PosAccessService so custom-access members can always reach it.
-Route::middleware(['pos.auth'])->get('/pos/tutorials', [\App\Http\Controllers\TutorialController::class, 'posIndex'])->name('pos.tutorials');
-
-// FBR POS panel ki apni tutorials page (owner, 6 Aug 2026) â€” fbrpos.auth ONLY,
-// NO company.approval (same precedent as /pos/tutorials): sirf fbrpos videos.
-Route::middleware(['fbrpos.auth'])->get('/fbr-pos/tutorials', [\App\Http\Controllers\TutorialController::class, 'fbrIndex'])->name('fbrpos.tutorials');
-
-// Per-user sale-grid visibility (owner, 25 Jul 2026) â€” pos.auth ONLY, NO
-// company.approval (personal display pref; same precedent as Madadgar).
-// ALL POS roles allowed, including cashiers and waiters (owner explicit).
-Route::middleware(['pos.auth'])->prefix('pos/grid-prefs')->group(function () {
-    Route::post('/toggle', [\App\Http\Controllers\PosGridPrefController::class, 'toggle'])->name('pos.grid-prefs.toggle')->middleware('throttle:60,1');
-    Route::post('/reset', [\App\Http\Controllers\PosGridPrefController::class, 'reset'])->name('pos.grid-prefs.reset')->middleware('throttle:10,1');
-});
-
-// Task 1271: FBR twin of the per-user grid prefs â€” fbrpos.auth ONLY, NO
-// company.approval (personal display pref; same precedent as the PRA routes).
-Route::middleware(['fbrpos.auth'])->prefix('fbr-pos/grid-prefs')->group(function () {
-    Route::post('/toggle', [\App\Http\Controllers\FbrPosGridPrefController::class, 'toggle'])->name('fbrpos.grid-prefs.toggle')->middleware('throttle:60,1');
-    Route::post('/reset', [\App\Http\Controllers\FbrPosGridPrefController::class, 'reset'])->name('fbrpos.grid-prefs.reset')->middleware('throttle:10,1');
-});
-
-Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(function () {
-    Route::get('/tax-integrations', [\App\Http\Controllers\PosTaxIntegrationController::class,'index'])->name('pos.tax-integrations');
-    Route::get('/tax-integrations/automatic', [\App\Http\Controllers\PosFederalAutomationController::class,'index'])->name('pos.federal-auto');
-    Route::post('/tax-integrations/automatic', [\App\Http\Controllers\PosFederalAutomationController::class,'save'])->middleware('throttle:6,1')->name('pos.federal-auto.save');
-    Route::prefix('tax-integrations/fbr-pos')->name('pos.tax-integrations.ims')->controller(\App\Http\Controllers\PosTaxIntegrationController::class)->group(function(){
-        Route::get('/', 'ims');
-        Route::post('/setup', 'saveIms')->middleware('throttle:6,1')->name('.save');
-        Route::post('/capture', 'capture')->name('.capture');
-        Route::get('/{id}', 'show')->whereNumber('id')->name('.show');
-        Route::post('/{id}/prepare', 'prepare')->whereNumber('id')->name('.prepare');
-        Route::post('/{id}/connection', 'refreshConnection')->whereNumber('id')->name('.connection');
-        Route::post('/{id}/reconcile', 'reconcilePortal')->whereNumber('id')->middleware('throttle:6,1')->name('.reconcile');
-        Route::post('/{id}/submit', 'submit')->whereNumber('id')->middleware('throttle:6,1')->name('.submit');
-        Route::get('/{id}/receipt', 'receipt')->whereNumber('id')->name('.receipt');
-    });
-
-    // Explicit company opt-in; fixed sandbox destination, owner + CSRF checks.
-    Route::prefix('di-sandbox')->name('pos.di-sandbox.')->controller(\App\Http\Controllers\PraDiSandboxController::class)->group(function () {
-        Route::get('/', 'index')->name('index');
-        Route::get('/setup', 'setup')->name('setup');
-        Route::post('/setup', 'saveSetup')->middleware('throttle:6,1')->name('setup.save');
-        Route::post('/check', 'check')->middleware('throttle:6,1')->name('check');
-        Route::post('/capture', 'capture')->name('capture');
-        Route::get('/{id}', 'show')->whereNumber('id')->name('show');
-        Route::post('/{id}/prepare', 'prepare')->whereNumber('id')->name('prepare');
-        Route::post('/{id}/submit', 'submit')->whereNumber('id')->middleware('throttle:6,1')->name('submit');
-        Route::get('/{id}/receipt', 'receipt')->whereNumber('id')->name('receipt');
-    });
-    Route::post('/desktop/local-core-lease', [\App\Http\Controllers\Api\AgentCoreController::class, 'issueLease'])
-        ->middleware('throttle:10,1')->name('pos.desktop.local-core-lease');
-    Route::get('/desktop/local-core-scope', [PosController::class, 'desktopLocalCoreScope'])
-        ->name('pos.desktop.local-core-scope');
-    Route::get('/agent', [\App\Http\Controllers\AgentManagementController::class, 'show'])->name('pos.agent');
-    Route::post('/agent/generate-key', [\App\Http\Controllers\AgentManagementController::class, 'generateKey'])->name('pos.agent.generate');
-    Route::post('/agent/regenerate-key', [\App\Http\Controllers\AgentManagementController::class, 'regenerateKey'])->name('pos.agent.regenerate');
-    Route::post('/agent/toggle', [\App\Http\Controllers\AgentManagementController::class, 'toggle'])->name('pos.agent.toggle');
-    Route::post('/agent/local-core/toggle', [\App\Http\Controllers\AgentManagementController::class, 'toggleLocalCore'])
-        ->middleware(\App\Http\Middleware\PosAdminOnly::class)->name('pos.agent.local-core.toggle');
-    Route::get('/agent/download', [\App\Http\Controllers\AgentManagementController::class, 'downloadAgent'])->name('pos.agent.download');
-    // NestPOS Desktop shell auto-config: shell fetches agent credentials with the
-    // logged-in POS session cookie right after login (zero manual agent setup).
-    Route::get('/desktop/agent-pairing', [\App\Http\Controllers\DesktopAgentPairingController::class, 'preview'])
-        ->defaults('panel', 'pos')->middleware('throttle:10,1')->block(10, 10)->name('pos.desktop.pairing');
-    Route::post('/desktop/agent-pairing', [\App\Http\Controllers\DesktopAgentPairingController::class, 'confirm'])
-        ->defaults('panel', 'pos')->middleware('throttle:10,1')->block(10, 10)->name('pos.desktop.pairing.confirm');
-    Route::get('/desktop/agent-config', [\App\Http\Controllers\AgentManagementController::class, 'desktopConfig'])->name('pos.desktop.agent-config');
-
-    Route::get('/dashboard', [PosController::class, 'dashboard'])->name('pos.dashboard');
-    Route::get('/dashboard/detail/{metric}', [PosController::class, 'dashboardDetail'])->name('pos.dashboard.detail');
-    Route::post('/notifications/{id}/dismiss', [PosController::class, 'dismissNotification'])->name('pos.notifications.dismiss');
-    Route::post('/notifications/dismiss-all', [PosController::class, 'dismissAllNotifications'])->name('pos.notifications.dismiss-all');
-    Route::get('/whats-new/history', [\App\Http\Controllers\AppUpdateController::class, 'history'])->defaults('announcement_panel', 'pra')->name('pos.whats-new.history');
-    Route::post('/whats-new/seen', [\App\Http\Controllers\AppUpdateController::class, 'markSeen'])->name('pos.whats-new.seen');
-    // Task 1022: POS survey popup (Caller ID elaan) â€” admin/manager gated in controller.
-    Route::post('/survey/{id}/respond', [\App\Http\Controllers\PosSurveyController::class, 'respond'])->name('pos.survey.respond');
-    Route::post('/survey/{id}/dismiss', [\App\Http\Controllers\PosSurveyController::class, 'dismiss'])->name('pos.survey.dismiss');
-    // Task 767: one-time "KOT centering still ON â€” verify your printout" banner dismiss (admin/manager only, gated in controller).
-    Route::post('/kot-center-notice/dismiss', [PosController::class, 'dismissKotCenterNotice'])->name('pos.kot-center-notice.dismiss');
-    // Task 1202: PRA provisional-billing elaan popup â€” raay collection (admin/manager gated in controller).
-    Route::post('/pra-elaan/respond', [\App\Http\Controllers\FeatureSuggestionController::class, 'praElaanRespond'])->name('pos.pra-elaan.respond')->middleware('throttle:10,1');
-    Route::post('/pra-elaan/dismiss', [\App\Http\Controllers\FeatureSuggestionController::class, 'praElaanDismiss'])->name('pos.pra-elaan.dismiss');
-    // Feature Suggestion box (owner request 20 Jul 2026) â€” customers submit feature requests.
-    Route::get('/suggestions', [\App\Http\Controllers\FeatureSuggestionController::class, 'index'])->name('pos.suggestions');
-    Route::post('/suggestions', [\App\Http\Controllers\FeatureSuggestionController::class, 'store'])->name('pos.suggestions.store')->middleware('throttle:10,1');
-    Route::post('/payment-proof', [\App\Http\Controllers\PaymentProofController::class, 'store'])
-        ->name('pos.payment-proof.store')->middleware('throttle:6,1');
-    Route::get('/billing/checkout', [\App\Http\Controllers\PackageCheckoutController::class, 'index'])->name('pos.package-checkout');
-    Route::post('/billing/checkout', [\App\Http\Controllers\PackageCheckoutController::class, 'select'])->name('pos.package-checkout.select');
-    Route::post('/settings/theme', [PosController::class, 'updateTheme'])->name('pos.settings.theme');
-    // Dark mode (owner video, 25 Aug 2026): per-USER preference, like the
-    // language pick above â€” the Ctrl+K palette used to flip the class in the
-    // browser only, so it died on the next page load. Deliberately NOT under
-    // /settings/ (those are shop settings a cashier may not touch).
-    Route::post('/set-dark-mode', [PosController::class, 'toggleDarkMode'])->name('pos.set-dark-mode');
-    Route::post('/settings/dashboard-style', [PosController::class, 'updateDashboardStyle'])->name('pos.settings.dashboard-style');
-    Route::post('/settings/guided-flow', [PosController::class, 'updateGuidedFlow'])->name('pos.settings.guided-flow');
-    // Language system (2 Aug 2026): per-user choice + company default. PosLocale: 'en' / 'rur' Roman Urdu / 'ur' Urdu script.
-    Route::post('/set-language', function (\Illuminate\Http\Request $request) {
-        $lang = $request->input('language');
-        if (in_array($lang, \App\Support\PosLocale::ALL, true)) {
-            $u = auth()->guard('pos')->user();
-            $u->language = $lang;
-            $u->save();
-        }
-        return back()->with('success', __('pos.language_saved'));
-    })->name('pos.set-language');
-    Route::post('/settings/default-language', function (\Illuminate\Http\Request $request) {
-        $u = auth()->guard('pos')->user();
-        abort_unless($u && $u->isPosAdmin(), 403);
-        $lang = $request->input('default_language');
-        if (in_array($lang, \App\Support\PosLocale::ALL, true)) {
-            $u->company->update(['default_language' => $lang]);
-        }
-        return back()->with('success', __('pos.language_saved'));
-    })->name('pos.settings.default-language');
-    Route::post('/settings/quick-type', [PosController::class, 'updateQuickType'])->name('pos.settings.quick-type');
-    // Caller ID (Task 1039): admin toggle + connected-phone status live on customize.
-    Route::post('/settings/caller-id', [\App\Http\Controllers\PosCallerIdController::class, 'toggle'])->name('pos.settings.caller-id');
-    Route::post('/settings/caller-devices/revoke', [\App\Http\Controllers\PosCallerIdController::class, 'revokeDevice'])->name('pos.settings.caller-devices.revoke');
-    Route::post('/settings/receipt-autoclose', [PosController::class, 'updateReceiptAutoclose'])->name('pos.settings.receipt-autoclose');
-    Route::post('/settings/cash-received-toggle', [PosController::class, 'toggleCashReceived'])->name('pos.settings.cash-received-toggle');
-    Route::get('/settings/whatsapp-delivery', [\App\Http\Controllers\PosWhatsAppSettingsController::class, 'show'])->name('pos.whatsapp-delivery');
-    Route::post('/settings/whatsapp-delivery', [\App\Http\Controllers\PosWhatsAppSettingsController::class, 'save'])->name('pos.whatsapp-delivery.save');
-    Route::post('/settings/whatsapp-bill-toggle', [PosController::class, 'toggleWhatsappBill'])->name('pos.settings.whatsapp-bill-toggle');
-    Route::post('/settings/tax-pricing-mode', [PosController::class, 'updateTaxPricingMode'])->name('pos.settings.tax-pricing-mode');
-    Route::post('/settings/inventory-toggle', [PosController::class, 'updateInventoryToggle'])->name('pos.settings.inventory-toggle');
-    Route::post('/settings/restock-toggle', [PosController::class, 'updateRestockToggle'])->name('pos.settings.restock-toggle');
-    Route::post('/settings/auto-purge-local-toggle', [PosController::class, 'toggleAutoPurgeLocal'])->name('pos.settings.auto-purge-local-toggle');
-    Route::post('/settings/local-billing', [PosController::class, 'updateLocalBillingSettings'])->name('pos.settings.local-billing');
-    Route::post('/settings/local-billing/number-style', [PosController::class, 'updateLocalNumberStyle'])->name('pos.settings.local-billing.number-style');
-    // Task 1358: owner-confirmed clear of ARCHIVED local bill detail (admin-only,
-    // permanent â€” never runs on its own and never resets the L-series).
-    Route::post('/settings/local-billing/clear-archived', [PosController::class, 'clearArchivedLocalBills'])->name('pos.settings.local-billing.clear-archived');
-    // Explicit admin-only fresh start, available only when the series is empty.
-    Route::post('/settings/local-billing/reset-numbering', [PosController::class, 'resetLocalNumbering'])->name('pos.settings.local-billing.reset-numbering');
-    // Owner (25 Aug 2026): wipe the customer-spend lines left behind by local
-    // bills that were already deleted at day close (admin-only, permanent).
-    Route::post('/settings/local-billing/clear-spend-records', [PosController::class, 'clearCustomerSpendRecords'])->name('pos.settings.local-billing.clear-spend-records');
-    Route::post('/settings/auto-dayclose-toggle', [PosController::class, 'toggleAutoDayclose'])->name('pos.settings.auto-dayclose-toggle');
-    Route::post('/settings/auto-dayclose-time', [PosController::class, 'updateAutoDaycloseTime'])->name('pos.settings.auto-dayclose-time');
-    Route::post('/settings/unassigned-delivery-dayclose', [PosController::class, 'updateUnassignedDeliveryDayclose'])->name('pos.settings.unassigned-delivery-dayclose');
-    Route::post('/settings/cashier-dayclose-toggle', [PosController::class, 'toggleCashierDayclose'])->name('pos.settings.cashier-dayclose-toggle');
-    Route::post('/settings/cashier-ordercancel-toggle', [PosController::class, 'toggleCashierOrderCancel'])->name('pos.settings.cashier-ordercancel-toggle');
-    Route::post('/settings/dayclose-cutoff', [PosController::class, 'updateDaycloseCutoff'])->name('pos.settings.dayclose-cutoff');
-    Route::post('/settings/kds-auto-print', [PosController::class, 'toggleKdsAutoPrint'])->name('pos.settings.kds-auto-print');
-    // Task 527: admin-controlled waiter permissions (cancel default OFF, takeaway default ON).
-    Route::post('/settings/waiter-permission', [PosController::class, 'toggleWaiterPermission'])->name('pos.settings.waiter-permission');
-    Route::get('/invoice/create', [PosController::class, 'createInvoice'])->name('pos.invoice.create');
-    Route::get('/v2/invoice/create', [PosController::class, 'universalCreateInvoice'])->name('pos.v2.invoice.create');
-    Route::get('/features', [PosController::class, 'featureSettings'])->name('pos.features');
-    Route::post('/features', [PosController::class, 'updateFeatureSettings'])->name('pos.features.update');
-    Route::post('/features/reset', [PosController::class, 'resetFeaturesToCategory'])->name('pos.features.reset');
-    Route::get('/customize', [PosController::class, 'customize'])->name('pos.customize');
-    Route::get('/local-support-copies', [\App\Http\Controllers\OptionalLocalBillArchiveController::class, 'index'])->name('pos.local-support-copies');
-    Route::post('/local-support-copies', [\App\Http\Controllers\OptionalLocalBillArchiveController::class, 'update'])->middleware('throttle:10,1')->name('pos.local-support-copies.update');
-    Route::get('/local-support-copies/{id}/download', [\App\Http\Controllers\OptionalLocalBillArchiveController::class, 'download'])->whereNumber('id')->middleware('throttle:20,1')->name('pos.local-support-copies.download');
-
-    Route::post('/invoice/store', [PosController::class, 'storeInvoice'])->name('pos.invoice.store')->middleware('plan.limit:invoices');
-    Route::get('/staff-discounts', [\App\Http\Controllers\PosStaffDiscountController::class, 'index'])->name('pos.staff-discounts');
-    Route::post('/staff-discounts/settings', [\App\Http\Controllers\PosStaffDiscountController::class, 'toggle'])->name('pos.staff-discounts.settings');
-    Route::get('/staff-discounts/{id}', [\App\Http\Controllers\PosStaffDiscountController::class, 'show'])->whereNumber('id')->name('pos.staff-discounts.show');
-    Route::post('/staff-discounts/{id}/review', [\App\Http\Controllers\PosStaffDiscountController::class, 'review'])->whereNumber('id')->name('pos.staff-discounts.review');
-    Route::get('/transactions', [PosController::class, 'transactions'])->name('pos.transactions');
-    Route::get('/transaction/{id}', [PosController::class, 'transactionShow'])->name('pos.transaction.show');
-    Route::get('/transaction/{id}/edit', [PosController::class, 'editTransaction'])->name('pos.transaction.edit');
-    Route::put('/transaction/{id}', [PosController::class, 'updateTransaction'])->name('pos.transaction.update');
-    Route::delete('/transaction/{id}', [PosController::class, 'deleteTransaction'])->name('pos.transaction.delete');
-    Route::post('/transaction/{id}/retry-pra', [PosController::class, 'retryPra'])->name('pos.transaction.retry-pra');
-    // Task 808: owner self-serve re-queue of historical exempt_internal bills.
-    Route::post('/transaction/{id}/requeue-exempt', [PosController::class, 'requeueExemptInternal'])->name('pos.transaction.requeue-exempt');
-    // Task 655: payment-complete popup polls this on agent-mode 'pending' bills.
-    Route::get('/transaction/{id}/pra-status', [PosController::class, 'apiPraStatus'])->name('pos.transaction.pra-status');
-    // Return / credit-note flow (Task 570; Task 678: BOTH streams â€” local
-    // parents produce local returns, never reported). Permission = owner/
-    // manager always, staff via the per-user "Return / Credit Note" Custom
-    // Access tick (PosAccessService::returnsAllowed â†’ 403 in controller).
-    // Task 681: sale-screen Quick Return â€” bill number â†’ return-form URL (JSON).
-    Route::get('/return-lookup', [\App\Http\Controllers\PosReturnController::class, 'quickLookup'])->name('pos.return.lookup');
-    Route::get('/transaction/{id}/return', [\App\Http\Controllers\PosReturnController::class, 'returnForm'])->name('pos.transaction.return-form');
-    Route::post('/transaction/{id}/return', [\App\Http\Controllers\PosReturnController::class, 'processReturn'])->name('pos.transaction.return');
-    Route::post('/transactions/bulk-retry-pra', [PosController::class, 'bulkRetryPra'])->name('pos.transactions.bulk-retry-pra');
-    Route::post('/api/promotion-quotes', [\App\Http\Controllers\PosPromotionController::class, 'quotes'])->name('pos.promotions.quotes');
-    Route::get('/api/provisional-bills', [PosController::class, 'apiProvisionalBills'])->name('pos.api.provisional-bills');
-    Route::post('/api/provisional-bills/{id}/delete', [PosController::class, 'apiDeleteProvisional'])->name('pos.api.provisional.delete');
-    Route::post('/api/provisional-bills/{id}/promote', [PosController::class, 'apiPromoteProvisional'])->name('pos.api.provisional.promote');
-    // Item #1 (Jul 2026): customer saved delivery addresses (sale-flow, cashiers allowed)
-    Route::get('/api/customer-addresses', [PosController::class, 'apiCustomerAddresses'])->name('pos.api.customer-addresses');
-    Route::post('/api/customer-addresses', [PosController::class, 'apiStoreCustomerAddress'])->name('pos.api.customer-addresses.store');
-    Route::post('/api/customer-addresses/delete', [PosController::class, 'apiDeleteCustomerAddress'])->name('pos.api.customer-addresses.delete');
-    Route::patch('/api/customers/{id}/name', [PosController::class, 'apiUpdateCustomerName'])->name('pos.api.customers.name');
-    Route::patch('/api/customers/{id}/contact', [PosController::class, 'apiUpdateCustomerContact'])->name('pos.api.customers.contact');
-    Route::get('/api/failed-bills', [PosController::class, 'apiFailedBills'])->name('pos.api.failed-bills');
-    Route::post('/api/failed-bills/{id}/retry', [PosController::class, 'apiRetryFailed'])->name('pos.api.failed.retry');
-    // Offline queue telemetry â€” the sale screen reports bills still held on the
-    // device. An offline shop cannot report; the dangerous case is a device that
-    // is ONLINE while bills stay stuck, and that used to be invisible.
-    Route::post('/api/offline-queue-report', OfflineQueueReportController::class)->name('pos.api.offline-queue-report');
-    // Reprint modal (Alt+R) â€” read-only list of ALL of today's completed bills.
-    Route::get('/api/todays-bills', [PosController::class, 'apiTodaysBills'])->name('pos.api.todays-bills');
-    Route::get('/transaction/{id}/receipt', [PosController::class, 'receipt'])->name('pos.receipt');
-    Route::get('/transaction/{id}/pdf', [PosController::class, 'downloadInvoicePdf'])->name('pos.invoice.pdf');
-    Route::post('/transaction/{id}/share-link', [PosController::class, 'generateShareLink'])->name('pos.invoice.share-link');
-    Route::get('/reports', [PosController::class, 'reports'])->name('pos.reports');
-    Route::get('/reports/dashboard-overview', [PosController::class, 'dashboardSalesOverview'])->name('pos.reports.dashboard-overview');
-    Route::get('/tax-reports', [PosController::class, 'taxReports'])->name('pos.tax-reports');
-    Route::get('/reports/csv', [PosController::class, 'exportReportCsv'])->name('pos.reports.csv');
-    // Staff Hazri (owner batch, 26 Jul 2026) â€” ADMIN/MANAGER-ONLY (403 in controller).
-    Route::get('/reports/hazri', [PosController::class, 'hazriReport'])->name('pos.reports.hazri');
-    // Payroll PDF export (Task #280) â€” same gates (planGate hazri_enabled + isPosAdmin).
-    Route::get('/reports/hazri/payroll-pdf', [PosController::class, 'payrollHazriPdf'])->name('pos.reports.hazri.payroll-pdf');
-    // Biometric device setup + CSV import (4 Aug 2026) â€” admin only (403 in controller).
-    Route::get('/bio-sync', [\App\Http\Controllers\PosBiometricController::class, 'setup'])->name('pos.bio-sync.setup');
-    Route::post('/bio-sync/device', [\App\Http\Controllers\PosBiometricController::class, 'storeDevice'])->name('pos.bio-sync.store-device');
-    Route::post('/bio-sync/device/{id}/toggle', [\App\Http\Controllers\PosBiometricController::class, 'toggleDevice'])->name('pos.bio-sync.toggle-device');
-    Route::delete('/bio-sync/device/{id}', [\App\Http\Controllers\PosBiometricController::class, 'destroyDevice'])->name('pos.bio-sync.destroy-device');
-    Route::post('/bio-sync/device/{id}/map', [\App\Http\Controllers\PosBiometricController::class, 'saveMapping'])->name('pos.bio-sync.save-mapping');
-    Route::get('/bio-sync/import', [\App\Http\Controllers\PosBiometricController::class, 'showImport'])->name('pos.bio-sync.import');
-    Route::post('/bio-sync/import', [\App\Http\Controllers\PosBiometricController::class, 'processImport'])->name('pos.bio-sync.process-import');
-    Route::post('/bio-sync/quick-map', [\App\Http\Controllers\PosBiometricController::class, 'quickMapPin'])->name('pos.bio-sync.quick-map');
-    // Unmapped PIN panel-banner dismiss (Task #277). Admin-only, normal POS web middleware (CSRF).
-    Route::post('/bio-sync/pin-alert/dismiss', [\App\Http\Controllers\PosBiometricController::class, 'dismissPinAlert'])->name('pos.bio-sync.dismiss-pin-alert');
-    Route::get('/tax-reports/csv', [PosController::class, 'exportTaxReportCsv'])->name('pos.tax-reports.csv');
-    Route::get('/tax-reports/pdf', [PosController::class, 'exportTaxReportPdf'])->name('pos.tax-reports.pdf');
-    Route::get('/reports/analytics-pdf', [PosController::class, 'reportsAnalyticsPdf'])->name('pos.reports.analytics-pdf');
-    // Task 705: khufia key (Ctrl+Alt+Shift+L) â€” no visible UI by design.
-    // Manager/owner: session-only "local check mode" toggle (cashier = 403).
-    // LOCAL-scoped cashier: station identity switch to the owner-linked PRA
-    // counterpart cashier and back (unlinked/ineligible = silent no-op).
-    Route::post('/api/local-check-toggle', [PosController::class, 'toggleLocalCheck'])->name('pos.api.local-check-toggle');
-    Route::post('/api/identity-switch', [PosController::class, 'identitySwitch'])->name('pos.api.identity-switch');
-    Route::get('/day-close', [PosController::class, 'dayCloseReport'])->name('pos.day-close');
-    Route::post('/day-close', [PosController::class, 'closeDayReport'])->name('pos.close-day');
-    // Task 516: bulk-close every stranded prior business day in one click.
-    Route::post('/day-close/close-all-prior', [PosController::class, 'closeAllPriorDays'])->name('pos.close-all-days');
-    // Owner 23 Aug 2026: clear a blocking open order from the checklist itself
-    // (literal path â€” sits BEFORE the /day-close/{id}/... routes by design).
-    Route::post('/day-close/open-order/{id}/cancel', [PosController::class, 'dayCloseCancelOrder'])->name('pos.day-close.cancel-order');
-    // Same reason for delivery bills, PLUS the stream trap: the deliveries
-    // board hides (and refuses) bills outside the closer's own local/PRA
-    // stream, while the close counts both â€” so the cure lives here, not there.
-    Route::post('/day-close/delivery/{id}/delivered', [PosController::class, 'dayCloseMarkDelivered'])->name('pos.day-close.deliver');
-    Route::post('/day-opening', [PosController::class, 'saveDayOpening'])->name('pos.day-opening.save');
-    // Task 1375: per-counter cash drawer â€” close ONE counter's drawer (the
-    // other counters keep billing; the shop's day closes once every used
-    // drawer is closed). Reopen is admin/manager-only, enforced in-controller.
-    Route::post('/day-close/counter', [PosController::class, 'closeCounter'])->name('pos.counter-close');
-    Route::post('/day-close/counter/reopen', [PosController::class, 'reopenCounter'])->name('pos.counter-reopen');
-     // Compact Summary X/Z reports â€” literal summary paths stay ahead of the
-     // dynamic report-id routes. They are presentation-only views of the same
-     // day-close context; no close or report row is created.
-     Route::get('/day-close/summary', [PosController::class, 'dayCloseReport'])
-         ->defaults('report_mode', 'summary')->name('pos.day-close-summary');
-    // Task 660: X-Report â€” read-only "abhi tak ki report" WITHOUT closing the
-    // day (no wash, no hash, no report row). Literal paths registered BEFORE
-    // the /day-close/{id}/... routes so {id} never swallows 'x-report'.
-    Route::get('/day-close/x-report/pdf', [PosController::class, 'dayCloseXReportPdf'])->name('pos.day-close-x-pdf');
-    Route::get('/day-close/x-report/pdf/download', [PosController::class, 'dayCloseXReportPdf'])->defaults('download', true)->name('pos.day-close-x-pdf-download');
-    Route::get('/day-close/x-report/thermal', [PosController::class, 'dayCloseXReportThermal'])->name('pos.day-close-x-thermal');
-    Route::get('/day-close/x-report/summary/pdf', [PosController::class, 'dayCloseXSummaryPdf'])->name('pos.day-close-x-summary-pdf');
-    Route::get('/day-close/x-report/summary/pdf/download', [PosController::class, 'dayCloseXSummaryPdf'])->defaults('download', true)->name('pos.day-close-x-summary-pdf-download');
-    Route::get('/day-close/x-report/summary/thermal', [PosController::class, 'dayCloseXSummaryThermal'])->name('pos.day-close-x-summary-thermal');
-    Route::get('/day-close/{id}/summary/pdf', [PosController::class, 'dayCloseSummaryPdf'])->name('pos.day-close-summary-pdf');
-    Route::get('/day-close/{id}/summary/pdf/download', [PosController::class, 'dayCloseSummaryPdf'])->defaults('download', true)->name('pos.day-close-summary-pdf-download');
-    Route::get('/day-close/{id}/summary/thermal', [PosController::class, 'dayCloseSummaryThermal'])->name('pos.day-close-summary-thermal');
-    Route::get('/day-close/{id}/pdf', [PosController::class, 'dayCloseReportPdf'])->name('pos.day-close-pdf');
-    Route::get('/day-close/{id}/pdf/download', [PosController::class, 'dayCloseReportPdf'])->defaults('download', true)->name('pos.day-close-pdf-download');
-    Route::get('/day-close/{id}/thermal', [PosController::class, 'dayCloseThermal'])->name('pos.day-close-thermal');
-    Route::get('/api/tax-rate', [PosController::class, 'getTaxRate'])->name('pos.api.tax-rate');
-    Route::post('/api/draft/save', [PosController::class, 'saveDraft'])->name('pos.api.draft.save');
-    Route::get('/api/last-order', [PosController::class, 'getLastOrder'])->name('pos.api.last-order');
-    Route::get('/csrf-token', function () { return response()->json(['token' => csrf_token()]); })->name('pos.csrf-token');
-    Route::get('/api/draft/list', [PosController::class, 'getDrafts'])->name('pos.api.draft.list');
-    Route::delete('/api/draft/{id}', [PosController::class, 'deleteDraft'])->name('pos.api.draft.delete');
-    Route::post('/api/invoice/{id}/lock', [PosController::class, 'lockInvoice'])->name('pos.api.invoice.lock');
-    Route::post('/api/invoice/{id}/unlock', [PosController::class, 'unlockInvoice'])->name('pos.api.invoice.unlock');
-    Route::post('/api/verify-pin', [PosController::class, 'verifyPin'])->name('pos.api.verify-pin');
-    Route::get('/api/check-pin-session', [PosController::class, 'checkPinSession'])->name('pos.api.check-pin-session');
-    Route::post('/api/toggle-pra', [PosController::class, 'togglePra'])->name('pos.api.toggle-pra');
-    Route::get('/api/boot-check', [PosController::class, 'bootCheck'])->name('pos.api.boot-check');
-    Route::post('/api/boot-diagnostics', [PosController::class, 'bootDiagnostics'])
-        ->middleware('throttle:10,1')->name('pos.api.boot-diagnostics');
-    // Caller ID (Task 1039): sale-screen popup poll â€” fresh ring events + customer match.
-    Route::get('/api/caller-events', [\App\Http\Controllers\PosCallerIdController::class, 'events'])->name('pos.api.caller-events');
-    Route::get('/api/caller-recent', [\App\Http\Controllers\PosCallerIdController::class, 'recentCalls'])->name('pos.api.caller-recent');
-    // Task 1380: handle ho chuki call(en) recent-calls list se hatana (shop-wide).
-    Route::post('/api/caller-clear', [\App\Http\Controllers\PosCallerIdController::class, 'clearCalls'])->name('pos.api.caller-clear');
-    // Task 1381: "Call back" â€” paired counter-phone par tap-to-dial request bhejna.
-    Route::post('/api/caller-dial', [\App\Http\Controllers\PosCallerIdController::class, 'dialBack'])
-        ->middleware('throttle:60,1')->name('pos.api.caller-dial');
-    Route::get('/api/caller-last-order', [\App\Http\Controllers\PosCallerIdController::class, 'lastOrder'])->name('pos.api.caller-last-order');
-    Route::post('/api/toggle-auto-print', [PosController::class, 'toggleAutoPrint'])->name('pos.api.toggle-auto-print');
-    Route::post('/api/print-jobs', [PosController::class, 'apiCreatePrintJob'])->name('pos.api.print-jobs');
-    // Test print (Aug 2026): enqueues a slip that carries the QUEUE'S OWN NAME.
-    // Windows keeps a queue alive after the printer moves ports ("XP-80C" vs
-    // "XP-80C (copy 2)"), accepts jobs for the dead one and reports success â€”
-    // whichever slip physically comes out names the printer to select.
-    Route::post('/api/print-jobs/test', [PosController::class, 'apiTestPrintJob'])
-        ->middleware('throttle:20,1')->name('pos.api.print-jobs.test');
-    // Print-failure telemetry beacon (Task #63 â€” 30 Jul vanished-bill case):
-    // sale screen reports WHY a print didn't fire so server logs carry the root
-    // cause next time. sendBeacon-compatible (pos/* is CSRF-exempt).
-    Route::post('/api/print-telemetry', [PosController::class, 'apiPrintTelemetry'])
-        ->middleware('throttle:30,1')->name('pos.api.print-telemetry');
-    Route::get('/api/kot-print-attention', [PosController::class, 'apiKotPrintAttention'])
-        ->middleware('throttle:60,1')->name('pos.api.kot-print-attention');
-    Route::post('/api/kot-print-attention/local-core-down', [PosController::class, 'apiKotLocalCoreDown'])
-        ->middleware('throttle:30,1')->name('pos.api.kot-local-core-down');
-    // One-click silent-print prompt (sale-screen banner) â€” controller enforces
-    // a strict admin/manager gate (isPosCashier â†’ 403), same pattern as bulk-sale.
-    Route::post('/api/printer-prompt', [PosController::class, 'apiPrinterPrompt'])->name('pos.api.printer-prompt');
-    // Smart Product Creation â€” Simple POS quick-create (refused server-side when inventory ON)
-    Route::post('/api/products/quick-create', [PosController::class, 'apiQuickCreate'])->name('pos.api.products.quick-create');
-    Route::post('/api/products/{id}/quick-price', [PosController::class, 'apiQuickUpdatePrice'])->name('pos.api.products.quick-price');
-    Route::match(['get', 'post'], '/my-profile', [PosController::class, 'userProfile'])->name('pos.user-profile');
-    Route::get('/products', [PosController::class, 'products'])->name('pos.products');
-    Route::get('/products/labels', [PosController::class, 'productLabels'])->name('pos.products.labels')->middleware('feature:barcode,relevant');
-    // Bulk sale-screen visibility: OUTSIDE PosAdminOnly on purpose â€” that middleware
-    // redirects instead of 403ing; controller enforces a strict admin/manager allowlist
-    // (isPosAdmin) and returns a true 403 to everyone else, cashiers included.
-    Route::post('/products/bulk-sale', [PosController::class, 'bulkToggleSale'])->name('pos.products.bulk-sale');
-    // Product search mode â€” same pattern as bulk-sale: controller enforces the
-    // admin allowlist with a true 403 (PosAdminOnly would redirect instead).
-    Route::post('/products/search-mode', [PosController::class, 'productSearchMode'])->name('pos.products.search-mode');
-    Route::get('/customers', [PosController::class, 'customers'])->name('pos.customers');
-    Route::post('/customers', [PosController::class, 'storeCustomer'])->name('pos.customers.store');
-
-    Route::middleware(['feature:rooms'])->prefix('hotel')->group(function () {
-        Route::get('/', [HotelController::class, 'dashboard'])->name('pos.hotel.dashboard');
-        Route::get('/reservations', [HotelController::class, 'reservations'])->name('pos.hotel.reservations');
-        Route::get('/housekeeping', [HotelController::class, 'housekeepingBoard'])->name('pos.hotel.housekeeping');
-        Route::get('/guests', [HotelController::class, 'guests'])->name('pos.hotel.guests');
-        Route::get('/guests/{id}/edit', [HotelController::class, 'editGuest'])->whereNumber('id')->name('pos.hotel.guests.edit');
-        Route::patch('/guests/{id}', [HotelController::class, 'updateGuest'])->whereNumber('id')->name('pos.hotel.guests.update');
-        Route::delete('/guests/{id}', [HotelController::class, 'deleteGuest'])->whereNumber('id')->name('pos.hotel.guests.delete');
-        Route::get('/folios', [HotelController::class, 'folios'])->name('pos.hotel.folios');
-        Route::get('/folios/csv', [\App\Http\Controllers\HotelBillingController::class, 'csv'])->name('pos.hotel.folios.csv');
-        Route::get('/folios/pdf', [\App\Http\Controllers\HotelBillingController::class, 'pdf'])->name('pos.hotel.folios.pdf');
-        Route::get('/reports', [HotelController::class, 'reports'])->name('pos.hotel.reports');
-        // Separated Restaurant Outlet (saved restaurant_mode ON only).
-        Route::get('/restaurant', [HotelController::class, 'restaurantOutlet'])->name('pos.hotel.restaurant-outlet');
-        Route::get('/restaurant/exit', [HotelController::class, 'leaveRestaurantOutlet'])->name('pos.hotel.restaurant-outlet.exit');
-        Route::get('/rooms', [HotelController::class, 'rooms'])->name('pos.hotel.rooms');
-        Route::post('/rooms/{id}/housekeeping', [HotelController::class, 'housekeeping'])->whereNumber('id')->name('pos.hotel.rooms.housekeeping');
-        Route::post('/rooms/{id}/service', [HotelController::class, 'serviceState'])->whereNumber('id')->name('pos.hotel.rooms.service');
-        Route::get('/stays', [HotelController::class, 'staysIndex'])->name('pos.hotel.stays.index');
-        Route::get('/available-rooms', [HotelController::class, 'availableRooms'])->name('pos.hotel.available-rooms');
-        Route::get('/stays/create', [HotelController::class, 'createStay'])->name('pos.hotel.stays.create');
-        Route::post('/stays', [HotelController::class, 'storeStay'])->name('pos.hotel.stays.store');
-        Route::get('/quote', [HotelController::class, 'bookingQuote'])->name('pos.hotel.quote');
-        Route::get('/stays/{id}/change-quote', [HotelController::class, 'changeQuote'])->whereNumber('id')->name('pos.hotel.change-quote');
-        Route::get('/stays/{id}/checkout', [HotelController::class, 'showCheckout'])->whereNumber('id')->name('pos.hotel.checkout');
-        Route::get('/stays/{id}/bill-preview', [HotelController::class, 'billPreview'])->whereNumber('id')->name('pos.hotel.bill-preview');
-        Route::post('/stays/{id}/bill-confirm', [HotelController::class, 'billConfirm'])->whereNumber('id')->name('pos.hotel.bill-confirm');
-        Route::get('/stays/{id}/bill-recovery', [HotelController::class, 'billRecovery'])->whereNumber('id')->name('pos.hotel.bill-recovery');
-        Route::get('/stays/{id}/bills/{billId}/status', [HotelController::class, 'billStatus'])->whereNumber('id')->whereNumber('billId')->name('pos.hotel.bill-status');
-        Route::get('/stays/{id}/checkout-quote', [HotelController::class, 'checkoutQuote'])->whereNumber('id')->name('pos.hotel.checkout-quote');
-        Route::post('/stays/{id}/checkout', [HotelController::class, 'completeCheckout'])->whereNumber('id')->name('pos.hotel.checkout.complete');
-        Route::post('/stays/{id}/discount', [HotelController::class, 'discount'])->whereNumber('id')->name('pos.hotel.stays.discount');
-        Route::get('/stays/{id}', [HotelController::class, 'showStay'])->whereNumber('id')->name('pos.hotel.stays.show');
-        Route::get('/stays/{id}/bills/{billId}/receipt', [HotelController::class, 'billReceipt'])->whereNumber(['id', 'billId'])->name('pos.hotel.bill-receipt');
-        Route::post('/receipt-paper', [HotelController::class, 'saveReceiptPaper'])->name('pos.hotel.receipt-paper');
-        Route::get('/stays/{id}/receipt-preview', [HotelController::class, 'receiptPreview'])->whereNumber('id')->name('pos.hotel.receipt-preview');
-        Route::post('/stays/{id}/bills/{billId}/print', [HotelController::class, 'billPrint'])->whereNumber(['id', 'billId'])->middleware('throttle:20,1')->name('pos.hotel.bill-print');
-        Route::get('/stays/{id}/print-jobs/{jobId}', [HotelController::class, 'receiptPrintStatus'])->whereNumber(['id', 'jobId'])->name('pos.hotel.print-status');
-        Route::get('/stays/{id}/statement', [HotelController::class, 'statement'])->whereNumber('id')->name('pos.hotel.stays.statement');
-        Route::post('/stays/{id}/statement/silent-print', [HotelController::class, 'silentStatement'])
-            ->middleware('throttle:20,1')->whereNumber('id')->name('pos.hotel.stays.statement.silent-print');
-        Route::post('/stays/{id}/check-in', [HotelController::class, 'checkIn'])->whereNumber('id')->name('pos.hotel.stays.check-in');
-        Route::post('/stays/{id}/check-out', [HotelController::class, 'checkOut'])->whereNumber('id')->name('pos.hotel.stays.check-out');
-        Route::post('/stays/{id}/extend', [HotelController::class, 'extend'])->whereNumber('id')->name('pos.hotel.stays.extend');
-        Route::post('/stays/{id}/move', [HotelController::class, 'move'])->whereNumber('id')->name('pos.hotel.stays.move');
-        Route::post('/stays/{id}/cancel', [HotelController::class, 'cancel'])->whereNumber('id')->name('pos.hotel.stays.cancel');
-        Route::get('/stays/{id}/credit-notes', [\App\Http\Controllers\HotelCreditNoteController::class, 'index'])->whereNumber('id')->name('pos.hotel.credit-notes');
-        Route::post('/stays/{id}/credit-notes/activation', [\App\Http\Controllers\HotelCreditNoteController::class, 'activation'])->whereNumber('id')->name('pos.hotel.credit-notes.activation');
-        Route::post('/stays/{id}/credit-notes/{bill}/review', [\App\Http\Controllers\HotelCreditNoteController::class, 'review'])->whereNumber('id')->whereNumber('bill')->name('pos.hotel.credit-notes.review');
-        Route::post('/stays/{id}/credit-notes/{bill}/issue', [\App\Http\Controllers\HotelCreditNoteController::class, 'issue'])->whereNumber('id')->whereNumber('bill')->name('pos.hotel.credit-notes.issue');
-        Route::post('/stays/{id}/credit-notes/{note}/refund', [\App\Http\Controllers\HotelCreditNoteController::class, 'refund'])->whereNumber('id')->whereNumber('note')->name('pos.hotel.credit-notes.refund');
-        Route::get('/stays/{id}/correction', [HotelController::class, 'correctionPreview'])->whereNumber('id')->name('pos.hotel.stays.correction');
-        Route::post('/stays/{id}/correction', [HotelController::class, 'correctStay'])->whereNumber('id')->name('pos.hotel.stays.correct');
-        Route::post('/stays/{id}/void-error', [HotelController::class, 'voidErroneousStay'])->whereNumber('id')->name('pos.hotel.stays.void-error');
-        Route::post('/stays/{id}/no-show', [HotelController::class, 'noShow'])->whereNumber('id')->name('pos.hotel.stays.no-show');
-        Route::post('/stays/{id}/folio/charge', [HotelController::class, 'folioCharge'])->whereNumber('id')->name('pos.hotel.folio.charge');
-        Route::post('/stays/{id}/folio/payment', [HotelController::class, 'folioPayment'])->whereNumber('id')->name('pos.hotel.folio.payment');
-        Route::post('/stays/{id}/folio/refund', [HotelController::class, 'folioRefund'])->whereNumber('id')->name('pos.hotel.folio.refund');
-        Route::post('/stays/{id}/folio/reverse', [HotelController::class, 'folioReverse'])->whereNumber('id')->name('pos.hotel.folio.reverse');
-        Route::post('/stays/{id}/folio/settle', [HotelController::class, 'folioSettle'])->whereNumber('id')->name('pos.hotel.folio.settle');
-    });
-    // Dashboard "gone quiet" card: mark one customer as handled. Same pattern
-    // as bulk-sale above â€” OUTSIDE PosAdminOnly (that middleware redirects),
-    // controller enforces the admin/manager allowlist with a true 403 so the
-    // card can roll the row back instead of silently "succeeding".
-    Route::post('/customers/alert-dismiss', [PosController::class, 'dismissInactiveRegular'])->name('pos.customers.alert-dismiss');
-
-    // Category-native service operations. Hotel is deliberately excluded by
-    // PosServiceWorkflowProfiles; its stays/folio workflow remains canonical.
-    Route::middleware(['feature:service_jobs,relevant'])->prefix('work-orders')->group(function () {
-        Route::get('/', [\App\Http\Controllers\PosServiceWorkOrderController::class, 'index'])->name('pos.service-work-orders.index');
-        Route::get('/create', [\App\Http\Controllers\PosServiceWorkOrderController::class, 'create'])->name('pos.service-work-orders.create');
-        Route::post('/', [\App\Http\Controllers\PosServiceWorkOrderController::class, 'store'])->name('pos.service-work-orders.store');
-        Route::get('/report.csv', [\App\Http\Controllers\PosServiceWorkOrderController::class, 'report'])->name('pos.service-work-orders.report');
-        Route::get('/{id}', [\App\Http\Controllers\PosServiceWorkOrderController::class, 'show'])->whereNumber('id')->name('pos.service-work-orders.show');
-        Route::post('/{id}/transition', [\App\Http\Controllers\PosServiceWorkOrderController::class, 'transition'])->whereNumber('id')->name('pos.service-work-orders.transition');
-        Route::post('/{id}/invoice', [\App\Http\Controllers\PosServiceWorkOrderController::class, 'invoice'])->whereNumber('id')->name('pos.service-work-orders.invoice');
-    });
-
-    Route::middleware([\App\Http\Middleware\PosAdminOnly::class])->group(function () {
-        // Category profile (Task 1582): Services belong to the services family
-        // (or an admin extra / grandfathered shop) â€” hidden = unreachable by URL.
-        Route::middleware(['feature:service_jobs,relevant'])->group(function () {
-            Route::get('/services', [PosController::class, 'services'])->name('pos.services');
-            Route::post('/services', [PosController::class, 'storeService'])->name('pos.services.store');
-            Route::put('/services/{id}', [PosController::class, 'updateService'])->name('pos.services.update');
-            Route::delete('/services/{id}', [PosController::class, 'deleteService'])->name('pos.services.delete');
-        });
-        Route::get('/promotions', [\App\Http\Controllers\PosPromotionController::class, 'index'])->name('pos.promotions');
-        Route::post('/promotions', [\App\Http\Controllers\PosPromotionController::class, 'store'])->name('pos.promotions.store');
-        Route::put('/promotions/{id}', [\App\Http\Controllers\PosPromotionController::class, 'update'])->name('pos.promotions.update');
-        Route::get('/deals', [PosController::class, 'deals'])->name('pos.deals');
-        Route::post('/deals', [PosController::class, 'storeDeal'])->name('pos.deals.store');
-        Route::put('/deals/{id}', [PosController::class, 'updateDeal'])->name('pos.deals.update');
-        Route::delete('/deals/{id}', [PosController::class, 'deleteDeal'])->name('pos.deals.delete');
-        // ðŸ¬ Branch management (multi-branch v1, Task 1347) â€” admin-only in controller.
-        Route::get('/branches', [\App\Http\Controllers\PosBranchController::class, 'index'])->name('pos.branches');
-        Route::post('/branches', [\App\Http\Controllers\PosBranchController::class, 'store'])->name('pos.branches.store');
-        Route::put('/branches/{id}', [\App\Http\Controllers\PosBranchController::class, 'update'])->name('pos.branches.update');
-        Route::post('/branches/{id}/toggle', [\App\Http\Controllers\PosBranchController::class, 'toggle'])->name('pos.branches.toggle');
-        Route::get('/terminals', [PosController::class, 'terminals'])->name('pos.terminals');
-        Route::post('/terminals', [PosController::class, 'storeTerminal'])->name('pos.terminals.store')->middleware('plan.limit:terminals');
-        Route::put('/terminals/{id}', [PosController::class, 'updateTerminal'])->name('pos.terminals.update');
-        Route::delete('/terminals/{id}', [PosController::class, 'deleteTerminal'])->name('pos.terminals.delete');
-        Route::match(['get', 'post'], '/pra-settings', [PosController::class, 'praSettings'])->name('pos.pra-settings');
-        // Irreversible standaloneâ†’PRA edition flip: admins only.
-        Route::post('/api/enable-pra-integration', [PosController::class, 'enablePraIntegration'])->name('pos.api.enable-pra-integration');
-        Route::get('/billing', [PosController::class, 'billing'])->name('pos.billing');
-        Route::get('/billing/documents/invoices/{invoice}', [\App\Http\Controllers\SubscriptionDocumentController::class, 'companyInvoice'])->whereNumber('invoice')->name('pos.billing.documents.invoice');
-        Route::get('/billing/documents/receipts/{payment}', [\App\Http\Controllers\SubscriptionDocumentController::class, 'companyReceipt'])->whereNumber('payment')->name('pos.billing.documents.receipt');
-        Route::match(['get', 'post'], '/business-profile', [PosController::class, 'businessProfile'])->name('pos.business-profile');
-        // F8 â€” public profile + menu builder (admin-only POSTs, gated in controller)
-        Route::post('/public-profile', [\App\Http\Controllers\PublicProfileController::class, 'saveSettings'])->name('pos.public-profile.save');
-        Route::post('/public-profile/regenerate', [\App\Http\Controllers\PublicProfileController::class, 'regenerateSlug'])->name('pos.public-profile.regenerate');
-        Route::post('/public-profile/menu', [\App\Http\Controllers\PublicProfileController::class, 'saveMenu'])->name('pos.public-profile.menu');
-        Route::match(['get', 'post'], '/receipt-settings', [PosController::class, 'receiptSettings'])->name('pos.receipt-settings');
-        Route::get('/receipt-design-preview', [\App\Http\Controllers\PosPrintDesignController::class, 'preview'])->name('pos.receipt-design-preview');
-        Route::post('/rider-bill-preview/settings', [\App\Http\Controllers\RiderBillPreviewController::class, 'update'])->name('rider.preview.settings');
-        Route::match(['get', 'post'], '/printer-settings', [PosController::class, 'printerSettings'])->name('pos.printer-settings');
-        Route::post('/hotel/rooms', [HotelController::class, 'storeRoom'])->name('pos.hotel.rooms.store')->middleware('feature:rooms');
-        Route::post('/hotel/checkout-policy', [HotelController::class, 'updateCheckoutPolicy'])->name('pos.hotel.checkout-policy')->middleware('feature:rooms');
-        Route::put('/hotel/rooms/{id}', [HotelController::class, 'updateRoom'])->whereNumber('id')->name('pos.hotel.rooms.update')->middleware('feature:rooms');
-        Route::delete('/hotel/rooms/{id}', [HotelController::class, 'removeRoom'])->whereNumber('id')->name('pos.hotel.rooms.remove')->middleware('feature:rooms');
-        Route::post('/hotel/rooms/{id}/restore', [HotelController::class, 'restoreRoom'])->whereNumber('id')->name('pos.hotel.rooms.restore')->middleware('feature:rooms');
-        Route::post('/products', [PosController::class, 'storeProduct'])->name('pos.products.store')->middleware('plan.limit:pos_products');
-        Route::get('/products/template', [PosController::class, 'downloadProductTemplate'])->name('pos.products.template');
-        // NO plan.limit middleware here on purpose: at-cap shops must still be
-        // able to run UPDATE-only imports (the middleware would 403 the whole
-        // request at cap). Access + per-row plan cap are enforced inside
-        // importProducts (SubscriptionAccessService gate + remaining allowance).
-        Route::post('/products/import', [PosController::class, 'importProducts'])->name('pos.products.import');
-        // Inventory Master Excel (Phase 1) â€” catalog + BOM only. Not behind
-        // feature:inventory so PRODUCT-only shops can still import. Row-level
-        // excel_enabled / recipes gates live in PosInventoryMasterExcelService.
-        // Never posts stock. Keep /products/template and /recipes/import.
-        Route::get('/inventory-master', [PosInventoryMasterController::class, 'index'])->name('pos.inventory-master');
-        Route::get('/inventory-master/template', [PosInventoryMasterController::class, 'downloadTemplate'])->name('pos.inventory-master.template');
-        Route::post('/inventory-master/preview', [PosInventoryMasterController::class, 'preview'])->name('pos.inventory-master.preview');
-        Route::post('/inventory-master/confirm', [PosInventoryMasterController::class, 'confirm'])->name('pos.inventory-master.confirm');
-        Route::get('/inventory-master/export', [PosInventoryMasterController::class, 'export'])->name('pos.inventory-master.export');
-        Route::post('/inventory-master/error-report', [PosInventoryMasterController::class, 'errorReport'])->name('pos.inventory-master.error-report');
-        Route::post('/products/bulk', [PosController::class, 'bulkProductAction'])->name('pos.products.bulk');
-        Route::put('/products/{id}', [PosController::class, 'updateProduct'])->name('pos.products.update');
-        Route::delete('/products/{id}', [PosController::class, 'deleteProduct'])->name('pos.products.delete');
-        Route::post('/products/{id}/toggle', [PosController::class, 'toggleProduct'])->name('pos.products.toggle');
-        Route::post('/products/{id}/toggle-sale', [PosController::class, 'toggleProductSale'])->name('pos.products.toggle-sale');
-        Route::get('/customers/export', [PosController::class, 'exportCustomers'])->name('pos.customers.export');
-        Route::get('/customers/template', [PosController::class, 'downloadCustomerTemplate'])->name('pos.customers.template');
-        Route::post('/customers/import', [PosController::class, 'importCustomers'])->name('pos.customers.import');
-        Route::put('/customers/{id}', [PosController::class, 'updateCustomer'])->name('pos.customers.update');
-        Route::delete('/customers/{id}', [PosController::class, 'deleteCustomer'])->name('pos.customers.delete');
-        Route::post('/customers/{id}/toggle', [PosController::class, 'toggleCustomer'])->name('pos.customers.toggle');
-        Route::get('/customers/{id}/history', [PosController::class, 'customerHistory'])->name('pos.customers.history');
-        // Bill quick-view on the history page â€” same authorization as the bill's
-        // own detail page (company + Billing Scope + cashier isolation).
-        Route::get('/customers/history/bill/{id}', [PosController::class, 'customerHistoryBill'])->name('pos.customers.history.bill');
-        Route::get('/customers/{id}/history/export', [PosController::class, 'exportCustomerHistory'])->name('pos.customers.history.export');
-        Route::get('/customers/{id}/history/pdf', [PosController::class, 'customerHistoryPdf'])->name('pos.customers.history.pdf');
-        // Category profile (Task 1582): the whole inventory family is for shops
-        // that stock goods (or an admin extra / grandfathered shop). The
-        // relevance-only mode keeps the dashboard's own "turn it on" flow.
-        Route::middleware(['feature:inventory,relevant'])->group(function () {
-            Route::get('/inventory', [PosInventoryController::class, 'dashboard'])->name('pos.inventory.dashboard');
-            Route::get('/inventory/stock', [PosInventoryController::class, 'stock'])->name('pos.inventory.stock');
-            Route::get('/inventory/movements', [PosInventoryController::class, 'movements'])->name('pos.inventory.movements');
-            Route::get('/inventory/low-stock', [PosInventoryController::class, 'lowStockAlerts'])->name('pos.inventory.low-stock');
-            Route::match(['get', 'post'], '/inventory/adjust', [PosInventoryController::class, 'adjustStock'])->name('pos.inventory.adjust');
-            // Branch-to-branch stock transfer (Task 1354) â€” owner/manager only.
-            Route::get('/inventory/transfer', [PosInventoryController::class, 'transfers'])->name('pos.inventory.transfers');
-            Route::post('/inventory/transfer', [PosInventoryController::class, 'storeTransfer'])->name('pos.inventory.transfer.store');
-            // In-transit transfers (Task 1434): the receiving branch confirms
-            // arrival, or either end cancels while the maal is still on the road.
-            Route::post('/inventory/transfer/{movement}/receive', [PosInventoryController::class, 'receiveTransfer'])->name('pos.inventory.transfer.receive');
-            Route::post('/inventory/transfer/{movement}/cancel', [PosInventoryController::class, 'cancelTransfer'])->name('pos.inventory.transfer.cancel');
-            Route::post('/inventory/min-stock', [PosInventoryController::class, 'updateMinStock'])->name('pos.inventory.min-stock');
-            Route::post('/inventory/toggle', [PosInventoryController::class, 'toggleInventory'])->name('pos.inventory.toggle');
-            // Physical Stock Check â€” expected vs physically counted, and the gap.
-            // Reads are open to anyone who can see inventory; every WRITE is
-            // owner/manager only (enforced inside the controller, not here, so a
-            // cashier hitting the URL directly gets the same 403).
-            Route::get('/inventory/stock-check', [PosStockCheckController::class, 'index'])->name('pos.inventory.stock-check.index');
-            Route::get('/inventory/stock-check/create', [PosStockCheckController::class, 'create'])->name('pos.inventory.stock-check.create');
-            Route::post('/inventory/stock-check', [PosStockCheckController::class, 'store'])->name('pos.inventory.stock-check.store');
-            Route::get('/inventory/stock-check/{id}', [PosStockCheckController::class, 'show'])->whereNumber('id')->name('pos.inventory.stock-check.show');
-            Route::post('/inventory/stock-check/{id}/counts', [PosStockCheckController::class, 'saveCounts'])->whereNumber('id')->name('pos.inventory.stock-check.counts');
-            Route::get('/inventory/stock-check/{id}/sheet', [PosStockCheckController::class, 'downloadSheet'])->whereNumber('id')->name('pos.inventory.stock-check.sheet');
-            Route::post('/inventory/stock-check/{id}/import', [PosStockCheckController::class, 'importSheet'])->whereNumber('id')->name('pos.inventory.stock-check.import');
-            Route::post('/inventory/stock-check/{id}/post', [PosStockCheckController::class, 'post'])->whereNumber('id')->name('pos.inventory.stock-check.post');
-            Route::post('/inventory/stock-check/{id}/cancel', [PosStockCheckController::class, 'cancel'])->whereNumber('id')->name('pos.inventory.stock-check.cancel');
-            Route::get('/inventory/stock-check/{id}/pdf', [PosStockCheckController::class, 'pdf'])->whereNumber('id')->name('pos.inventory.stock-check.pdf');
-            // NestPOS Stock-In Excel Phase 2a â€” single-shop receiving. Persistent
-            // staging. Not Master Excel. Cashiers cannot POST (controller).
-            Route::get('/inventory/stock-in', [PosStockInController::class, 'index'])->name('pos.inventory.stock-in.index');
-            Route::get('/inventory/stock-in/template', [PosStockInController::class, 'template'])->name('pos.inventory.stock-in.template');
-            Route::post('/inventory/stock-in', [PosStockInController::class, 'store'])->name('pos.inventory.stock-in.store');
-            Route::get('/inventory/stock-in/{id}', [PosStockInController::class, 'show'])->whereNumber('id')->name('pos.inventory.stock-in.show');
-            Route::post('/inventory/stock-in/{id}/rematch', [PosStockInController::class, 'rematch'])->whereNumber('id')->name('pos.inventory.stock-in.rematch');
-            Route::post('/inventory/stock-in/{id}/lines/{line}/map', [PosStockInController::class, 'mapLine'])->whereNumber('id')->whereNumber('line')->name('pos.inventory.stock-in.map');
-            Route::post('/inventory/stock-in/{id}/post', [PosStockInController::class, 'post'])->whereNumber('id')->name('pos.inventory.stock-in.post');
-            Route::post('/inventory/stock-in/{id}/cancel', [PosStockInController::class, 'cancel'])->whereNumber('id')->name('pos.inventory.stock-in.cancel');
-        });
-        Route::get('/team', [PosController::class, 'posTeam'])->name('pos.team');
-        Route::get('/team/online-payment-policy', [\App\Http\Controllers\PosOnlinePaymentPolicyController::class, 'index'])->name('pos.team.online-payment-policy');
-        Route::put('/team/online-payment-policy/{id}', [\App\Http\Controllers\PosOnlinePaymentPolicyController::class, 'update'])->whereNumber('id')->name('pos.team.online-payment-policy.update');
-        Route::post('/team/cashier', [PosController::class, 'storeCashier'])->name('pos.team.store-cashier');
-        Route::put('/team/cashier/{id}', [PosController::class, 'updateCashier'])->name('pos.team.update-cashier');
-        Route::post('/team/cashier/{id}/toggle', [PosController::class, 'toggleCashier'])->name('pos.team.toggle-cashier');
-        Route::post('/team/cashier/{id}/pra', [PosController::class, 'setCashierPra'])->name('pos.team.set-pra');
-        Route::post('/team/scope-permission', [PosController::class, 'setBillingScopePermission'])->name('pos.team.scope-permission');
-        // Task 1197: owner-only "Cashier sirf apni sale dekhe" switch (default ON).
-        Route::post('/team/own-sales', [PosController::class, 'setCashierOwnSales'])->name('pos.team.own-sales');
-        // Custom Access (Task #111): per-member feature tick-boxes.
-        Route::post('/team/cashier/{id}/access', [PosController::class, 'setCashierAccess'])->name('pos.team.set-access');
-
-        Route::post('/restaurant/kitchen-settings/notes/enable', [RestaurantPosController::class, 'enableKitchenNotes'])
-            ->middleware('feature:kot')->name('pos.restaurant.kitchen-notes.enable');
-        Route::prefix('restaurant')->middleware('feature:kitchen')->group(function () {
-            Route::get('/kitchen-settings', [RestaurantPosController::class, 'kitchenSettings'])->name('pos.restaurant.kitchen-settings');
-            Route::post('/kitchen-settings', [RestaurantPosController::class, 'updateKitchenSettings'])->name('pos.restaurant.kitchen-settings.update');
-            // Counter/Station KOT routing (owner, Jul 2026) â€” admin-only CRUD (guarded in controller).
-            Route::post('/stations', [RestaurantPosController::class, 'storeStation'])->name('pos.restaurant.stations.store');
-            Route::post('/stations/{id}', [RestaurantPosController::class, 'updateStation'])->name('pos.restaurant.stations.update');
-            Route::post('/stations/{id}/delete', [RestaurantPosController::class, 'deleteStation'])->name('pos.restaurant.stations.delete');
-        });
-        Route::prefix('restaurant')->middleware('feature:tables')->group(function () {
-            Route::get('/table-management', [RestaurantTableController::class, 'manage'])->name('pos.restaurant.table-management');
-            // Task 779: Tables-first flow toggle (admin-only â€” denyCashier in controller).
-            Route::post('/tables-first-flow', [RestaurantTableController::class, 'updateTablesFirstFlow'])->name('pos.restaurant.tables-first-flow');
-            Route::post('/table-direct-open', [RestaurantTableController::class, 'updateTableClickDirectOpen'])->name('pos.restaurant.table-direct-open');
-            Route::post('/floors', [RestaurantTableController::class, 'storeFloor'])->name('pos.restaurant.floors.store');
-            Route::put('/floors/{id}', [RestaurantTableController::class, 'updateFloor'])->name('pos.restaurant.floors.update');
-            Route::delete('/floors/{id}', [RestaurantTableController::class, 'deleteFloor'])->name('pos.restaurant.floors.delete');
-            Route::post('/tables', [RestaurantTableController::class, 'storeTable'])->name('pos.restaurant.tables.store');
-            Route::put('/tables/{id}', [RestaurantTableController::class, 'updateTable'])->name('pos.restaurant.tables.update');
-            Route::delete('/tables/{id}', [RestaurantTableController::class, 'deleteTable'])->name('pos.restaurant.tables.delete');
-        });
-        Route::prefix('restaurant')->middleware('feature:recipes')->group(function () {
-            Route::get('/ingredients', [IngredientController::class, 'index'])->name('pos.restaurant.ingredients');
-            Route::get('/kitchen-report', [IngredientController::class, 'kitchenReport'])->name('pos.restaurant.kitchen-report');
-            Route::post('/ingredients', [IngredientController::class, 'store'])->name('pos.restaurant.ingredients.store');
-            Route::put('/ingredients/{id}', [IngredientController::class, 'update'])->name('pos.restaurant.ingredients.update');
-            Route::post('/ingredients/{id}/adjust', [IngredientController::class, 'adjustStock'])->name('pos.restaurant.ingredients.adjust');
-            Route::delete('/ingredients/{id}', [IngredientController::class, 'destroy'])->name('pos.restaurant.ingredients.delete');
-            Route::get('/recipes', [IngredientController::class, 'recipes'])->name('pos.restaurant.recipes');
-            Route::post('/recipes', [IngredientController::class, 'storeRecipe'])->name('pos.restaurant.recipes.store');
-            // Task 1162: Excel bulk upload (template + import) â€” same feature gate.
-            Route::get('/recipes/template', [IngredientController::class, 'downloadRecipeTemplate'])->name('pos.restaurant.recipes.template');
-            Route::post('/recipes/import', [IngredientController::class, 'importRecipes'])->name('pos.restaurant.recipes.import');
-            Route::put('/recipes/{id}', [IngredientController::class, 'updateRecipe'])->name('pos.restaurant.recipes.update');
-            Route::delete('/recipes/{id}', [IngredientController::class, 'deleteRecipe'])->name('pos.restaurant.recipes.delete');
-        });
-    });
-
-    // ðŸ”§ Customer search/lookup/store â€” accessible from BOTH PRA POS (universal)
-    // and Restaurant POS. Previously these were trapped inside restaurant.only,
-    // which broke customer name/phone search on retail/general companies.
-    Route::get('/restaurant/api/customer-search', [RestaurantPosController::class, 'customerSearch'])->name('pos.restaurant.customer-search');
-    // Unclosed-prior-day popup (sale screen + dashboard ask on load).
-    Route::get('/api/day-close-pending', [PosController::class, 'dayClosePendingState'])->name('pos.api.day-close-pending');
-    Route::get('/restaurant/api/customer-lookup', [RestaurantPosController::class, 'customerLookup'])->name('pos.restaurant.customer-lookup');
-    Route::post('/restaurant/api/customer-store', [RestaurantPosController::class, 'customerStore'])->name('pos.restaurant.customer-store');
-
-    // ðŸ”§ Hold / Pay-held / Delete-held â€” accessible from BOTH plain-retail (universal)
-    // and restaurant companies. Previously trapped inside restaurant.only, which
-    // 403'd Hold on retail/general companies even though the universal screen shows
-    // the Hold button and holdOrder() itself enforces the dine-in flow rules for
-    // restaurant companies (defence-in-depth). Same fix pattern as customer-search above.
-    Route::post('/restaurant/orders/hold', [RestaurantPosController::class, 'holdOrder'])->name('pos.restaurant.orders.hold');
-    Route::post('/restaurant/orders/{id}/pay', [RestaurantPosController::class, 'payOrder'])->name('pos.restaurant.orders.pay');
-    Route::post('/restaurant/orders/{id}/edit', [\App\Http\Controllers\RestaurantWaiterController::class, 'updateIncomingOrder'])->name('pos.restaurant.orders.edit');
-    Route::get('/restaurant/orders/{id}/payment-quote', [RestaurantPosController::class, 'paymentQuote'])->name('pos.restaurant.orders.payment-quote');
-    Route::post('/restaurant/orders/{id}/delete', [RestaurantPosController::class, 'deleteOrder'])->name('pos.restaurant.orders.delete');
-
-    // â”€â”€ "Bill rokein" for RETAIL (owner, 23 Aug 2026) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    // Plain retail shops (no tables / KOT / kitchen / delivery) park a JSON cart
-    // here instead of creating a restaurant order they could never recall.
-    // Deliberately OUTSIDE PosAdminOnly â€” the cashier is the one who parks bills.
-    Route::post('/api/held-sales', [\App\Http\Controllers\PosHeldSaleController::class, 'store'])->name('pos.held-sales.store');
-    Route::get('/api/held-sales', [\App\Http\Controllers\PosHeldSaleController::class, 'index'])->name('pos.held-sales.index');
-    Route::post('/api/held-sales/{id}/recall', [\App\Http\Controllers\PosHeldSaleController::class, 'recall'])->name('pos.held-sales.recall');
-    Route::delete('/api/held-sales/{id}', [\App\Http\Controllers\PosHeldSaleController::class, 'destroy'])->name('pos.held-sales.destroy');
-
-    Route::get('/delivery-accounts', [\App\Http\Controllers\PosDeliveryAccountController::class, 'index'])->name('pos.delivery-accounts.index');
-    Route::post('/delivery-accounts/{accountId}/collect', [\App\Http\Controllers\PosDeliveryAccountController::class, 'collect'])->name('pos.delivery-accounts.collect');
-
-    Route::middleware('restaurant.only')->group(function () {
-    Route::get('/restaurant/pos', [RestaurantPosController::class, 'pos'])->name('pos.restaurant.pos');
-    Route::post('/restaurant/orders/{id}/shift-table', [RestaurantPosController::class, 'shiftTable'])->name('pos.restaurant.orders.shift-table');
-    Route::get('/restaurant/orders/by-table/{tableId}', [RestaurantPosController::class, 'getOrdersByTable'])->name('pos.restaurant.orders.by-table');
-    // Cancelled Orders report (ZFC, 2 Aug 2026) â€” admin/manager only (in-method gate)
-    Route::get('/restaurant/cancelled-orders', [RestaurantPosController::class, 'cancelledOrders'])->name('pos.restaurant.cancelled-orders');
-    Route::get('/restaurant/cancelled-orders/csv', [RestaurantPosController::class, 'cancelledOrdersCsv'])->name('pos.restaurant.cancelled-orders.csv');
-    Route::get('/restaurant/cancelled-orders/pdf', [RestaurantPosController::class, 'cancelledOrdersPdf'])->name('pos.restaurant.cancelled-orders.pdf');
-    Route::get('/restaurant/tables', [RestaurantTableController::class, 'index'])->name('pos.restaurant.tables');
-    Route::post('/restaurant/tables/{id}/lock', [RestaurantTableController::class, 'lockTable'])->name('pos.restaurant.tables.lock');
-    Route::post('/restaurant/tables/{id}/unlock', [RestaurantTableController::class, 'unlockTable'])->name('pos.restaurant.tables.unlock');
-    Route::post('/restaurant/tables/{id}/reserve', [RestaurantTableController::class, 'reserveTable'])->name('pos.restaurant.tables.reserve');
-    Route::post('/restaurant/tables/{id}/release', [RestaurantTableController::class, 'releaseTable'])->name('pos.restaurant.tables.release');
-    Route::get('/restaurant/api/table-status', [RestaurantTableController::class, 'tableStatus'])->name('pos.restaurant.table-status');
-    // Task 899: cross-terminal held-orders sync feed (polled every 25 s by all open tabs).
-    Route::get('/restaurant/api/held-orders', [RestaurantPosController::class, 'listHeldOrders'])->name('pos.restaurant.api.held-orders');
-    Route::get('/restaurant/kds', [RestaurantKdsController::class, 'index'])->name('pos.restaurant.kds');
-    Route::post('/restaurant/kds/{id}/status', [RestaurantKdsController::class, 'updateStatus'])->name('pos.restaurant.kds.status');
-    Route::post('/restaurant/kds/{id}/kitchen-status', [RestaurantKdsController::class, 'kitchenStatus'])->name('pos.restaurant.kds.kitchen-status');
-    Route::post('/restaurant/kds/scan', [RestaurantKdsController::class, 'scanComplete'])->name('pos.restaurant.kds.scan');
-    Route::post('/restaurant/kds/clear-all', [RestaurantKdsController::class, 'clearAll'])->name('pos.restaurant.kds.clear-all');
-    // Task 855: server-side void ack â€” clears cancelled-dish badge on ALL KDS screens.
-    Route::post('/restaurant/orders/{id}/ack-void', [RestaurantKdsController::class, 'ackVoid'])->name('pos.restaurant.kds.ack-void');
-    Route::get('/restaurant/api/live-orders', [RestaurantKdsController::class, 'liveOrders'])->name('pos.restaurant.live-orders');
-    Route::get('/restaurant/orders/{id}/kitchen-ticket', [RestaurantPosController::class, 'kitchenTicket'])->name('pos.restaurant.kitchen-ticket');
-    // Task 794: VOID/CANCEL slip â€” dishes removed from a running order after their KOT fired.
-    Route::get('/restaurant/orders/{id}/void-ticket', [RestaurantPosController::class, 'voidTicket'])->name('pos.restaurant.void-ticket');
-    Route::get('/restaurant/orders/{id}/proof-bill', [RestaurantPosController::class, 'proofBill'])->name('pos.restaurant.proof-bill');
-    // Owner batch 26 Aug 2026: mark/unmark "payment online aa rahi hai" on a held
-    // order â€” proof bill wording + the pay-time confirm gate both read this stamp.
-    Route::post('/restaurant/orders/{id}/online-payment', [RestaurantPosController::class, 'markOnlinePayment'])->name('pos.restaurant.online-payment');
-    // Delivery KOT for order-less bills (rendered from the transaction itself).
-    Route::get('/transactions/{id}/kitchen-ticket', [RestaurantPosController::class, 'transactionKitchenTicket'])->name('pos.transaction.kitchen-ticket');
-
-    // â”€â”€ P7 (F6): Waiter Tablets â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    // Waiter composes an order (customer/table/items) and SENDs it to a cashier.
-    // pos_waiter role is confined to these routes by PosAuth.
-    Route::get('/waiter', [\App\Http\Controllers\RestaurantWaiterController::class, 'index'])->name('pos.waiter');
-    Route::get('/waiter/api/version', [\App\Http\Controllers\RestaurantWaiterController::class, 'version'])->name('pos.waiter.version');
-    // Per-waiter style pref (owner, 5 Aug 2026) â€” path stays under pos/waiter so the PosAuth waiter allowlist covers it.
-    Route::post('/waiter/style', [\App\Http\Controllers\RestaurantWaiterController::class, 'saveStyle'])->name('pos.waiter.style');
-    Route::get('/waiter/api/tables', [\App\Http\Controllers\RestaurantWaiterController::class, 'tables'])->name('pos.waiter.tables');
-    Route::get('/waiter/api/orders', [\App\Http\Controllers\RestaurantWaiterController::class, 'myOrders'])->name('pos.waiter.orders');
-    Route::post('/waiter/orders', [\App\Http\Controllers\RestaurantWaiterController::class, 'storeOrder'])->name('pos.waiter.orders.store');
-    Route::post('/waiter/orders/{id}/items', [\App\Http\Controllers\RestaurantWaiterController::class, 'appendItems'])->name('pos.waiter.orders.append');
-    Route::post('/waiter/orders/{id}/shift-table', [\App\Http\Controllers\RestaurantWaiterController::class, 'shiftTable'])->name('pos.waiter.orders.shift-table');
-    // Waiter self-cancel (Task 412): apna un-settled order tablet se cancel.
-    Route::post('/waiter/orders/{id}/cancel', [\App\Http\Controllers\RestaurantWaiterController::class, 'cancelOrder'])->name('pos.waiter.orders.cancel');
-    // Task 851: waiter-accessible void-ticket fallback (under pos/waiter so PosAuth
-    // waiter allowlist covers it without touching PosAuth logic). Mirrors the cashier
-    // pos.restaurant.void-ticket but company-scoped to the waiter's own session.
-    Route::get('/waiter/orders/{id}/void-ticket', [\App\Http\Controllers\RestaurantWaiterController::class, 'waiterVoidTicket'])->name('pos.waiter.orders.void-ticket');
-    // Cashier side â€” incoming waiter orders on the sale screen.
-    Route::get('/api/incoming-orders', [\App\Http\Controllers\RestaurantWaiterController::class, 'incomingOrders'])->name('pos.api.incoming-orders');
-    Route::post('/api/incoming-orders/{id}/complete', [\App\Http\Controllers\RestaurantWaiterController::class, 'completeIncoming'])->name('pos.api.incoming-orders.complete');
-    Route::post('/api/incoming-orders/{id}/claim', [\App\Http\Controllers\RestaurantWaiterController::class, 'claimIncoming'])->name('pos.api.incoming-orders.claim');
-    Route::post('/api/incoming-orders/{id}/transfer', [\App\Http\Controllers\RestaurantWaiterController::class, 'transferIncoming'])->name('pos.api.incoming-orders.transfer');
-    Route::post('/restaurant/orders/{id}/resend-kitchen', [RestaurantPosController::class, 'resendKitchen'])->name('pos.restaurant.orders.resend-kitchen');
-    Route::post('/api/toggle-auto-kot', [PosController::class, 'toggleAutoKot'])->name('pos.api.toggle-auto-kot');
-    Route::get('/restaurant/dashboard', [RestaurantPosController::class, 'dashboard'])->name('pos.restaurant.dashboard');
-    Route::get('/restaurant/top-selling', [RestaurantPosController::class, 'topSelling'])->name('pos.restaurant.top-selling');
-    Route::get('/restaurant/receipt/{id}', [RestaurantPosController::class, 'receipt'])->name('pos.restaurant.receipt');
-    Route::get('/restaurant/api/check-stock', [RestaurantPosController::class, 'checkStock'])->name('pos.restaurant.check-stock');
-    Route::post('/restaurant/api/refresh-product-image/{id}', [RestaurantPosController::class, 'refreshProductImage'])->name('pos.restaurant.refresh-image');
-    Route::post('/restaurant/api/verify-manager-pin', [RestaurantPosController::class, 'verifyManagerPin'])->name('pos.restaurant.verify-manager-pin');
-    Route::post('/restaurant/api/receipt-printed/{id}', [RestaurantPosController::class, 'markReceiptPrinted'])->name('pos.restaurant.receipt-printed');
-    Route::get('/restaurant/api/customer-history/{id}', [RestaurantPosController::class, 'customerHistory'])->name('pos.restaurant.customer-history');
-    Route::post('/restaurant/api/save-manager-pin', [RestaurantPosController::class, 'saveManagerPin'])->name('pos.restaurant.save-manager-pin');
-
-    // â”€â”€ Delivery Riders (Jul 2026) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    // Board + settlement open to cashiers too (the cashier receives rider cash);
-    // rider CRUD + login management is admin/manager only (PosAdminOnly below).
-    Route::get('/deliveries', [\App\Http\Controllers\PosRiderController::class, 'deliveries'])->name('pos.deliveries');
-    Route::match(['get', 'post'], '/deliveries/shop-cash', [\App\Http\Controllers\PosRiderController::class, 'shopCash'])->name('pos.deliveries.shop-cash');
-    Route::post('/deliveries/{id}/assign', [\App\Http\Controllers\PosRiderController::class, 'assign'])->name('pos.deliveries.assign');
-    Route::post('/deliveries/bulk-assign', [\App\Http\Controllers\PosRiderController::class, 'bulkAssign'])->name('pos.deliveries.bulk-assign');
-    Route::post('/deliveries/{id}/status', [\App\Http\Controllers\PosRiderController::class, 'updateStatus'])->name('pos.deliveries.status');
-    // Prepaid conversion (Task 285, Aug 2026) â€” admin/manager only; role-checked in controller.
-    Route::post('/deliveries/{id}/mark-prepaid', [\App\Http\Controllers\PosRiderController::class, 'markPrepaid'])->name('pos.deliveries.mark-prepaid');
-    // Prepaid revert / undo (Task 288, Aug 2026) â€” admin/manager only; role-checked in controller.
-    Route::post('/deliveries/{id}/unmark-prepaid', [\App\Http\Controllers\PosRiderController::class, 'unmarkPrepaid'])->name('pos.deliveries.unmark-prepaid');
-    Route::post('/deliveries/rider/{riderId}/bulk-status', [\App\Http\Controllers\PosRiderController::class, 'bulkStatus'])->name('pos.deliveries.bulk');
-    Route::post('/riders/{id}/settle', [\App\Http\Controllers\PosRiderController::class, 'settle'])->name('pos.riders.settle');
-    // Task 1105: customer delivery pin + public track link + ETA chip poll.
-    // Board roles (cashier included â€” same people who run the board); every
-    // endpoint is plan-gated in the controller (Unlimited tracking only).
-    Route::post('/deliveries/{id}/customer-location', [\App\Http\Controllers\PosRiderController::class, 'saveCustomerLocation'])->name('pos.deliveries.customer-location');
-    Route::post('/deliveries/{id}/track-link', [\App\Http\Controllers\PosRiderController::class, 'trackLink'])->name('pos.deliveries.track-link');
-    Route::get('/deliveries/eta/data', [\App\Http\Controllers\PosRiderController::class, 'etaData'])->name('pos.deliveries.eta');
-    Route::middleware([\App\Http\Middleware\PosAdminOnly::class])->group(function () {
-        Route::get('/riders', [\App\Http\Controllers\PosRiderController::class, 'index'])->name('pos.riders');
-        Route::post('/riders', [\App\Http\Controllers\PosRiderController::class, 'store'])->name('pos.riders.store');
-        Route::put('/riders/{id}', [\App\Http\Controllers\PosRiderController::class, 'update'])->name('pos.riders.update');
-        Route::post('/riders/{id}/login', [\App\Http\Controllers\PosRiderController::class, 'saveLogin'])->name('pos.riders.login');
-        // Rider LIVE Tracking (Aug 2026) â€” Unlimited exclusive; map + poll + trail
-        Route::get('/riders/tracking', [\App\Http\Controllers\PosRiderTrackingController::class, 'trackingPage'])->name('pos.riders.tracking');
-        Route::get('/riders/tracking/data', [\App\Http\Controllers\PosRiderTrackingController::class, 'trackingData'])->name('pos.riders.tracking.data');
-        // Private customer-place memory + confirmed arrival history. These
-        // routes deliberately stay under /pos/riders so custom-access mapping,
-        // PosAdminOnly and tracking plan gates all apply.
-        Route::get('/riders/tracking/places', [\App\Http\Controllers\PosCustomerPlaceController::class, 'index'])->name('pos.riders.tracking.places');
-        Route::get('/riders/tracking/places/data', [\App\Http\Controllers\PosCustomerPlaceController::class, 'data'])->name('pos.riders.tracking.places.data');
-        Route::post('/riders/tracking/places', [\App\Http\Controllers\PosCustomerPlaceController::class, 'store'])->name('pos.riders.tracking.places.store');
-        Route::patch('/riders/tracking/places/{place}', [\App\Http\Controllers\PosCustomerPlaceController::class, 'update'])->name('pos.riders.tracking.places.update');
-        Route::post('/riders/tracking/places/{place}/merge', [\App\Http\Controllers\PosCustomerPlaceController::class, 'merge'])->name('pos.riders.tracking.places.merge');
-        Route::delete('/riders/tracking/places/{place}', [\App\Http\Controllers\PosCustomerPlaceController::class, 'destroy'])->name('pos.riders.tracking.places.destroy');
-        Route::get('/riders/tracking/trail/{rider}', [\App\Http\Controllers\PosRiderTrackingController::class, 'trail'])->name('pos.riders.tracking.trail');
-        // Task #320 (ZFC): dukan ki location pin â€” map par shop marker + default center
-        Route::post('/riders/tracking/shop-location', [\App\Http\Controllers\PosRiderTrackingController::class, 'saveShopLocation'])->name('pos.riders.tracking.shop');
-        // Task #446 (ZFC): Google Maps short-link â†’ lat/lng (server follows redirects)
-        Route::post('/riders/tracking/resolve-link', [\App\Http\Controllers\PosRiderTrackingController::class, 'resolveShopLink'])->name('pos.riders.tracking.resolve');
-        // Task #1115: per-company idle/silent/auto-off threshold overrides
-        Route::post('/riders/tracking/settings', [\App\Http\Controllers\PosRiderTrackingController::class, 'saveRiderTrackingSettings'])->name('pos.riders.tracking.settings');
-        // Task #1103: Rider performance report & ranking (same Unlimited gates as tracking)
-        Route::get('/riders/report', [\App\Http\Controllers\PosRiderTrackingController::class, 'reportPage'])->name('pos.riders.report');
-    });
-    // Rider portal â€” pos_rider role is confined to these routes by PosAuth
-    // (exact 'pos/rider' + 'pos/rider/' prefix; /pos/riders stays admin-only).
-    Route::get('/rider', [\App\Http\Controllers\PosRiderController::class, 'portal'])->name('pos.rider.portal');
-    Route::get('/rider/deliveries/{id}/preview', [\App\Http\Controllers\RiderBillPreviewController::class, 'web'])->name('pos.rider.preview');
-    Route::post('/rider/deliveries/{id}/delivered', [\App\Http\Controllers\PosRiderController::class, 'portalMarkDelivered'])->name('pos.rider.delivered');
-    });
-});
-
-use App\Http\Controllers\SaasAdmin\AdminAuthController;
-use App\Http\Controllers\SaasAdmin\AdminDashboardController;
-use App\Http\Controllers\SaasAdmin\AdminCompanyController;
-use App\Http\Controllers\SaasAdmin\AdminGroupController;
-use App\Http\Controllers\SaasAdmin\AdminPlanController;
-use App\Http\Controllers\SaasAdmin\AdminSaleController;
-use App\Http\Controllers\SaasAdmin\AdminSubscriptionController;
-use App\Http\Controllers\SaasAdmin\AdminFranchiseController;
-use App\Http\Controllers\SaasAdmin\AdminUsageController;
-use App\Http\Controllers\SaasAdmin\AdminSystemController;
-use App\Http\Controllers\SaasAdmin\AdminSettingsController;
-use App\Http\Controllers\SaasAdmin\AdminAuditController;
-use App\Http\Controllers\SaasAdmin\AdminPaymentProofController;
-use App\Http\Controllers\Franchise\FranchiseAuthController;
-use App\Http\Controllers\Franchise\FranchiseDashboardController;
-
-Route::get('/admin/login', [AdminAuthController::class, 'showLogin'])->name('admin.login');
-Route::post('/admin/login', [AdminAuthController::class, 'login']);
-Route::post('/admin/logout', [AdminAuthController::class, 'logout'])->name('admin.logout');
-
-Route::prefix('admin')->middleware(['admin.auth'])->group(function () {
-    Route::get('/companies/{companyId}/pilot-fiscal-control', [\App\Http\Controllers\SaasAdmin\PilotFiscalControlController::class, 'show'])->whereNumber('companyId')->name('saas.admin.pilot-fiscal-control');
-    Route::post('/companies/{companyId}/pilot-fiscal-control', [\App\Http\Controllers\SaasAdmin\PilotFiscalControlController::class, 'update'])->whereNumber('companyId')->name('saas.admin.pilot-fiscal-control.update');
-    Route::get('/platform-expenses', [\App\Http\Controllers\SaasAdmin\PlatformExpenseController::class, 'index'])->name('saas.admin.platform-expenses');
-    Route::post('/platform-expenses', [\App\Http\Controllers\SaasAdmin\PlatformExpenseController::class, 'store'])->name('saas.admin.platform-expenses.store');
-    Route::post('/platform-expenses/{id}/reverse', [\App\Http\Controllers\SaasAdmin\PlatformExpenseController::class, 'reverse'])->whereNumber('id')->name('saas.admin.platform-expenses.reverse');
-    Route::get('/companies/{companyId}/device-proofs', [\App\Http\Controllers\SaasAdmin\ReviewedDeviceProofController::class, 'index'])->whereNumber('companyId')->name('saas.admin.device-proofs.index');
-    Route::post('/companies/{companyId}/device-proofs', [\App\Http\Controllers\SaasAdmin\ReviewedDeviceProofController::class, 'store'])->whereNumber('companyId')->name('saas.admin.device-proofs.store');
-    Route::post('/companies/{companyId}/device-proofs/{id}/revoke', [\App\Http\Controllers\SaasAdmin\ReviewedDeviceProofController::class, 'revoke'])->whereNumber(['companyId','id'])->name('saas.admin.device-proofs.revoke');
-
-    Route::get('/companies/{companyId}/local-bill-records', [\App\Http\Controllers\SaasAdmin\AdminLocalBillRecordController::class, 'index'])->whereNumber('companyId')->name('saas.admin.local-bill-records');
-    Route::put('/companies/{companyId}/local-bill-records', [\App\Http\Controllers\SaasAdmin\AdminLocalBillRecordController::class, 'update'])->whereNumber('companyId')->name('saas.admin.local-bill-records.update');
-    Route::get('/companies/{companyId}/local-bill-records/{id}/download', [\App\Http\Controllers\SaasAdmin\AdminLocalBillRecordController::class, 'download'])->whereNumber(['companyId', 'id'])->middleware('throttle:20,1')->name('saas.admin.local-bill-records.download');
-    Route::delete('/companies/{companyId}/local-bill-records/{id}', [\App\Http\Controllers\SaasAdmin\AdminLocalBillRecordController::class, 'destroy'])->whereNumber(['companyId', 'id'])->name('saas.admin.local-bill-records.destroy');
-
-    Route::get('/companies/{companyId}/local-support-copies', [\App\Http\Controllers\OptionalLocalBillArchiveController::class, 'adminIndex'])->whereNumber('companyId')->name('saas.admin.local-support-copies');
-    Route::get('/companies/{companyId}/local-support-copies/{id}/download', [\App\Http\Controllers\OptionalLocalBillArchiveController::class, 'adminDownload'])->whereNumber(['companyId', 'id'])->middleware('throttle:20,1')->name('saas.admin.local-support-copies.download');
-
-    Route::get('/dashboard', [AdminDashboardController::class, 'index'])->name('saas.admin.dashboard');
-    Route::get('/dashboard/invoices/{product}/{company}/{record}/{action}', [\App\Http\Controllers\SaasAdmin\AdminInvoicePreviewController::class, 'show'])->whereIn('product', ['di', 'pos', 'fbrpos'])->whereNumber(['company', 'record'])->whereIn('action', ['preview', 'download'])->name('saas.admin.invoice.document');
-    Route::get('/companies/{company}/billing/invoices/{invoice}', [\App\Http\Controllers\SubscriptionDocumentController::class, 'adminInvoice'])->whereNumber(['company', 'invoice'])->name('saas.admin.billing.documents.invoice');
-    Route::get('/companies/{company}/billing/receipts/{payment}', [\App\Http\Controllers\SubscriptionDocumentController::class, 'adminReceipt'])->whereNumber(['company', 'payment'])->name('saas.admin.billing.documents.receipt');
-    Route::post('/companies/{company}/billing/adjustments', [\App\Http\Controllers\SaasAdmin\AdminSubscriptionAdjustmentController::class, 'store'])
-        ->whereNumber('company')->name('saas.admin.billing.adjustments.store');
-    Route::get('/dashboard/details/{metric}', [\App\Http\Controllers\SaasAdmin\AdminDashboardDetailController::class, 'show'])->name('saas.admin.dashboard.detail');
-    Route::get('/live-activity', [\App\Http\Controllers\SaasAdmin\AdminLiveActivityController::class, 'index'])->name('saas.admin.live-activity');
-
-    // Live Ops console (NestPOS PRA diagnostics + owner-approved remediation)
-    Route::get('/live-ops', [\App\Http\Controllers\SaasAdmin\AdminLiveOpsController::class, 'index'])->name('saas.admin.live-ops');
-    Route::post('/live-ops/diagnose', [\App\Http\Controllers\SaasAdmin\AdminLiveOpsController::class, 'diagnose'])->name('saas.admin.live-ops.diagnose');
-    Route::get('/live-ops/company/{id}', [\App\Http\Controllers\SaasAdmin\AdminLiveOpsController::class, 'showCompany'])->name('saas.admin.live-ops.company');
-    Route::get('/live-ops/fbr-reconciliation/{id}', [\App\Http\Controllers\SaasAdmin\AdminLiveOpsController::class, 'fbrReconciliation'])
-        ->whereNumber('id')->name('saas.admin.live-ops.fbr-reconciliation');
-    Route::post('/live-ops/propose', [\App\Http\Controllers\SaasAdmin\AdminLiveOpsController::class, 'propose'])->name('saas.admin.live-ops.propose');
-    Route::get('/live-ops/remediation/{actionId}', [\App\Http\Controllers\SaasAdmin\AdminLiveOpsController::class, 'showRemediation'])->name('saas.admin.live-ops.remediation');
-    Route::post('/live-ops/remediation/{actionId}/approve', [\App\Http\Controllers\SaasAdmin\AdminLiveOpsController::class, 'approve'])->name('saas.admin.live-ops.approve');
-    Route::post('/live-ops/remediation/{actionId}/reject', [\App\Http\Controllers\SaasAdmin\AdminLiveOpsController::class, 'reject'])->name('saas.admin.live-ops.reject');
-    Route::post('/live-ops/remediation/{actionId}/execute', [\App\Http\Controllers\SaasAdmin\AdminLiveOpsController::class, 'execute'])->name('saas.admin.live-ops.execute');
-
-    // ðŸŽ¯ Analytics + Reporting + Smart Pricing (Phases 1-4)
-    Route::get('/analytics/dashboard', [\App\Http\Controllers\Admin\AnalyticsController::class, 'dashboard'])->name('admin.analytics.dashboard');
-    Route::get('/analytics/advanced', [\App\Http\Controllers\Admin\AnalyticsController::class, 'advanced'])->name('admin.analytics.advanced');
-    Route::get('/reports/daily', [\App\Http\Controllers\Admin\ReportsController::class, 'dailyReport'])->name('admin.reports.daily');
-    Route::get('/reports/products', [\App\Http\Controllers\Admin\ReportsController::class, 'productReport'])->name('admin.reports.products');
-    Route::get('/reports/fbr', [\App\Http\Controllers\Admin\ReportsController::class, 'fbrComplianceReport'])->name('admin.reports.fbr');
-    Route::get('/pricing/suggestions', [\App\Http\Controllers\Admin\PricingController::class, 'index'])->name('admin.pricing.suggestions');
-    Route::post('/pricing/apply/{product}', [\App\Http\Controllers\Admin\PricingController::class, 'applySuggestion'])->name('admin.pricing.apply');
-
-    Route::get('/old-dashboard', [AdminController::class, 'dashboard'])->name('admin.dashboard');
-    Route::get('/di-companies', [AdminController::class, 'companies']);
-    Route::get('/di-companies/create', [AdminController::class, 'createCompany']);
-    Route::post('/di-companies/store', [AdminController::class, 'storeCompany']);
-    Route::get('/all-users', [AdminController::class, 'users']);
-    Route::post('/all-users', [AdminController::class, 'storeUser']);
-    Route::get('/fbr-logs', [AdminController::class, 'fbrLogs']);
-    Route::get('/fbr-doctor/{company}', [AdminController::class, 'fbrDoctor'])->name('admin.fbr.doctor');
-    Route::get('/fbr/failed-invoices', [AdminController::class, 'failedFbrInvoices'])->name('admin.fbr.failed-invoices');
-    Route::post('/fbr/retry/{invoice}', [AdminController::class, 'retryFbrInvoice'])->name('admin.fbr.retry');
-    Route::get('/fbr-pos-logs', [AdminController::class, 'fbrPosLogs'])->name('admin.fbrPosLogs');
-    Route::get('/system-health', [AdminController::class, 'systemHealth']);
-    Route::get('/security-logs', [AdminController::class, 'securityLogs']);
-    Route::get('/audit/export', [AdminController::class, 'auditExport'])->name('admin.audit.export');
-    Route::get('/old-audit-logs', [AdminController::class, 'auditLogs'])->name('admin.audit-logs');
-    Route::get('/anomalies', [AdminController::class, 'anomalies'])->name('admin.anomalies');
-    Route::get('/override-logs', [AdminController::class, 'overrideLogs']);
-    Route::get('/company/{company}', [AdminController::class, 'companyShow']);
-    Route::post('/company/{company}/suspend', [AdminController::class, 'suspendCompany']);
-    Route::post('/company/{company}/approve', [AdminController::class, 'approveCompany']);
-    Route::post('/company/{company}/reject', [AdminController::class, 'rejectCompany']);
-    Route::post('/company/{company}/toggle-watermark', [AdminController::class, 'toggleWatermark']);
-    Route::get('/di-companies/pending', [AdminController::class, 'pendingCompanies']);
-    Route::post('/company/{company}/change-plan', [AdminController::class, 'changePlan']);
-    Route::post('/company/{company}/toggle-internal', [AdminController::class, 'toggleInternalAccount']);
-    Route::post('/company/{company}/toggle-inventory', [AdminController::class, 'toggleInventory']);
-    Route::post('/company/{company}/toggle-fbr-pos', [AdminController::class, 'toggleFbrPos']);
-    Route::get('/company/{company}/pos-features', [AdminController::class, 'posFeatures'])->name('admin.company.pos-features');
-    Route::put('/company/{company}/pos-features', [AdminController::class, 'updatePosFeatures'])->name('admin.company.pos-features.update');
-    Route::post('/company/{company}/pos-features/extras', [AdminController::class, 'grantPosFeatureExtra'])->name('admin.company.pos-features.extras.grant');
-    Route::post('/company/{company}/pos-features/extras/{module}/revoke', [AdminController::class, 'revokePosFeatureExtra'])->name('admin.company.pos-features.extras.revoke');
-    Route::post('/company/{company}/update-limits', [AdminController::class, 'updateCompanyLimits']);
-    Route::post('/company/{company}/reset-limits', [AdminController::class, 'resetCompanyLimits']);
-
-    Route::get('/risk-settings', [AdminController::class, 'riskSettings']);
-    Route::post('/risk-settings', [AdminController::class, 'updateRiskSettings']);
-    Route::get('/announcements', [AnnouncementController::class, 'index'])->name('admin.announcements');
-    Route::post('/announcements/audience-preview', [AnnouncementController::class, 'audiencePreview'])->name('admin.announcements.audience-preview');
-    Route::post('/announcements', [AnnouncementController::class, 'store'])->name('admin.announcements.store');
-    Route::post('/announcements/{id}/toggle', [AnnouncementController::class, 'toggle'])->name('admin.announcements.toggle');
-    Route::delete('/announcements/{id}/delete', [AnnouncementController::class, 'destroy'])->name('admin.announcements.destroy');
-
-    // POS "What's New" app updates (popup + bell) â€” owner request 20 Jul 2026
-    Route::get('/app-updates', [\App\Http\Controllers\AppUpdateController::class, 'index'])->name('admin.app-updates');
-    Route::post('/app-updates/audience-preview', [\App\Http\Controllers\AppUpdateController::class, 'audiencePreview'])->name('admin.app-updates.audience-preview');
-    Route::post('/app-updates', [\App\Http\Controllers\AppUpdateController::class, 'store'])->name('admin.app-updates.store');
-    Route::post('/app-updates/feature-toggle', [\App\Http\Controllers\AppUpdateController::class, 'toggleFeature'])->name('admin.app-updates.feature-toggle');
-    Route::post('/app-updates/{id}/update', [\App\Http\Controllers\AppUpdateController::class, 'update'])->name('admin.app-updates.update');
-    Route::post('/app-updates/{id}/toggle', [\App\Http\Controllers\AppUpdateController::class, 'toggle'])->name('admin.app-updates.toggle');
-    Route::post('/app-updates/{id}/reannounce', [\App\Http\Controllers\AppUpdateController::class, 'reannounce'])->name('admin.app-updates.reannounce');
-    Route::delete('/app-updates/{id}/delete', [\App\Http\Controllers\AppUpdateController::class, 'destroy'])->name('admin.app-updates.destroy');
-
-    // Tutorial videos visibility control (owner request 3 Aug 2026)
-    Route::get('/tutorial-videos', [\App\Http\Controllers\TutorialVideoAdminController::class, 'index'])->name('admin.tutorial-videos');
-    Route::post('/tutorial-videos/{id}/toggle-published', [\App\Http\Controllers\TutorialVideoAdminController::class, 'togglePublished'])->name('admin.tutorial-videos.toggle-published');
-    Route::post('/tutorial-videos/{id}/toggle-public', [\App\Http\Controllers\TutorialVideoAdminController::class, 'togglePublic'])->name('admin.tutorial-videos.toggle-public');
-    Route::post('/tutorial-videos/{id}/gate', [\App\Http\Controllers\TutorialVideoAdminController::class, 'setGate'])->name('admin.tutorial-videos.gate');
-    Route::post('/tutorial-videos/{id}/metadata', [\App\Http\Controllers\TutorialVideoAdminController::class, 'metadata'])->name('admin.tutorial-videos.metadata');
-    Route::post('/tutorial-videos/{id}/role', [\App\Http\Controllers\TutorialVideoAdminController::class, 'setRole'])->name('admin.tutorial-videos.role');
-
-    // POS Feature Suggestions review (owner request 20 Jul 2026)
-    Route::get('/feature-suggestions', [\App\Http\Controllers\FeatureSuggestionController::class, 'adminIndex'])->name('admin.feature-suggestions');
-    Route::post('/feature-suggestions/{id}/status', [\App\Http\Controllers\FeatureSuggestionController::class, 'setStatus'])->name('admin.feature-suggestions.status');
-    Route::delete('/feature-suggestions/{id}/delete', [\App\Http\Controllers\FeatureSuggestionController::class, 'destroy'])->name('admin.feature-suggestions.destroy');
-
-    // POS Surveys (Task 1022 â€” Caller ID elaan / advice collection)
-    Route::get('/surveys', [\App\Http\Controllers\PosSurveyController::class, 'adminIndex'])->name('admin.surveys');
-    Route::post('/surveys/feature-toggle', [\App\Http\Controllers\PosSurveyController::class, 'toggleFeature'])->name('admin.surveys.feature-toggle');
-    Route::post('/surveys', [\App\Http\Controllers\PosSurveyController::class, 'adminStore'])->name('admin.surveys.store');
-    Route::get('/surveys/{id}/export', [\App\Http\Controllers\PosSurveyController::class, 'adminExport'])->name('admin.surveys.export');
-    Route::get('/surveys/{id}', [\App\Http\Controllers\PosSurveyController::class, 'adminShow'])->name('admin.surveys.show');
-    Route::post('/surveys/{id}/toggle-close', [\App\Http\Controllers\PosSurveyController::class, 'toggleClose'])->name('admin.surveys.toggle-close');
-    Route::post('/surveys/{id}/update', [\App\Http\Controllers\PosSurveyController::class, 'adminUpdate'])->name('admin.surveys.update');
-    Route::delete('/surveys/{id}', [\App\Http\Controllers\PosSurveyController::class, 'adminDestroy'])->name('admin.surveys.destroy');
-
-    // Madadgar AI bot â€” chat logs + settings (owner request 22 Jul 2026)
-    Route::get('/companies/{companyId}/ai-usage', [\App\Http\Controllers\MadadgarUsageController::class, 'show'])->name('admin.company-ai-usage');
-    Route::post('/companies/{companyId}/ai-usage', [\App\Http\Controllers\MadadgarUsageController::class, 'configure'])->name('admin.company-ai-budget');
-    Route::get('/madadgar-chats', [\App\Http\Controllers\MadadgarController::class, 'adminChats'])->name('admin.madadgar-chats');
-    Route::post('/madadgar-settings', [\App\Http\Controllers\MadadgarController::class, 'adminSettings'])->name('admin.madadgar-settings');
-
-    Route::get('/invoice-override', [AdminController::class, 'invoiceSearch'])->name('admin.invoice-override');
-    Route::post('/invoice-override/{id}', [AdminController::class, 'invoiceOverride'])->name('admin.invoice-override.action');
-
-    Route::get('/hs-master-export', [HsMasterExportController::class, 'index'])->name('admin.hs-master-export');
-
-    // HS-Rate Links (manual mappings + auto-learned from invoicing)
-    Route::get('/hs-rate-links', [\App\Http\Controllers\Admin\HsRateLinksController::class, 'index'])->name('admin.hs-rate-links');
-    Route::post('/hs-rate-links', [\App\Http\Controllers\Admin\HsRateLinksController::class, 'store'])->name('admin.hs-rate-links.store');
-    Route::put('/hs-rate-links/{id}', [\App\Http\Controllers\Admin\HsRateLinksController::class, 'update'])->name('admin.hs-rate-links.update');
-    Route::delete('/hs-rate-links/{id}', [\App\Http\Controllers\Admin\HsRateLinksController::class, 'destroy'])->name('admin.hs-rate-links.destroy');
-    Route::post('/hs-rate-links/{id}/toggle', [\App\Http\Controllers\Admin\HsRateLinksController::class, 'toggle'])->name('admin.hs-rate-links.toggle');
-    Route::get('/hs-rate-links-export', [\App\Http\Controllers\Admin\HsRateLinksController::class, 'exportCsv'])->name('admin.hs-rate-links.export');
-    Route::get('/hs-rate-links-sample', [\App\Http\Controllers\Admin\HsRateLinksController::class, 'sampleCsv'])->name('admin.hs-rate-links.sample');
-    Route::post('/hs-rate-links-import', [\App\Http\Controllers\Admin\HsRateLinksController::class, 'importCsv'])->name('admin.hs-rate-links.import');
-
-    Route::get('/hs-master', [GlobalHsMasterController::class, 'index'])->name('admin.hs-master');
-    Route::post('/hs-master', [GlobalHsMasterController::class, 'store'])->name('admin.hs-master.store');
-    Route::put('/hs-master/{id}', [GlobalHsMasterController::class, 'update'])->name('admin.hs-master.update');
-    Route::post('/hs-master/seed', [GlobalHsMasterController::class, 'seed'])->name('admin.hs-master.seed');
-    Route::post('/hs-master/map-unmapped', [GlobalHsMasterController::class, 'mapUnmapped'])->name('admin.hs-master.map-unmapped');
-
-    // Medicine Catalogue (Task 1579) â€” global DRAP-seeded list for pharmacy-mode FBR shops
-    Route::get('/medicine-catalogue', [\App\Http\Controllers\Admin\MedicineCatalogueController::class, 'index'])->name('admin.medicine-catalogue');
-    Route::get('/medicine-catalogue/sync-status', [\App\Http\Controllers\Admin\MedicineCatalogueController::class, 'syncStatus'])->name('admin.medicine-catalogue.sync-status');
-    Route::get('/medicine-catalogue/export', [\App\Http\Controllers\Admin\MedicineCatalogueController::class, 'export'])->name('admin.medicine-catalogue.export');
-    Route::post('/medicine-catalogue/sync', [\App\Http\Controllers\Admin\MedicineCatalogueController::class, 'startSync'])->name('admin.medicine-catalogue.sync');
-    Route::post('/medicine-catalogue/sync-cancel', [\App\Http\Controllers\Admin\MedicineCatalogueController::class, 'cancelSync'])->name('admin.medicine-catalogue.sync-cancel');
-    Route::post('/medicine-catalogue/import', [\App\Http\Controllers\Admin\MedicineCatalogueController::class, 'import'])->name('admin.medicine-catalogue.import');
-    Route::post('/medicine-catalogue', [\App\Http\Controllers\Admin\MedicineCatalogueController::class, 'store'])->name('admin.medicine-catalogue.store');
-    Route::put('/medicine-catalogue/{id}', [\App\Http\Controllers\Admin\MedicineCatalogueController::class, 'update'])->name('admin.medicine-catalogue.update');
-
-    Route::get('/hs-master-global', [HsMasterController::class, 'index'])->name('admin.hs-master-global.index');
-    Route::get('/hs-master-global/{id}/edit', [HsMasterController::class, 'edit'])->name('admin.hs-master-global.edit');
-    Route::post('/hs-master-global/{id}', [HsMasterController::class, 'update'])->name('admin.hs-master-global.update');
-    Route::get('/hs-unmapped', [HsMasterController::class, 'unmapped'])->name('admin.hs-master-global.unmapped');
-    Route::post('/hs-unmapped/{id}/map', [HsMasterController::class, 'mapFromQueue'])->name('admin.hs-master-global.map');
-    Route::post('/hs-unmapped/{id}/reject', [HsMasterController::class, 'rejectSuggestion'])->name('admin.hs-master-global.reject');
-    Route::post('/hs-unmapped/{id}/regenerate', [HsMasterController::class, 'regenerateSuggestion'])->name('admin.hs-master-global.regenerate');
-
-    Route::get('/hs-mapping-engine', [HsCodeMappingController::class, 'index'])->name('admin.hs-mapping-engine');
-    Route::get('/hs-mapping-engine/export', [HsCodeMappingController::class, 'exportCsv'])->name('admin.hs-mapping-engine.export');
-    Route::post('/hs-mapping-engine/import', [HsCodeMappingController::class, 'importCsv'])->name('admin.hs-mapping-engine.import');
-    Route::post('/hs-mapping-engine', [HsCodeMappingController::class, 'store'])->name('admin.hs-mapping-engine.store');
-    Route::put('/hs-mapping-engine/{id}', [HsCodeMappingController::class, 'update'])->name('admin.hs-mapping-engine.update');
-    Route::delete('/hs-mapping-engine/{id}', [HsCodeMappingController::class, 'destroy'])->name('admin.hs-mapping-engine.destroy');
-    Route::post('/hs-mapping-engine/{id}/clone', [HsCodeMappingController::class, 'duplicate'])->name('admin.hs-mapping-engine.clone');
-
-    // Business Groups (5 Sep 2026): admin-only view of one customer's
-    // accounts across the product lines. Nothing here is exposed to shops.
-    Route::get('/groups', [AdminGroupController::class, 'index'])->name('saas.admin.groups');
-    Route::post('/groups/resync', [AdminGroupController::class, 'resync'])->name('saas.admin.groups.resync');
-    Route::get('/groups/{id}', [AdminGroupController::class, 'show'])->name('saas.admin.groups.show');
-    Route::put('/groups/{id}', [AdminGroupController::class, 'update'])->name('saas.admin.groups.update');
-    Route::post('/groups/{id}/link', [AdminGroupController::class, 'link'])->name('saas.admin.groups.link');
-    Route::post('/groups/{id}/detach/{companyId}', [AdminGroupController::class, 'detach'])->name('saas.admin.groups.detach');
-
-    Route::get('/companies', [AdminCompanyController::class, 'index'])->name('saas.admin.companies');
-    Route::get('/companies/create', [\App\Http\Controllers\SaasAdmin\AdminCompanyCreationController::class, 'create'])->name('saas.admin.companies.create');
-    Route::post('/companies', [\App\Http\Controllers\SaasAdmin\AdminCompanyCreationController::class, 'store'])->name('saas.admin.companies.store');
-    Route::get('/companies/{id}', [AdminCompanyController::class, 'show'])->name('saas.admin.companies.show');
-    Route::get('/companies/{id}/edit', [AdminCompanyController::class, 'edit'])->name('saas.admin.companies.edit');
-    Route::put('/companies/{id}', [AdminCompanyController::class, 'update'])->name('saas.admin.companies.update');
-    Route::post('/companies/{id}/approve', [AdminCompanyController::class, 'approve'])->name('saas.admin.companies.approve');
-    Route::post('/companies/{id}/reject', [AdminCompanyController::class, 'reject'])->name('saas.admin.companies.reject');
-    Route::post('/companies/{id}/suspend', [AdminCompanyController::class, 'suspend'])->name('saas.admin.companies.suspend');
-    Route::post('/companies/{id}/activate', [AdminCompanyController::class, 'activate'])->name('saas.admin.companies.activate');
-    Route::post('/companies/{id}/limits', [AdminCompanyController::class, 'updateLimits'])->name('saas.admin.companies.limits');
-    // Hand a DI shop AI Reader pages without a payment proof (goodwill, or a
-    // transfer paid for outside the panel).
-    Route::post('/companies/{id}/ai-pages', [AdminCompanyController::class, 'grantAiPages'])->name('saas.admin.companies.aiPages');
-    Route::post('/companies/{id}/delete', [AdminCompanyController::class, 'softDelete'])->name('saas.admin.companies.delete');
-    Route::get('/companies/{id}/product-review', [\App\Http\Controllers\SaasAdmin\AdminProductTransitionController::class, 'productReview'])->name('saas.admin.companies.productReview');
-    Route::post('/companies/{id}/change-type', [\App\Http\Controllers\SaasAdmin\AdminProductTransitionController::class, 'changeProductType'])->name('saas.admin.companies.changeType');
-    Route::post('/companies/{id}/clone-product', [\App\Http\Controllers\SaasAdmin\AdminProductTransitionController::class, 'cloneToProduct'])->name('saas.admin.companies.cloneProduct');
-    Route::post('/companies/{id}/reveal-access-code', [AdminCompanyController::class, 'revealFbrAccessCode'])->name('saas.admin.companies.revealAccessCode');
-    Route::post('/companies/{id}/reset-password', [AdminCompanyController::class, 'resetAdminPassword'])->name('saas.admin.companies.resetPassword');
-
-    // â”€â”€ View / Manage as Company (impersonation: view-only + full-access) â”€â”€
-    Route::post('/companies/{id}/impersonate', [AdminCompanyController::class, 'impersonate'])->name('saas.admin.companies.impersonate');
-    Route::post('/impersonation/stop', [AdminCompanyController::class, 'stopImpersonation'])->name('saas.admin.impersonation.stop');
-    Route::post('/impersonation/lock', [AdminCompanyController::class, 'lockImpersonation'])->name('saas.admin.impersonation.lock');
-
-    // Archive Viewer (Local Bills Archive Portal) â€” super-admin only.
-    Route::post('/companies/{id}/archive-viewer', [AdminCompanyController::class, 'storeArchiveViewer'])->name('saas.admin.companies.archive-viewer.store');
-    Route::put('/companies/{id}/archive-viewer/{userId}', [AdminCompanyController::class, 'updateArchiveViewer'])->name('saas.admin.companies.archive-viewer.update');
-    Route::post('/companies/{id}/archive-viewer/{userId}/toggle', [AdminCompanyController::class, 'toggleArchiveViewer'])->name('saas.admin.companies.archive-viewer.toggle');
-    Route::delete('/companies/{id}/archive-viewer/{userId}', [AdminCompanyController::class, 'deleteArchiveViewer'])->name('saas.admin.companies.archive-viewer.delete');
-    Route::post('/companies/{id}/requeue-exempt-internal', [AdminCompanyController::class, 'requeueExemptInternal'])->name('saas.admin.companies.requeueExemptInternal');
-    Route::post('/companies/{id}/local-viewer', [AdminCompanyController::class, 'storeLocalViewer'])->name('saas.admin.companies.local-viewer.store');
-    Route::put('/companies/{id}/local-viewer/{userId}', [AdminCompanyController::class, 'updateLocalViewer'])->name('saas.admin.companies.local-viewer.update');
-    Route::post('/companies/{id}/local-viewer/{userId}/toggle', [AdminCompanyController::class, 'toggleLocalViewer'])->name('saas.admin.companies.local-viewer.toggle');
-    Route::delete('/companies/{id}/local-viewer/{userId}', [AdminCompanyController::class, 'deleteLocalViewer'])->name('saas.admin.companies.local-viewer.delete');
-    Route::post('/companies/{id}/override/lifetime', [AdminCompanyController::class, 'grantLifetime'])->name('saas.admin.companies.override.lifetime');
-    Route::post('/companies/{id}/override/temporary', [AdminCompanyController::class, 'grantTemporary'])->name('saas.admin.companies.override.temporary');
-    Route::delete('/companies/{id}/override', [AdminCompanyController::class, 'removeOverride'])->name('saas.admin.companies.override.remove');
-    Route::get('/bin', [AdminCompanyController::class, 'bin'])->name('saas.admin.companies.bin');
-    Route::post('/bin/{id}/restore', [AdminCompanyController::class, 'restore'])->name('saas.admin.companies.restore');
-    Route::delete('/bin/{id}/destroy', [AdminCompanyController::class, 'forceDelete'])->name('saas.admin.companies.destroy');
-    Route::get('/plans', [AdminPlanController::class, 'index'])->name('saas.admin.plans');
-    Route::post('/plans', [AdminPlanController::class, 'store'])->name('saas.admin.plans.store');
-    Route::post('/plans/addons', [AdminPlanController::class, 'updateAddonPricing'])->name('saas.admin.plans.addons.update');
-    Route::put('/plans/{id}', [AdminPlanController::class, 'update'])->name('saas.admin.plans.update');
-    Route::get('/sales', [AdminSaleController::class, 'index'])->name('saas.admin.sales');
-    Route::post('/sales', [AdminSaleController::class, 'store'])->name('saas.admin.sales.store');
-    Route::post('/sales/{id}/toggle', [AdminSaleController::class, 'toggle'])->name('saas.admin.sales.toggle');
-    Route::delete('/sales/{id}', [AdminSaleController::class, 'destroy'])->name('saas.admin.sales.destroy');
-    Route::get('/subscriptions', [AdminSubscriptionController::class, 'index'])->name('saas.admin.subscriptions');
-    Route::post('/subscriptions/assign', [AdminSubscriptionController::class, 'assign'])->name('saas.admin.subscriptions.assign');
-
-    // Agents/Partners program (super-admin only, guarded in controller).
-    Route::get('/agents', [\App\Http\Controllers\SaasAdmin\AdminAgentController::class, 'index'])->name('saas.admin.agents');
-    Route::post('/agents', [\App\Http\Controllers\SaasAdmin\AdminAgentController::class, 'store'])->name('saas.admin.agents.store');
-    Route::get('/agents/{id}', [\App\Http\Controllers\SaasAdmin\AdminAgentController::class, 'show'])->whereNumber('id')->name('saas.admin.agents.show');
-    Route::put('/agents/{id}', [\App\Http\Controllers\SaasAdmin\AdminAgentController::class, 'update'])->name('saas.admin.agents.update');
-    Route::post('/agents/{id}/toggle', [\App\Http\Controllers\SaasAdmin\AdminAgentController::class, 'toggle'])->name('saas.admin.agents.toggle');
-    Route::get('/agents/{id}/export', [\App\Http\Controllers\SaasAdmin\AdminAgentController::class, 'export'])->name('saas.admin.agents.export');
-    Route::post('/agents/{id}/clawback', [\App\Http\Controllers\SaasAdmin\AdminAgentController::class, 'clawback'])->name('saas.admin.agents.clawback');
-    Route::post('/companies/{id}/distributor-attribution', [\App\Http\Controllers\SaasAdmin\AdminAgentController::class, 'updateAttribution'])->name('saas.admin.companies.distributor-attribution');
-    Route::post('/agents/{id}/incentives', [\App\Http\Controllers\SaasAdmin\AdminAgentController::class, 'createAward'])->name('saas.admin.agents.incentives.store');
-    Route::post('/agents/{id}/incentives/{awardId}/approve', [\App\Http\Controllers\SaasAdmin\AdminAgentController::class, 'approveAward'])->name('saas.admin.agents.incentives.approve');
-    Route::post('/agents/{id}/incentives/{awardId}/paid', [\App\Http\Controllers\SaasAdmin\AdminAgentController::class, 'payAward'])->name('saas.admin.agents.incentives.paid');
-
-    // Consultant program oversight: consultants, links, commissions, payouts.
-    Route::get('/consultants', [\App\Http\Controllers\SaasAdmin\AdminConsultantController::class, 'index'])->name('saas.admin.consultants');
-    Route::post('/consultants/{id}/toggle', [\App\Http\Controllers\SaasAdmin\AdminConsultantController::class, 'toggle'])->name('saas.admin.consultants.toggle');
-    Route::post('/consultants/{id}/rate', [\App\Http\Controllers\SaasAdmin\AdminConsultantController::class, 'updateRate'])->name('saas.admin.consultants.rate');
-    Route::post('/consultant-links/{id}/revoke', [\App\Http\Controllers\SaasAdmin\AdminConsultantController::class, 'revokeLink'])->name('saas.admin.consultants.revoke-link');
-    Route::post('/consultant-commissions/{id}/paid', [\App\Http\Controllers\SaasAdmin\AdminConsultantController::class, 'markPaid'])->name('saas.admin.consultants.mark-paid');
-    Route::post('/consultants/min-payout', [\App\Http\Controllers\SaasAdmin\AdminConsultantController::class, 'updateMinPayout'])->name('saas.admin.consultants.min-payout');
-    Route::post('/subscriptions/{id}/toggle', [AdminSubscriptionController::class, 'toggle'])->name('saas.admin.subscriptions.toggle');
-    Route::get('/franchises', [AdminFranchiseController::class, 'index'])->name('saas.admin.franchises');
-    Route::post('/franchises', [AdminFranchiseController::class, 'store'])->name('saas.admin.franchises.store');
-    Route::put('/franchises/{id}', [AdminFranchiseController::class, 'update'])->name('saas.admin.franchises.update');
-    Route::post('/franchises/{id}/toggle', [AdminFranchiseController::class, 'toggleStatus'])->name('saas.admin.franchises.toggle');
-    Route::get('/franchises/{id}/statement', [AdminFranchiseController::class, 'statement'])->name('saas.admin.franchises.statement');
-    Route::post('/franchises/{id}/reconcile', [AdminFranchiseController::class, 'reconcile'])->name('saas.admin.franchises.reconcile');
-    Route::post('/franchises/{id}/payout', [AdminFranchiseController::class, 'markPaid'])->name('saas.admin.franchises.paid');
-    Route::post('/franchises/{id}/commissions/{lineId}/adjust', [AdminFranchiseController::class, 'adjust'])->name('saas.admin.franchises.adjust');
-    Route::get('/company-usage', [AdminUsageController::class, 'index'])->name('saas.admin.usage');
-    Route::get('/system-control', [AdminSystemController::class, 'index'])->name('saas.admin.system');
-    Route::get('/system-control/mysql-health', [AdminSystemController::class, 'mysqlHealth'])->name('saas.admin.system.mysql-health');
-    Route::post('/system-control/{key}/toggle', [AdminSystemController::class, 'toggle'])->name('saas.admin.system.toggle');
-    Route::get('/settings', [AdminSettingsController::class, 'index'])->name('saas.admin.settings');
-    Route::post('/settings', [AdminSettingsController::class, 'update'])->name('saas.admin.settings.update');
-    Route::post('/settings/test-email', [AdminSettingsController::class, 'sendTestEmail'])->middleware('throttle:5,1')->name('saas.admin.settings.test-email');
-    Route::post('/settings/smtp', [AdminSettingsController::class, 'updateSmtp'])->name('saas.admin.settings.smtp');
-    Route::post('/settings/whatsapp', [AdminSettingsController::class, 'updateWhatsApp'])->name('saas.admin.settings.whatsapp');
-    Route::get('/audit-logs', [AdminAuditController::class, 'index'])->name('saas.admin.audit');
-
-    // Support Inbox â€” support@taxnest.pk (super admin only, guarded in controller)
-    Route::get('/support-inbox', [\App\Http\Controllers\SaasAdmin\SupportInboxController::class, 'index'])->name('saas.admin.support-inbox');
-    Route::post('/support-inbox/send', [\App\Http\Controllers\SaasAdmin\SupportInboxController::class, 'send'])->middleware('throttle:20,1')->name('saas.admin.support-inbox.send');
-    Route::get('/support-inbox/unread', [\App\Http\Controllers\SaasAdmin\SupportInboxController::class, 'unread'])->name('saas.admin.support-inbox.unread');
-    Route::get('/support-inbox/poll', [\App\Http\Controllers\SaasAdmin\SupportInboxController::class, 'poll'])->middleware('throttle:30,1')->name('saas.admin.support-inbox.poll');
-    Route::get('/support-cases', [\App\Http\Controllers\SaasAdmin\SupportInboxController::class, 'caseIndex'])->name('saas.admin.support-cases');
-    Route::get('/support-cases/{supportCase}', [\App\Http\Controllers\SaasAdmin\SupportInboxController::class, 'caseShow'])->whereNumber('supportCase')->name('saas.admin.support-cases.show');
-    Route::post('/support-inbox/{box}/{uid}/case', [\App\Http\Controllers\SaasAdmin\SupportInboxController::class, 'storeCase'])->whereNumber('uid')->name('saas.admin.support-inbox.case.store');
-    Route::post('/support-inbox/cases/{supportCase}/links', [\App\Http\Controllers\SaasAdmin\SupportInboxController::class, 'linkCase'])->whereNumber('supportCase')->name('saas.admin.support-inbox.case.link');
-    Route::post('/support-inbox/cases/{supportCase}/assign', [\App\Http\Controllers\SaasAdmin\SupportInboxController::class, 'assignCase'])->whereNumber('supportCase')->name('saas.admin.support-inbox.case.assign');
-    Route::post('/support-inbox/cases/{supportCase}/resolve', [\App\Http\Controllers\SaasAdmin\SupportInboxController::class, 'resolveCase'])->whereNumber('supportCase')->name('saas.admin.support-inbox.case.resolve');
-    Route::post('/support-inbox/cases/{supportCase}/reopen', [\App\Http\Controllers\SaasAdmin\SupportInboxController::class, 'reopenCase'])->whereNumber('supportCase')->name('saas.admin.support-inbox.case.reopen');
-    Route::get('/support-inbox/{box}/{uid}', [\App\Http\Controllers\SaasAdmin\SupportInboxController::class, 'show'])->name('saas.admin.support-inbox.show');
-    Route::get('/support-inbox/{box}/{uid}/attachment/{index}', [\App\Http\Controllers\SaasAdmin\SupportInboxController::class, 'attachment'])->name('saas.admin.support-inbox.attachment');
-
-    // Payment proof verification queue
-    Route::get('/payment-proofs', [AdminPaymentProofController::class, 'index'])->name('saas.admin.payment-proofs');
-    Route::get('/payment-proofs/{id}/download', [AdminPaymentProofController::class, 'download'])->name('saas.admin.payment-proofs.download');
-    Route::post('/payment-proofs/{id}/approve', [AdminPaymentProofController::class, 'approve'])->name('saas.admin.payment-proofs.approve');
-    Route::post('/payment-proofs/{id}/reject', [AdminPaymentProofController::class, 'reject'])->name('saas.admin.payment-proofs.reject');
-});
-
-// Agent distributor portal and super-admin claim review.
-Route::get('/agent/login', [\App\Http\Controllers\AgentPortalAuthController::class, 'showLogin'])->name('agent.login');
-Route::post('/agent/login', [\App\Http\Controllers\AgentPortalAuthController::class, 'login'])->name('agent.login.submit');
-Route::post('/agent/logout', [\App\Http\Controllers\AgentPortalAuthController::class, 'logout'])->name('agent.logout');
-Route::prefix('agent')->group(function () {
-    Route::get('/dashboard', [\App\Http\Controllers\AgentPortalController::class, 'dashboard'])->name('agent.dashboard');
-    Route::get('/companies', [\App\Http\Controllers\AgentPortalController::class, 'companies'])->name('agent.companies');
-    Route::get('/commissions', [\App\Http\Controllers\AgentPortalController::class, 'commissions'])->name('agent.commissions');
-    Route::get('/claims', [\App\Http\Controllers\AgentPortalController::class, 'claims'])->name('agent.claims');
-    Route::post('/claims', [\App\Http\Controllers\AgentPortalController::class, 'storeClaim'])->name('agent.claims.store');
-});
-Route::prefix('admin')->middleware('admin.auth')->group(function () {
-    Route::get('/agent-claims', [\App\Http\Controllers\SaasAdmin\AdminAgentClaimController::class, 'index'])->name('saas.admin.agent-claims');
-    Route::post('/agent-claims/{claim}/review', [\App\Http\Controllers\SaasAdmin\AdminAgentClaimController::class, 'review'])->name('saas.admin.agent-claims.review');
-    Route::post('/agents/{id}/commissions/{commissionId}/paid', [\App\Http\Controllers\SaasAdmin\AdminAgentController::class, 'markPaid'])->name('saas.admin.agents.mark-paid');
-});
-
-Route::get('/franchise/login', [FranchiseAuthController::class, 'showLogin'])->name('franchise.login');
-Route::post('/franchise/login', [FranchiseAuthController::class, 'login']);
-Route::post('/franchise/logout', [FranchiseAuthController::class, 'logout'])->name('franchise.logout');
-
-Route::prefix('franchise')->middleware(['franchise.auth'])->group(function () {
-    Route::get('/dashboard', [FranchiseDashboardController::class, 'dashboard'])->name('franchise.dashboard');
-    Route::get('/companies', [FranchiseDashboardController::class, 'companies'])->name('franchise.companies');
-    Route::get('/revenue', [FranchiseDashboardController::class, 'revenue'])->name('franchise.revenue');
-    Route::post('/companies/{companyId}/approve', [\App\Http\Controllers\Franchise\FranchiseApprovalController::class, 'approve'])->name('franchise.companies.approve');
-});
-
-Route::get('/fbr-pos-landing', function () {
-    // Must come from the service, never a raw query: it is the ONE list of
-    // packages FBR POS still sells. A raw product_type query kept the retired
-    // Pro column (and its stale price) on the public page after the merge.
-    $plans = \App\Services\FbrPosPlanComparisonService::plans();
-    return view('fbr-pos.landing', ['plans' => $plans]);
-})->name('fbrpos.landing');
-
-Route::get('/fbr-pos/login', [FbrPosAuthController::class, 'showLogin'])->name('fbrpos.login');
-Route::post('/fbr-pos/login', [FbrPosAuthController::class, 'login']);
-Route::get('/fbr-pos/register', [FbrPosAuthController::class, 'showRegister'])->name('fbrpos.register');
-Route::post('/fbr-pos/register', [FbrPosAuthController::class, 'register']);
-Route::post('/fbr-pos/logout', [FbrPosAuthController::class, 'logout'])->name('fbrpos.logout');
-// Guest language picker on login/register (Aug 2026): session-only choice.
-Route::post('/fbr-pos/guest-language', function (\Illuminate\Http\Request $request) {
-    $lang = $request->input('language');
-    if (\App\Support\PosLocale::isValid($lang)) {
-        $request->session()->put(\App\Support\PosLocale::SESSION_KEY, $lang);
-    }
-    return back();
-})->name('fbrpos.guest-language');
-
-/*
-|--------------------------------------------------------------------------
-| Nest ERPS â€” Healthcare (Tasks 1547, 1568): the umbrella product line's FIRST
-| vertical. Its own panel, its own guard, its own prefix.
-|--------------------------------------------------------------------------
-| Nothing here is reachable from a DI / PRA POS / FBR POS session: health.auth
-| refuses any company that is not a Nest ERPS company, and those panels never
-| link to /health. The public hub lives at /nest-erps so the /health prefix
-| stays entirely the panel's.
-|
-| A FUTURE VERTICAL registers itself in App\Support\NestErps::VERTICALS and adds
-| a block like this one â€” its own prefix, guard and screens. It needs no new
-| product type, no new billing branch and no new admin allow-list edit.
-*/
-// The line's public hub. /healthcare was the page's original address and is
-// kept working for good â€” saved links and printed material must not break.
-Route::get(\App\Support\NestErps::LANDING_PATH, [HealthController::class, 'landing'])->name('erps.landing');
-Route::get('/healthcare', [HealthController::class, 'landing'])->name('health.landing');
-
-Route::get('/health/login', [HealthAuthController::class, 'showLogin'])->name('health.login');
-Route::post('/health/login', [HealthAuthController::class, 'login']);
-Route::get('/health/register', [HealthAuthController::class, 'showRegister'])->name('health.register');
-Route::post('/health/register', [HealthAuthController::class, 'register']);
-Route::post('/health/logout', [HealthAuthController::class, 'logout'])->name('health.logout');
-// Session-only language choice for signed-out visitors (same three locales).
-Route::post('/health/guest-language', [HealthController::class, 'guestLanguage'])->name('health.guest-language');
-
-Route::prefix('health')->middleware(['health.auth', 'company.approval'])->group(function () {
-    Route::get('/package-checkout', [\App\Http\Controllers\PackageCheckoutController::class, 'index'])->name('health.package-checkout');
-    Route::post('/package-checkout', [\App\Http\Controllers\PackageCheckoutController::class, 'select'])->name('health.package-checkout.select');
-    Route::post('/package-payment-proof', [\App\Http\Controllers\PaymentProofController::class, 'store'])->name('health.payment-proof.store')->middleware('throttle:6,1');
-    Route::post('/survey/{id}/respond', [\App\Http\Controllers\PosSurveyController::class, 'respond'])->defaults('survey_guard', 'health')->name('health.survey.respond');
-    Route::post('/survey/{id}/dismiss', [\App\Http\Controllers\PosSurveyController::class, 'dismiss'])->defaults('survey_guard', 'health')->name('health.survey.dismiss');
-    Route::get('/', fn () => redirect()->route('health.dashboard'));
-    Route::get('/dashboard', [HealthController::class, 'dashboard'])->name('health.dashboard');
-
-    // Per-user display preferences â€” every signed-in member owns their own.
-    Route::post('/set-dark-mode', [HealthController::class, 'toggleDarkMode'])->name('health.set-dark-mode');
-    Route::post('/set-language', [HealthController::class, 'setLanguage'])->name('health.set-language');
-
-    // Settings hub. The capability is also derived from the PATH by HealthAuth,
-    // so a forgotten middleware argument here still cannot open the screen.
-    Route::get('/settings', [HealthController::class, 'settings'])
-        ->middleware('health.can:settings.manage')->name('health.settings');
-    Route::get('/settings/billing/documents/invoices/{invoice}', [\App\Http\Controllers\SubscriptionDocumentController::class, 'companyInvoice'])
-        ->whereNumber('invoice')->middleware('health.can:settings.manage')->name('health.billing.documents.invoice');
-    Route::get('/settings/billing/documents/receipts/{payment}', [\App\Http\Controllers\SubscriptionDocumentController::class, 'companyReceipt'])
-        ->whereNumber('payment')->middleware('health.can:settings.manage')->name('health.billing.documents.receipt');
-
-    // Module switchboard: owner only, both here and in HealthAuth's path map.
-    Route::get('/settings/modules', [HealthController::class, 'modules'])
-        ->middleware('health.can:settings.manage.modules')->name('health.settings.modules');
-    Route::post('/settings/modules', [HealthController::class, 'updateModules'])
-        ->middleware('health.can:settings.manage.modules')->name('health.settings.modules.update');
-
-    /*
-    |--------------------------------------------------------------------------
-    | Hospital setup by spreadsheet (Task 1555)
-    |--------------------------------------------------------------------------
-    | Owner only â€” `setup.import` is in OWNER_ONLY, so the capability check
-    | refuses everybody else no matter what the owner delegated, and HealthAuth's
-    | path map (#^health/setup#) refuses them a second time.
-    |
-    | Upload and commit are separate presses against a STORED file, never one
-    | round trip: the hospital must be able to read what an import would do to
-    | 4,000 rows before any of it lands.
-    */
-    Route::middleware('health.can:setup.import')->group(function () {
-        Route::get('/setup/import', [HealthSetupImportController::class, 'index'])->name('health.setup.import');
-        Route::get('/setup/import/{dataset}/template', [HealthSetupImportController::class, 'template'])->name('health.setup.import.template');
-        Route::post('/setup/import/{dataset}/upload', [HealthSetupImportController::class, 'upload'])->name('health.setup.import.upload');
-        Route::get('/setup/import/{dataset}/preview/{token}', [HealthSetupImportController::class, 'preview'])->name('health.setup.import.preview');
-        Route::post('/setup/import/{dataset}/commit/{token}', [HealthSetupImportController::class, 'commit'])->name('health.setup.import.commit');
-        Route::post('/setup/import/discard/{token}', [HealthSetupImportController::class, 'discard'])->name('health.setup.import.discard');
-    });
-
-    Route::middleware('health.can:departments.manage')->group(function () {
-        Route::get('/departments', [HealthDepartmentController::class, 'index'])->name('health.departments');
-        Route::post('/departments', [HealthDepartmentController::class, 'store'])->name('health.departments.store');
-        Route::put('/departments/{id}', [HealthDepartmentController::class, 'update'])->name('health.departments.update');
-        // Deactivate / reactivate, never delete: records are filed under these.
-        Route::post('/departments/{id}/deactivate', [HealthDepartmentController::class, 'deactivate'])->name('health.departments.deactivate');
-        Route::post('/departments/{id}/reactivate', [HealthDepartmentController::class, 'reactivate'])->name('health.departments.reactivate');
-    });
-
-    /*
-    |--------------------------------------------------------------------------
-    | Pharmacy (Task 1549)
-    |--------------------------------------------------------------------------
-    | Three gates stack here on purpose:
-    |   1. `health.module:pharmacy` â€” the organisation switched the module on,
-    |   2. HealthAuth's path map â€” /health/pharmacy needs `pharmacy.view`,
-    |   3. the per-route capability below, re-checked inside each controller.
-    |
-    | The hub MUST stay named `health.pharmacy`: the layout's navigation only
-    | renders an entry whose route already exists, so this name is what lights
-    | the sidebar link up.
-    */
-    Route::prefix('pharmacy')->middleware('health.module:pharmacy')->group(function () {
-        Route::get('/', [HealthPharmacyController::class, 'index'])->name('health.pharmacy');
-
-        // â”€â”€ Catalogue â”€â”€
-        Route::get('/medicines', [HealthPharmacyController::class, 'medicines'])->name('health.pharmacy.medicines');
-        Route::middleware('health.can:pharmacy.manage')->group(function () {
-            Route::post('/medicines', [HealthPharmacyController::class, 'storeMedicine'])->name('health.pharmacy.medicines.store');
-            Route::put('/medicines/{id}', [HealthPharmacyController::class, 'updateMedicine'])->name('health.pharmacy.medicines.update');
-            // Switch off, never delete: batches and old bills point at this row.
-            Route::post('/medicines/{id}/toggle', [HealthPharmacyController::class, 'toggleMedicine'])->name('health.pharmacy.medicines.toggle');
-
-            Route::get('/settings', [HealthPharmacyController::class, 'settingsPage'])->name('health.pharmacy.settings');
-            Route::post('/settings', [HealthPharmacyController::class, 'updateSettings'])->name('health.pharmacy.settings.update');
-        });
-
-        // â”€â”€ Purchasing & suppliers â”€â”€
-        Route::get('/purchases', [HealthPharmacyPurchaseController::class, 'index'])->name('health.pharmacy.purchases');
-        Route::middleware('health.can:pharmacy.manage')->group(function () {
-            Route::post('/purchases', [HealthPharmacyPurchaseController::class, 'store'])->middleware(\App\Http\Middleware\HealthSubscriptionLock::class)->name('health.pharmacy.purchases.store');
-            Route::post('/suppliers', [HealthPharmacyPurchaseController::class, 'storeSupplier'])->name('health.pharmacy.suppliers.store');
-            Route::post('/supplier-payments', [HealthPharmacyPurchaseController::class, 'storePayment'])->middleware(\App\Http\Middleware\HealthSubscriptionLock::class)->name('health.pharmacy.supplier-payments.store');
-        });
-
-        // â”€â”€ Batch stock control â”€â”€
-        Route::get('/stock', [HealthPharmacyStockController::class, 'index'])->name('health.pharmacy.stock');
-        Route::get('/stock/movements', [HealthPharmacyStockController::class, 'movements'])->name('health.pharmacy.movements');
-        Route::middleware('health.can:pharmacy.manage')->group(function () {
-            Route::post('/stock/opening', [HealthPharmacyStockController::class, 'openingStock'])->name('health.pharmacy.stock.opening');
-            Route::post('/stock/{id}/adjust', [HealthPharmacyStockController::class, 'adjust'])->name('health.pharmacy.stock.adjust');
-            Route::post('/stock/{id}/write-off', [HealthPharmacyStockController::class, 'writeOff'])->name('health.pharmacy.stock.write-off');
-            Route::post('/stock/{id}/quarantine', [HealthPharmacyStockController::class, 'quarantine'])->name('health.pharmacy.stock.quarantine');
-            Route::post('/stock/{id}/release', [HealthPharmacyStockController::class, 'release'])->name('health.pharmacy.stock.release');
-            Route::post('/stock/{id}/transfer', [HealthPharmacyStockController::class, 'transfer'])->name('health.pharmacy.stock.transfer');
-        });
-
-        // â”€â”€ Prescriptions & dispensing â”€â”€
-        Route::get('/prescriptions', [HealthPharmacyPrescriptionController::class, 'index'])->name('health.pharmacy.prescriptions');
-        Route::get('/prescriptions/{id}', [HealthPharmacyPrescriptionController::class, 'show'])->name('health.pharmacy.prescriptions.show');
-        Route::middleware('health.can:pharmacy.dispense')->group(function () {
-            Route::post('/prescriptions', [HealthPharmacyPrescriptionController::class, 'store'])->name('health.pharmacy.prescriptions.store');
-            Route::post('/prescriptions/{id}/dispense', [HealthPharmacyPrescriptionController::class, 'dispense'])->name('health.pharmacy.prescriptions.dispense');
-            Route::post('/prescriptions/{id}/cancel', [HealthPharmacyPrescriptionController::class, 'cancel'])->name('health.pharmacy.prescriptions.cancel');
-            Route::post('/prescriptions/{id}/reopen', [HealthPharmacyPrescriptionController::class, 'reopen'])->name('health.pharmacy.prescriptions.reopen');
-        });
-
-        // â”€â”€ Counter, bills & returns â”€â”€
-        Route::get('/sales', [HealthPharmacySaleController::class, 'index'])->name('health.pharmacy.sales');
-        Route::get('/sales/{id}', [HealthPharmacySaleController::class, 'show'])->name('health.pharmacy.sales.show');
-        Route::get('/sales/{id}/receipt', [HealthPharmacySaleController::class, 'receipt'])->name('health.pharmacy.sales.receipt');
-        Route::middleware('health.can:pharmacy.dispense')->group(function () {
-            Route::get('/counter', [HealthPharmacySaleController::class, 'counter'])->name('health.pharmacy.counter');
-            Route::post('/counter', [HealthPharmacySaleController::class, 'store'])->middleware(\App\Http\Middleware\HealthSubscriptionLock::class)->name('health.pharmacy.counter.store');
-            Route::get('/counter/batches', [HealthPharmacySaleController::class, 'batches'])->name('health.pharmacy.counter.batches');
-            Route::post('/sales/{id}/return', [HealthPharmacySaleController::class, 'refund'])->name('health.pharmacy.sales.return');
-        });
-
-        // â”€â”€ Reports â”€â”€
-        Route::get('/reports', [HealthPharmacyReportController::class, 'index'])->name('health.pharmacy.reports');
-    });
-
-    Route::middleware('health.can:staff.manage')->group(function () {
-        Route::get('/team', [HealthTeamController::class, 'index'])->name('health.team');
-        Route::post('/team', [HealthTeamController::class, 'store'])->name('health.team.store');
-        Route::put('/team/{id}', [HealthTeamController::class, 'update'])->name('health.team.update');
-        Route::post('/team/{id}/toggle-active', [HealthTeamController::class, 'toggleActive'])->name('health.team.toggle-active');
-        Route::post('/team/{id}/departments', [HealthTeamController::class, 'syncDepartments'])->name('health.team.departments');
-        // Owner-only delegation â€” re-checked inside the controller, because the
-        // route gate only proves the actor may manage staff at all.
-        Route::post('/team/{id}/permissions', [HealthTeamController::class, 'permissions'])->name('health.team.permissions');
-    });
-
-    /*
-    |----------------------------------------------------------------------
-    | Owner one-click audit (Task 1554)
-    |----------------------------------------------------------------------
-    | Three capabilities, deliberately separated. audit.view runs an audit and
-    | reads it; audit.export produces the signed evidence pack; audit.manage
-    | records a decision against a finding. The dedicated auditor role holds the
-    | first two and NOT the third, because an auditor who closes their own
-    | findings is not a control.
-    |
-    | Nothing under this prefix can change an operational record. A wrong charge
-    | is corrected on the billing screen by the person accountable for it â€” and
-    | that correction writes its own audited event.
-    */
-    Route::middleware('health.can:audit.view')->group(function () {
-        Route::get('/audit', [HealthAuditController::class, 'index'])->name('health.audit');
-        Route::post('/audit/run', [HealthAuditController::class, 'run'])->name('health.audit.run');
-        Route::get('/audit/trail', [HealthAuditController::class, 'trail'])->name('health.audit.trail');
-        Route::get('/audit/finding/{id}', [HealthAuditController::class, 'finding'])->name('health.audit.finding');
-        Route::get('/audit/{id}', [HealthAuditController::class, 'show'])->name('health.audit.show');
-
-        // Recording a decision is a different right from reading the audit.
-        Route::middleware('health.can:audit.manage')->group(function () {
-            Route::post('/audit/finding/{id}/status', [HealthAuditController::class, 'updateStatus'])->name('health.audit.finding.status');
-            Route::post('/audit/finding/{id}/note', [HealthAuditController::class, 'addNote'])->name('health.audit.finding.note');
-        });
-
-        // So is taking the evidence out of the building.
-        Route::middleware('health.can:audit.export')->group(function () {
-            Route::post('/audit/{id}/pack', [HealthAuditController::class, 'pack'])->name('health.audit.pack');
-            Route::get('/audit/{id}/pack/download', [HealthAuditController::class, 'packDownload'])->name('health.audit.pack.download');
-        });
-    });
-
-    /*
-    | â”€â”€ Patient & OPD core (Task 1548) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    | The patient register is CORE (a lab or a pharmacy still needs to know who
-    | walked in), so it is not behind the OPD module. Everything that is an
-    | out-patient consultation â€” the diary, the token queue, the encounter and
-    | the prescription â€” is, via health.module:opd.
-    */
-    Route::middleware('health.can:patients.view')->group(function () {
-        Route::get('/patients', [HealthPatientController::class, 'index'])->name('health.patients');
-        Route::get('/patients/duplicates', [HealthPatientController::class, 'duplicates'])->name('health.patients.duplicates');
-        Route::get('/patients/new', [HealthPatientController::class, 'create'])->name('health.patients.create');
-        Route::post('/patients', [HealthPatientController::class, 'store'])->name('health.patients.store');
-        Route::get('/patients/{id}', [HealthPatientController::class, 'show'])->whereNumber('id')->name('health.patients.show');
-        Route::get('/patients/{id}/edit', [HealthPatientController::class, 'edit'])->whereNumber('id')->name('health.patients.edit');
-        Route::put('/patients/{id}', [HealthPatientController::class, 'update'])->whereNumber('id')->name('health.patients.update');
-        Route::post('/patients/{id}/toggle-active', [HealthPatientController::class, 'toggleActive'])->whereNumber('id')->name('health.patients.toggle-active');
-    });
-
-    Route::middleware(['health.module:opd', 'health.can:doctors.manage'])->group(function () {
-        Route::get('/doctors', [HealthDoctorController::class, 'index'])->name('health.doctors');
-        Route::post('/doctors', [HealthDoctorController::class, 'store'])->name('health.doctors.store');
-        Route::put('/doctors/{id}', [HealthDoctorController::class, 'update'])->whereNumber('id')->name('health.doctors.update');
-        Route::post('/doctors/{id}/toggle-active', [HealthDoctorController::class, 'toggleActive'])->whereNumber('id')->name('health.doctors.toggle-active');
-        Route::post('/doctors/{id}/slots', [HealthDoctorController::class, 'saveSlots'])->whereNumber('id')->name('health.doctors.slots');
-    });
-
-    Route::middleware(['health.module:opd', 'health.can:appointments.view'])->group(function () {
-        Route::get('/appointments', [HealthAppointmentController::class, 'index'])->name('health.appointments');
-        Route::get('/appointments/patient-search', [HealthAppointmentController::class, 'searchPatients'])->name('health.appointments.patient-search');
-        Route::post('/appointments', [HealthAppointmentController::class, 'store'])->name('health.appointments.store');
-        Route::post('/appointments/{id}/reschedule', [HealthAppointmentController::class, 'reschedule'])->whereNumber('id')->name('health.appointments.reschedule');
-        Route::post('/appointments/{id}/check-in', [HealthAppointmentController::class, 'checkIn'])->whereNumber('id')->name('health.appointments.check-in');
-        Route::post('/appointments/{id}/cancel', [HealthAppointmentController::class, 'cancel'])->whereNumber('id')->name('health.appointments.cancel');
-        Route::post('/appointments/{id}/no-show', [HealthAppointmentController::class, 'noShow'])->whereNumber('id')->name('health.appointments.no-show');
-        // The fee is captured against the ENCOUNTER, but recorded by reception.
-        Route::post('/appointments/visits/{visitId}/fee', [HealthAppointmentController::class, 'updateFee'])->whereNumber('visitId')->name('health.appointments.fee');
-    });
-
-    Route::middleware(['health.module:opd', 'health.can:clinical.view,nursing.record'])->group(function () {
-        Route::get('/clinical', [HealthClinicalController::class, 'queue'])->name('health.clinical');
-        Route::get('/clinical/visits/{id}', [HealthClinicalController::class, 'show'])->whereNumber('id')->name('health.clinical.visit');
-        Route::post('/clinical/visits/{id}/start', [HealthClinicalController::class, 'start'])->whereNumber('id')->name('health.clinical.start');
-        Route::post('/clinical/visits/{id}/vitals', [HealthClinicalController::class, 'saveVitals'])->whereNumber('id')->name('health.clinical.vitals');
-        Route::post('/clinical/visits/{id}/notes', [HealthClinicalController::class, 'saveNotes'])->whereNumber('id')->name('health.clinical.notes');
-        Route::post('/clinical/visits/{id}/reopen', [HealthClinicalController::class, 'reopen'])->whereNumber('id')->name('health.clinical.reopen');
-        Route::post('/clinical/visits/{id}/attachments', [HealthClinicalController::class, 'uploadAttachment'])->whereNumber('id')->name('health.clinical.attachments.store');
-        Route::get('/clinical/attachments/{id}', [HealthClinicalController::class, 'downloadAttachment'])->whereNumber('id')->name('health.clinical.attachments.download');
-        Route::delete('/clinical/attachments/{id}', [HealthClinicalController::class, 'deleteAttachment'])->whereNumber('id')->name('health.clinical.attachments.delete');
-        Route::post('/clinical/visits/{id}/prescription', [HealthClinicalController::class, 'savePrescription'])->whereNumber('id')->name('health.clinical.prescription');
-        Route::get('/clinical/prescriptions/{id}/print', [HealthClinicalController::class, 'printPrescription'])->whereNumber('id')->name('health.clinical.prescription.print');
-    });
-
-    /*
-    |--------------------------------------------------------------------------
-    | Inpatient, ward, bed and theatre (Task 1550)
-    |--------------------------------------------------------------------------
-    | One module (`ipd`) but FOUR capabilities, kept apart because four
-    | different people meet on these screens: wards.manage prices a bed,
-    | ipd.manage moves the patient, ipd.charge posts the money, ipd.discharge
-    | clears the bill and opens the door. Theatre work carries its own
-    | operations.* pair so a surgeon writing operative notes never needs the
-    | ward's capabilities and a ward sister never needs the surgeon's.
-    */
-    Route::middleware('health.module:ipd')->group(function () {
-        // Bed board + the stays running on it. Reachable by the accounts
-        // counter too (ipd.charge / ipd.discharge) â€” the screens themselves
-        // withhold the clinical narrative from anyone without ward access.
-        Route::middleware('health.can:ipd.view,ipd.charge,ipd.discharge')->group(function () {
-            Route::get('/ipd', [HealthAdmissionController::class, 'index'])->name('health.ipd');
-            Route::get('/ipd/admissions/{id}', [HealthAdmissionController::class, 'show'])->whereNumber('id')->name('health.ipd.show');
-        });
-
-        Route::middleware('health.can:ipd.manage')->group(function () {
-            Route::post('/ipd/admissions', [HealthAdmissionController::class, 'store'])->name('health.ipd.store');
-            Route::post('/ipd/admissions/{id}/admit', [HealthAdmissionController::class, 'admit'])->whereNumber('id')->name('health.ipd.admit');
-            Route::post('/ipd/admissions/{id}/reserve', [HealthAdmissionController::class, 'reserve'])->whereNumber('id')->name('health.ipd.reserve');
-            Route::post('/ipd/admissions/{id}/transfer', [HealthAdmissionController::class, 'transfer'])->whereNumber('id')->name('health.ipd.transfer');
-            Route::post('/ipd/admissions/{id}/care', [HealthAdmissionController::class, 'recordCare'])->whereNumber('id')->name('health.ipd.care');
-            Route::post('/ipd/admissions/{id}/discharge-request', [HealthAdmissionController::class, 'requestDischarge'])->whereNumber('id')->name('health.ipd.discharge-request');
-            Route::post('/ipd/admissions/{id}/cancel', [HealthAdmissionController::class, 'cancel'])->whereNumber('id')->name('health.ipd.cancel');
-            Route::post('/ipd/beds/{id}/status', [HealthWardController::class, 'setBedStatus'])->whereNumber('id')->name('health.ipd.bed-status');
-        });
-
-        // Money posting: subscription lock (hasAccess) on top of the capability.
-        Route::middleware(['health.can:ipd.charge', \App\Http\Middleware\HealthSubscriptionLock::class])->group(function () {
-            Route::post('/ipd/admissions/{id}/charges', [HealthAdmissionController::class, 'storeCharge'])->whereNumber('id')->name('health.ipd.charges.store');
-            Route::post('/ipd/admissions/{id}/charges/{chargeId}/reverse', [HealthAdmissionController::class, 'reverseCharge'])->whereNumber('id')->whereNumber('chargeId')->name('health.ipd.charges.reverse');
-            Route::post('/ipd/admissions/{id}/payments', [HealthAdmissionController::class, 'storePayment'])->whereNumber('id')->name('health.ipd.payments.store');
-            Route::post('/ipd/admissions/{id}/run-daily', [HealthAdmissionController::class, 'runDailyCharges'])->whereNumber('id')->name('health.ipd.run-daily');
-        });
-
-        Route::middleware('health.can:ipd.discharge')->group(function () {
-            Route::post('/ipd/admissions/{id}/clear', [HealthAdmissionController::class, 'clear'])->whereNumber('id')->name('health.ipd.clear');
-            Route::post('/ipd/admissions/{id}/discharge', [HealthAdmissionController::class, 'discharge'])->whereNumber('id')->name('health.ipd.discharge');
-        });
-
-        // Facility setup carries the DAY RATE, so reading it needs ward access
-        // and writing it needs the pricing capability.
-        Route::middleware('health.can:wards.manage,ipd.view')->group(function () {
-            Route::get('/ipd/facility', [HealthWardController::class, 'index'])->name('health.ipd.facility');
-        });
-
-        Route::middleware('health.can:wards.manage')->group(function () {
-            Route::post('/ipd/wards', [HealthWardController::class, 'storeWard'])->name('health.ipd.wards.store');
-            Route::put('/ipd/wards/{id}', [HealthWardController::class, 'updateWard'])->whereNumber('id')->name('health.ipd.wards.update');
-            Route::post('/ipd/wards/{id}/toggle', [HealthWardController::class, 'toggleWard'])->whereNumber('id')->name('health.ipd.wards.toggle');
-            Route::post('/ipd/rooms', [HealthWardController::class, 'storeRoom'])->name('health.ipd.rooms.store');
-            Route::put('/ipd/rooms/{id}', [HealthWardController::class, 'updateRoom'])->whereNumber('id')->name('health.ipd.rooms.update');
-            Route::post('/ipd/rooms/{id}/toggle', [HealthWardController::class, 'toggleRoom'])->whereNumber('id')->name('health.ipd.rooms.toggle');
-            Route::post('/ipd/beds', [HealthWardController::class, 'storeBed'])->name('health.ipd.beds.store');
-            Route::put('/ipd/beds/{id}', [HealthWardController::class, 'updateBed'])->whereNumber('id')->name('health.ipd.beds.update');
-            Route::post('/ipd/beds/{id}/toggle', [HealthWardController::class, 'toggleBed'])->whereNumber('id')->name('health.ipd.beds.toggle');
-        });
-
-        // Inpatient + theatre reporting. Needs BOTH the reporting capability
-        // and ward sight â€” reports.view alone must not hand somebody the ward's
-        // numbers when they cannot open the ward.
-        Route::middleware('health.can:reports.view')->group(function () {
-            Route::get('/ipd/reports', [HealthIpdReportController::class, 'index'])->name('health.ipd.reports');
-        });
-
-        /* â”€â”€ operation theatre â”€â”€ */
-        Route::middleware('health.can:operations.view')->group(function () {
-            Route::get('/operations', [HealthOperationController::class, 'index'])->name('health.operations');
-            Route::get('/operations/catalogue', [HealthOperationController::class, 'catalogue'])->name('health.operations.catalogue');
-            Route::get('/operations/{id}', [HealthOperationController::class, 'show'])->whereNumber('id')->name('health.operations.show');
-        });
-
-        Route::middleware('health.can:operations.manage')->group(function () {
-            Route::post('/operations', [HealthOperationController::class, 'store'])->name('health.operations.store');
-            Route::post('/operations/{id}/reschedule', [HealthOperationController::class, 'reschedule'])->whereNumber('id')->name('health.operations.reschedule');
-            Route::post('/operations/{id}/pre-op', [HealthOperationController::class, 'savePreOp'])->whereNumber('id')->name('health.operations.pre-op');
-            Route::post('/operations/{id}/start', [HealthOperationController::class, 'start'])->whereNumber('id')->name('health.operations.start');
-            Route::post('/operations/{id}/complete', [HealthOperationController::class, 'complete'])->whereNumber('id')->name('health.operations.complete');
-            Route::post('/operations/{id}/cancel', [HealthOperationController::class, 'cancel'])->whereNumber('id')->name('health.operations.cancel');
-            Route::post('/operations/{id}/team', [HealthOperationController::class, 'saveTeam'])->whereNumber('id')->name('health.operations.team');
-            Route::post('/operations/{id}/consumables', [HealthOperationController::class, 'saveConsumables'])->whereNumber('id')->name('health.operations.consumables');
-            Route::post('/operations/procedures', [HealthOperationController::class, 'storeProcedure'])->name('health.operations.procedures.store');
-            Route::put('/operations/procedures/{id}', [HealthOperationController::class, 'updateProcedure'])->whereNumber('id')->name('health.operations.procedures.update');
-            Route::post('/operations/procedures/{id}/toggle', [HealthOperationController::class, 'toggleProcedure'])->whereNumber('id')->name('health.operations.procedures.toggle');
-            Route::post('/operations/theatres', [HealthOperationController::class, 'storeTheatre'])->name('health.operations.theatres.store');
-            Route::put('/operations/theatres/{id}', [HealthOperationController::class, 'updateTheatre'])->whereNumber('id')->name('health.operations.theatres.update');
-            Route::post('/operations/theatres/{id}/toggle', [HealthOperationController::class, 'toggleTheatre'])->whereNumber('id')->name('health.operations.theatres.toggle');
-        });
-    });
-
-    Route::middleware('health.can:reports.view')->group(function () {
-        Route::get('/reports', [HealthOpdReportController::class, 'index'])->name('health.reports');
-    });
-
-    /*
-     * â•â•â•â•â•â•â•â•â•â•â•â•â•â• HR & ATTENDANCE â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-     *
-     * Two prefixes, deliberately:
-     *
-     *   /health/hr  â€” the HR desk. Every path here is capability-gated, and
-     *                 HealthAuth ALSO derives the capability from the path, so
-     *                 a forgotten middleware argument below still cannot open a
-     *                 screen. The sub-desks (attendance, corrections, payroll)
-     *                 sit above the generic hr.view rule in that path map.
-     *
-     *   /health/my  â€” self-service. Gated by the HR module only, because
-     *                 everybody who works here has attendance, including the
-     *                 read-only auditor. Nothing under it takes a user id.
-     */
-    Route::middleware('health.module:hr')->group(function () {
-
-        // â”€â”€ The HR desk: records, patterns, rosters, leave â”€â”€
-        Route::middleware('health.can:hr.view')->group(function () {
-            Route::get('/hr', [HealthHrController::class, 'index'])->name('health.hr');
-            Route::get('/hr/staff', [HealthHrController::class, 'staff'])->name('health.hr.staff');
-            Route::get('/hr/shifts', [HealthHrController::class, 'shifts'])->name('health.hr.shifts');
-            Route::get('/hr/policy', [HealthHrController::class, 'policy'])->name('health.hr.policy');
-            Route::get('/hr/devices', [HealthHrController::class, 'devices'])->name('health.hr.devices');
-            Route::get('/hr/roster', [HealthRosterController::class, 'index'])->name('health.hr.roster');
-            Route::get('/hr/leave', [HealthLeaveController::class, 'index'])->name('health.hr.leave');
-        });
-
-        // Writes to the records half. Each controller re-checks hr.manage, so
-        // the gate holds even if a route is later moved out of this group.
-        Route::middleware('health.can:hr.manage')->group(function () {
-            Route::put('/hr/staff/{userId}', [HealthHrController::class, 'updateStaff'])->name('health.hr.staff.update');
-
-            Route::post('/hr/shifts', [HealthHrController::class, 'storeShift'])->name('health.hr.shifts.store');
-            Route::put('/hr/shifts/{id}', [HealthHrController::class, 'updateShift'])->name('health.hr.shifts.update');
-            // Deactivate / reactivate, never delete: rosters and history point here.
-            Route::post('/hr/shifts/{id}/toggle', [HealthHrController::class, 'toggleShift'])->name('health.hr.shifts.toggle');
-
-            Route::post('/hr/holidays', [HealthHrController::class, 'storeHoliday'])->name('health.hr.holidays.store');
-            Route::delete('/hr/holidays/{id}', [HealthHrController::class, 'destroyHoliday'])->name('health.hr.holidays.destroy');
-
-            Route::post('/hr/leave-types', [HealthHrController::class, 'storeLeaveType'])->name('health.hr.leave-types.store');
-            Route::put('/hr/leave-types/{id}', [HealthHrController::class, 'updateLeaveType'])->name('health.hr.leave-types.update');
-
-            Route::post('/hr/policy', [HealthHrController::class, 'updatePolicy'])->name('health.hr.policy.update');
-
-            // Biometric devices: the SHARED hardware integration, viewed from
-            // healthcare. The ADMS push endpoint itself is registered once,
-            // panel-agnostically, near the top of this file.
-            Route::post('/hr/devices', [HealthHrController::class, 'storeDevice'])->name('health.hr.devices.store');
-            Route::post('/hr/devices/{id}/toggle', [HealthHrController::class, 'toggleDevice'])->name('health.hr.devices.toggle');
-            Route::post('/hr/devices/map', [HealthHrController::class, 'mapPin'])->name('health.hr.devices.map');
-            Route::post('/hr/devices/sync', [HealthHrController::class, 'syncDevices'])->name('health.hr.devices.sync');
-
-            Route::post('/hr/roster', [HealthRosterController::class, 'store'])->name('health.hr.roster.store');
-            Route::post('/hr/roster/bulk', [HealthRosterController::class, 'bulk'])->name('health.hr.roster.bulk');
-            Route::post('/hr/roster/clear', [HealthRosterController::class, 'clear'])->name('health.hr.roster.clear');
-
-            Route::post('/hr/leave', [HealthLeaveController::class, 'store'])->name('health.hr.leave.store');
-        });
-
-        // Leave decisions are their own permission: the person who files the
-        // roster is not automatically the person who grants time off it.
-        Route::post('/hr/leave/{id}/review', [HealthLeaveController::class, 'review'])
-            ->middleware('health.can:hr.leave.approve')->name('health.hr.leave.review');
-        // Cancel is reachable by the requester too â€” the controller decides.
-        Route::post('/hr/leave/{id}/cancel', [HealthLeaveController::class, 'cancel'])->name('health.hr.leave.cancel');
-
-        // â”€â”€ The attendance desk â”€â”€
-        Route::middleware('health.can:hr.attendance.view')->group(function () {
-            Route::get('/hr/attendance', [HealthAttendanceController::class, 'index'])->name('health.hr.attendance');
-            Route::get('/hr/attendance/reports', [HealthAttendanceController::class, 'reports'])->name('health.hr.attendance.reports');
-            Route::get('/hr/attendance/reports/export', [HealthAttendanceController::class, 'exportReport'])->name('health.hr.attendance.reports.export');
-            Route::get('/hr/attendance/{userId}/{date}', [HealthAttendanceController::class, 'day'])->name('health.hr.attendance.day');
-            Route::get('/hr/corrections', [HealthAttendanceController::class, 'corrections'])->name('health.hr.corrections');
-        });
-
-        Route::middleware('health.can:hr.attendance.correct')->group(function () {
-            Route::post('/hr/attendance/recompute', [HealthAttendanceController::class, 'recompute'])->name('health.hr.attendance.recompute');
-            Route::post('/hr/corrections', [HealthAttendanceController::class, 'storeCorrection'])->name('health.hr.corrections.store');
-        });
-
-        // Deciding a correction, and locking a month, are the same authority.
-        Route::middleware('health.can:hr.attendance.approve')->group(function () {
-            Route::post('/hr/corrections/{id}/review', [HealthAttendanceController::class, 'reviewCorrection'])->name('health.hr.corrections.review');
-            Route::post('/hr/payroll/lock', [HealthAttendanceController::class, 'lock'])->name('health.hr.payroll.lock');
-            Route::post('/hr/payroll/unlock', [HealthAttendanceController::class, 'unlock'])->name('health.hr.payroll.unlock');
-        });
-
-        // â”€â”€ The payroll handoff â”€â”€
-        Route::middleware('health.can:hr.payroll.view')->group(function () {
-            Route::get('/hr/payroll', [HealthAttendanceController::class, 'payroll'])->name('health.hr.payroll');
-            Route::get('/hr/payroll/export', [HealthAttendanceController::class, 'exportPayroll'])->name('health.hr.payroll.export');
-        });
-
-        // â”€â”€ Self-service: your own duty, your own leave, your own corrections â”€â”€
-        Route::get('/my/attendance', [HealthSelfServiceController::class, 'attendance'])->name('health.my.attendance');
-        Route::post('/my/punch', [HealthSelfServiceController::class, 'punch'])
-            ->middleware('throttle:30,1')->name('health.my.punch');
-        Route::post('/my/leave', [HealthSelfServiceController::class, 'storeLeave'])->name('health.my.leave');
-        // Withdrawing your own pending request is self-service. The HR path
-        // needs hr.view, which ordinary staff do not hold.
-        Route::post('/my/leave/{id}/cancel', [HealthSelfServiceController::class, 'cancelLeave'])->name('health.my.leave.cancel');
-        Route::post('/my/correction', [HealthSelfServiceController::class, 'storeCorrection'])->name('health.my.correction');
-    });
-
-    /*
-    |----------------------------------------------------------------------
-    | Billing counter (Task 1551)
-    |----------------------------------------------------------------------
-    | Every path here starts /health/billing, so HealthAuth's PATH_MAP derives
-    | `billing.view` on its own and a forgotten middleware argument below still
-    | cannot open a screen. The explicit `health.can:` guards then narrow it
-    | further â€” reading a bill is not the same right as taking money for it,
-    | and taking money is not the same right as telling FBR about it.
-    |
-    | The whole family also sits behind the `accounts` module, so a hospital
-    | that has not switched billing on has no billing routes at all, which is
-    | what keeps the nav link hidden without a layout edit.
-    */
-    Route::prefix('billing')->middleware('health.module:accounts')->group(function () {
-        Route::middleware('health.can:billing.view')->group(function () {
-            Route::get('/', [HealthBillingController::class, 'index'])->name('health.billing');
-            Route::get('/patient/{id}', [HealthBillingController::class, 'patient'])->whereNumber('id')->name('health.billing.patient');
-            Route::get('/patient/{id}/statement', [HealthBillingController::class, 'statement'])->whereNumber('id')->name('health.billing.statement');
-            Route::get('/bills/{id}', [HealthBillingController::class, 'bill'])->whereNumber('id')->name('health.billing.bill');
-            Route::get('/bills/{id}/receipt', [HealthBillingController::class, 'receipt'])->whereNumber('id')->name('health.billing.receipt');
-            Route::get('/bills/{id}/fbr', [HealthBillingController::class, 'fbr'])->whereNumber('id')->name('health.billing.fbr');
-            Route::post('/bills/{id}/fbr/reconcile', [HealthBillingController::class, 'reconcileFbr'])->whereNumber('id')->name('health.billing.fbr.reconcile');
-            Route::get('/shifts', [HealthBillingController::class, 'shifts'])->name('health.billing.shifts');
-        });
-
-        /* Money movement â€” the counter's own rights. */
-        // Money posting: subscription lock (hasAccess) on top of the capability â€”
-        // GETs inside this group are untouched, only the writes are refused.
-        Route::middleware(['health.can:billing.charge', \App\Http\Middleware\HealthSubscriptionLock::class])->group(function () {
-            Route::post('/patient/{id}/sync', [HealthBillingController::class, 'syncCharges'])->whereNumber('id')->name('health.billing.sync');
-            Route::post('/patient/{id}/charges', [HealthBillingController::class, 'storeCharge'])->whereNumber('id')->name('health.billing.charges.store');
-            Route::post('/charges/{id}/reverse', [HealthBillingController::class, 'reverseCharge'])->whereNumber('id')->name('health.billing.charges.reverse');
-            Route::post('/charges/{id}/concession', [HealthBillingController::class, 'concession'])->whereNumber('id')->name('health.billing.charges.concession');
-            Route::post('/patient/{id}/bills', [HealthBillingController::class, 'storeBill'])->whereNumber('id')->name('health.billing.bills.store');
-            Route::post('/patient/{id}/settle/{admissionId}', [HealthBillingController::class, 'settleAdmission'])
-                ->whereNumber('id')->whereNumber('admissionId')->name('health.billing.settle');
-            Route::post('/patient/{id}/deposit', [HealthBillingController::class, 'deposit'])->whereNumber('id')->name('health.billing.deposit');
-            Route::post('/bills/{id}/finalize', [HealthBillingController::class, 'finalize'])->whereNumber('id')->name('health.billing.bills.finalize');
-            Route::post('/bills/{id}/pay', [HealthBillingController::class, 'pay'])->whereNumber('id')->name('health.billing.bills.pay');
-            Route::post('/bills/{id}/apply-credit', [HealthBillingController::class, 'applyCredit'])->whereNumber('id')->name('health.billing.bills.credit');
-            Route::post('/shifts/open', [HealthBillingController::class, 'openShift'])->name('health.billing.shifts.open');
-            Route::post('/shifts/{id}/close', [HealthBillingController::class, 'closeShift'])->whereNumber('id')->name('health.billing.shifts.close');
-        });
-
-        /* Reconciliation reading needs the accounts eye, not the cash drawer. */
-        Route::middleware('health.can:accounts.view')->group(function () {
-            Route::get('/day-close', [HealthBillingController::class, 'dayClose'])->name('health.billing.day-close');
-        });
-
-        /*
-         * Decisions the counter must NOT make on its own: what the regulator is
-         * told, money going back out, cancelling a raised bill, and the tax
-         * rulebook itself.
-         */
-        Route::middleware('health.can:accounts.manage')->group(function () {
-            Route::post('/charges/{id}/reclassify', [HealthBillingController::class, 'reclassify'])->whereNumber('id')->name('health.billing.charges.reclassify');
-            Route::post('/bills/{id}/cancel', [HealthBillingController::class, 'cancelBill'])->whereNumber('id')->name('health.billing.bills.cancel');
-            Route::post('/bills/{id}/refund', [HealthBillingController::class, 'refund'])->whereNumber('id')->name('health.billing.bills.refund');
-            Route::post('/bills/{id}/fbr/submit', [HealthBillingController::class, 'submitFbr'])->whereNumber('id')->name('health.billing.fbr.submit');
-            Route::post('/payments/{id}/reverse', [HealthBillingController::class, 'reversePayment'])->whereNumber('id')->name('health.billing.payments.reverse');
-            Route::get('/tax-categories', [HealthBillingController::class, 'taxCategories'])->name('health.billing.tax-categories');
-            Route::post('/tax-categories', [HealthBillingController::class, 'storeTaxCategory'])->name('health.billing.tax-categories.store');
-            Route::put('/tax-categories/{id}', [HealthBillingController::class, 'updateTaxCategory'])->whereNumber('id')->name('health.billing.tax-categories.update');
-            Route::post('/tax-categories/{id}/toggle', [HealthBillingController::class, 'toggleTaxCategory'])->whereNumber('id')->name('health.billing.tax-categories.toggle');
-            Route::post('/tax-categories/seed', [HealthBillingController::class, 'seedTaxCategories'])->name('health.billing.tax-categories.seed');
-        });
-    });
-
-    /*
-    |----------------------------------------------------------------------
-    | ACCOUNTS â€” the accountant's workspace and the books (Task 1552).
-    |----------------------------------------------------------------------
-    | Rides the same `accounts` module as billing, because a hospital that has
-    | not switched money on has no books to keep. Three rights, kept apart:
-    |
-    |   accounts.view     read the books and every report
-    |   accounts.manage   post to them â€” journals, expenses, transfers, payouts
-    |   accounts.approve  sign off what the accountant prepared: closing a
-    |                     financial period, and approving or reversing a
-    |                     doctor's payout
-    |
-    | The accountant holds view+manage and NOT approve. That is the whole
-    | control: the person who prepares a figure must not also be the person who
-    | blesses it. The route file is where that separation is enforced, not the
-    | blade â€” a hidden button is a suggestion, a middleware is a boundary.
-    |
-    | None of the three grants clinical.view, so a finance account reaches the
-    | money on a stay and never the diagnosis behind it.
-    */
-    Route::prefix('accounts')->middleware('health.module:accounts')->group(function () {
-        Route::middleware('health.can:accounts.view')->group(function () {
-            Route::get('/', [HealthAccountsController::class, 'index'])->name('health.accounts');
-            Route::get('/chart', [HealthAccountsController::class, 'chart'])->name('health.accounts.chart');
-            Route::get('/journals', [HealthAccountsController::class, 'journals'])->name('health.accounts.journals');
-            Route::get('/journals/{id}', [HealthAccountsController::class, 'journal'])->whereNumber('id')->name('health.accounts.journal');
-            Route::get('/expenses', [HealthAccountsController::class, 'expenses'])->name('health.accounts.expenses');
-            Route::get('/transfers', [HealthAccountsController::class, 'transfers'])->name('health.accounts.transfers');
-            Route::get('/reconciliations', [HealthAccountsController::class, 'reconciliations'])->name('health.accounts.reconciliations');
-            Route::get('/periods', [HealthAccountsController::class, 'periods'])->name('health.accounts.periods');
-            Route::get('/settings', [HealthAccountsController::class, 'settings'])->name('health.accounts.settings');
-
-            /* Doctor compensation â€” reading it. */
-            Route::get('/doctor-shares/rules', [HealthDoctorShareController::class, 'rules'])->name('health.accounts.share-rules');
-            Route::get('/doctor-shares', [HealthDoctorShareController::class, 'accruals'])->name('health.accounts.shares');
-            Route::get('/settlements', [HealthDoctorShareController::class, 'settlements'])->name('health.accounts.settlements');
-            Route::get('/settlements/{id}', [HealthDoctorShareController::class, 'settlement'])->whereNumber('id')->name('health.accounts.settlement');
-            Route::get('/doctors/{id}/statement', [HealthDoctorShareController::class, 'statement'])->whereNumber('id')->name('health.accounts.doctor-statement');
-
-            /* Reports. Every one of them also serves its own CSV via ?export=csv. */
-            Route::get('/reports', [HealthAccountsReportController::class, 'index'])->name('health.accounts.reports');
-            Route::get('/reports/trial-balance', [HealthAccountsReportController::class, 'trialBalance'])->name('health.accounts.reports.trial-balance');
-            Route::get('/reports/ledger', [HealthAccountsReportController::class, 'ledger'])->name('health.accounts.reports.ledger');
-            Route::get('/reports/profit-loss', [HealthAccountsReportController::class, 'profitAndLoss'])->name('health.accounts.reports.profit-loss');
-            Route::get('/reports/balance-sheet', [HealthAccountsReportController::class, 'balanceSheet'])->name('health.accounts.reports.balance-sheet');
-            Route::get('/reports/cash-flow', [HealthAccountsReportController::class, 'cashFlow'])->name('health.accounts.reports.cash-flow');
-            Route::get('/reports/receivables', [HealthAccountsReportController::class, 'receivables'])->name('health.accounts.reports.receivables');
-            Route::get('/reports/payables', [HealthAccountsReportController::class, 'payables'])->name('health.accounts.reports.payables');
-            Route::get('/reports/suppliers/{id}', [HealthAccountsReportController::class, 'supplier'])->whereNumber('id')->name('health.accounts.reports.supplier');
-            Route::get('/reports/profitability', [HealthAccountsReportController::class, 'profitability'])->name('health.accounts.reports.profitability');
-        });
-
-        /* Posting to the books. */
-        Route::middleware('health.can:accounts.manage')->group(function () {
-            Route::post('/sweep', [HealthAccountsController::class, 'sweep'])->name('health.accounts.sweep');
-            Route::post('/chart', [HealthAccountsController::class, 'storeAccount'])->name('health.accounts.chart.store');
-            Route::put('/chart/{id}', [HealthAccountsController::class, 'updateAccount'])->whereNumber('id')->name('health.accounts.chart.update');
-            Route::post('/chart/{id}/toggle', [HealthAccountsController::class, 'toggleAccount'])->whereNumber('id')->name('health.accounts.chart.toggle');
-            Route::post('/journals', [HealthAccountsController::class, 'storeJournal'])->name('health.accounts.journals.store');
-            Route::post('/journals/{id}/reverse', [HealthAccountsController::class, 'reverseJournal'])->whereNumber('id')->name('health.accounts.journals.reverse');
-            Route::post('/expense-categories', [HealthAccountsController::class, 'storeExpenseCategory'])->name('health.accounts.expense-categories.store');
-            Route::post('/expense-categories/{id}/toggle', [HealthAccountsController::class, 'toggleExpenseCategory'])->whereNumber('id')->name('health.accounts.expense-categories.toggle');
-            Route::post('/expenses', [HealthAccountsController::class, 'storeExpense'])->name('health.accounts.expenses.store');
-            Route::post('/expenses/{id}/reverse', [HealthAccountsController::class, 'reverseExpense'])->whereNumber('id')->name('health.accounts.expenses.reverse');
-            Route::post('/transfers', [HealthAccountsController::class, 'storeTransfer'])->name('health.accounts.transfers.store');
-            Route::post('/transfers/{id}/reverse', [HealthAccountsController::class, 'reverseTransfer'])->whereNumber('id')->name('health.accounts.transfers.reverse');
-            Route::post('/bank-accounts', [HealthAccountsController::class, 'storeBankAccount'])->name('health.accounts.bank-accounts.store');
-            Route::post('/reconciliations', [HealthAccountsController::class, 'storeReconciliation'])->name('health.accounts.reconciliations.store');
-            Route::post('/reconciliations/{id}/close', [HealthAccountsController::class, 'closeReconciliation'])->whereNumber('id')->name('health.accounts.reconciliations.close');
-            Route::post('/periods/ensure', [HealthAccountsController::class, 'ensurePeriod'])->name('health.accounts.periods.ensure');
-            Route::post('/settings', [HealthAccountsController::class, 'updateSettings'])->name('health.accounts.settings.update');
-            Route::post('/doctor-shares/accrue', [HealthAccountsController::class, 'accrueShares'])->name('health.accounts.shares.accrue');
-            Route::post('/doctor-shares/rules', [HealthDoctorShareController::class, 'storeRule'])->name('health.accounts.share-rules.store');
-            Route::put('/doctor-shares/rules/{id}', [HealthDoctorShareController::class, 'updateRule'])->whereNumber('id')->name('health.accounts.share-rules.update');
-            Route::post('/doctor-shares/rules/{id}/toggle', [HealthDoctorShareController::class, 'toggleRule'])->whereNumber('id')->name('health.accounts.share-rules.toggle');
-            Route::post('/doctor-shares/{id}/exclude', [HealthDoctorShareController::class, 'excludeShare'])->whereNumber('id')->name('health.accounts.shares.exclude');
-            Route::post('/doctor-shares/{id}/restore', [HealthDoctorShareController::class, 'restoreShare'])->whereNumber('id')->name('health.accounts.shares.restore');
-            Route::post('/settlements', [HealthDoctorShareController::class, 'buildSettlement'])->name('health.accounts.settlements.build');
-            Route::put('/settlements/{id}', [HealthDoctorShareController::class, 'updateSettlement'])->whereNumber('id')->name('health.accounts.settlements.update');
-            Route::post('/settlements/{id}/shares/{shareId}/detach', [HealthDoctorShareController::class, 'detachShare'])
-                ->whereNumber('id')->whereNumber('shareId')->name('health.accounts.settlements.detach');
-            Route::post('/settlements/{id}/pay', [HealthDoctorShareController::class, 'paySettlement'])->whereNumber('id')->name('health.accounts.settlements.pay');
-        });
-
-        /*
-         * The approver's two acts. Separated from `manage` so the accountant
-         * who built the payout is not the person who signs it, and the month
-         * they posted into is not closed by their own hand.
-         */
-        Route::middleware('health.can:accounts.approve')->group(function () {
-            Route::post('/periods/{id}/close', [HealthAccountsController::class, 'closePeriod'])->whereNumber('id')->name('health.accounts.periods.close');
-            Route::post('/settlements/{id}/approve', [HealthDoctorShareController::class, 'approveSettlement'])->whereNumber('id')->name('health.accounts.settlements.approve');
-            Route::post('/settlements/{id}/reverse', [HealthDoctorShareController::class, 'reverseSettlement'])->whereNumber('id')->name('health.accounts.settlements.reverse');
-        });
-    });
-
-    /*
-     * A doctor's OWN earnings. Deliberately OUTSIDE the accounts group: it
-     * rides dashboard.view and resolves the doctor from the signed-in account's
-     * linked profile, so a consultant sees their own money without being given
-     * any right over anybody else's.
-     */
-    Route::get('/my/earnings', [HealthDoctorShareController::class, 'myEarnings'])
-        ->middleware('health.module:accounts')
-        ->name('health.my.earnings');
-});
-
-Route::prefix('fbr-pos')->middleware(['fbrpos.auth', 'company.approval', \App\Http\Middleware\SchoolWorkspace::class])->group(function () {
-    Route::post('/survey/{id}/respond', [\App\Http\Controllers\PosSurveyController::class, 'respond'])->defaults('survey_guard', 'fbrpos')->name('fbrpos.survey.respond');
-    Route::post('/survey/{id}/dismiss', [\App\Http\Controllers\PosSurveyController::class, 'dismiss'])->defaults('survey_guard', 'fbrpos')->name('fbrpos.survey.dismiss');
-    // Same shared users.dark_mode preference as PRA POS. This is deliberately
-    // outside company settings: each authenticated cashier owns their display.
-    Route::post('/set-dark-mode', [PosController::class, 'toggleDarkMode'])->name('fbrpos.set-dark-mode');
-    Route::get('/dashboard', [FbrPosController::class, 'dashboard'])->name('fbrpos.dashboard');
-    Route::post('/notifications/{id}/dismiss', [FbrPosController::class, 'dismissNotification'])->name('fbrpos.notifications.dismiss');
-    Route::post('/notifications/dismiss-all', [FbrPosController::class, 'dismissAllNotifications'])->name('fbrpos.notifications.dismiss-all');
-    Route::get('/whats-new/history', [\App\Http\Controllers\AppUpdateController::class, 'history'])->defaults('announcement_panel', 'fbr')->name('fbrpos.whats-new.history');
-    Route::post('/whats-new/seen', [\App\Http\Controllers\AppUpdateController::class, 'markSeen'])->name('fbrpos.whats-new.seen');
-    Route::post('/payment-proof', [\App\Http\Controllers\PaymentProofController::class, 'store'])
-        ->name('fbrpos.payment-proof.store')->middleware('throttle:6,1');
-    Route::get('/billing/checkout', [\App\Http\Controllers\PackageCheckoutController::class, 'index'])->name('fbrpos.package-checkout');
-    Route::post('/billing/checkout', [\App\Http\Controllers\PackageCheckoutController::class, 'select'])->name('fbrpos.package-checkout.select');
-    // Feature suggestion box (Task 1275) â€” admin/manager-only (in-controller
-    // gate), 10/day cap; rows land product='fbrpos' in the shared admin view.
-    Route::get('/suggestions', [\App\Http\Controllers\FeatureSuggestionController::class, 'fbrIndex'])->name('fbrpos.suggestions');
-    Route::post('/suggestions', [\App\Http\Controllers\FeatureSuggestionController::class, 'fbrStore'])->name('fbrpos.suggestions.store')->middleware('throttle:10,1');
-    Route::get('/school-fees/legacy-retail', [\App\Http\Controllers\FbrPosSchoolFeeController::class, 'legacyIndex'])->name('fbrpos.school-fees.legacy');
-    Route::post('/school-fees/legacy-retail/unlock', [\App\Http\Controllers\FbrPosSchoolFeeController::class, 'legacyUnlock'])->middleware('throttle:10,1')->name('fbrpos.school-fees.legacy-unlock');
-    Route::get('/school-fees/legacy-retail/{id}', [\App\Http\Controllers\FbrPosSchoolFeeController::class, 'legacyShow'])->whereNumber('id')->name('fbrpos.school-fees.legacy-show');
-    Route::get('/hospital', [\App\Http\Controllers\FbrPosHospitalController::class, 'index'])->name('fbrpos.hospital.index');
-    Route::post('/hospital', [\App\Http\Controllers\FbrPosHospitalController::class, 'store'])->name('fbrpos.hospital.store')->middleware('plan.limit:invoices');
-    Route::get('/hospital/dashboard', [\App\Http\Controllers\FbrPosHospitalController::class, 'dashboard'])->name('fbrpos.hospital.dashboard');
-    Route::get('/hospital/history', [\App\Http\Controllers\FbrPosHospitalController::class, 'history'])->name('fbrpos.hospital.history');
-    Route::get('/hospital/day-close', [\App\Http\Controllers\FbrPosHospitalController::class, 'dayClose'])->name('fbrpos.hospital.day-close');
-    Route::post('/hospital/day-close', [\App\Http\Controllers\FbrPosHospitalController::class, 'close'])->name('fbrpos.hospital.close');
-    Route::post('/hospital/campus', [\App\Http\Controllers\FbrPosHospitalController::class, 'switchCampus'])->name('fbrpos.hospital.campus');
-    Route::get('/hospital/settings', [\App\Http\Controllers\HospitalWorkspaceSettingsController::class, 'index'])->name('fbrpos.hospital.settings');
-    Route::post('/hospital/settings/services', [\App\Http\Controllers\HospitalWorkspaceSettingsController::class, 'saveService'])->name('fbrpos.hospital.settings.services');
-    Route::post('/hospital/settings/campus', [\App\Http\Controllers\HospitalWorkspaceSettingsController::class, 'addCampus'])->name('fbrpos.hospital.settings.campus');
-    Route::get('/hospital/printing', [\App\Http\Controllers\HospitalReceiptSettingsController::class, 'index'])->name('fbrpos.hospital.printing');
-    Route::post('/hospital/printing', [\App\Http\Controllers\HospitalReceiptSettingsController::class, 'update'])->name('fbrpos.hospital.printing.update');
-    Route::get('/hospital/printing/preview', [\App\Http\Controllers\HospitalReceiptSettingsController::class, 'preview'])->name('fbrpos.hospital.printing.preview');
-    Route::get('/hospital/invoices/{id}', [\App\Http\Controllers\FbrPosHospitalController::class, 'invoice'])->whereNumber('id')->name('fbrpos.hospital.invoice');
-    Route::post('/hospital/invoices/{id}/payments', [\App\Http\Controllers\FbrPosHospitalController::class, 'payment'])->whereNumber('id')->name('fbrpos.hospital.payment');
-    Route::get('/hospital/receipts/{id}', [\App\Http\Controllers\FbrPosHospitalController::class, 'receipt'])->whereNumber('id')->name('fbrpos.hospital.receipt');
-    Route::get('/school-fees/printing', [\App\Http\Controllers\SchoolReceiptSettingsController::class, 'index'])->name('fbrpos.school-fees.printing');
-    Route::post('/school-fees/printing', [\App\Http\Controllers\SchoolReceiptSettingsController::class, 'update'])->name('fbrpos.school-fees.printing.update');
-    Route::get('/school-fees/printing/preview', [\App\Http\Controllers\SchoolReceiptSettingsController::class, 'preview'])->name('fbrpos.school-fees.printing.preview');
-    Route::get('/school-fees/recover', [\App\Http\Controllers\FbrPosSchoolFeeController::class, 'recover'])->name('fbrpos.school-fees.recover');
-    Route::get('/school-fees/settings', [\App\Http\Controllers\FbrPosSchoolFeeController::class, 'settings'])->name('fbrpos.school-fees.settings');
-    Route::post('/school-fees/settings/fee-head', [\App\Http\Controllers\FbrPosSchoolFeeController::class, 'saveFeeHead'])->name('fbrpos.school-fees.fee-head');
-    Route::post('/school-fees/settings/campus', [\App\Http\Controllers\FbrPosSchoolFeeController::class, 'addCampus'])->name('fbrpos.school-fees.add-campus');
-    Route::get('/school-fees/student-ledger', [\App\Http\Controllers\FbrPosSchoolFeeController::class, 'studentLedger'])->name('fbrpos.school-fees.student-ledger');
-    Route::get('/school-fees/outstanding', [\App\Http\Controllers\FbrPosSchoolFeeController::class, 'outstanding'])->name('fbrpos.school-fees.outstanding');
-    Route::get('/school-fees', [\App\Http\Controllers\FbrPosSchoolFeeController::class, 'index'])->name('fbrpos.school-fees.index');
-    Route::post('/school-fees', [\App\Http\Controllers\FbrPosSchoolFeeController::class, 'store'])->name('fbrpos.school-fees.store')->middleware('plan.limit:invoices');
-    Route::post('/school-fees/campus', [\App\Http\Controllers\FbrPosSchoolFeeController::class, 'switchCampus'])->name('fbrpos.school-fees.campus');
-    Route::get('/school-fees/{id}/receipt', [\App\Http\Controllers\FbrPosSchoolFeeController::class, 'receipt'])->whereNumber('id')->name('fbrpos.school-fees.receipt');
-    Route::get('/create', [FbrPosController::class, 'create'])->name('fbrpos.create');
-    Route::post('/store', [FbrPosController::class, 'store'])->name('fbrpos.store')->middleware('plan.limit:invoices');
-    Route::get('/transactions', [FbrPosController::class, 'transactions'])->name('fbrpos.transactions');
-    Route::get('/transactions/{id}', [FbrPosController::class, 'show'])->name('fbrpos.show');
-    Route::post('/transactions/{id}/retry-fbr', [FbrPosController::class, 'retryFbr'])->name('fbrpos.retryFbr');
-    // Task 655: payment-complete popup polls this on fiscal_device 'pending' bills.
-    Route::get('/transaction/{id}/fbr-status', [FbrPosController::class, 'apiFbrStatus'])->name('fbrpos.transaction.fbr-status');
-    Route::get('/transactions/{id}/edit-failed', [FbrPosController::class, 'editFailed'])->name('fbrpos.editFailed');
-    Route::post('/transactions/{id}/update-and-retry', [FbrPosController::class, 'updateAndRetry'])->name('fbrpos.updateAndRetry');
-    Route::get('/fail-queue', [FbrPosController::class, 'failQueue'])->name('fbrpos.failQueue');
-    Route::get('/fail-queue/{id}/reconcile', [\App\Http\Controllers\FbrPosReconciliationController::class, 'show'])->name('fbrpos.reconcile');
-    Route::post('/fail-queue/{id}/reconcile', [\App\Http\Controllers\FbrPosReconciliationController::class, 'store'])->name('fbrpos.reconcile.store');
-    Route::post('/fail-queue/retry-all', [FbrPosController::class, 'failQueueRetryAll'])->name('fbrpos.failQueue.retryAll');
-    Route::post('/fail-queue/{id}/retry', [FbrPosController::class, 'failQueueRetryOne'])->name('fbrpos.failQueue.retryOne');
-    Route::match(['get', 'post'], '/settings/identities', [\App\Http\Controllers\FbrPosIdentityController::class, 'index'])->name('fbrpos.identities');
-    Route::match(['get', 'post'], '/settings', [FbrPosController::class, 'fbrSettings'])->name('fbrpos.settings');
-    // ðŸ–¥ Desktop Agent â€” FBR-owned page (Task 1403). MODE-INDEPENDENT: the
-    // agent is what makes silent BILL + STORE SLIP printing work, so a cloud
-    // shop must be able to pair one too. Minting a key here never touches
-    // fbr_connection_mode / submission routing (that stays on FBR Settings).
-    // The download alias moved off AgentManagementController because that one
-    // resolves the company from the POS guard only â€” on FBR routes it found no
-    // user and skipped the plan gate entirely.
-    Route::get('/agent', [\App\Http\Controllers\FbrAgentController::class, 'show'])->name('fbrpos.agent');
-    Route::get('/desktop/agent-pairing', [\App\Http\Controllers\DesktopAgentPairingController::class, 'preview'])
-        ->defaults('panel', 'fbrpos')->middleware('throttle:10,1')->block(10, 10)->name('fbrpos.desktop.pairing');
-    Route::post('/desktop/agent-pairing', [\App\Http\Controllers\DesktopAgentPairingController::class, 'confirm'])
-        ->defaults('panel', 'fbrpos')->middleware('throttle:10,1')->block(10, 10)->name('fbrpos.desktop.pairing.confirm');
-    Route::post('/agent/generate', [\App\Http\Controllers\FbrAgentController::class, 'generateKey'])->name('fbrpos.agent.generate');
-    Route::post('/agent/regenerate', [\App\Http\Controllers\FbrAgentController::class, 'regenerateKey'])->name('fbrpos.agent.regenerate');
-    Route::get('/agent/download', [\App\Http\Controllers\FbrAgentController::class, 'download'])->name('fbrpos.agent.download');
-    Route::post('/test-connection', [FbrPosController::class, 'testConnection'])->name('fbrpos.testConnection');
-    Route::post('/api/toggle-fbr-reporting', [FbrPosController::class, 'toggleFbrReporting'])->name('fbrpos.api.toggle-fbr-reporting');
-    // Optional FBR integration (Sep 2026): one-time decision card (connect / without_fbr / later / reset).
-    Route::post('/integration/decision', [FbrPosController::class, 'fbrIntegrationDecision'])->name('fbrpos.integration.decision');
-    // OFFLINE-FIRST BOOT (Aug 2026 â€” PRA port): freshness probe for the SW-cached sale screen.
-    Route::get('/api/boot-check', [FbrPosController::class, 'bootCheck'])->name('fbrpos.api.boot-check');
-    Route::post('/api/boot-diagnostics', [FbrPosController::class, 'bootDiagnostics'])
-        ->middleware('throttle:10,1')->name('fbrpos.api.boot-diagnostics');
-    Route::post('/api/toggle-universal', [FbrPosController::class, 'toggleUniversal'])->name('fbrpos.api.toggle-universal');
-    Route::post('/api/toggle-auto-kot', [FbrPosController::class, 'toggleAutoKot'])->name('fbrpos.api.toggle-auto-kot');
-    Route::post('/settings/dashboard-style', [FbrPosController::class, 'updateDashboardStyle'])->name('fbrpos.settings.dashboard-style');
-    Route::post('/settings/theme', [FbrPosController::class, 'updateTheme'])->name('fbrpos.settings.theme');
-    Route::post('/settings/guided-flow', [FbrPosController::class, 'updateGuidedFlow'])->name('fbrpos.settings.guided-flow');
-    // Task 1263 â€” Customize parity toggles (FBR twins of the PRA endpoints; admin-gated in controller).
-    Route::post('/settings/quick-type', [FbrPosController::class, 'updateQuickType'])->name('fbrpos.settings.quick-type');
-    Route::post('/settings/receipt-autoclose', [FbrPosController::class, 'updateReceiptAutoclose'])->name('fbrpos.settings.receipt-autoclose');
-    Route::post('/settings/cash-received-toggle', [FbrPosController::class, 'toggleCashReceived'])->name('fbrpos.settings.cash-received-toggle');
-    Route::post('/settings/kot-reprint-toggle', [FbrPosController::class, 'updateKotReprint'])->name('fbrpos.settings.kot-reprint-toggle');
-    Route::post('/settings/restock-toggle', [FbrPosController::class, 'updateRestockToggle'])->name('fbrpos.settings.restock-toggle');
-    Route::post('/settings/inventory-toggle', [FbrPosController::class, 'updateInventoryToggle'])->name('fbrpos.settings.inventory-toggle');
-    Route::post('/settings/cashier-dayclose-toggle', [FbrPosController::class, 'toggleCashierDayclose'])->name('fbrpos.settings.cashier-dayclose-toggle');
-    // Task 1263 â€” Printer Settings page + silent print-job enqueue (Desktop Agent shared with PRA).
-    Route::match(['get', 'post'], '/printer-settings', [FbrPosController::class, 'fbrPrinterSettings'])->name('fbrpos.printer-settings');
-    Route::post('/api/print-jobs', [FbrPosController::class, 'fbrApiCreatePrintJob'])->name('fbrpos.api.print-jobs');
-    // Task 1271: WhatsApp Bill share (PRA parity) â€” Customize toggle, tokened
-    // share-link mint, khufia identity switch, product search-mode pref.
-    Route::post('/settings/whatsapp-bill-toggle', [FbrPosController::class, 'toggleWhatsappBill'])->name('fbrpos.settings.whatsapp-bill-toggle');
-    Route::post('/transaction/{id}/share-link', [FbrPosController::class, 'generateShareLink'])->name('fbrpos.invoice.share-link');
-    Route::post('/api/identity-switch', [FbrPosController::class, 'identitySwitch'])->name('fbrpos.api.identity-switch');
-    Route::post('/products/search-mode', [FbrPosController::class, 'productSearchMode'])->name('fbrpos.products.search-mode');
-    // Language system (2 Aug 2026): per-user choice + company default. PosLocale: 'en' / 'rur' Roman Urdu / 'ur' Urdu script.
-    Route::post('/set-language', function (\Illuminate\Http\Request $request) {
-        $lang = $request->input('language');
-        if (in_array($lang, \App\Support\PosLocale::ALL, true)) {
-            $u = auth()->guard('fbrpos')->user();
-            $u->language = $lang;
-            $u->save();
-        }
-        return back()->with('success', __('pos.language_saved'));
-    })->name('fbrpos.set-language');
-    Route::post('/settings/default-language', function (\Illuminate\Http\Request $request) {
-        $u = auth()->guard('fbrpos')->user();
-        abort_unless($u && $u->isPosAdmin(), 403);
-        $lang = $request->input('default_language');
-        if (in_array($lang, \App\Support\PosLocale::ALL, true)) {
-            $u->company->update(['default_language' => $lang]);
-        }
-        return back()->with('success', __('pos.language_saved'));
-    })->name('fbrpos.settings.default-language');
-    // Task 1403 â€” FBR "Features" card on the Customize hub. One admin-only
-    // endpoint for the three FBR-owned feature switches (store slip, delivery,
-    // per-item store notes); each carries its own plan gate in-controller.
-    Route::post('/settings/feature-toggle', [FbrPosController::class, 'updateFbrFeatureToggle'])->name('fbrpos.settings.feature-toggle');
-    Route::get('/customize', [FbrPosController::class, 'customize'])->name('fbrpos.customize');
-    Route::get('/local-support-copies', [\App\Http\Controllers\OptionalLocalBillArchiveController::class, 'index'])->name('fbrpos.local-support-copies');
-    Route::post('/local-support-copies', [\App\Http\Controllers\OptionalLocalBillArchiveController::class, 'update'])->middleware('throttle:10,1')->name('fbrpos.local-support-copies.update');
-    Route::get('/local-support-copies/{id}/download', [\App\Http\Controllers\OptionalLocalBillArchiveController::class, 'download'])->whereNumber('id')->middleware('throttle:20,1')->name('fbrpos.local-support-copies.download');
-
-    // Caller ID (Task 1353 â€” FBR twin of the PRA routes): admin toggle +
-    // paired-phone revoke on the customize hub. PosCallerIdController resolves
-    // the company from currentCompanyId (bound by FbrPosAuth too) and the user
-    // from whichever panel guard owns the request, so both handlers are reused
-    // as-is â€” one server-side gate, no FBR-only copy that can drift.
-    Route::post('/settings/caller-id', [\App\Http\Controllers\PosCallerIdController::class, 'toggle'])->name('fbrpos.settings.caller-id');
-    Route::post('/settings/caller-devices/revoke', [\App\Http\Controllers\PosCallerIdController::class, 'revokeDevice'])->name('fbrpos.settings.caller-devices.revoke');
-    Route::match(['get', 'post'], '/receipt-settings', [FbrPosController::class, 'fbrReceiptSettings'])->name('fbrpos.receipt-settings');
-
-    // ðŸŽ¯ Universal Header API â€” Local / Provisional bills (F10) + Failed bills (F11)
-    Route::get('/api/provisional-bills', [FbrPosController::class, 'apiProvisionalBills'])->name('fbrpos.api.provisional-bills');
-    Route::post('/api/provisional-bills/{id}/delete', [FbrPosController::class, 'apiDeleteProvisional'])->name('fbrpos.api.provisional.delete');
-    Route::post('/api/provisional-bills/{id}/promote', [FbrPosController::class, 'apiPromoteProvisional'])->name('fbrpos.api.provisional.promote');
-    Route::post('/api/verify-pin', [FbrPosController::class, 'verifyPin'])->name('fbrpos.api.verify-pin');
-    Route::get('/api/check-pin-session', [FbrPosController::class, 'checkPinSession'])->name('fbrpos.api.check-pin-session');
-    Route::get('/billing', [FbrPosController::class, 'billing'])->name('fbrpos.billing');
-    Route::get('/billing/documents/invoices/{invoice}', [\App\Http\Controllers\SubscriptionDocumentController::class, 'companyInvoice'])->whereNumber('invoice')->name('fbrpos.billing.documents.invoice');
-    Route::get('/billing/documents/receipts/{payment}', [\App\Http\Controllers\SubscriptionDocumentController::class, 'companyReceipt'])->whereNumber('payment')->name('fbrpos.billing.documents.receipt');
-    Route::get('/reports', [FbrPosController::class, 'reports'])->name('fbrpos.reports');
-    // Staff Hazri â€” FBR mirror (Task #560) â€” ADMIN/MANAGER-ONLY (403 in controller).
-    Route::get('/reports/hazri', [FbrPosController::class, 'hazriReport'])->name('fbrpos.reports.hazri');
-    // Payroll PDF export â€” FBR mirror of pos.reports.hazri.payroll-pdf (same gates).
-    Route::get('/reports/hazri/payroll-pdf', [FbrPosController::class, 'payrollHazriPdf'])->name('fbrpos.reports.hazri.payroll-pdf');
-    // Biometric device setup + Excel import â€” FBR mirror of the PRA bio-sync
-    // pages (admin only, 403 in controller). The public ADMS ingest endpoints
-    // stay SHARED (token/SN-scoped, panel-agnostic) â€” see /bio-sync above.
-    Route::get('/bio-sync', [\App\Http\Controllers\FbrPosBiometricController::class, 'setup'])->name('fbrpos.bio-sync.setup');
-    Route::post('/bio-sync/device', [\App\Http\Controllers\FbrPosBiometricController::class, 'storeDevice'])->name('fbrpos.bio-sync.store-device');
-    Route::post('/bio-sync/late-time', [\App\Http\Controllers\FbrPosBiometricController::class, 'saveLateTime'])->name('fbrpos.bio-sync.save-late');
-    Route::post('/bio-sync/device/{id}/toggle', [\App\Http\Controllers\FbrPosBiometricController::class, 'toggleDevice'])->name('fbrpos.bio-sync.toggle-device');
-    Route::delete('/bio-sync/device/{id}', [\App\Http\Controllers\FbrPosBiometricController::class, 'destroyDevice'])->name('fbrpos.bio-sync.destroy-device');
-    Route::post('/bio-sync/device/{id}/map', [\App\Http\Controllers\FbrPosBiometricController::class, 'saveMapping'])->name('fbrpos.bio-sync.save-mapping');
-    Route::get('/bio-sync/import', [\App\Http\Controllers\FbrPosBiometricController::class, 'showImport'])->name('fbrpos.bio-sync.import');
-    Route::post('/bio-sync/import', [\App\Http\Controllers\FbrPosBiometricController::class, 'processImport'])->name('fbrpos.bio-sync.process-import');
-    Route::post('/bio-sync/quick-map', [\App\Http\Controllers\FbrPosBiometricController::class, 'quickMapPin'])->name('fbrpos.bio-sync.quick-map');
-    // Unmapped PIN panel-banner dismiss â€” admin-only, normal fbrpos web middleware (CSRF).
-    Route::post('/bio-sync/pin-alert/dismiss', [\App\Http\Controllers\FbrPosBiometricController::class, 'dismissPinAlert'])->name('fbrpos.bio-sync.dismiss-pin-alert');
-    Route::get('/reports/export-csv', [FbrPosController::class, 'exportReportCsv'])->name('fbrpos.reports.export-csv');
-
-    // ðŸ‘¥ Team management (FBR twin of /pos/team) â€” admin-only in controller.
-    Route::get('/team', [\App\Http\Controllers\PilotTeamController::class, 'index'])->name('fbrpos.team');
-    Route::post('/team', [FbrPosController::class, 'fbrStoreTeamMember'])->name('fbrpos.team.store');
-    Route::put('/team/{id}', [FbrPosController::class, 'fbrUpdateTeamMember'])->name('fbrpos.team.update');
-    Route::post('/team/{id}/toggle', [FbrPosController::class, 'fbrToggleTeamMember'])->name('fbrpos.team.toggle');
-
-    // ðŸ¬ Branch management (multi-branch v1) â€” admin-only in controller.
-    Route::get('/branches', [\App\Http\Controllers\FbrPosBranchController::class, 'index'])->name('fbrpos.branches');
-    Route::post('/branches', [\App\Http\Controllers\FbrPosBranchController::class, 'store'])->name('fbrpos.branches.store');
-    Route::put('/branches/{id}', [\App\Http\Controllers\FbrPosBranchController::class, 'update'])->name('fbrpos.branches.update');
-    Route::post('/branches/{id}/toggle', [\App\Http\Controllers\FbrPosBranchController::class, 'toggle'])->name('fbrpos.branches.toggle');
-    Route::get('/tax-reports', [FbrPosController::class, 'taxReports'])->name('fbrpos.tax-reports');
-    // Task 698: CSV/PDF export of the monthly FBR tax report (PRA parity).
-    Route::get('/tax-reports/csv', [FbrPosController::class, 'exportTaxReportCsv'])->name('fbrpos.tax-reports.csv');
-    Route::get('/tax-reports/pdf', [FbrPosController::class, 'exportTaxReportPdf'])->name('fbrpos.tax-reports.pdf');
-    Route::match(['get', 'post'], '/business-profile', [FbrPosController::class, 'businessProfile'])->name('fbrpos.business-profile');
-    Route::match(['get', 'post'], '/my-profile', [FbrPosController::class, 'myProfile'])->name('fbrpos.my-profile');
-    Route::get('/transaction/{id}/receipt', [FbrPosController::class, 'receipt'])->name('fbrpos.receipt');
-    // Order Matching (Aug 2026) â€” FBR KOT print endpoints
-    Route::get('/held/{id}/kitchen-ticket', [FbrPosController::class, 'kotTicket'])->name('fbrpos.held.kot');
-    Route::get('/transaction/{id}/kot-reprint', [FbrPosController::class, 'kotReprint'])->name('fbrpos.transaction.kot-reprint');
-    Route::get('/transaction/{id}/pdf', [FbrPosController::class, 'downloadPdf'])->name('fbrpos.pdf');
-    Route::get('/transaction/{id}/pdf-preview', [FbrPosController::class, 'previewPdf'])->name('fbrpos.pdf.preview');
-    Route::get('/day-close', [FbrPosController::class, 'dayCloseReport'])->name('fbrpos.day-close');
-    Route::post('/day-close', [FbrPosController::class, 'closeDayReport'])->name('fbrpos.close-day');
-    Route::post('/day-close/close-all-prior', [FbrPosController::class, 'closeAllPriorDays'])->name('fbrpos.close-all-days');
-    // Task 676 (FBR mirror of PRA Task 661): auto day-close checkbox + cutoff
-    // selector on the FBR day-close page â€” cashier-blocked in the controller.
-    Route::post('/settings/auto-dayclose-toggle', [FbrPosController::class, 'toggleAutoDayclose'])->name('fbrpos.settings.auto-dayclose-toggle');
-    Route::post('/settings/auto-dayclose-time', [FbrPosController::class, 'updateAutoDaycloseTime'])->name('fbrpos.settings.auto-dayclose-time');
-    Route::post('/settings/unassigned-delivery-dayclose', [FbrPosController::class, 'updateUnassignedDeliveryDayclose'])->name('fbrpos.settings.unassigned-delivery-dayclose');
-    Route::post('/settings/dayclose-cutoff', [FbrPosController::class, 'updateDaycloseCutoff'])->name('fbrpos.settings.dayclose-cutoff');
-    Route::get('/day-close/{id}/pdf', [FbrPosController::class, 'dayCloseReportPdf'])->name('fbrpos.day-close-pdf');
-    Route::get('/day-close/{id}/pdf/download', [FbrPosController::class, 'dayCloseReportPdf'])->defaults('download', true)->name('fbrpos.day-close-pdf-download');
-    Route::get('/day-close/{id}/thermal', [FbrPosController::class, 'dayCloseThermal'])->name('fbrpos.day-close-thermal');
-    Route::get('/reports/analytics-pdf', [FbrPosController::class, 'reportsAnalyticsPdf'])->name('fbrpos.reports.analytics-pdf');
-    // ðŸš€ Smart auto-close (rush/holiday recovery â€” closes any past day with sales but no Z-report)
-    Route::post('/api/auto-close-day', [FbrPosController::class, 'apiAutoCloseDay'])->name('fbrpos.api.auto-close-day');
-
-    Route::get('/products', [FbrPosController::class, 'products'])->name('fbrpos.products');
-    Route::get('/products/create', [FbrPosController::class, 'createProduct'])->name('fbrpos.products.create');
-    // ðŸ· Barcode label print page (Task 1272 â€” PRA port + picker upgrade)
-    Route::get('/products/labels', [FbrPosController::class, 'productLabels'])->name('fbrpos.products.labels')->middleware('feature:barcode,relevant');
-    // Bulk ops on SELECTED products â€” admin-gated in-controller (FBR convention)
-    Route::post('/products/bulk', [FbrPosController::class, 'bulkProductAction'])->name('fbrpos.products.bulk');
-    // ðŸ“¦ Excel export/template + bulk import (FBR mirror of pos.products.template/import).
-    // NO plan.limit middleware on import (Task 361): at-cap shops must still be
-    // able to run UPDATE-only imports (the middleware 403s the whole request at
-    // cap). Access + per-row plan cap are enforced inside importProducts
-    // (SubscriptionAccessService gate + remaining allowance).
-    Route::get('/products/template', [FbrPosController::class, 'downloadProductTemplate'])->name('fbrpos.products.template');
-    Route::post('/products/import', [FbrPosController::class, 'importProducts'])->name('fbrpos.products.import');
-    Route::post('/products', [FbrPosController::class, 'storeProduct'])->name('fbrpos.products.store')->middleware('plan.limit:products');
-    Route::get('/products/{id}/edit', [FbrPosController::class, 'editProduct'])->name('fbrpos.products.edit');
-    Route::put('/products/{id}', [FbrPosController::class, 'updateProduct'])->name('fbrpos.products.update');
-    Route::post('/products/{id}/toggle', [FbrPosController::class, 'toggleProduct'])->name('fbrpos.products.toggle');
-    Route::post('/products/{id}/toggle-sale', [FbrPosController::class, 'toggleProductSale'])->name('fbrpos.products.toggle-sale');
-    Route::post('/products/bulk-sale', [FbrPosController::class, 'bulkToggleSale'])->name('fbrpos.products.bulk-sale');
-    Route::delete('/products/{id}', [FbrPosController::class, 'destroyProduct'])->name('fbrpos.products.destroy');
-    // ðŸ›  Services (Task 1272 â€” PRA port): non-stock service items; admin-gated in-controller
-    // Category profile (Task 1582): hidden for goods shops = unreachable by URL.
-    Route::middleware(['feature:service_jobs,relevant'])->group(function () {
-        Route::get('/services', [FbrPosController::class, 'services'])->name('fbrpos.services');
-        Route::post('/services', [FbrPosController::class, 'storeService'])->name('fbrpos.services.store');
-        Route::put('/services/{id}', [FbrPosController::class, 'updateService'])->name('fbrpos.services.update');
-        Route::delete('/services/{id}', [FbrPosController::class, 'deleteService'])->name('fbrpos.services.delete');
-    });
-    Route::get('/api/products/search', [FbrPosController::class, 'searchProducts'])->name('fbrpos.api.products.search');
-    Route::get('/api/products/barcode', [FbrPosController::class, 'lookupByBarcode'])->name('fbrpos.api.products.barcode');
-    // ðŸ”„ Auto-Sync engine â€” silent 30-sec frontend poller + manual Failed modal
-    Route::get('/api/failed-bills', [FbrPosController::class, 'apiFailedBills'])->name('fbrpos.api.failed-bills');
-    Route::post('/api/failed-bills/{id}/retry', [FbrPosController::class, 'apiRetryFailed'])->name('fbrpos.api.failed.retry');
-    // Offline queue telemetry â€” same single controller as the PRA screen.
-    Route::post('/api/offline-queue-report', OfflineQueueReportController::class)->name('fbrpos.api.offline-queue-report');
-
-    // ðŸŒ Universal sale screen APIs â€” customer + quick product (PRA-shape mirrors)
-    Route::get('/api/customer-search', [FbrPosController::class, 'apiCustomerSearch'])->name('fbrpos.api.customer-search');
-    Route::get('/api/customer-lookup', [FbrPosController::class, 'apiCustomerLookup'])->name('fbrpos.api.customer-lookup');
-    Route::post('/api/customer-store', [FbrPosController::class, 'apiCustomerStore'])->name('fbrpos.api.customer-store');
-    Route::get('/api/customer-history/{id}', [FbrPosController::class, 'apiCustomerHistory'])->name('fbrpos.api.customer-history');
-    // Task 163: cashier-editable delivery addresses â€” customers live in the shared
-    // pos_customers/pos_customer_addresses tables, so PosController handlers are
-    // reused as-is (they only depend on currentCompanyId, bound here too).
-    Route::get('/api/customer-addresses', [PosController::class, 'apiCustomerAddresses'])->name('fbrpos.api.customer-addresses');
-    Route::post('/api/customer-addresses', [PosController::class, 'apiStoreCustomerAddress'])->name('fbrpos.api.customer-addresses.store');
-    Route::post('/api/customer-addresses/delete', [PosController::class, 'apiDeleteCustomerAddress'])->name('fbrpos.api.customer-addresses.delete');
-    Route::patch('/api/customers/{id}/name', [PosController::class, 'apiUpdateCustomerName'])->name('fbrpos.api.customers.name');
-    // Caller ID popup poll (Task 1353) â€” exact FBR mirrors of the PRA sale-screen
-    // endpoints. Same handlers: the plan gate (Unlimited) + caller_id_enabled
-    // check live INSIDE them, so a non-Unlimited or toggled-off FBR shop gets the
-    // same empty payload the PRA screen gets â€” no data leaks into the FBR poll.
-    Route::get('/api/caller-events', [\App\Http\Controllers\PosCallerIdController::class, 'events'])->name('fbrpos.api.caller-events');
-    Route::get('/api/caller-recent', [\App\Http\Controllers\PosCallerIdController::class, 'recentCalls'])->name('fbrpos.api.caller-recent');
-    Route::post('/api/caller-clear', [\App\Http\Controllers\PosCallerIdController::class, 'clearCalls'])->name('fbrpos.api.caller-clear');
-    Route::post('/api/caller-dial', [\App\Http\Controllers\PosCallerIdController::class, 'dialBack'])
-        ->middleware('throttle:60,1')->name('fbrpos.api.caller-dial');
-    Route::get('/api/caller-last-order', [\App\Http\Controllers\PosCallerIdController::class, 'lastOrder'])->name('fbrpos.api.caller-last-order');
-    // NO plan.limit middleware (Task 362): the middleware would 403 the whole
-    // request at cap, breaking dedupe/barcode-rescue of EXISTING products for
-    // at-cap shops. The controller enforces the cap on genuinely NEW rows only.
-    Route::post('/api/products/quick-create', [FbrPosController::class, 'apiQuickCreateProduct'])->name('fbrpos.api.products.quick-create');
-    Route::post('/api/products/{id}/quick-price', [FbrPosController::class, 'apiQuickUpdatePrice'])->name('fbrpos.api.products.quick-price');
-
-    // -------------------------------------------------------- Phase 2: Mall-Grade Universal Features --------------------------------------------------------
-    // Terminals (multi-counter)
-    Route::get('/terminals', [\App\Http\Controllers\FbrPosPhase2Controller::class, 'terminals'])->name('fbrpos.phase2.terminals');
-    Route::post('/terminals', [\App\Http\Controllers\FbrPosPhase2Controller::class, 'storeTerminal'])->middleware('plan.limit:terminals')->name('fbrpos.phase2.terminals.store');
-    Route::post('/terminals/{id}/toggle', [\App\Http\Controllers\FbrPosPhase2Controller::class, 'toggleTerminal'])->name('fbrpos.phase2.terminals.toggle');
-    Route::delete('/terminals/{id}', [\App\Http\Controllers\FbrPosPhase2Controller::class, 'deleteTerminal'])->name('fbrpos.phase2.terminals.delete');
-
-    // Held sales / Park sale
-    Route::post('/api/hold', [\App\Http\Controllers\FbrPosPhase2Controller::class, 'holdSale'])->name('fbrpos.phase2.hold');
-    Route::get('/api/held', [\App\Http\Controllers\FbrPosPhase2Controller::class, 'listHeld'])->name('fbrpos.phase2.held.list');
-    Route::get('/api/held/{id}/recall', [\App\Http\Controllers\FbrPosPhase2Controller::class, 'recallHeld'])->name('fbrpos.phase2.held.recall');
-    Route::delete('/api/held/{id}', [\App\Http\Controllers\FbrPosPhase2Controller::class, 'deleteHeld'])->name('fbrpos.phase2.held.delete');
-
-    // Cart drafts (Task 1271 â€” PRA parity; own JSON table, never FBR serials)
-    Route::post('/api/drafts', [\App\Http\Controllers\FbrPosPhase2Controller::class, 'saveDraft'])->name('fbrpos.drafts.save');
-    Route::get('/api/drafts', [\App\Http\Controllers\FbrPosPhase2Controller::class, 'listDrafts'])->name('fbrpos.drafts.list');
-    Route::get('/api/drafts/{id}/recall', [\App\Http\Controllers\FbrPosPhase2Controller::class, 'recallDraft'])->name('fbrpos.drafts.recall');
-    Route::delete('/api/drafts/{id}', [\App\Http\Controllers\FbrPosPhase2Controller::class, 'deleteDraft'])->name('fbrpos.drafts.delete');
-    Route::post('/api/drafts/{id}/lock', [\App\Http\Controllers\FbrPosPhase2Controller::class, 'lockDraft'])->name('fbrpos.drafts.lock');
-    Route::post('/api/drafts/{id}/unlock', [\App\Http\Controllers\FbrPosPhase2Controller::class, 'unlockDraft'])->name('fbrpos.drafts.unlock');
-
-    // Deals (Task 1273 â€” fixed-price combos; admin-only + plan-gated in-controller)
-    Route::get('/deals', [\App\Http\Controllers\FbrPosPhase2Controller::class, 'deals'])->name('fbrpos.deals');
-    Route::post('/deals', [\App\Http\Controllers\FbrPosPhase2Controller::class, 'storeDeal'])->name('fbrpos.deals.store');
-    Route::put('/deals/{id}', [\App\Http\Controllers\FbrPosPhase2Controller::class, 'updateDeal'])->name('fbrpos.deals.update');
-    Route::delete('/deals/{id}', [\App\Http\Controllers\FbrPosPhase2Controller::class, 'deleteDeal'])->name('fbrpos.deals.delete');
-
-    // Promotions
-    Route::get('/promotions', [\App\Http\Controllers\FbrPosPhase2Controller::class, 'promotions'])->name('fbrpos.phase2.promotions');
-    Route::post('/promotions', [\App\Http\Controllers\FbrPosPhase2Controller::class, 'storePromotion'])->name('fbrpos.phase2.promotions.store');
-    Route::post('/promotions/{id}/toggle', [\App\Http\Controllers\FbrPosPhase2Controller::class, 'togglePromotion'])->name('fbrpos.phase2.promotions.toggle');
-    Route::delete('/promotions/{id}', [\App\Http\Controllers\FbrPosPhase2Controller::class, 'deletePromotion'])->name('fbrpos.phase2.promotions.delete');
-    Route::post('/api/promo/validate', [\App\Http\Controllers\FbrPosPhase2Controller::class, 'validatePromo'])->name('fbrpos.phase2.promo.validate');
-
-    // Loyalty
-    Route::match(['get', 'post'], '/loyalty', [\App\Http\Controllers\FbrPosPhase2Controller::class, 'loyaltySettings'])->name('fbrpos.phase2.loyalty');
-    Route::get('/api/customer/{phone}/points', [\App\Http\Controllers\FbrPosPhase2Controller::class, 'customerPoints'])->name('fbrpos.phase2.customer.points');
-
-    // Shifts / Cash drawer
-    Route::get('/shifts', [\App\Http\Controllers\FbrPosPhase2Controller::class, 'shiftsIndex'])->name('fbrpos.phase2.shifts');
-    Route::post('/shifts/open', [\App\Http\Controllers\FbrPosPhase2Controller::class, 'openShift'])->name('fbrpos.phase2.shift.open');
-    Route::post('/shifts/close', [\App\Http\Controllers\FbrPosPhase2Controller::class, 'closeShift'])->name('fbrpos.phase2.shift.close');
-    Route::get('/shifts/{id}/report', [\App\Http\Controllers\FbrPosPhase2Controller::class, 'shiftReport'])->name('fbrpos.phase2.shift.report');
-    Route::post('/shifts/cash-movement', [\App\Http\Controllers\FbrPosPhase2Controller::class, 'cashMovement'])->name('fbrpos.phase2.shift.cash');
-
-    // Returns / Refunds
-    // Quick Return lookup (Task 685) â€” sale screen se bill number â†’ return form.
-    // /api/ prefix keeps it inside sw.js skipPatterns (never SW-cached).
-    Route::get('/api/return-lookup', [\App\Http\Controllers\FbrPosPhase2Controller::class, 'quickReturnLookup'])->name('fbrpos.phase2.return.lookup');
-    Route::get('/transactions/{id}/return', [\App\Http\Controllers\FbrPosPhase2Controller::class, 'returnForm'])->name('fbrpos.phase2.return.form');
-    Route::post('/transactions/{id}/return', [\App\Http\Controllers\FbrPosPhase2Controller::class, 'processReturn'])->name('fbrpos.phase2.return.process');
-
-    // Udhaar / Khata (Aug 2026 â€” Retail Core)
-    Route::get('/khata', [\App\Http\Controllers\FbrPosKhataController::class, 'index'])->name('fbrpos.khata');
-    Route::get('/khata/{customer}/ledger', [\App\Http\Controllers\FbrPosKhataController::class, 'ledger'])->name('fbrpos.khata.ledger');
-    Route::post('/khata/wasooli', [\App\Http\Controllers\FbrPosKhataController::class, 'wasooli'])->name('fbrpos.khata.wasooli');
-    // (Khata upgrade Aug 2026) manager-only thermal Wasooli ki rasid, keyed on the
-    // wasooli ledger entry. Company-scoped + assertNotCashier inside the controller.
-    Route::get('/khata/wasooli/{entry}/receipt', [\App\Http\Controllers\FbrPosKhataController::class, 'wasooliReceipt'])->name('fbrpos.khata.wasooli.receipt');
-    // (Khata upgrade Aug 2026) record a WhatsApp yaad-dehani send (stamps
-    // khata_last_reminder_at) â€” manager-only, company-scoped.
-    Route::post('/khata/{customer}/reminder-sent', [\App\Http\Controllers\FbrPosKhataController::class, 'markReminderSent'])->name('fbrpos.khata.reminder-sent');
-
-    // ðŸ‘¥ Customers page (Task 1260 â€” FBR twin of /pos/customers; shared
-    // pos_customers table, stats/history from fbr_pos_transactions only).
-    // List + add: every role (mirrors PRA). Manage actions: admin/manager only
-    // â€” assertNotCashier in the controller returns a true 403 (khata precedent;
-    // there is no FBR admin-only middleware group).
-    Route::get('/customers', [\App\Http\Controllers\FbrPosCustomerController::class, 'index'])->name('fbrpos.customers');
-    Route::post('/customers', [\App\Http\Controllers\FbrPosCustomerController::class, 'store'])->name('fbrpos.customers.store');
-    Route::get('/customers/export', [\App\Http\Controllers\FbrPosCustomerController::class, 'export'])->name('fbrpos.customers.export');
-    Route::get('/customers/template', [\App\Http\Controllers\FbrPosCustomerController::class, 'template'])->name('fbrpos.customers.template');
-    Route::post('/customers/import', [\App\Http\Controllers\FbrPosCustomerController::class, 'import'])->name('fbrpos.customers.import');
-    Route::put('/customers/{id}', [\App\Http\Controllers\FbrPosCustomerController::class, 'update'])->name('fbrpos.customers.update');
-    Route::delete('/customers/{id}', [\App\Http\Controllers\FbrPosCustomerController::class, 'destroy'])->name('fbrpos.customers.delete');
-    Route::post('/customers/{id}/toggle', [\App\Http\Controllers\FbrPosCustomerController::class, 'toggle'])->name('fbrpos.customers.toggle');
-    Route::get('/customers/{id}/history', [\App\Http\Controllers\FbrPosCustomerController::class, 'history'])->name('fbrpos.customers.history');
-    Route::get('/customers/{id}/history/export', [\App\Http\Controllers\FbrPosCustomerController::class, 'historyExport'])->name('fbrpos.customers.history.export');
-    Route::get('/customers/{id}/history/pdf', [\App\Http\Controllers\FbrPosCustomerController::class, 'historyPdf'])->name('fbrpos.customers.history.pdf');
-
-    // Category profile (Task 1582): stock, purchases, suppliers, munafa and the
-    // distributor ledger belong to goods/pharmacy shops (or an admin extra /
-    // grandfathered shop) â€” relevance-only so /stock keeps its own ON switch.
-    Route::middleware(['feature:inventory,relevant'])->group(function () {
-        // Stock / Purchase / Suppliers (Aug 2026 â€” Retail Core)
-        Route::get('/stock', [\App\Http\Controllers\FbrPosStockController::class, 'index'])->name('fbrpos.stock');
-        Route::get('/stock/purchases', [\App\Http\Controllers\FbrPosStockController::class, 'purchases'])->name('fbrpos.stock.purchases');
-        Route::get('/stock/movements', [\App\Http\Controllers\FbrPosStockController::class, 'movements'])->name('fbrpos.stock.movements');
-        Route::get('/stock/corrections', [\App\Http\Controllers\FbrPosStockController::class, 'corrections'])->name('fbrpos.stock.corrections');
-        Route::post('/stock/toggle', [\App\Http\Controllers\FbrPosStockController::class, 'toggle'])->name('fbrpos.stock.toggle')->middleware('plan.limit:inventory');
-        Route::post('/stock/supplier', [\App\Http\Controllers\FbrPosStockController::class, 'storeSupplier'])->name('fbrpos.stock.supplier')->middleware('plan.limit:inventory');
-        Route::post('/stock/supplier/{id}/update', [\App\Http\Controllers\FbrPosStockController::class, 'updateSupplier'])->name('fbrpos.stock.supplier.update')->middleware('plan.limit:inventory');
-        Route::post('/stock/supplier/{id}/delete', [\App\Http\Controllers\FbrPosStockController::class, 'deleteSupplier'])->name('fbrpos.stock.supplier.delete')->middleware('plan.limit:inventory');
-        Route::post('/stock/supplier/{id}/reactivate', [\App\Http\Controllers\FbrPosStockController::class, 'reactivateSupplier'])->name('fbrpos.stock.supplier.reactivate')->middleware('plan.limit:inventory');
-        Route::post('/stock/purchase', [\App\Http\Controllers\FbrPosStockController::class, 'storePurchase'])->name('fbrpos.stock.purchase')->middleware('plan.limit:inventory');
-        Route::post('/stock/purchase/{id}/void', [\App\Http\Controllers\FbrPosStockController::class, 'voidPurchase'])->name('fbrpos.stock.purchase.void')->middleware('plan.limit:inventory');
-        // Branch-to-branch stock transfer (Task 1365) â€” owner/manager only.
-        Route::get('/stock/transfer', [\App\Http\Controllers\FbrPosStockController::class, 'transfers'])->name('fbrpos.stock.transfers');
-        Route::post('/stock/transfer', [\App\Http\Controllers\FbrPosStockController::class, 'storeTransfer'])->name('fbrpos.stock.transfer.store')->middleware('plan.limit:inventory');
-        Route::post('/stock/min-level', [\App\Http\Controllers\FbrPosStockController::class, 'updateMinLevel'])->name('fbrpos.stock.minlevel')->middleware('plan.limit:inventory');
-        Route::post('/stock/item', [\App\Http\Controllers\FbrPosStockController::class, 'updateItem'])->name('fbrpos.stock.item')->middleware('plan.limit:inventory');
-        Route::get('/munafa', [\App\Http\Controllers\FbrPosStockController::class, 'munafa'])->name('fbrpos.munafa');
-        // ðŸ§¾ Distributor ledger (Task 1580) â€” supplier payments, statements and
-        // purchase returns. Same owner/manager gate + branch scoping as /stock;
-        // every money mutation sits behind plan.limit:inventory like the rest.
-        Route::post('/stock/payments', [\App\Http\Controllers\FbrPosSupplierLedgerController::class, 'storePayment'])->name('fbrpos.stock.payment.store')->middleware('plan.limit:inventory');
-        Route::post('/stock/payments/{id}/void', [\App\Http\Controllers\FbrPosSupplierLedgerController::class, 'voidPayment'])->name('fbrpos.stock.payment.void')->middleware('plan.limit:inventory');
-        Route::get('/stock/suppliers/{id}/statement', [\App\Http\Controllers\FbrPosSupplierLedgerController::class, 'statement'])->name('fbrpos.stock.supplier.statement');
-        Route::get('/stock/suppliers/{id}/statement/pdf', [\App\Http\Controllers\FbrPosSupplierLedgerController::class, 'statementPdf'])->name('fbrpos.stock.supplier.statement.pdf');
-        Route::get('/stock/returns', [\App\Http\Controllers\FbrPosSupplierLedgerController::class, 'returns'])->name('fbrpos.stock.returns');
-        Route::post('/stock/returns', [\App\Http\Controllers\FbrPosSupplierLedgerController::class, 'storeReturn'])->name('fbrpos.stock.return.store')->middleware('plan.limit:inventory');
-        Route::get('/stock/returns/{id}/print', [\App\Http\Controllers\FbrPosSupplierLedgerController::class, 'returnPrint'])->name('fbrpos.stock.return.print');
-        Route::get('/stock/purchases/{id}/lines', [\App\Http\Controllers\FbrPosSupplierLedgerController::class, 'purchaseLines'])->name('fbrpos.stock.purchase.lines');
-    });
-
-    // ðŸ’Š Pharmacy Mode (Task 1558) â€” batch/expiry stock, distributor expiry
-    // claims and pharmacy reports. Every action re-checks pharmacyLive() in
-    // the controller, so a bookmarked URL cannot walk around the nav hiding.
-    // ðŸ’Š Medicine Catalogue + MRP update notices (Task 1579) â€” pharmacyLive()
-    // re-checked in-controller; writes are company_admin only.
-    Route::get('/pharmacy/catalogue/search', [\App\Http\Controllers\FbrPosCatalogueController::class, 'search'])->name('fbrpos.pharmacy.catalogue.search');
-    Route::post('/pharmacy/catalogue/add', [\App\Http\Controllers\FbrPosCatalogueController::class, 'add'])->name('fbrpos.pharmacy.catalogue.add')->middleware('plan.limit:products');
-    Route::get('/pharmacy/price-updates', [\App\Http\Controllers\FbrPosCatalogueController::class, 'priceUpdates'])->name('fbrpos.pharmacy.price-updates');
-    Route::post('/pharmacy/price-updates/apply-all', [\App\Http\Controllers\FbrPosCatalogueController::class, 'applyAll'])->name('fbrpos.pharmacy.price-updates.apply-all');
-    Route::post('/pharmacy/price-updates/{id}/apply', [\App\Http\Controllers\FbrPosCatalogueController::class, 'apply'])->name('fbrpos.pharmacy.price-updates.apply');
-    Route::post('/pharmacy/price-updates/{id}/dismiss', [\App\Http\Controllers\FbrPosCatalogueController::class, 'dismiss'])->name('fbrpos.pharmacy.price-updates.dismiss');
-    Route::get('/pharmacy/batches', [\App\Http\Controllers\FbrPosPharmacyController::class, 'batches'])->name('fbrpos.pharmacy.batches');
-    Route::post('/pharmacy/batches', [\App\Http\Controllers\FbrPosPharmacyController::class, 'storeBatch'])->name('fbrpos.pharmacy.batch.store')->middleware('plan.limit:inventory');
-    Route::post('/pharmacy/batches/{id}/action', [\App\Http\Controllers\FbrPosPharmacyController::class, 'batchAction'])->name('fbrpos.pharmacy.batch.action')->middleware('plan.limit:inventory');
-    Route::get('/pharmacy/batch-options', [\App\Http\Controllers\FbrPosPharmacyController::class, 'batchOptions'])->name('fbrpos.pharmacy.batch.options');
-    Route::get('/pharmacy/claims', [\App\Http\Controllers\FbrPosPharmacyController::class, 'claims'])->name('fbrpos.pharmacy.claims');
-    Route::post('/pharmacy/claims', [\App\Http\Controllers\FbrPosPharmacyController::class, 'storeClaim'])->name('fbrpos.pharmacy.claim.store')->middleware('plan.limit:inventory');
-    Route::get('/pharmacy/claims/{id}', [\App\Http\Controllers\FbrPosPharmacyController::class, 'showClaim'])->name('fbrpos.pharmacy.claim');
-    Route::get('/pharmacy/claims/{id}/print', [\App\Http\Controllers\FbrPosPharmacyController::class, 'printClaim'])->name('fbrpos.pharmacy.claim.print');
-    Route::post('/pharmacy/claims/{id}/status', [\App\Http\Controllers\FbrPosPharmacyController::class, 'updateClaimStatus'])->name('fbrpos.pharmacy.claim.status')->middleware('plan.limit:inventory');
-    Route::get('/pharmacy/reports', [\App\Http\Controllers\FbrPosPharmacyController::class, 'reports'])->name('fbrpos.pharmacy.reports');
-    // Counter-side pharmacy (Sep 2026): near-expiry window, salt-alternative
-    // stock check, and the "customer asked, shop lacked" missed-sale log.
-    Route::post('/pharmacy/near-days', [\App\Http\Controllers\FbrPosPharmacyController::class, 'updateNearDays'])->name('fbrpos.pharmacy.near-days');
-    Route::get('/pharmacy/stock-check', [\App\Http\Controllers\FbrPosPharmacyController::class, 'stockCheck'])->name('fbrpos.pharmacy.stock-check');
-    Route::post('/pharmacy/missed-sales', [\App\Http\Controllers\FbrPosPharmacyController::class, 'storeMissedSale'])->name('fbrpos.pharmacy.missed-sales.store');
-    Route::get('/pharmacy/missed-sales', [\App\Http\Controllers\FbrPosPharmacyController::class, 'missedSales'])->name('fbrpos.pharmacy.missed-sales');
-    Route::post('/pharmacy/missed-sales/handled', [\App\Http\Controllers\FbrPosPharmacyController::class, 'missedSaleHandled'])->name('fbrpos.pharmacy.missed-sales.handled');
-
-    // ðŸšš Delivery Riders (Aug 2026 â€” FBR port of PRA PosRiderController)
-    // Board + mutations: admin + cashier. Rider CRUD: admin-only (checked in controller).
-    Route::get('/deliveries', [\App\Http\Controllers\FbrPosRiderController::class, 'deliveries'])->name('fbrpos.deliveries');
-    Route::post('/deliveries/{id}/assign', [\App\Http\Controllers\FbrPosRiderController::class, 'assign'])->name('fbrpos.deliveries.assign');
-    Route::post('/deliveries/{id}/status', [\App\Http\Controllers\FbrPosRiderController::class, 'updateStatus'])->name('fbrpos.deliveries.status');
-    Route::post('/deliveries/{id}/mark-prepaid', [\App\Http\Controllers\FbrPosRiderController::class, 'markPrepaid'])->name('fbrpos.deliveries.mark-prepaid');
-    Route::post('/deliveries/{id}/unmark-prepaid', [\App\Http\Controllers\FbrPosRiderController::class, 'unmarkPrepaid'])->name('fbrpos.deliveries.unmark-prepaid');
-    Route::post('/deliveries/rider/{riderId}/bulk-status', [\App\Http\Controllers\FbrPosRiderController::class, 'bulkStatus'])->name('fbrpos.deliveries.bulk');
-    Route::post('/riders/{id}/settle', [\App\Http\Controllers\FbrPosRiderController::class, 'settle'])->name('fbrpos.riders.settle');
-    Route::get('/riders', [\App\Http\Controllers\FbrPosRiderController::class, 'index'])->name('fbrpos.riders');
-    Route::post('/riders', [\App\Http\Controllers\FbrPosRiderController::class, 'store'])->name('fbrpos.riders.store');
-    Route::put('/riders/{id}', [\App\Http\Controllers\FbrPosRiderController::class, 'update'])->name('fbrpos.riders.update');
-    Route::post('/riders/{id}/login', [\App\Http\Controllers\FbrPosRiderController::class, 'saveLogin'])->name('fbrpos.riders.login');
-});
-
-// Schema/seed changes are CLI-only: `php artisan migrate --force` runs inside
-// scripts/lib/live-remote-apply.sh during the GitHub Actions deploy, and
-// `php artisan db:seed` is a local/dev command. The former web-reachable
-// /setup-migrate-* and /setup-seed-* closures were removed (unauthenticated
-// GET could run migrate/seed --force); tests/Feature/Security/SetupRoutesRemovedTest
-// guards against their return.
-
-// --------------------------------------------------------
-// AGENT API (TaxNest Desktop Sync Agent)
-// Bearer token auth, no CSRF
-// --------------------------------------------------------
-// â”€â”€ TaxNest Rider app API (Aug 2026) â€” stateless bearer-token JSON.
-// Rider signs in with his portal login; token rotates per login (one device).
-// CSRF-exempt via bootstrap/app.php ('api/rider-app/*').
-Route::prefix('api/rider-app/v1')->middleware(['throttle:120,1'])->withoutMiddleware($statelessMachine)->group(function () {
-    Route::post('/login', [\App\Http\Controllers\PosRiderTrackingController::class, 'appLogin'])->middleware('throttle:15,1')->name('riderapp.login');
-    Route::post('/duty', [\App\Http\Controllers\PosRiderTrackingController::class, 'appDuty'])->name('riderapp.duty');
-    // Task #1106: FCM push-token registration (async â€” token arrives after login / rotates via onNewToken).
-    Route::post('/fcm-token', [\App\Http\Controllers\PosRiderTrackingController::class, 'appFcmToken'])->name('riderapp.fcmtoken');
-    Route::post('/locations', [\App\Http\Controllers\PosRiderTrackingController::class, 'appLocations'])->name('riderapp.locations');
-    Route::get('/me', [\App\Http\Controllers\PosRiderTrackingController::class, 'appMe'])->name('riderapp.me');
-    Route::get('/deliveries/{txnId}/preview', [\App\Http\Controllers\RiderBillPreviewController::class, 'app'])->name('riderapp.preview');
-    // Task #1160: rider marks his own bill delivered from the app (additive â€” old APKs unaffected).
-    Route::post('/deliveries/{txnId}/delivered', [\App\Http\Controllers\PosRiderTrackingController::class, 'appMarkDelivered'])->name('riderapp.delivered');
-    Route::get('/version', [\App\Http\Controllers\PosRiderTrackingController::class, 'appVersion'])->name('riderapp.version');
-    Route::post('/logout', [\App\Http\Controllers\PosRiderTrackingController::class, 'appLogout'])->name('riderapp.logout');
-});
-
-// â”€â”€ TaxNest Caller ID app API (Task 1039) â€” stateless bearer-token JSON.
-// Shop admin/manager signs in with the portal login; token rotates per login
-// (one active phone per company). CSRF-exempt via bootstrap/app.php
-// ('api/caller-app/*'). Open to all POS plans for now.
-Route::prefix('api/caller-app/v1')->middleware(['throttle:120,1'])->withoutMiddleware($statelessMachine)->group(function () {
-    Route::post('/login', [\App\Http\Controllers\PosCallerIdController::class, 'appLogin'])->middleware('throttle:15,1')->name('callerapp.login');
-    Route::post('/ring', [\App\Http\Controllers\PosCallerIdController::class, 'appRing'])->name('callerapp.ring');
-    Route::get('/me', [\App\Http\Controllers\PosCallerIdController::class, 'appMe'])->name('callerapp.me');
-    Route::get('/version', [\App\Http\Controllers\PosCallerIdController::class, 'appVersion'])->name('callerapp.version');
-    Route::post('/logout', [\App\Http\Controllers\PosCallerIdController::class, 'appLogout'])->name('callerapp.logout');
-});
-
-// â”€â”€ Caller ID call-back queue (Task 1381) â€” apna throttle group.
-// Paired phone in do routes ko har chand second par maarta hai (yehi uska
-// "main zinda hoon aur call back kar sakta hoon" heartbeat bhi hai). Upar wale
-// group ka throttle:120,1 IP par lagta hai â€” ek NAT ke peeche kai shops ke
-// phone mil kar use chhoo lete, is liye alag, khula group.
-Route::prefix('api/caller-app/v1')->middleware(['throttle:600,1'])->withoutMiddleware($statelessMachine)->group(function () {
-    Route::get('/dial-requests', [\App\Http\Controllers\PosCallerIdController::class, 'appDialRequests'])->name('callerapp.dial.requests');
-    Route::post('/dial-result', [\App\Http\Controllers\PosCallerIdController::class, 'appDialResult'])->name('callerapp.dial.result');
-});
-
-// â”€â”€ DI invoice push API (Task 1231) â€” stateless Bearer-key JSON for third-party
-// DMS/ERP software (SAMS, Intellibiz, EasyDMSFlow, custom distributor systems).
-// Versioned v1; key managed at /company/api-access; CSRF-exempt via
-// bootstrap/app.php ('api/di/*'). Suspended/pending companies rejected by di.api.
-Route::prefix('api/di/v1')->middleware(['di.api', 'throttle:120,1'])->withoutMiddleware($statelessMachine)->group(function () {
-    // Billable endpoint: subscription access gate (same hasAccess() decision
-    // CheckPlanLimit applies to the panel) sits ONLY here â€” status stays readable
-    // for a locked company so an ERP can still reconcile what it already filed.
-    Route::post('/invoices', [\App\Http\Controllers\Api\DiInvoiceApiController::class, 'store'])
-        ->middleware([\App\Http\Middleware\DiApiSubscriptionAccess::class, 'throttle:60,1'])->name('diapi.invoices.store');
-    Route::get('/invoices/status', [\App\Http\Controllers\Api\DiInvoiceApiController::class, 'status'])->name('diapi.invoices.status');
-});
-
-// Live Ops runner API â€” trusted GitHub Actions / server only (X-Live-Ops-Token).
-// Cloud Agents never hold LIVE_OPS_RUNNER_TOKEN.
-Route::prefix('api/live-ops/v1')->middleware(['throttle:30,1'])->withoutMiddleware($statelessMachine)->group(function () {
-    Route::post('/diagnose', [\App\Http\Controllers\Api\LiveOpsRunnerController::class, 'diagnose']);
-    Route::post('/owner-command', [\App\Http\Controllers\Api\LiveOpsRunnerController::class, 'ownerCommand']);
-    Route::post('/safe-auto-deploy', [\App\Http\Controllers\Api\LiveOpsRunnerController::class, 'safeAutoDeploy']);
-    Route::post('/remediate/propose', [\App\Http\Controllers\Api\LiveOpsRunnerController::class, 'propose']);
-    Route::post('/remediate/{actionId}/approve', [\App\Http\Controllers\Api\LiveOpsRunnerController::class, 'approve']);
-    Route::post('/remediate/{actionId}/execute', [\App\Http\Controllers\Api\LiveOpsRunnerController::class, 'execute']);
-});
-
-// throttle:agent-api (AppServiceProvider) â€” 600/min per presented key, before
-// agent.auth so unauthenticated floods are bounded too. The v2 group below
-// keeps its own per-route throttles and is NOT double-wrapped.
-Route::prefix('api/agent')->middleware(['throttle:agent-api', 'agent.auth'])->withoutMiddleware($statelessMachine)->group(function () {
-    Route::post('/pra-fbr-ims/claim', [\App\Http\Controllers\PosTaxIntegrationController::class,'agentClaim']);
-    Route::post('/pra-fbr-ims/result', [\App\Http\Controllers\PosTaxIntegrationController::class,'agentResult']);
-    // Local realtime gateway credential exchange; deliberately sessionless.
-    Route::get('/realtime-auth', [\App\Http\Controllers\AgentController::class, 'realtimeAuth']);
-    Route::post('/heartbeat', [\App\Http\Controllers\AgentController::class, 'heartbeat']);
-    Route::get('/pending-invoices', [\App\Http\Controllers\AgentController::class, 'pendingInvoices']);
-    Route::post('/submit-result', [\App\Http\Controllers\AgentController::class, 'submitResult']);
-    // Silent printer routing â€” agent reports printers + polls/prints queued jobs.
-    // Task 1187: agent setup form saves the chosen receipt printer directly.
-    Route::post('/device-printer', [\App\Http\Controllers\AgentController::class, 'setDevicePrinter']);
-    Route::post('/printers', [\App\Http\Controllers\AgentController::class, 'reportPrinters']);
-    Route::get('/print-jobs', [\App\Http\Controllers\AgentController::class, 'claimPrintJobs']);
-    Route::get('/print-jobs/{id}/content', [\App\Http\Controllers\AgentController::class, 'printJobContent']);
-    Route::post('/print-jobs/{id}/result', [\App\Http\Controllers\AgentController::class, 'printJobResult']);
-    // LAN Mode: rings the phone could only deliver to the shop's own PC while
-    // the internet was down, forwarded once it is back (history only).
-    Route::post('/caller-events', [\App\Http\Controllers\AgentController::class, 'callerEvents']);
-    // Live Ops pending-command ACK/result (allow-listed commands only).
-    Route::post('/command-result', [\App\Http\Controllers\AgentController::class, 'commandResult']);
-});
-
-// Additive Local TaxNest Core protocol. This intentionally does not alter the
-// legacy /api/agent contract: companies must explicitly opt in before v2 exists.
-Route::prefix('api/agent/v2')->middleware(['agent.auth', 'agent.core.enabled'])->withoutMiddleware($statelessMachine)->group(function () {
-    Route::get('/capabilities', [\App\Http\Controllers\Api\AgentCoreController::class, 'capabilities']);
-    Route::post('/events', [\App\Http\Controllers\Api\AgentCoreController::class, 'storeEvents'])
-        ->middleware('throttle:60,1');
-    Route::get('/status', [\App\Http\Controllers\Api\AgentCoreController::class, 'status'])
-        ->middleware('throttle:60,1');
-    Route::post('/snapshot', [\App\Http\Controllers\Api\AgentCoreController::class, 'snapshot'])
-        ->middleware('throttle:10,1');
-});
-
-// === Public business profile + menu (F8) â€” slug-only, throttled, 404 on unknown ===
-Route::get('/menu/{slug}', [\App\Http\Controllers\PublicProfileController::class, 'show'])
-    ->middleware('throttle:60,1')
-    ->name('public.company-profile');
-
-// === Public bill page (Task 777) â€” the receipt QR on non-fiscal (local/
-// provisional) bills opens this. Token-only lookup (64-hex share_token),
-// throttled, 404 on unknown â€” no login, no expiry (customers scan late),
-// archived bills open too. ===
-Route::get('/bill/{token}', [\App\Http\Controllers\PublicProfileController::class, 'showBill'])
-    ->middleware('throttle:60,1')
-    ->name('public.bill');
-
-// === PWA Diagnostics page (public â€” no sensitive data, only client-side checks) ===
-Route::get('/pwa-status', function () {
-    return response()->view('pwa-status')
-        ->header('Cache-Control', 'no-store');
-})->name('pwa.status');
-
-// === PWA Push Notification subscription endpoints (works for any auth guard) ===
-Route::post('/api/push/subscribe', [\App\Http\Controllers\PushSubscriptionController::class, 'store'])
-    ->middleware('throttle:30,1')
-    ->name('push.subscribe');
-Route::post('/api/push/unsubscribe', [\App\Http\Controllers\PushSubscriptionController::class, 'destroy'])
-    ->middleware('throttle:30,1')
-    ->name('push.unsubscribe');
-
-// FBR Reference Data Demo (public â€” no auth, just shows the data is queryable)
-Route::get('/fbr/reference-demo', [\App\Http\Controllers\FbrReferenceController::class, 'demo'])->name('fbr.reference.demo');
-Route::get('/api/fbr/hs-search', [\App\Http\Controllers\FbrReferenceController::class, 'searchHs'])->name('fbr.api.hs-search');
-Route::get('/api/fbr/sro-search', [\App\Http\Controllers\FbrReferenceController::class, 'searchSro'])->name('fbr.api.sro-search');
-Route::get('/api/fbr/item-sr-search', [\App\Http\Controllers\FbrReferenceController::class, 'searchItemSr'])->name('fbr.api.item-sr-search');
-Route::get('/api/fbr/hs-detail', [\App\Http\Controllers\FbrReferenceController::class, 'hsDetail'])->name('fbr.api.hs-detail');
-
-require __DIR__.'/auth.php';
-
-// Owner Deployment Approval Relay. Browser routes are admin-session protected;
-// machine routes use a signed GitHub Actions OIDC JWT (never a shared secret).
-Route::prefix('admin/deployment-approval')->middleware(['admin.auth'])->group(function () {
-    Route::get('/', [\App\Http\Controllers\SaasAdmin\OwnerDeploymentApprovalController::class, 'index'])->name('saas.admin.deployment-approval');
-    Route::post('/', [\App\Http\Controllers\SaasAdmin\OwnerDeploymentApprovalController::class, 'store'])->name('saas.admin.deployment-approval.store');
-    Route::get('/{requestId}/review', [\App\Http\Controllers\SaasAdmin\OwnerDeploymentApprovalController::class, 'review'])
-        ->middleware(['signed', 'throttle:10,1'])->name('saas.admin.deployment-approval.review');
-    Route::post('/{requestId}/approve', [\App\Http\Controllers\SaasAdmin\OwnerDeploymentApprovalController::class, 'approve'])->name('saas.admin.deployment-approval.approve');
-});
-Route::prefix('api/deployment-approval/v1')->middleware('throttle:30,1')->withoutMiddleware($statelessMachine)->group(function () {
-    Route::post('/dispatch-claims', [\App\Http\Controllers\SaasAdmin\OwnerDeploymentApprovalController::class, 'dispatchClaims']);
-    Route::post('/approval-claims', [\App\Http\Controllers\SaasAdmin\OwnerDeploymentApprovalController::class, 'claim']);
-    Route::post('/merge-complete', [\App\Http\Controllers\SaasAdmin\OwnerDeploymentApprovalController::class, 'mergeComplete']);
-    Route::post('/owner-status', [\App\Http\Controllers\SaasAdmin\OwnerDeploymentApprovalController::class, 'ownerStatus']);
-    Route::post('/deploy-run', [\App\Http\Controllers\SaasAdmin\OwnerDeploymentApprovalController::class, 'deployRun']);
-    Route::post('/provenance/verify', [\App\Http\Controllers\SaasAdmin\OwnerDeploymentApprovalController::class, 'provenance']);
-    Route::post('/status', [\App\Http\Controllers\SaasAdmin\OwnerDeploymentApprovalController::class, 'status']);
-});
-
-// Owner-authorized read-only MCP reporting, isolated from Live Ops runner credentials.
-Route::middleware('throttle:60,1')->withoutMiddleware($statelessMachine)->group(function () {
-    Route::get('/.well-known/oauth-authorization-server', [\App\Http\Controllers\Reporting\OAuthController::class, 'metadata']);
-    Route::get('/.well-known/oauth-protected-resource', [\App\Http\Controllers\Reporting\OAuthController::class, 'resource']);
-    Route::get('/.well-known/oauth-protected-resource/api/reporting/mcp', [\App\Http\Controllers\Reporting\OAuthController::class, 'resource']);
-    Route::post('/api/reporting/oauth/register', [\App\Http\Controllers\Reporting\OAuthController::class, 'register'])->middleware('throttle:10,1');
-    Route::post('/api/reporting/oauth/token', [\App\Http\Controllers\Reporting\OAuthController::class, 'token']);
-    Route::match(['GET', 'POST', 'DELETE'], '/api/reporting/mcp', [\App\Http\Controllers\Reporting\McpController::class, 'handle']);
-});
-Route::middleware(['admin.auth', 'throttle:60,1'])->group(function () {
-    Route::get('/admin/reporting/oauth/authorize', [\App\Http\Controllers\Reporting\OAuthController::class, 'consent']);
-    Route::post('/admin/reporting/oauth/authorize', [\App\Http\Controllers\Reporting\OAuthController::class, 'approve']);
-    Route::get('/admin/reporting/connections', [\App\Http\Controllers\Reporting\OAuthController::class, 'connections']);
-    Route::post('/admin/reporting/connections/{id}/revoke', [\App\Http\Controllers\Reporting\OAuthController::class, 'revoke'])->whereUuid('id');
-});
-
-Route::middleware('auth')->prefix('profile/greetings')->name('greetings.')->group(function () {
-    Route::get('/', [\App\Http\Controllers\GreetingPreferencesController::class, 'index'])->name('index');
-    Route::post('/', [\App\Http\Controllers\GreetingPreferencesController::class, 'save'])->name('save');
-    Route::post('/recipient', [\App\Http\Controllers\GreetingPreferencesController::class, 'recipient'])->name('recipient');
-    Route::post('/preview', [\App\Http\Controllers\GreetingPreferencesController::class, 'preview'])->name('preview');
-});
+YªçŠx-®éÜj×¢ëiºÚ+Š§j[h‘éÜ¢éí×MõÓtèµ©hºÚn¶X§zÍOÜ‚\ÙH\ÛÛ›Û\œ×›Ùš[PÛÛ›Û\ŽÂ\ÙH\ÛÛ›Û\œ×Ü×Ù™›[™T]Y]YT™\ÜÛÛ›Û\ŽÂ\ÙH[[Z[˜]WÝ\Ü˜XØY\×›Ý]NÂ‚‹ËÈ^XÝYÝX\™]]Üš^˜][Ûˆ]™\È[ˆHÛÛ›Û\ˆÛÈHÚ[[™ÙHØ[››Ý‹ËÈ™Y\™XÝ˜XÚÈ[È]ÈÝÛˆ›ÝXÝYZY]Ø\™Kˆ[Üš]\È™]Z[ˆÙXˆÔÔ‘‹‚”›Ý]NŽœ™Yš^
+	ÜÙXÝ\š]KÝÛË\Ý\ÞÜ[™[IÊKOÚ\™JÉÜ[™[	ÈOˆ	Ù_Üß˜œœÜßX[YZ[‰×JBˆO˜ÛÛ›Û\Š\ÛÛ›Û\œ×]]ÛÔÝ\ÛÛ›Û\ŽŽ˜Û\ÜÊKO™Ü›Ý\
+[˜Ý[Ûˆ
+
+HÂˆ›Ý]NŽ™Ù]
+	ËÉË	ÜÙ][™ÜÉÊKO›˜[YJ	ÝÛË\Ý\œÙ][™ÜÉÊNÂˆ›Ý]NŽ™Ù]
+	ËØÚ[[™ÙIË	ØÚ[[™ÙIÊKO›˜[YJ	ÝÛË\Ý\˜Ú[[™ÙIÊNÂˆ›Ü™XXÚ
+ÉØ™YÚ[‰Ë	ØÛÛ™š\›IË	Ý™\šYžIË	Ù\ØX›IË	ÛÙÛÝ]	×H\È	XÝ[ÛŠHÂˆ›Ý]NŽœÜÝ
+	ËÉË‰XÝ[Û‹	XÝ[ÛŠKO›ZY]Ø\™J	Ý›ÝNŒŒIÊKO›˜[YJ	ÝÛË\Ý\‰Ë‰XÝ[ÛŠNÂˆBˆJNÂ‚‹ËÈ8¥ 8¥ Ý][\ÜÈXXÚ[™H[™Ú[È
+\ÚÈLL
+H8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ ‹ËÈÚÙ[‹ÝÙXšÛÚËX]][XØ]Y[™Ú[È]žHXXÚ[™\È
+\ÚÝÜYÙ[]™\žB‹ËÈKLÌÈ\ˆÚÜšY\‹ØØ[\ˆ\Ëš[ÛY]šXÈ]šXÙ\ËÐHÙXšÛÚÜÊKˆ^B‹ËÈ]™H[ˆ›Ý]\ËÝÙX‹œÛÈžHY˜][^HÙ]H•SÙXˆÜ›Ý\ˆÛÛÚÚY\È
+Â‹ËÈÝ\Ù\ÜÚ[Ûˆ
+ÈÙ\ÜÚ[Û‹Y\[™[ZY]Ø\™KˆÚ]ÑTÔÒSÓ—Ñ’U‘TY]X˜\ÙHÛ‚‹ËÈ]™K]™\žHÝXÚ™\]Y\Ý
+^[ÜÈÙY\È›ÈÛÛÚÚY\ÊHYHÙ\ÜÚ[ÛœÈÑSPÕ
+Â‹ËÈHœ˜[™[™]ÈÙ\ÜÚ[ÛœÈS”ÑT•
+ÈØË[Ý\žHSU\È8 %Ý\Ø[™ÈÙˆØ\˜˜YÙB‹ËÈÙ\ÜÚ[Ûˆ›ÝÜÈ[™È^˜HˆÝ][Y[È\ˆÛˆ\š[™ÈHMÈ]YÈŒ‚‹ËÈšYÚ\Ú\ÈÛÛšX]YÈ^TÔS•ÛÈX[žHÛÛ›™XÝ[ÛœÈˆ
+L
+K‚‹ËÈÝš\[™ÈÙ\ÜÚ[Û‹ØÛÛÚÚYHZY]Ø\™HXZÙ\È\ÙH™\]Y\ÝÈÙ\ÜÚ[Û‹Yœ™YK‚‹ËÈ“ÕNˆH[\\œÛÛ˜][Û‹ØÛÛœÝ[[ÛØØ[HZY]Ø\™H™[ÝÈØ[‹ËÈ	™\]Y\ÝOœÙ\ÜÚ[ÛŠ
+H[™ÝX\™YÛÈ^HUTÕÛÛYHÙ™ˆÙÙ]\ˆÚ]‹ËÈÝ\Ù\ÜÚ[ÛˆÜˆ]™\žH™\]Y\ÝÛÝ[L‚‰Ý][\ÜÓXXÚ[™HHÂˆ\ZY]Ø\™WÛÛ\[žTÙ\ÜÚ[Û‘Ù[™\˜][ÛŽŽ˜Û\ÜËˆ[[Z[˜]WÛÛÚÚYWZY]Ø\™W[˜Üž\ÛÛÚÚY\ÎŽ˜Û\ÜËˆ[[Z[˜]WÛÛÚÚYWZY]Ø\™WY]Y]YYÛÛÚÚY\ÕÔ™\ÜÛœÙNŽ˜Û\ÜËˆ[[Z[˜]WÙ\ÜÚ[Û—ZY]Ø\™WÝ\Ù\ÜÚ[ÛŽŽ˜Û\ÜËˆ[[Z[˜]WšY]×ZY]Ø\™WÚ\™Q\œ›ÜœÑœ›ÛTÙ\ÜÚ[ÛŽŽ˜Û\ÜËˆ[[Z[˜]W›Ý[™][Û—ZY]Ø\™W˜[Y]PÜÜ™•ÚÙ[ŽŽ˜Û\ÜËˆ\ZY]Ø\™W™XYÛ›R[\\œÛÛ˜][ÛŽŽ˜Û\ÜËˆ\ZY]Ø\™WÙÒ[\\œÛÛ˜]YÜš]\ÎŽ˜Û\ÜËˆ\ZY]Ø\™WÛÛœÝ[[ÝÚ]ÚÝX\™Ž˜Û\ÜËˆ\ZY]Ø\™WÙ]ÜÓØØ[NŽ˜Û\ÜË—NÂ\ÙH[[Z[˜]WÝ\Ü˜XØY\×\\Ø[ŽÂ\ÙH\ÛÛ›Û\œ×[›ÚXÙPÛÛ›Û\ŽÂ\ÙH\ÛÛ›Û\œ×YZ[ÛÛ›Û\ŽÂ\ÙH\ÛÛ›Û\œ×š[[™ÐÛÛ›Û\ŽÂ\ÙH\ÛÛ›Û\œ×\Ú›Ø\™ÛÛ›Û\ŽÂ\ÙH\ÛÛ›Û\œ×ÛÛ\X[˜ÙPÙ\YšXØ]PÛÛ›Û\ŽÂ\ÙH\ÛÛ›Û\œ×ÛÛ\X[˜ÙPÛÛ›Û\ŽÂ\ÙH\ÛÛ›Û\œ×š\ÚÔ™\ÜÛÛ›Û\ŽÂ\ÙH\ÛÛ›Û\œ×›ÙXÝÛÛ›Û\ŽÂ\ÙH\ÛÛ›Û\œ×RTÐÛÛ›Û\ŽÂ\ÙH\ÛÛ›Û\œ×ÓX\Ý\‘^ÜÛÛ›Û\ŽÂ\ÙH\ÛÛ›Û\œ×ÛØ˜[ÓX\Ý\ÛÛ›Û\ŽÂ\ÙH\ÛÛ›Û\œ×Ü›Ô™Y™\™[˜ÙPÛÛ›Û\ŽÂ\ÙH\ÛÛ›Û\œ×YZ[—ÓX\Ý\ÛÛ›Û\ŽÂ\ÙH\ÛÛ›Û\œ×Ú\™PÛÛ›Û\ŽÂ\ÙH\ÛÛ›Û\œ×ÛÛ\[žU\Ù\ÛÛ›Û\ŽÂ\ÙH\ÛÛ›Û\œ×ÛÛ\[žPÛÛœÝ[[ÛÛ›Û\ŽÂ\ÙH\ÛÛ›Û\œ×ÛÛœÝ[[ÛÛœÛÛPÛÛ›Û\ŽÂ\ÙH\ÛÛ›Û\œ×ÛÛ\[žTÙ][™ÜÐÛÛ›Û\ŽÂ\ÙH\ÛÛ›Û\œ×Ý\ÝÛY\“YÙ\ÛÛ›Û\ŽÂ\ÙH\ÛÛ›Û\œ×ÜÐÛÛ›Û\ŽÂ\ÙH\ÛÛ›Û\œ×™\Ý]\˜[ÜÐÛÛ›Û\ŽÂ\ÙH\ÛÛ›Û\œ×™\Ý]\˜[X›PÛÛ›Û\ŽÂ\ÙH\ÛÛ›Û\œ×™\Ý]\˜[ÙÐÛÛ›Û\ŽÂ\ÙH\ÛÛ›Û\œ×[™Ü™YY[ÛÛ›Û\ŽÂ\ÙH\ÛÛ›Û\œ×ÜÒ[™[ÜžPÛÛ›Û\ŽÂ\ÙH\ÛÛ›Û\œ×ÜÒ[™[ÜžSX\Ý\ÛÛ›Û\ŽÂ\ÙH\ÛÛ›Û\œ×ÜÔÝØÚÐÚXÚÐÛÛ›Û\ŽÂ\ÙH\ÛÛ›Û\œ×ÜÔÝØÚÒ[ÛÛ›Û\ŽÂ\ÙH\ÛÛ›Û\œ×Ý[ÛÛ›Û\ŽÂ\ÙH\ÛÛ›Û\œ×ÜÐ]]ÛÛ›Û\ŽÂ\ÙH\ÛÛ›Û\œ×ÐÛÙSX\[™ÐÛÛ›Û\ŽÂ\ÙH\ÛÛ›Û\œ×œ˜[˜ÚÛÛ›Û\ŽÂ\ÙH\ÛÛ›Û\œ×œ˜[˜ÚÝÚ]ÚÛÛ›Û\ŽÂ\ÙH\ÛÛ›Û\œ×Û˜›Ø\™[™ÐÛÛ›Û\ŽÂ\ÙH\ÛÛ›Û\œ×^Ý™\œšYPÛÛ›Û\ŽÂ\ÙH\ÛÛ›Û\œ×Ý\ÝÛY\”›Ùš[PÛÛ›Û\ŽÂ\ÙH\ÛÛ›Û\œ×Ú™\ÜÛÛ›Û\ŽÂ\ÙH\ÛÛ›Û\œ×ÜÝ’[\ÜÛÛ›Û\ŽÂ\ÙH\ÛÛ›Û\œ×[›ÚXÙR[\ÜÛÛ›Û\ŽÂ\ÙH\ÛÛ›Û\œ×ZR[›ÚXÙT™XY\ÛÛ›Û\ŽÂ\ÙH\ÛÛ›Û\œ×˜œ”ÜÐÛÛ›Û\ŽÂ\ÙH\ÛÛ›Û\œ×˜œ”ÜÐ]]ÛÛ›Û\ŽÂ\ÙH\ÛÛ›Û\œ×X[ÛÛ›Û\ŽÂ\ÙH\ÛÛ›Û\œ×X[]]ÛÛ›Û\ŽÂ\ÙH\ÛÛ›Û\œ×X[\\Y[ÛÛ›Û\ŽÂ\ÙH\ÛÛ›Û\œ×X[][™[˜ÙPÛÛ›Û\ŽÂ\ÙH\ÛÛ›Û\œ×X[ÛÛ›Û\ŽÂ\ÙH\ÛÛ›Û\œ×X[X]™PÛÛ›Û\ŽÂ\ÙH\ÛÛ›Û\œ×X[›ÜÝ\ÛÛ›Û\ŽÂ\ÙH\ÛÛ›Û\œ×X[Ù[”Ù\šXÙPÛÛ›Û\ŽÂ\ÙH\ÛÛ›Û\œ×X[X[PÛÛ›Û\ŽÂ\ÙH\ÛÛ›Û\œ×X[X[XØÛÝ[ÐÛÛ›Û\ŽÂ\ÙH\ÛÛ›Û\œ×X[X[]Y]ÛÛ›Û\ŽÂ\ÙH\ÛÛ›Û\œ×X[X[XØÛÝ[Ô™\ÜÛÛ›Û\ŽÂ\ÙH\ÛÛ›Û\œ×X[X[ØÝÜ”Ú\™PÛÛ›Û\ŽÂ\ÙH\ÛÛ›Û\œ×X[X[YZ\ÜÚ[ÛÛÛ›Û\ŽÂ\ÙH\ÛÛ›Û\œ×X[X[\Ú[Y[ÛÛ›Û\ŽÂ\ÙH\ÛÛ›Û\œ×X[X[Û[šXØ[ÛÛ›Û\ŽÂ\ÙH\ÛÛ›Û\œ×X[X[ØÝÜÛÛ›Û\ŽÂ\ÙH\ÛÛ›Û\œ×X[X[\™\ÜÛÛ›Û\ŽÂ\ÙH\ÛÛ›Û\œ×X[X[Ü™\ÜÛÛ›Û\ŽÂ\ÙH\ÛÛ›Û\œ×X[X[š[[™ÐÛÛ›Û\ŽÂ\ÙH\ÛÛ›Û\œ×X[X[Ü\˜][ÛÛÛ›Û\ŽÂ\ÙH\ÛÛ›Û\œ×X[X[Ø\™ÛÛ›Û\ŽÂ\ÙH\ÛÛ›Û\œ×X[X[]Y[ÛÛ›Û\ŽÂ\ÙH\ÛÛ›Û\œ×X[X[Ù]\[\ÜÛÛ›Û\ŽÂ\ÙH\ÛÛ›Û\œ×X[\›XXÞPÛÛ›Û\ŽÂ\ÙH\ÛÛ›Û\œ×X[\›XXÞT\˜Ú\ÙPÛÛ›Û\ŽÂ\ÙH\ÛÛ›Û\œ×X[\›XXÞTÝØÚÐÛÛ›Û\ŽÂ\ÙH\ÛÛ›Û\œ×X[\›XXÞT™\ØÜš\[ÛÛÛ›Û\ŽÂ\ÙH\ÛÛ›Û\œ×X[\›XXÞTØ[PÛÛ›Û\ŽÂ\ÙH\ÛÛ›Û\œ×X[\›XXÞT™\ÜÛÛ›Û\ŽÂ\ÙH\ÛÛ›Û\œ×[™[ÜžPÛÛ›Û\ŽÂ\ÙH\ÛÛ›Û\œ×Ý\Y\ÛÛ›Û\ŽÂ\ÙH\ÛÛ›Û\œ×[››Ý[˜Ù[Y[ÛÛ›Û\ŽÂ‚‹ËÈ]Y]XÚÈ’TšXH[\Ü˜\žHÚYÛ™YT“œ›ÛHHœXÚÈ™XYHˆ[XZ[8 %›ÈÙÚ[‚‹ËÈ™YYYˆ	ÜÚYÛ™Y	ÈZY]Ø\™HÜÈ[\\™YÙ^\™Y[šÜÈ
+^\žHHXÚÈ™][[ÛŠK‚”›Ý]NŽ™Ù]
+	ËØÛÛ\X[˜ÙKØ]Y]\XÚÜËÞÜXÚßKÙÝÛ›ØY\ÚYÛ™Y	ËÐÛÛ\X[˜ÙPÛÛ›Û\ŽŽ˜Û\ÜË	ÙÝÛ›ØYÚYÛ™Y	×JBˆO›ZY]Ø\™J	ÜÚYÛ™Y	ÊBˆO›˜[YJ	ØÛÛ\X[˜ÙKœXÚÜË™ÝÛ›ØY\ÚYÛ™Y	ÊNÂ‚”›Ý]NŽ™Ù]
+	ËÜÚ\™KÚ[›ÚXÙKÞÝ]ZYIËÔÚ\™PÛÛ›Û\ŽŽ˜Û\ÜË	ÜÚÝÉ×JNÂ”›Ý]NŽ™Ù]
+	ËÜÚ\™KÚ[›ÚXÙKÞÝ]ZYKÜ‰ËÔÚ\™PÛÛ›Û\ŽŽ˜Û\ÜË	Ü‰×JKO›˜[YJ	ÜÚ\™Kš[›ÚXÙKœ‰ÊNÂ‚‹ËÈY]HÚ]Ð\ÛÝYTHÝ]\ÈÙXšÛÚÈ
+\‹XÛÛ\[žNÈX›XÈ
+ÈÔÔ‘‹Y^[\
+K‚”›Ý]NŽœÜÝ
+	ËØ\KÙXYÛ›ÜÝXÜËØ˜XÚÝ\Y]šY[˜ÙKÞÜÛÝ\˜Ù_IË×\ÛÛ›Û\œ×XYÛ›ÜÝXÜ×˜XÚÝ\]šY[˜ÙPÛÛ›Û\ŽŽ˜Û\ÜË	ÜÝÜ™I×JBˆOÚ\™U]ZY
+	ÜÛÝ\˜ÙIÊKO›ZY]Ø\™J	Ý›ÝNŒIÊKOÚ]Ý]ZY]Ø\™J	Ý][\ÜÓXXÚ[™JNÂ‚”›Ý]NŽ™Ù]
+	ËÝÙXšÛÚÜËÝÚ]Ø\ÞØÛÛ\[ž_IË×\ÛÛ›Û\œ×Ú]Ð\ÙXšÛÚÐÛÛ›Û\ŽŽ˜Û\ÜË	Ý™\šYžI×JKOÚ\™S[X™\Š	ØÛÛ\[žIÊKOÚ]Ý]ZY]Ø\™J	Ý][\ÜÓXXÚ[™JNÂ”›Ý]NŽœÜÝ
+	ËÝÙXšÛÚÜËÝÚ]Ø\ÞØÛÛ\[ž_IË×\ÛÛ›Û\œ×Ú]Ð\ÙXšÛÚÐÛÛ›Û\ŽŽ˜Û\ÜË	Ü™XÙZ]™I×JKOÚ\™S[X™\Š	ØÛÛ\[žIÊKOÚ]Ý]ZY]Ø\™J	Ý][\ÜÓXXÚ[™JNÂ‚‹ËÈØØ[Y]™[ÜY[ÛÛ™[šY[˜ÙHÛ›KˆHÛÛ›Û\ˆ˜Z[ÈÛÜÙY
+
+H[›\ÜÂ‹ËÈTÑS•[ØØ[S‘SS×ÓÑÒS—ÑSP“Q]YNÈš]š[YÙY›Û\È\™H™]™\ˆÙ™™\™Y‚”›Ý]NŽ™Ù]
+	ËÙ[[Ë[ÙÚ[‹ÞÜ›Û_IË×\ÛÛ›Û\œ×]]]][XØ]YÙ\ÜÚ[ÛÛÛ›Û\ŽŽ˜Û\ÜË	Ù[[ÓÙÚ[‰×JBˆOÚ\™J	Ü›ÛIË	ØÛÛ\[žWØYZ[Ÿ[[ÉÊNÂ‚‹ËÈ[™œ˜\ÝXÝ\™HXYÛ›ÜÝXËˆ]\ÙYÈÚ]ÛˆÚX[ÚXÚ\ÈÜ›Û™ÈÚXÙB‹ËÈÝ™\Žˆ]™Yš^›ÝÈ™[Û™ÜÈÈH™\ÝT”ÈX[Ø\™H[™[[™H^[ØY‹ËÈ
+]X˜\ÙHÜÝÝ\Ù\‹Ù\ÜÚ[Ûˆ[™ØXÚHš]™\œËHÛXÙHÙˆH™\]‚‹ËÈš[JH\È›È\Ú[™\ÜÈ™Z[™È™XYX›HÚ]Ý]ÚYÛš[™È[‹ˆ[Ý™Y™Z[™B‹ËÈØXTÈYZ[ˆÝX\™Ûˆ]ÈÝÛˆ]‚”›Ý]NŽ™Ù]
+	Ë××ÙXYËÚ[™œ˜\ÝXÝ\™IË[˜Ý[Ûˆ
+
+HÂˆ	™\]ÛÛ[H	ÉÎÂˆYˆ
+š[WÙ^\ÝÊ	ËÝ\Ü™\]‰ÊJHÂˆ	˜]ÈHš[Jš[WÙÙ]ØÛÛ[Ê	ËÝ\Ü™\]‰ÊJNÂˆYˆ
+™Y×ÛX]Ú
+	Ë×ŠÜÝÜ™\Ê[
+OÎ—×Ö×Ž—JÎ–×JÐ
+J×—×JÊJ×ÊÊKÉË	˜]Ë	JJHÂˆ	™\]ÛÛ[H	ÜÜÝÜ™\×Ý\›ÚÜÝIÈˆ	VÌ×NÂˆH[ÙHÂˆ	™\]ÛÛ[HÝXœÝŠ	˜]ËÌ
+Hˆ	Ë‹‹‰ÎÂˆBˆBˆ	•\›Ù][ˆHÙ][Š	ÑUPTÑWÕT“	ÊHÎˆ	Ù[\IÎÂˆ	•\›[ˆH	ÑS•–ÉÑUPTÑWÕT“	×HÏÈ	Ù[\IÎÂˆ	•\›Ù\™\ˆH	ÔÑT•‘T–ÉÑUPTÑWÕT“	×HÏÈ	Ù[\IÎÂˆ	•\›\˜]™[H[Š	ÑUPTÑWÕT“	ÊHÎˆ	Ù[\IÎÂˆ	•\›š[HHš[WÙ^\ÝÊ	ËÝ\Ü›ÙÙ]X˜\ÙWÝ\›	ÊHÈš[Jš[WÙÙ]ØÛÛ[Ê	ËÝ\Ü›ÙÙ]X˜\ÙWÝ\›	ÊJHˆ	Ù[\IÎÂˆ	•\›ÛÝ\˜Ù\ÈHÂˆ	ÙÙ][‰ÈOˆ
+	•\›Ù][ˆOOH	Ù[\IÊHÈ	ÜÙ]	Èˆ	Ù[\IËˆ	×ÑS•‰ÈOˆ
+	•\›[ˆOOH	Ù[\IÊHÈ	ÜÙ]	Èˆ	Ù[\IËˆ	×ÔÑT•‘T‰ÈOˆ
+	•\›Ù\™\ˆOOH	Ù[\IÊHÈ	ÜÙ]	Èˆ	Ù[\IËˆ	Û\˜]™[Ù[‰ÈOˆ
+	•\›\˜]™[OOH	Ù[\IÊHÈ	ÜÙ]	Èˆ	Ù[\IËˆ	Ùš[WÙ[\	ÈOˆ
+	•\›š[HOOH	Ù[\IÈ	‰ˆY[\J	•\›š[JJHÈ	ÜÙ]	Èˆ	Ù[\IËˆNÂˆ	›Ý[™\›H[Âˆ›Ü™XXÚ
+É•\›Ù][‹	•\›[‹	•\›Ù\™\‹	•\›\˜]™[H\È	Ø[™Y]JHÂˆYˆ
+	Ø[™Y]HOOH	Ù[\IÈ	‰ˆ™Y×ÛX]Ú
+	Ë×œÜÝÜ™\Ê[
+OÎ—×ËÉË	Ø[™Y]JJHÂˆ	›Ý[™\›H	Ø[™Y]NÂˆœ™XZÎÂˆBˆBˆ	™\ÛÛ™YÜÝH	Û›Û™IÎÂˆYˆ
+	›Ý[™\›
+HÂˆ	H\œÙWÝ\›
+™Y×Ü™\XÙJ	Ë×œÜÝÜ™\Î—×ËÉË	ÜÜÝÜ™\Ü[‹ËÉË	›Ý[™\›
+JNÂˆ	™\ÛÛ™YÜÝH	ÉÚÜÝ	×HÏÈ	Ü\œÙWÙ˜Z[	ÎÂˆBˆ	[™›ÈHÂˆ	ÜÝ]\ÉÈOˆ	ÛÚÉËˆ	Ù—ÚÜÝ	ÈOˆÛÛ™šYÊ	Ù]X˜\ÙK˜ÛÛ›™XÝ[ÛœËœÜÜ[šÜÝ	ÊKˆ	Ù—ÜÜ	ÈOˆÛÛ™šYÊ	Ù]X˜\ÙK˜ÛÛ›™XÝ[ÛœËœÜÜ[œÜ	ÊKˆ	Ù—Û˜[YIÈOˆÛÛ™šYÊ	Ù]X˜\ÙK˜ÛÛ›™XÝ[ÛœËœÜÜ[™]X˜\ÙIÊKˆ	Ù—Ý\Ù\‰ÈOˆÛÛ™šYÊ	Ù]X˜\ÙK˜ÛÛ›™XÝ[ÛœËœÜÜ[\Ù\›˜[YIÊKˆ	ÜÙ\ÜÚ[Û—Ùš]™\‰ÈOˆÛÛ™šYÊ	ÜÙ\ÜÚ[Û‹™š]™\‰ÊKˆ	ØØXÚWÙš]™\‰ÈOˆÛÛ™šYÊ	ØØXÚK™Y˜][	ÊKˆ	ØÛÛ™šY×ØØXÚY	ÈOˆš[WÙ^\ÝÊ˜\ÙWÜ]
+	Ø›ÛÝÝ˜\ØØXÚKØÛÛ™šYËœ	ÊJKˆ	Ü™\]—Ù^\ÝÉÈOˆš[WÙ^\ÝÊ	ËÝ\Ü™\]‰ÊKˆ	Ü™\]—ØÛÛ[	ÈOˆ	™\]ÛÛ[ˆ	Ù]X˜\ÙWÝ\›ÜÛÝ\˜Ù\ÉÈOˆ	•\›ÛÝ\˜Ù\Ëˆ	Ü™\ÛÛ™YÙ—ÚÜÝ	ÈOˆ	™\ÛÛ™YÜÝˆ	ÜÚÜÝÙÙ][‰ÈOˆÙ][Š	ÔÒÔÕ	ÊHÎˆ	Û›ÝÜÙ]	Ëˆ	Ù—ÚÜÝÙÙ][‰ÈOˆÙ][Š	Ñ—ÒÔÕ	ÊHÎˆ	Û›ÝÜÙ]	ËˆNÂˆžHÂˆ	Ý\HZXÜ›Ý[YJYJNÂˆŽŽ˜ÛÛ›™XÝ[ÛŠ
+KO™Ù]Ê
+NÂˆ	[™›ÖÉÙ‰×HH	ØÛÛ›™XÝY	ÎÂˆ	[™›ÖÉÙ—Ý[YI×HH›Ý[™
+
+ZXÜ›Ý[YJYJHH	Ý\
+H
+ˆL
+Hˆ	Û\ÉÎÂˆHØ]Ú
+^Ù\[Ûˆ	JHÂˆ	[™›ÖÉÙ‰×HH	Ù˜Z[Y	ÎÂˆ	[™›ÖÉÙ—Ù\œ›Ü‰×HHÝXœÝŠ	KO™Ù]Y\ÜØYÙJ
+KÌ
+NÂˆBˆ™]\›ˆ™\ÜÛœÙJ
+KOšœÛÛŠ	[™›ÊNÂŸJKO›ZY]Ø\™J	Ø]]˜YZ[‰ÊNÂ‚”›Ý]NŽ™Ù]
+	ËÉË[˜Ý[Ûˆ
+
+HÂˆËÈ\™ˆ
+[ŒŠNˆ\ÙHÓÕS•ÈÝ™\ˆšYÈX›\ÈÛÜÝŒL\ÈÛˆU‘T–BˆËÈ[™[™È]8 %ØXÚHLZ[ˆ
+X\šÙ][™ÈÝ]ÈÛ‰Ý™YYÈ™H]™JK‚ˆžHÂˆ	Ý]ÈH[[Z[˜]WÝ\Ü˜XØY\×ØXÚNŽœ™[Y[X™\Š	Û[™[™×ÜÝ]ÉËŒ[˜Ý[Ûˆ
+
+HÂˆ™]\›ˆÂˆ	ÝÝ[Ú[›ÚXÙ\ÉÈOˆ\[Ù[×[›ÚXÙNŽÚ\™J	ÜÝ]\ÉË	ÛØÚÙY	ÊKO˜ÛÝ[
+
+BˆËÈHÜš]\È	ÜÝX›Z]Y	È
+™]™\ˆ	ÜÝXØÙ\ÜÉÊNÈ”ˆÔÈÜš]\È	ÜÝXØÙ\ÜÉË‚ˆ
+È\[Ù[×ÜÕ˜[œØXÝ[ÛŽŽÚ\™R[Š	Ü˜WÜÝ]\ÉËÉÜÝX›Z]Y	Ë	ÜÝXØÙ\ÜÉ×JKO˜ÛÝ[
+
+Bˆ
+È\[Ù[×˜œ”ÜÕ˜[œØXÝ[ÛŽŽÚ\™R[Š	Ù˜œ—ÜÝ]\ÉËÉÜÝX›Z]Y	Ë	ÜÝXØÙ\ÜÉ×JKO˜ÛÝ[
+
+Kˆ	ÝÝ[ØÛÛ\[šY\ÉÈOˆ\[Ù[×ÛÛ\[žNŽÚ\™J	ÜÝ]\ÉË	Ø\›Ý™Y	ÊKO˜ÛÝ[
+
+KˆNÂˆJNÂˆHØ]Ú
+›ÝØX›H	JHÂˆËÈˆÝÛŽˆÚÝÈ™\›ÜÈ›ÜˆTÈ™\]Y\ÝÛ›H8 %™]™\ˆØXÚH™\›ÜÈ›ÜˆLZ[‹‚ˆÙÎŽØ\›š[™Ê	Ó[™[™ÈÝ]È[˜]˜Z[X›Nˆ	Èˆ	KO™Ù]Y\ÜØYÙJ
+JNÂˆ	Ý]ÈHÉÝÝ[Ú[›ÚXÙ\ÉÈOˆ	ÝÝ[ØÛÛ\[šY\ÉÈOˆNÂˆB‚ˆ™]\›ˆšY]Ê	Û[™[™ÉËÂˆ	ÜÚÝÓÙÚ[‰ÈOˆ˜[ÙKˆ	ÜÝ]ÉÈOˆ	Ý]ËˆJNÂŸJNÂ‚”›Ý]NŽ™Ù]
+	ËØÛÛXÝ	Ë›ˆ
+
+HOˆšY]Ê	ØÛÛXÝ	ÊJKO›˜[YJ	ØÛÛXÝ	ÊNÂ”›Ý]NŽšY]Ê	ËÜ›ÙXÝYÝZYIË	Ü›ÙXÝYÝZYIÊKO›˜[YJ	Ü›ÙXÝYÝZYIÊNÂ‚‹ËÈX›XÈYØ[YÙ\ËˆÛÛÙÛH^H[ˆÛ›ÈT“ÈÛÈ\Ý[™ÈYZ[ˆXX[™ÝHZH]\‚‹ËÈYZÚXÚÈØ\HZHÙHÛÚš[˜HÙÚ[ˆÚ[[ˆ
+\ÚÈLÍŠH8 %\È^YHYZÝY\Ý‹ËÈ›Ý]\ÈZ[‹Ú\ÚHZY]Ø\™HÙH[™\ˆ˜ZKˆØÛÛXÝÜš]˜XÞHØHÚÝB‹ËÈÚ[\ØHXZ[HZNÈ]ZØ[[X[ÛXÞHÜš]˜XÞH\ˆZK‚”›Ý]NŽ™Ù]
+	ËÜš]˜XÞIË›ˆ
+
+HOˆšY]Ê	Üš]˜XÞIÊJKO›˜[YJ	Üš]˜XÞIÊNÂ”›Ý]NŽ™Ù]
+	ËÙ]KY[][Û‰Ë›ˆ
+
+HOˆšY]Ê	Ù]KY[][Û‰ÊJKO›˜[YJ	Ù]KY[][Û‰ÊNÂ‚”›Ý]NŽ™Ù]
+	ËÜÚ][X\ž[	Ë[˜Ý[Ûˆ
+
+HÂˆ	\›ÈHÂˆÉÛØÉÈOˆ\›
+	ËÉÊK	Üš[Üš]IÈOˆ	ÌKŒ	Ë	ØÚ[™ÙYœ™\IÈOˆ	ÝÙYZÛI×KˆÉÛØÉÈOˆ\›
+	ËÜÜÉÊK	Üš[Üš]IÈOˆ	ÌŽIË	ØÚ[™ÙYœ™\IÈOˆ	Û[ÛI×KˆÉÛØÉÈOˆ\›
+	ËÙ˜œ‹\ÜË[[™[™ÉÊK	Üš[Üš]IÈOˆ	ÌŽIË	ØÚ[™ÙYœ™\IÈOˆ	Û[ÛI×KˆÉÛØÉÈOˆ\›
+	ËÙYÚ][Z[›ÚXÙIÊK	Üš[Üš]IÈOˆ	ÌŽIË	ØÚ[™ÙYœ™\IÈOˆ	Û[ÛI×KˆÉÛØÉÈOˆ\›
+	ËÝ]ÜšX[ÉÊK	Üš[Üš]IÈOˆ	ÌŽ	Ë	ØÚ[™ÙYœ™\IÈOˆ	ÝÙYZÛI×KˆÉÛØÉÈOˆ\›
+	ËÙÝÛ›ØY	ÊK	Üš[Üš]IÈOˆ	ÌÉË	ØÚ[™ÙYœ™\IÈOˆ	Û[ÛI×KˆÉÛØÉÈOˆ\›
+	ËØÛÛXÝ	ÊK	Üš[Üš]IÈOˆ	Ì‰Ë	ØÚ[™ÙYœ™\IÈOˆ	ÞYX\›I×KˆÉÛØÉÈOˆ\›
+	ËÜš]˜XÞIÊK	Üš[Üš]IÈOˆ	ÌIË	ØÚ[™ÙYœ™\IÈOˆ	ÞYX\›I×KˆÉÛØÉÈOˆ\›
+	ËÙ]KY[][Û‰ÊK	Üš[Üš]IÈOˆ	Ì	Ë	ØÚ[™ÙYœ™\IÈOˆ	ÞYX\›I×KˆNÂˆ™]\›ˆ™\ÜÛœÙJ
+KOšY]Ê	ÜÚ][X\	ËÛÛ\XÝ
+	Ý\›ÉÊJBˆOšXY\Š	ÐÛÛ[U\IË	Ø\XØ][Û‹Þ[	ÊNÂŸJKO›˜[YJ	ÜÚ][X\	ÊNÂ‚‹ËÈX›XÈÝÛ›ØYÈXˆ8 %ÙÝÛ›ØY
+Ú[™Ý[\ŠHÛˆ\œÜÙNˆÙÝÛ›ØYËÈ\ÈH™X[‹ËÈ\™XÝÜžH[ˆX›XËÈ
+TÜËYÙ[š\
+H[™\XÚHÙ\™\È^\Ý[™È\œÂ‹ËÈ\™XÝKÛÈ]]™]™\ˆ™XXÚ\È\˜]™[‚”›Ý]NŽ™Ù]
+	ËÙÝÛ›ØY	Ë›ˆ
+
+HOˆšY]Ê	ÙÝÛ›ØYÉÊJKO›˜[YJ	ÙÝÛ›ØYËœYÙIÊNÂ‚‹ËÈ[‹X\\]HÚXÚÈ›ÜˆH[™›ÚYÚ[È
+\ÚÈÍÊH8 %X›XËÝ][\ÜÂ‹ËÈ”ÓÓ‹ˆXXÚ\Ø[È\ÈÛˆ][˜ÚÚ]]ÈÝÛˆÙ^H[™ÛÛ\\™\ÈB‹ËÈ™]\›™Y]\ÝYØZ[œÝ]È[œÝ[Y™\œÚ[Û“˜[YNÈ[\H]\ÝH›Â‹ËÈ\]H›Û\
+ÝÛ™\ˆ\Û‰Ý™[X\ÙYÈ›\YH™\œÚ[ÛˆY]
+K‚”›Ý]NŽ™Ù]
+	ËØ\KØ\]™\œÚ[Û‰Ë[˜Ý[Ûˆ
+
+HÂˆ	X\HÂˆ	ÜÜÉÈOˆÉÜÙ][™ÉÈOˆ	ÜÜ×Ø\Û]\ÝÝ™\œÚ[Û‰Ë	Ø\ÉÈOˆ	ÙÝÛ›ØYËÝ^™\Ý\ÜË˜\É×Kˆ	Ù˜œœÜÉÈOˆÉÜÙ][™ÉÈOˆ	Ù˜œœÜ×Ø\Û]\ÝÝ™\œÚ[Û‰Ë	Ø\ÉÈOˆ	ÙÝÛ›ØYËÝ^™\ÝY˜œ‹\ÜË˜\É×Kˆ	ÝØZ]\‰ÈOˆÉÜÙ][™ÉÈOˆ	ÝØZ]\—Ø\Û]\ÝÝ™\œÚ[Û‰Ë	Ø\ÉÈOˆ	ÙÝÛ›ØYËÝ^™\Ý]ØZ]\‹˜\É×Kˆ	ÜšY\‰ÈOˆÉÜÙ][™ÉÈOˆ	ÜšY\—Ø\Û]\ÝÝ™\œÚ[Û‰Ë	Ø\ÉÈOˆ	ÙÝÛ›ØYËÝ^™\Ý\šY\‹˜\É×Kˆ	ÙIÈOˆÉÜÙ][™ÉÈOˆ	ÙWØ\Û]\ÝÝ™\œÚ[Û‰Ë	Ø\ÉÈOˆ	ÙÝÛ›ØYËÝ^™\ÝYK˜\É×Kˆ	ØØ[\‰ÈOˆÉÜÙ][™ÉÈOˆ	ØØ[\—Ø\Û]\ÝÝ™\œÚ[Û‰Ë	Ø\ÉÈOˆ	ÙÝÛ›ØYËÝ^™\ÝXØ[\‹˜\É×KˆËÈØ[\ˆQÚHÚ]Ð\Ø[HZ[
+\ÚÈLÍJH8 %[YÈ™XÛÜ™[YÈTËˆËÈXZÙH\ÈØ[HÛ™HÛÈÛX[ˆZ[ØH\]H˜HÚ[H˜^YK‚ˆ	ØØ[\—Ü\ÉÈOˆÉÜÙ][™ÉÈOˆ	ØØ[\—Ø\Ü\×Û]\ÝÝ™\œÚ[Û‰Ë	Ø\ÉÈOˆ	ÙÝÛ›ØYËÝ^™\ÝXØ[\‹\\Ë˜\É×KˆNÂˆ	\H
+Ýš[™ÊH™\]Y\Ý
+
+KOœ]Y\žJ	Ø\	Ë	ÉÊNÂˆYˆ
+Z\ÜÙ]
+	X\É\JJHÂˆ™]\›ˆ™\ÜÛœÙJ
+KOšœÛÛŠÉÛÚÉÈOˆ˜[ÙK	Ù\œ›Ü‰ÈOˆ	Ý[šÛ›ÝÛˆ\	×K
+NÂˆBˆ	]\ÝHš[J
+Ýš[™ÊH\[Ù[×Þ\Ý[TÙ][™ÎŽ™Ù]
+	X\É\VÉÜÙ][™É×K	ÉÊJNÂˆËÈ\ÚÈMLÈ8 %Û›HY™\\ÙHH™\œÚ[ÛˆHÔÕQš[HXÝX[HÛÛZ[œËˆËÈÛÈHÙ][™È›\Y™Y›Ü™HH\ØY™]™\ˆ˜YÜÈÛ™\È[È[œÝ[[™ÂˆËÈHØ[YHÛž]\Ëˆ˜Z[ÈÜ[ˆÚ[ˆHTÈ\È›ÝÛˆ\ÚÈ
+]‹ÐÒJK‚ˆ	]\ÝH\Ù\šXÙ\×\ÓX[šY™\Ý™XY\ŽŽ˜Y™\\ÙY™\œÚ[ÛŠ	]\ÝX›X×Ü]
+	X\É\VÉØ\É×JJNÂˆ™]\›ˆ™\ÜÛœÙJ
+KOšœÛÛŠÂˆ	ÛÚÉÈOˆYKˆ	Ø\	ÈOˆ	\ˆ	Û]\Ý	ÈOˆ	]\Ýˆ	Ø\×Ý\›	ÏOˆ\›
+	X\É\VÉØ\É×JKˆJNÂŸJKO›˜[YJ	Ø\K˜\]™\œÚ[Û‰ÊNÂ”›Ý]NŽ™Ù]
+	ËÙÝÛ›ØYØYÙ[	Ë×\ÛÛ›Û\œ×YÙ[X[˜YÙ[Y[ÛÛ›Û\ŽŽ˜Û\ÜË	ÙÝÛ›ØYYÙ[	×JKO›˜[YJ	ÜX›XË˜YÙ[™ÝÛ›ØY	ÊNÂ‚‹ËÈ\™H]ÜšX[šY[ÈXœ˜\žH
+ÝÛ™\ˆ™\]Y\Ýˆ]YÈŒŠH8 %X›XÈYÙK‹ËÈ[šÙYœ›ÛHHX\šÙ][™ÈÜ˜]‹ˆ[‹X\Ú[ˆ]™\È]ÜÜËÝ]ÜšX[Ë‚”›Ý]NŽ™Ù]
+	ËÝ]ÜšX[ÉË×\ÛÛ›Û\œ×]ÜšX[ÛÛ›Û\ŽŽ˜Û\ÜË	ÜX›XÒ[™^	×JKO›˜[YJ	Ý]ÜšX[ËœYÙIÊNÂ‚”›Ý]NŽ™Ù]
+	ËÙYÚ][Z[›ÚXÙIË[˜Ý[Ûˆ
+
+HÂˆËÈÛ›HHXÚØYÙ\ÈÝ[ÛˆØ[H8 %™]\™Y[œÈÙY\Z\ˆ›ÝÜÈ›Ü‚ˆËÈ^\Ý[™ÈÝXœØÜš\[ÛœÈ]]\Ý™]™\ˆ™HÜ™\˜X›Hœ›ÛHH[™[™Ë‚ˆ	[œÈH\Ù\šXÙ\×T[ÛÛ\\š\ÛÛ”Ù\šXÙNŽœ[œÊ
+NÂˆ™]\›ˆšY]Ê	ÙK[[™[™ÉËÉÜ[œÉÈOˆ	[œ×JNÂŸJKO›˜[YJ	ÙK›[™[™ÉÊNÂ‚”›Ý]NŽœ™Y\™XÝ
+	ËÙIË	ËÙYÚ][Z[›ÚXÙIËÌJNÂ‚”›Ý]NŽ™Ù]
+	ËÜÜÉË[˜Ý[Ûˆ
+
+HÂˆ	[œÈH\Ù\šXÙ\×ÜÔ[ÛÛ\\š\ÛÛ”Ù\šXÙNŽœ[œÊ
+NÂˆ™]\›ˆšY]Ê	ÜÜË›[™[™ÉËÉÜ[œÉÈOˆ	[œ×JNÂŸJKO›˜[YJ	ÜÜË›[™[™ÉÊNÂ”›Ý]NŽ™Ù]
+	ËÜÜËÛÙÚ[‰ËÔÜÐ]]ÛÛ›Û\ŽŽ˜Û\ÜË	ÜÚÝÓÙÚ[‰×JKO›˜[YJ	ÜÜË›ÙÚ[‰ÊNÂ”›Ý]NŽœÜÝ
+	ËÜÜËÛÙÚ[‰ËÔÜÐ]]ÛÛ›Û\ŽŽ˜Û\ÜË	ÛÙÚ[‰×JNÂ”›Ý]NŽ™Ù]
+	ËÜÜËÜ™YÚ\Ý\‰ËÔÜÐ]]ÛÛ›Û\ŽŽ˜Û\ÜË	ÜÚÝÔ™YÚ\Ý\‰×JKO›˜[YJ	ÜÜËœ™YÚ\Ý\‰ÊNÂ”›Ý]NŽœÜÝ
+	ËÜÜËÜ™YÚ\Ý\‰ËÔÜÐ]]ÛÛ›Û\ŽŽ˜Û\ÜË	Ü™YÚ\Ý\‰×JNÂ”›Ý]NŽœÜÝ
+	ËÜÜËÛÙÛÝ]	ËÔÜÐ]]ÛÛ›Û\ŽŽ˜Û\ÜË	ÛÙÛÝ]	×JKO›˜[YJ	ÜÜË›ÙÛÝ]	ÊNÂ‹ËÈÝY\Ý[™ÝXYÙHXÚÙ\ˆÛˆÙÚ[‹Ü™YÚ\Ý\ˆ
+]YÈŒŠNˆÙ\ÜÚ[Û‹[Û›HÚÚXÙH8 %‹ËÈÙ]ÜÓØØ[H[ˆ›ÛÝÜÈ]Ûˆ[ÝY\ÝYÙ\È[˜Ûˆ›ÛÝ›Ü™ÛÝÜ™\Ù]\\ÜÝÛÜ™‚”›Ý]NŽœÜÝ
+	ËÜÜËÙÝY\Ý[[™ÝXYÙIË[˜Ý[Ûˆ
+[[Z[˜]W™\]Y\Ý	™\]Y\Ý
+HÂˆ	[™ÈH	™\]Y\ÝOš[œ]
+	Û[™ÝXYÙIÊNÂˆYˆ
+\Ý\ÜÜÓØØ[NŽš\Õ˜[Y
+	[™ÊJHÂˆ	™\]Y\ÝOœÙ\ÜÚ[ÛŠ
+KOœ]
+\Ý\ÜÜÓØØ[NŽ”ÑTÔÒSÓ—ÒÑVK	[™ÊNÂˆBˆ™]\›ˆ˜XÚÊ
+NÂŸJKO›˜[YJ	ÜÜË™ÝY\Ý[[™ÝXYÙIÊNÂ‚”›Ý]NŽ™Ù]
+	ËÜÜËÚ[›ÚXÙKÜÚ\™KÞÝÚÙ[ŸIËÔÜÐÛÛ›Û\ŽŽ˜Û\ÜË	ÜX›XÒ[›ÚXÙT‰×JKO›˜[YJ	ÜÜËš[›ÚXÙKœÚ\™IÊNÂ‚‹ËÈ\ÚÈLÌNˆ”ˆÚ[ˆ8 %P“PÈÚÙ[™Yš[ˆ›ÜˆÚ]Ð\Ú\™H
+”‚‹ËÈ[›ÚXÙH[X™\ˆ
+È^\ØX[ˆTˆ[XÝÈ›Ýš\Ú[Û˜[Ù^\™YÚÙ[œÈ™Y\ÙJK‚”›Ý]NŽ™Ù]
+	ËÙ˜œ‹\ÜËÚ[›ÚXÙKÜÚ\™KÞÝÚÙ[ŸIËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	ÜX›XÒ[›ÚXÙT‰×JKO›˜[YJ	Ù˜œœÜËš[›ÚXÙKœÚ\™IÊNÂ‚‹ËÈÝ\ÝÛY\ˆ]™H˜XÚÚ[™È
+\ÚÈLLJH8 %P“PÈÚÙ[š^™Y˜X\ØHšY\ˆXZ[‚‹ËÈZHˆYÙH
+ÈÛˆÚÙ[ˆHXÚ\ˆ˜[™ÛHYYÈÓ‘Hš[È›Ý[™Ú[Â‹ËÈ™KXÚXÚÈHÛÛ\[žIÜÈ[ˆÛˆ]™\žHØ[
+ÝÛ™Ü˜YHÚ[È]™H[šÜÊH[™‹ËÈ›\ÈH™XY[Û›H‘[]™\™YˆÝ]HÛ˜ÙHHš[ÛÜÙ\Ëˆ›ÝY‹ËÈ\‹RT
+ÚÙ[œÈÝ^H[™[[Y\˜X›JNÈÝ][\ÜÈ8 %›ÈÙ\ÜÚ[Û‹\›ÝÈÚ\›ˆœ›ÛB‹ËÈÝ\ÝÛY\œÉÈÛ™\ÈÛ[™È]™\žHLË‚”›Ý]NŽ™Ù]
+	ËÝ˜XÚËÞÝÚÙ[ŸIË×\ÛÛ›Û\œ×ÜÔšY\•˜XÚÚ[™ÐÛÛ›Û\ŽŽ˜Û\ÜË	ÜX›XÕ˜XÚÔYÙI×JBˆOÚ\™J	ÝÚÙ[‰Ë	ÖÐKV˜K^ŒNW^ÌŒIÊBˆO›ZY]Ø\™J	Ý›ÝNŒIÊKOÚ]Ý]ZY]Ø\™J	Ý][\ÜÓXXÚ[™JBˆO›˜[YJ	ÜÜË˜XÚËœX›XÉÊNÂ”›Ý]NŽ™Ù]
+	ËÝ˜XÚËÞÝÚÙ[ŸKÙ]IË×\ÛÛ›Û\œ×ÜÔšY\•˜XÚÚ[™ÐÛÛ›Û\ŽŽ˜Û\ÜË	ÜX›XÕ˜XÚÑ]I×JBˆOÚ\™J	ÝÚÙ[‰Ë	ÖÐKV˜K^ŒNW^ÌŒIÊBˆO›ZY]Ø\™J	Ý›ÝNŒIÊKOÚ]Ý]ZY]Ø\™J	Ý][\ÜÓXXÚ[™JBˆO›˜[YJ	ÜÜË˜XÚËœX›XË™]IÊNÂ‚‹ËÈš[ÛY]šXÈQTÈ\Ú[™Ú[
+]YÈŒŠH8 %P“PË›ÈÔÈ]]‚‹ËÈ’ÕXÛÈ[™ÛÛ\]X›H]šXÙ\ÈØ[Øš[Ë\Þ[˜ËÞÝÚÙ[ŸKÚXÛØÚËØÙ]K‚‹ËÈÚÙ[ˆY[YšY\È
+ÈØÛÜ\ÈHÛÛ\[žNÈ›ÈÙ\ÜÚ[Û‹ÐÔÔ‘ˆ™YYY‚”›Ý]NŽ™Ù]
+	ËØš[Ë\Þ[˜ËÞÝÚÙ[ŸKÚXÛØÚËØÙ]IË×\ÛÛ›Û\œ×ÜÐš[ÛY]šXÐÛÛ›Û\ŽŽ˜Û\ÜË	ØY\Ò[™ÚZÙI×JKO›˜[YJ	ÜÜË˜š[Ë\Þ[˜Ë˜Y\ËYÙ]	ÊKOÚ]Ý]ZY]Ø\™J	Ý][\ÜÓXXÚ[™JNÂ”›Ý]NŽœÜÝ
+	ËØš[Ë\Þ[˜ËÞÝÚÙ[ŸKÚXÛØÚËØÙ]IË×\ÛÛ›Û\œ×ÜÐš[ÛY]šXÐÛÛ›Û\ŽŽ˜Û\ÜË	ØY\Ô™XÙZ]™T[˜Ú\É×JKO›˜[YJ	ÜÜË˜š[Ë\Þ[˜Ë˜Y\Ë\ÜÝ	ÊKOÚ]Ý]ZY]Ø\™J	Ý][\ÜÓXXÚ[™JNÂ‹ËÈ›ÛÝQTÈ[™Ú[È
+]YÈŒŠH8 %ÍLÒÍXÛ\ÜÈš\›]Ø\™HÛ›HXØÙ\ÈH˜\™B‹ËÈÙ\™\ˆY™\ÜÈ
+›ÈT“]
+KÛÈÜÙH]šXÙ\È\ÚÈÚXÛØÚËØÙ]H]B‹ËÈÛXZ[ˆ›ÛÝˆ]šXÙH\ÈY[YšYYžHÔÓH
+]\Ý™H™K\™YÚ\Ý\™YÛˆÜÜËØš[Ë\Þ[˜ÊK‚‹ËÈ›ÝY\‹RTˆ]šXÙ\ÈÛ]™\žHŒÌMŒÈ
+È\Ú\œÝÎÈLŒÛZ[ˆ\ÈÙ[™\›Ý\Â‹ËÈ›Üˆ™X[\™Ø\™H]›ØÚÜÈÓ‹Y[[Y\˜][ÛˆØØ[œÈ[™[˜ÚY›ÛÙX\ÙK‚”›Ý]NŽ›ZY]Ø\™J	Ý›ÝNŒLŒIÊKOÚ]Ý]ZY]Ø\™J	Ý][\ÜÓXXÚ[™JKO™Ü›Ý\
+[˜Ý[Ûˆ
+
+HÂˆ›Ý]NŽ™Ù]
+	ËÚXÛØÚËØÙ]IË×\ÛÛ›Û\œ×ÜÐš[ÛY]šXÐÛÛ›Û\ŽŽ˜Û\ÜË	ØY\Ò[™ÚZÙPžTÛ‰×JKO›˜[YJ	ÜÜË˜š[Ë\Þ[˜Ë˜Y\Ë\›ÛÝYÙ]	ÊNÂˆ›Ý]NŽœÜÝ
+	ËÚXÛØÚËØÙ]IË×\ÛÛ›Û\œ×ÜÐš[ÛY]šXÐÛÛ›Û\ŽŽ˜Û\ÜË	ØY\Ô™XÙZ]™T[˜Ú\ÐžTÛ‰×JKO›˜[YJ	ÜÜË˜š[Ë\Þ[˜Ë˜Y\Ë\›ÛÝ\ÜÝ	ÊNÂˆ›Ý]NŽ›X]Ú
+ÉÙÙ]	Ë	ÜÜÝ	×K	ËÚXÛØÚËÙÙ]™\]Y\Ý	Ë×\ÛÛ›Û\œ×ÜÐš[ÛY]šXÐÛÛ›Û\ŽŽ˜Û\ÜË	ØY\Ó›ÐÛÛ[X[™	×JKO›˜[YJ	ÜÜË˜š[Ë\Þ[˜Ë˜Y\ËYÙ]™\]Y\Ý	ÊNÂˆ›Ý]NŽ›X]Ú
+ÉÙÙ]	Ë	ÜÜÝ	×K	ËÚXÛØÚËÙ]šXÙXÛY	Ë×\ÛÛ›Û\œ×ÜÐš[ÛY]šXÐÛÛ›Û\ŽŽ˜Û\ÜË	ØY\Ó›ÐÛÛ[X[™	×JKO›˜[YJ	ÜÜË˜š[Ë\Þ[˜Ë˜Y\ËY]šXÙXÛY	ÊNÂŸJNÂ‚‹ËÈ8¥d8¥d8¥dØØ[š[È\˜Ú]™HÜ[8¥d8¥d8¥d‹ËÈ\ÛÛ]Y™XY[Û›HÜ[›Üˆ\Ù\œÈÚ]Ü×Ü›ÛOIØ\˜Ú]™WÝšY]Ù\‰ËˆØ[YHÜÜËÛÙÚ[ˆT“‹ËÈ
+]]ËY]XÝY
+KˆÜÐ]]ZY]Ø\™HÛÛ™š[™\È\˜Ú]™WÝšY]Ù\ˆÈÜÜËØ\˜Ú]™KÊˆ[™‹ËÈ›ØÚÜÈ]™\žHÝ\ˆÜ×Ü›ÛHœ›ÛH\ÙH›Ý]\È
+
+KˆXØÛÝ[Ü™X]YÛX[˜YÙYÛ›B‹ËÈžHØXTÈÝ\\‹XYZ[ˆœ›ÛHØYZ[‹ØÛÛ\[šY\ËÞÚYK‚”›Ý]NŽ›ZY]Ø\™JÉÜÜË˜]]	×JKOœ™Yš^
+	ÜÜËØ\˜Ú]™IÊKO™Ü›Ý\
+[˜Ý[Ûˆ
+
+HÂˆ›Ý]NŽ™Ù]
+	ËÉË×\ÛÛ›Û\œ×ÜÐ\˜Ú]™PÛÛ›Û\ŽŽ˜Û\ÜË	Ú[™^	×JKO›˜[YJ	ÜÜË˜\˜Ú]™Kš[™^	ÊNÂˆ›Ý]NŽ™Ù]
+	ËÙ^Ü	Ë×\ÛÛ›Û\œ×ÜÐ\˜Ú]™PÛÛ›Û\ŽŽ˜Û\ÜË	Ù^ÜÜÝ‰×JKO›˜[YJ	ÜÜË˜\˜Ú]™K™^Ü	ÊNÂˆ›Ý]NŽ™Ù]
+	ËÞÚYIË×\ÛÛ›Û\œ×ÜÐ\˜Ú]™PÛÛ›Û\ŽŽ˜Û\ÜË	ÜÚÝÉ×JKOÚ\™S[X™\Š	ÚY	ÊKO›˜[YJ	ÜÜË˜\˜Ú]™KœÚÝÉÊNÂŸJNÂ‚‹ËÈ8¥d8¥d8¥dØØ[š[ÈÜ[8¥d8¥d8¥d‹ËÈ\ÛÛ]Y™XY[Û›HÜ[›Üˆ\Ù\œÈÚ]Ü×Ü›ÛOIÛØØ[ÝšY]Ù\‰ËˆØ[YHÜÜËÛÙÚ[ˆT“‹ËÈ
+]]ËY]XÝY
+KˆÜÐ]]ZY]Ø\™HÛÛ™š[™\ÈØØ[ÝšY]Ù\ˆÈÜÜËÛØØ[Xš[ËÊˆ[™‹ËÈ›ØÚÜÈ]™\žHÝ\ˆÜ×Ü›ÛHœ›ÛH\ÙH›Ý]\È
+
+Kˆ\È\ÈHÓ“HÝ\™˜XÙHÚ\™B‹ËÈØØ[
+›Û‹TJHš[È\™Hš\ÚX›KˆXØÛÝ[È\™HÜ™X]YÛX[˜YÙYžHHØXTÂ‹ËÈÝ\\‹XYZ[ˆS‘
+\ÚÈJHžHHÛÛ\[žHÕÓ‘Tˆ[\Ù[ˆœ›ÛH\ÈÜ[‚”›Ý]NŽ›ZY]Ø\™JÉÜÜË˜]]	×JKOœ™Yš^
+	ÜÜËÛØØ[Xš[ÉÊKO™Ü›Ý\
+[˜Ý[Ûˆ
+
+HÂˆ›Ý]NŽ™Ù]
+	ËÉË×\ÛÛ›Û\œ×ÜÓØØ[š[ÐÛÛ›Û\ŽŽ˜Û\ÜË	Ú[™^	×JKO›˜[YJ	ÜÜË›ØØ[š[™^	ÊNÂˆ›Ý]NŽ™Ù]
+	ËÙ^Ü	Ë×\ÛÛ›Û\œ×ÜÓØØ[š[ÐÛÛ›Û\ŽŽ˜Û\ÜË	Ù^ÜÜÝ‰×JKO›˜[YJ	ÜÜË›ØØ[™^Ü	ÊNÂ‚ˆËÈšY]Ù\‹XXØÛÝ[Ù[‹\Ù\šXÙH
+\ÚÈJH8 %ÕÓ‘TˆÓ“KˆÜÐ]]]È]™\žHÔÂˆËÈYZ[ˆ
+[˜ÛˆÜ×ÛX[˜YÙ\ŠH[È\È™Yš^ÛÈXXÚ[™Ú[[™›Ü˜Ù\ÂˆËÈ›ÛHOOH	ØÛÛ\[žWØYZ[‰È]Ù[ˆ
+ÊH8 %Y[™ÈHRH\È™]™\ˆHØ]K‚ˆ›Ý]NŽœÜÝ
+	ËÝšY]Ù\œÉË×\ÛÛ›Û\œ×ÜÓØØ[š[ÐÛÛ›Û\ŽŽ˜Û\ÜË	ÜÝÜ™UšY]Ù\‰×JKO›˜[YJ	ÜÜË›ØØ[šY]Ù\œËœÝÜ™IÊNÂˆ›Ý]NŽœ]
+	ËÝšY]Ù\œËÞÝ\Ù\’YIË×\ÛÛ›Û\œ×ÜÓØØ[š[ÐÛÛ›Û\ŽŽ˜Û\ÜË	Ý\]UšY]Ù\‰×JKOÚ\™S[X™\Š	Ý\Ù\’Y	ÊKO›˜[YJ	ÜÜË›ØØ[šY]Ù\œË\]IÊNÂˆ›Ý]NŽœÜÝ
+	ËÝšY]Ù\œËÞÝ\Ù\’YKÝÙÙÛIË×\ÛÛ›Û\œ×ÜÓØØ[š[ÐÛÛ›Û\ŽŽ˜Û\ÜË	ÝÙÙÛUšY]Ù\‰×JKOÚ\™S[X™\Š	Ý\Ù\’Y	ÊKO›˜[YJ	ÜÜË›ØØ[šY]Ù\œËÙÙÛIÊNÂˆ›Ý]NŽ™[]J	ËÝšY]Ù\œËÞÝ\Ù\’YIË×\ÛÛ›Û\œ×ÜÓØØ[š[ÐÛÛ›Û\ŽŽ˜Û\ÜË	Ù[]UšY]Ù\‰×JKOÚ\™S[X™\Š	Ý\Ù\’Y	ÊKO›˜[YJ	ÜÜË›ØØ[šY]Ù\œË™[]IÊNÂ‚ˆ›Ý]NŽ™Ù]
+	ËÞÚYIË×\ÛÛ›Û\œ×ÜÓØØ[š[ÐÛÛ›Û\ŽŽ˜Û\ÜË	ÜÚÝÉ×JKOÚ\™S[X™\Š	ÚY	ÊKO›˜[YJ	ÜÜË›ØØ[œÚÝÉÊNÂŸJNÂ‚‹ËÈœ˜[˜ÚÝÚ]Ú\ˆ8 %XØÙ\ÜÚX›HžHS–H]][XØ]YÝX\™
+ÙX‹ÜÜËÙ˜œœÜÊB”›Ý]NŽ›ZY]Ø\™J	ÝÙX‰ÊKOœÜÝ
+	ËØœ˜[˜ÚÜÝÚ]Ú	ËÐœ˜[˜ÚÝÚ]ÚÛÛ›Û\ŽŽ˜Û\ÜË	ÜÝÚ]Ú	×JKO›˜[YJ	Øœ˜[˜ÚœÝÚ]Ú	ÊNÂ‚”›Ý]NŽ›ZY]Ø\™JÉØ]]	Ë	ØÛÛ\[žIË	Ü˜]WÛ[Z]ØÛÛ\[žIË	ØÛÛ\[žK˜\›Ý˜[	×JKO™Ü›Ý\
+[˜Ý[Ûˆ
+
+HÂˆ›Ý]NŽ›X]Ú
+ÉÙÙ]	Ë	ÜÜÝ	×K	ËÛXYYØ\‹ÙK\™XY	Ë×\ÛÛ›Û\œ×SXYYØ\”™XYÛÛ›Û\ŽŽ˜Û\ÜË	ÜÚÝÉ×JKO›˜[YJ	ÙK›XYYØ\‹œ™XY	ÊKO›ZY]Ø\™J	Ý›ÝNŒŒIÊNÂˆ›Ý]NŽœÜÝ
+	ËÜÝ\™^KÞÚYKÜ™\ÜÛ™	Ë×\ÛÛ›Û\œ×ÜÔÝ\™^PÛÛ›Û\ŽŽ˜Û\ÜË	Ü™\ÜÛ™	×JKO™Y˜][Ê	ÜÝ\™^WÙÝX\™	Ë	ÝÙX‰ÊKO›˜[YJ	ÙKœÝ\™^Kœ™\ÜÛ™	ÊNÂˆ›Ý]NŽœÜÝ
+	ËÜÝ\™^KÞÚYKÙ\ÛZ\ÜÉË×\ÛÛ›Û\œ×ÜÔÝ\™^PÛÛ›Û\ŽŽ˜Û\ÜË	Ù\ÛZ\ÜÉ×JKO™Y˜][Ê	ÜÝ\™^WÙÝX\™	Ë	ÝÙX‰ÊKO›˜[YJ	ÙKœÝ\™^K™\ÛZ\ÜÉÊNÂ‚ˆ›Ý]NŽ™Ù]
+	ËÛÛ˜›Ø\™[™ÉËÓÛ˜›Ø\™[™ÐÛÛ›Û\ŽŽ˜Û\ÜË	Ú[™^	×JKO›˜[YJ	ÛÛ˜›Ø\™[™ÉÊNÂˆ›Ý]NŽœÜÝ
+	ËÛÛ˜›Ø\™[™ËØÛÛ\]IËÓÛ˜›Ø\™[™ÐÛÛ›Û\ŽŽ˜Û\ÜË	ØÛÛ\]I×JNÂˆ›Ý]NŽœÜÝ
+	ËÛÛ˜›Ø\™[™ËÜÚÚ\	ËÓÛ˜›Ø\™[™ÐÛÛ›Û\ŽŽ˜Û\ÜË	ÜÚÚ\	×JNÂ‚ˆ›Ý]NŽ™Ù]
+	ËÙ\Ú›Ø\™	ËÑ\Ú›Ø\™ÛÛ›Û\ŽŽ˜Û\ÜË	Ú[™^	×JKO›˜[YJ	Ù\Ú›Ø\™	ÊNÂˆ›Ý]NŽ™Ù]
+	ËÝÚ]Ë[™]ËÚ\ÝÜžIË×\ÛÛ›Û\œ×\\]PÛÛ›Û\ŽŽ˜Û\ÜË	Ú\ÝÜžI×JKO™Y˜][Ê	Ø[››Ý[˜Ù[Y[Ü[™[	Ë	ÙIÊKO›˜[YJ	ÙKÚ]Ë[™]Ëš\ÝÜžIÊNÂˆ›Ý]NŽœÜÝ
+	ËÝÚ]Ë[™]ËÜÙY[‰Ë×\ÛÛ›Û\œ×\\]PÛÛ›Û\ŽŽ˜Û\ÜË	ÛX\šÔÙY[‰×JKO›˜[YJ	ÙKÚ]Ë[™]ËœÙY[‰ÊNÂ‚ˆËÈ8¥ 8¥ ^ÛÛœÝ[[ÛÛœÛÛH
+[žHHÙXˆ\Ù\ˆØ[ˆ™XÛÛYHHÛÛœÝ[[
+H8¥ 8¥ ˆËÈ[šÚ[™È\ÈÛÛœÙ[X˜\ÙYÓ“Nˆ™YY[HHÛY[YÙ[™\˜]Y[š]HÛÙKÜ‚ˆËÈÙ[™H™\]Y\ÝHÛY[YZ[ˆ]\Ý\›Ý™KˆÝÚ]ÚH]Y]YÙÚ[ˆ\ÂˆËÈHÛY[	ÜÈYZ[ˆ\Ù\‹Ø]ÚYžHÛÛœÝ[[ÝÚ]ÚÝX\™ZY]Ø\™K‚ˆ›Ý]NŽœ™Yš^
+	ØÛÛœÝ[[	ÊKO™Ü›Ý\
+[˜Ý[Ûˆ
+
+HÂˆ›Ý]NŽ™Ù]
+	ËÉËÐÛÛœÝ[[ÛÛœÛÛPÛÛ›Û\ŽŽ˜Û\ÜË	Ú[™^	×JKO›˜[YJ	ØÛÛœÝ[[˜ÛÛœÛÛIÊNÂˆ›Ý]NŽ™Ù]
+	ËÙX\›š[™ÜÉËÐÛÛœÝ[[ÛÛœÛÛPÛÛ›Û\ŽŽ˜Û\ÜË	ÙX\›š[™ÜÉ×JKO›˜[YJ	ØÛÛœÝ[[™X\›š[™ÜÉÊNÂˆ›Ý]NŽœÜÝ
+	ËÜ^[Ý]Y]Z[ÉËÐÛÛœÝ[[ÛÛœÛÛPÛÛ›Û\ŽŽ˜Û\ÜË	ÜØ]™T^[Ý]]Z[É×JKO›˜[YJ	ØÛÛœÝ[[œ^[Ý]Y]Z[ÉÊNÂˆ›Ý]NŽœÜÝ
+	ËÚ›Ú[‰ËÐÛÛœÝ[[ÛÛœÛÛPÛÛ›Û\ŽŽ˜Û\ÜË	Ú›Ú[‰×JKO›˜[YJ	ØÛÛœÝ[[š›Ú[‰ÊNÂˆ›Ý]NŽœÜÝ
+	ËÜ™YY[IËÐÛÛœÝ[[ÛÛœÛÛPÛÛ›Û\ŽŽ˜Û\ÜË	Ü™YY[I×JKO›ZY]Ø\™J	Ý›ÝNŒLIÊKO›˜[YJ	ØÛÛœÝ[[œ™YY[IÊNÂˆ›Ý]NŽœÜÝ
+	ËÜ™\]Y\Ý	ËÐÛÛœÝ[[ÛÛœÛÛPÛÛ›Û\ŽŽ˜Û\ÜË	Ü™\]Y\Ý[šÉ×JKO›ZY]Ø\™J	Ý›ÝNŒLIÊKO›˜[YJ	ØÛÛœÝ[[œ™\]Y\Ý	ÊNÂˆ›Ý]NŽœÜÝ
+	ËÛ[šÜËÞÛ[šßKØØ[˜Ù[	ËÐÛÛœÝ[[ÛÛœÛÛPÛÛ›Û\ŽŽ˜Û\ÜË	ØØ[˜Ù[	×JKO›˜[YJ	ØÛÛœÝ[[˜Ø[˜Ù[	ÊNÂˆ›Ý]NŽœÜÝ
+	ËÛ[šÜËÞÛ[šßKÜ™]›ÚÙIËÐÛÛœÝ[[ÛÛœÛÛPÛÛ›Û\ŽŽ˜Û\ÜË	Ü™]›ÚÙI×JKO›˜[YJ	ØÛÛœÝ[[œ™]›ÚÙIÊNÂˆ›Ý]NŽœÜÝ
+	ËÜÝÚ]ÚÞØÛÛ\[ž_IËÐÛÛœÝ[[ÛÛœÛÛPÛÛ›Û\ŽŽ˜Û\ÜË	ÜÝÚ]Ú[‰×JKO›˜[YJ	ØÛÛœÝ[[œÝÚ]Ú	ÊNÂˆJNÂˆ›Ý]NŽœÜÝ
+	ËÛ›ÝYšXØ][ÛœËÞÚYKÙ\ÛZ\ÜÉËÑ\Ú›Ø\™ÛÛ›Û\ŽŽ˜Û\ÜË	Ù\ÛZ\ÜÓ›ÝYšXØ][Û‰×JKO›˜[YJ	Û›ÝYšXØ][ÛœË™\ÛZ\ÜÉÊNÂˆ›Ý]NŽœÜÝ
+	ËÛ›ÝYšXØ][ÛœËÙ\ÛZ\ÜËX[	ËÑ\Ú›Ø\™ÛÛ›Û\ŽŽ˜Û\ÜË	Ù\ÛZ\ÜÐ[›ÝYšXØ][ÛœÉ×JKO›˜[YJ	Û›ÝYšXØ][ÛœË™\ÛZ\ÜËX[	ÊNÂ‚ˆ›Ý]NŽ™Ù]
+	ËØš[[™ËØÚXÚÛÝ]	Ë×\ÛÛ›Û\œ×XÚØYÙPÚXÚÛÝ]ÛÛ›Û\ŽŽ˜Û\ÜË	Ú[™^	×JKO›˜[YJ	Øš[[™ËœXÚØYÙKXÚXÚÛÝ]	ÊNÂˆ›Ý]NŽœÜÝ
+	ËØš[[™ËØÚXÚÛÝ]	Ë×\ÛÛ›Û\œ×XÚØYÙPÚXÚÛÝ]ÛÛ›Û\ŽŽ˜Û\ÜË	ÜÙ[XÝ	×JKO›˜[YJ	Øš[[™ËœXÚØYÙKXÚXÚÛÝ]œÙ[XÝ	ÊNÂˆ›Ý]NŽ™Ù]
+	ËØš[[™ËÜ[œÉËÐš[[™ÐÛÛ›Û\ŽŽ˜Û\ÜË	Ü[œÉ×JKO›˜[YJ	Øš[[™Ëœ[œÉÊNÂˆ›Ý]NŽ™Ù]
+	ËØš[[™ËÙØÝ[Y[ËÚ[›ÚXÙ\ËÞÚ[›ÚXÙ_IË×\ÛÛ›Û\œ×ÝXœØÜš\[Û‘ØÝ[Y[ÛÛ›Û\ŽŽ˜Û\ÜË	ØÛÛ\[žR[›ÚXÙI×JKOÚ\™S[X™\Š	Ú[›ÚXÙIÊKO›˜[YJ	Øš[[™Ë™ØÝ[Y[Ëš[›ÚXÙIÊNÂˆ›Ý]NŽ™Ù]
+	ËØš[[™ËÙØÝ[Y[ËÜ™XÙZ\ËÞÜ^[Y[IË×\ÛÛ›Û\œ×ÝXœØÜš\[Û‘ØÝ[Y[ÛÛ›Û\ŽŽ˜Û\ÜË	ØÛÛ\[žT™XÙZ\	×JKOÚ\™S[X™\Š	Ü^[Y[	ÊKO›˜[YJ	Øš[[™Ë™ØÝ[Y[Ëœ™XÙZ\	ÊNÂˆ›Ý]NŽœÜÝ
+	ËØš[[™ËÜÝXœØÜšX™IËÐš[[™ÐÛÛ›Û\ŽŽ˜Û\ÜË	ÜÝXœØÜšX™I×JNÂˆ›Ý]NŽœÜÝ
+	ËØ\KØš[[™ËØØ[Ý[]IËÐš[[™ÐÛÛ›Û\ŽŽ˜Û\ÜË	ØØ[Ý[]TšXÙI×JNÂˆËÈRH™XY\ˆYÙHYÙ\ˆ8 %Ú]Ø\ÈÜ[™Y[™Y›ÝYÚÜˆÜ˜[Y‚ˆ›Ý]NŽ™Ù]
+	ËØš[[™ËØZK\YÙ\ÉËÐš[[™ÐÛÛ›Û\ŽŽ˜Û\ÜË	ØZTYÙ\ÓYÙ\‰×JKO›˜[YJ	Øš[[™Ë˜ZK\YÙ\ÉÊNÂˆ›Ý]NŽ™Ù]
+	ËØš[[™ËØÝ\ÝÛK\[‰ËÐš[[™ÐÛÛ›Û\ŽŽ˜Û\ÜË	ØÝ\ÝÛT[Z[\‰×JNÂˆ›Ý]NŽœÜÝ
+	ËØš[[™ËØØ[Ý[]KXÝ\ÝÛIËÐš[[™ÐÛÛ›Û\ŽŽ˜Û\ÜË	ØØ[Ý[]PÝ\ÝÛT[‰×JNÂˆ›Ý]NŽœÜÝ
+	ËØš[[™ËÜÝXœØÜšX™KXÝ\ÝÛIËÐš[[™ÐÛÛ›Û\ŽŽ˜Û\ÜË	ÜÝXœØÜšX™PÝ\ÝÛT[‰×JNÂ‚ˆ›Ý]NŽ™Ù]
+	ËÚ[›ÚXÙ\ÉËÒ[›ÚXÙPÛÛ›Û\ŽŽ˜Û\ÜË	Ú[™^	×JKO›˜[YJ	Ú[›ÚXÙ\Ëš[™^	ÊNÂˆ›Ý]NŽ™Ù]
+	ËÚ[›ÚXÙ\ËÜ™]\›‹Z][\ÉËÒ[›ÚXÙPÛÛ›Û\ŽŽ˜Û\ÜË	Ü™]\›’][\É×JKO›˜[YJ	Ú[›ÚXÙ\Ëœ™]\›‹Z][\ÉÊNÂˆ›Ý]NŽ™Ù]
+	ËÚ[›ÚXÙ\ËÝ[š\]YKX^Y\œÉËÒ[›ÚXÙPÛÛ›Û\ŽŽ˜Û\ÜË	Ý[š\]YP^Y\œÉ×JKO›˜[YJ	Ú[›ÚXÙ\Ë[š\]YKX^Y\œÉÊNÂˆ›Ý]NŽ™Ù]
+	ËÚ[›ÚXÙ\ËØ[Ë\‰ËÒ[›ÚXÙPÛÛ›Û\ŽŽ˜Û\ÜË	Ø[ÑÝÛ›ØY‰×JKO›˜[YJ	Ú[›ÚXÙ\Ë˜[Ë\‰ÊNÂ‚ˆËÈ˜XÚÙÜ›Ý[™’T^Ü8 %[›ZÙH[Ë\ˆ\È\È›ÈLØ\ÛÝ™\œÂˆËÈQ•[›ÚXÙ\ÈÛË[™Ý\š]™\È[œÈÙˆÝ\Ø[™ÈÙˆœÈžHZ[[™ÂˆËÈ[ˆ™\Ý[XX›HÚ[šÜÈÚ]H›ÙÜ™\ÜÈ˜\‹‚ˆ›Ý]NŽœÜÝ
+	ËÚ[›ÚXÙ\ËÞš\Y^ÜÉË×\ÛÛ›Û\œ×[›ÚXÙVš\^ÜÛÛ›Û\ŽŽ˜Û\ÜË	ÜÝÜ™I×JBˆO›˜[YJ	Ú[›ÚXÙ\Ëžš\Y^ÜËœÝÜ™IÊNÂˆ›Ý]NŽ™Ù]
+	ËÚ[›ÚXÙ\ËÞš\Y^ÜËÞÙ^ÜKÜÝ]\ÉË×\ÛÛ›Û\œ×[›ÚXÙVš\^ÜÛÛ›Û\ŽŽ˜Û\ÜË	ÜÝ]\É×JBˆO›˜[YJ	Ú[›ÚXÙ\Ëžš\Y^ÜËœÝ]\ÉÊNÂˆ›Ý]NŽ™Ù]
+	ËÚ[›ÚXÙ\ËÞš\Y^ÜËÞÙ^ÜKÙÝÛ›ØY	Ë×\ÛÛ›Û\œ×[›ÚXÙVš\^ÜÛÛ›Û\ŽŽ˜Û\ÜË	ÙÝÛ›ØY	×JBˆO›˜[YJ	Ú[›ÚXÙ\Ëžš\Y^ÜË™ÝÛ›ØY	ÊNÂˆ›Ý]NŽ™[]J	ËÚ[›ÚXÙ\ËÞš\Y^ÜËÞÙ^ÜIË×\ÛÛ›Û\œ×[›ÚXÙVš\^ÜÛÛ›Û\ŽŽ˜Û\ÜË	Ù\Ý›ÞI×JBˆO›˜[YJ	Ú[›ÚXÙ\Ëžš\Y^ÜË™\Ý›ÞIÊNÂˆËÈÒÛˆˆ\È›ÝÈ\‹Z[›ÚXÙH
+™[™\™YÚ[™]™\ˆH[›ÚXÙH\ÈHÒˆËÈ[[Ý[\YY
+H8 %HÛÙ\ÜÚ[Û‹X˜\ÙYÙÙÛH›Ý]HØ\È™[[Ý™Y‚‚ˆ›Ý]NŽ›ZY]Ø\™JÉÜ›ÛN˜ÛÛ\[žWØYZ[‹[\ÞYYI×JKO™Ü›Ý\
+[˜Ý[Ûˆ
+
+HÂˆ›Ý]NŽ™Ù]
+	ËÚ[›ÚXÙKØÜ™X]IËÒ[›ÚXÙPÛÛ›Û\ŽŽ˜Û\ÜË	ØÜ™X]I×JKO›˜[YJ	Ú[›ÚXÙK˜Ü™X]IÊNÂˆ›Ý]NŽœÜÝ
+	ËÚ[›ÚXÙKÜÝÜ™IËÒ[›ÚXÙPÛÛ›Û\ŽŽ˜Û\ÜË	ÜÝÜ™I×JKO›ZY]Ø\™J	Ü[‹›[Z]š[›ÚXÙ\ÉÊNÂˆ›Ý]NŽ™Ù]
+	ËÚ[›ÚXÙKÞÚ[›ÚXÙ_KÙY]	ËÒ[›ÚXÙPÛÛ›Û\ŽŽ˜Û\ÜË	ÙY]	×JNÂˆ›Ý]NŽœ]
+	ËÚ[›ÚXÙKÞÚ[›ÚXÙ_IËÒ[›ÚXÙPÛÛ›Û\ŽŽ˜Û\ÜË	Ý\]I×JNÂˆ›Ý]NŽœÜÝ
+	ËÚ[›ÚXÙKÞÚ[›ÚXÙ_KÜÝX›Z]	ËÒ[›ÚXÙPÛÛ›Û\ŽŽ˜Û\ÜË	ÜÝX›Z]	×JNÂˆËÈ\ÚÈLNˆ[Ë\ÝX›Z]Ù[XÝY˜Y[›ÚXÙ\ÈÈ”ˆ
+]Y]YY
+K‚ˆ›Ý]NŽœÜÝ
+	ËÚ[›ÚXÙ\ËØ[Ë\ÝX›Z]	ËÒ[›ÚXÙPÛÛ›Û\ŽŽ˜Û\ÜË	Ø[ÔÝX›Z]	×JKO›˜[YJ	Ú[›ÚXÙ\Ë˜[Ë\ÝX›Z]	ÊNÂˆ›Ý]NŽ™Ù]
+	ËÚ[›ÚXÙ\ËØ[Ë\ÝX›Z]\Ý]\ÉËÒ[›ÚXÙPÛÛ›Û\ŽŽ˜Û\ÜË	Ø[ÔÝX›Z]Ý]\É×JKO›˜[YJ	Ú[›ÚXÙ\Ë˜[Ë\ÝX›Z]\Ý]\ÉÊNÂˆËÈH[ˆØ[ˆZÙHÝ\œËÛÈHÚÜ]\Ý™HX›HÈÝÜ][™ÂˆËÈÛX\ˆHš[š\ÚYÝ[[X\žH]ÛÛY\È˜XÚÈË‚ˆ›Ý]NŽœÜÝ
+	ËÚ[›ÚXÙ\ËØ[Ë\ÝX›Z]XØ[˜Ù[	ËÒ[›ÚXÙPÛÛ›Û\ŽŽ˜Û\ÜË	Ø[ÔÝX›Z]Ø[˜Ù[	×JKO›˜[YJ	Ú[›ÚXÙ\Ë˜[Ë\ÝX›Z]XØ[˜Ù[	ÊNÂˆ›Ý]NŽœÜÝ
+	ËÚ[›ÚXÙ\ËØ[Ë\ÝX›Z]XXÚÉËÒ[›ÚXÙPÛÛ›Û\ŽŽ˜Û\ÜË	Ø[ÔÝX›Z]XÚÛ›ÝÛYÙI×JKO›˜[YJ	Ú[›ÚXÙ\Ë˜[Ë\ÝX›Z]XXÚÉÊNÂˆ›Ý]NŽœÜÝ
+	ËÚ[›ÚXÙKÞÚ[›ÚXÙ_KÜ™]žIËÒ[›ÚXÙPÛÛ›Û\ŽŽ˜Û\ÜË	Ü™]žI×JNÂˆ›Ý]NŽœÜÝ
+	ËÚ[›ÚXÙKÞÚ[›ÚXÙ_KÜ™\ÝX›Z]Y˜œ‰ËÒ[›ÚXÙPÛÛ›Û\ŽŽ˜Û\ÜË	Ü™\ÝX›Z]Ñ˜œ‰×JNÂˆ›Ý]NŽœÜÝ
+	ËÚ[›ÚXÙKÞÚ[›ÚXÙ_KÝ˜[Y]IËÒ[›ÚXÙPÛÛ›Û\ŽŽ˜Û\ÜË	Ý˜[Y]R[›ÚXÙI×JNÂˆ›Ý]NŽœÜÝ
+	ËÚ[›ÚXÙKÞÚ[›ÚXÙ_KÝ˜[Y]KY˜œ‰ËÒ[›ÚXÙPÛÛ›Û\ŽŽ˜Û\ÜË	Ý˜[Y]Q˜œ”^[ØY	×JNÂˆ›Ý]NŽœÜÝ
+	ËÚ[›ÚXÙKÞÚ[›ÚXÙ_KØÛÛ™š\›KY˜œ‰ËÒ[›ÚXÙPÛÛ›Û\ŽŽ˜Û\ÜË	ØÛÛ™š\›Q˜œ”Ý]\É×JNÂˆ›Ý]NŽœÜÝ
+	ËÚ[›ÚXÙKÞÚ[›ÚXÙ_KÜ™]žKZ[™[ÜžIË×\ÛÛ›Û\œ×[›ÚXÙR[™[ÜžPÛÛ›Û\ŽŽ˜Û\ÜË	Ü™]žI×JKO›˜[YJ	Ú[›ÚXÙKœ™]žKZ[™[ÜžIÊNÂˆ›Ý]NŽœÜÝ
+	ËÚ[›ÚXÙKÞÚ[›ÚXÙ_KÝ\]KY˜œ‹[[X™\‰ËÒ[›ÚXÙPÛÛ›Û\ŽŽ˜Û\ÜË	Ý\]Q˜œ“[X™\‰×JNÂˆ›Ý]NŽœÜÝ
+	ËÚ[›ÚXÙKÞÚ[›ÚXÙ_KÙ\XØ]IËÒ[›ÚXÙPÛÛ›Û\ŽŽ˜Û\ÜË	Ù\XØ]I×JKO›˜[YJ	Ú[›ÚXÙK™\XØ]IÊNÂˆ›Ý]NŽ™[]J	ËÚ[›ÚXÙKÞÚ[›ÚXÙ_IËÒ[›ÚXÙPÛÛ›Û\ŽŽ˜Û\ÜË	Ù\Ý›ÞI×JKO›˜[YJ	Ú[›ÚXÙK™\Ý›ÞIÊNÂ‚ˆËÈ^Y\ˆÛÈ[›ÚXÙHšZ›˜H
+[XZ[ÈÚ]Ð\ØK›YJH8 %ØXˆ[œË›È™[Z][HØ]K‚ˆ›Ý]NŽ™Ù]
+	ËÚ[›ÚXÙKÞÚ[›ÚXÙ_KÜÙ[™Z[™›ÉË×\ÛÛ›Û\œ×[›ÚXÙTÙ[™ÛÛ›Û\ŽŽ˜Û\ÜË	Ú[™›É×JKO›˜[YJ	Ú[›ÚXÙKœÙ[™Z[™›ÉÊNÂˆ›Ý]NŽœÜÝ
+	ËÚ[›ÚXÙKÞÚ[›ÚXÙ_KÜÙ[™Y[XZ[	Ë×\ÛÛ›Û\œ×[›ÚXÙTÙ[™ÛÛ›Û\ŽŽ˜Û\ÜË	ÜÙ[™[XZ[	×JKO›˜[YJ	Ú[›ÚXÙKœÙ[™Y[XZ[	ÊKO›ZY]Ø\™J	Ý›ÝNŒL‹IÊNÂˆ›Ý]NŽœÜÝ
+	ËÚ[›ÚXÙKÞÚ[›ÚXÙ_KÜÙ[™]Ú]Ø\	Ë×\ÛÛ›Û\œ×[›ÚXÙTÙ[™ÛÛ›Û\ŽŽ˜Û\ÜË	ÜÙ[™Ú]Ð\	×JKO›˜[YJ	Ú[›ÚXÙKœÙ[™]Ú]Ø\	ÊKO›ZY]Ø\™J	Ý›ÝNŒÌIÊNÂ‚ˆ›Ý]NŽ™Ù]
+	ËÚ[›ÚXÙ\ËØÜÝ‹][\]IËÐÜÝ’[\ÜÛÛ›Û\ŽŽ˜Û\ÜË	Ý[\]I×JKO›˜[YJ	Ú[›ÚXÙ\Ë˜ÜÝ‹][\]IÊNÂˆ›Ý]NŽœÜÝ
+	ËÚ[›ÚXÙ\ËØÜÝ‹]\ØY	ËÐÜÝ’[\ÜÛÛ›Û\ŽŽ˜Û\ÜË	Ý\ØY	×JKO›˜[YJ	Ú[›ÚXÙ\Ë˜ÜÝ‹]\ØY	ÊNÂˆ›Ý]NŽœÜÝ
+	ËÚ[›ÚXÙ\ËØÜÝ‹\›ØÙ\ÜÉËÐÜÝ’[\ÜÛÛ›Û\ŽŽ˜Û\ÜË	Ü›ØÙ\ÜÉ×JKO›˜[YJ	Ú[›ÚXÙ\Ë˜ÜÝ‹\›ØÙ\ÜÉÊNÂ‚ˆËÈ[È[\ÜŒŽˆžÞ[\]H
+È™K]˜[Y][Ûˆ
+È˜XÚÙÜ›Ý[™›ØÙ\ÜÚ[™Ë‚ˆ›Ý]NŽ™Ù]
+	ËÚ[›ÚXÙ\ËÚ[\Ü][\]IËÒ[›ÚXÙR[\ÜÛÛ›Û\ŽŽ˜Û\ÜË	Ý[\]I×JKO›˜[YJ	Ú[›ÚXÙ\Ëš[\Ü][\]IÊNÂˆ›Ý]NŽœÜÝ
+	ËÚ[›ÚXÙ\ËÚ[\Ü]\ØY	ËÒ[›ÚXÙR[\ÜÛÛ›Û\ŽŽ˜Û\ÜË	Ý\ØY	×JKO›˜[YJ	Ú[›ÚXÙ\Ëš[\Ü]\ØY	ÊNÂˆËÈTËY^ÜÛÛ[[ˆX\[™Îˆ\HHX\[™ËÜ™\Ù]ÈH[\ØY
+È™\Ù]X[˜YÙ[Y[‚ˆ›Ý]NŽœÜÝ
+	ËÚ[›ÚXÙ\ËÚ[\ÜX\K[X\[™ÉËÒ[›ÚXÙR[\ÜÛÛ›Û\ŽŽ˜Û\ÜË	Ø\SX\[™É×JKO›˜[YJ	Ú[›ÚXÙ\Ëš[\ÜX\K[X\[™ÉÊNÂˆ›Ý]NŽ™Ù]
+	ËÚ[›ÚXÙ\ËÚ[\Ü[X\[™ÜËÞÚYKÚ\ÝÜžIËÒ[›ÚXÙR[\ÜÛÛ›Û\ŽŽ˜Û\ÜË	ÛX\[™Ò\ÝÜžI×JKO›˜[YJ	Ú[›ÚXÙ\Ëš[\Ü[X\[™ËZ\ÝÜžIÊNÂˆ›Ý]NŽœÜÝ
+	ËÚ[›ÚXÙ\ËÚ[\Ü[X\[™ÜËÞÚYKÜ™[˜[YIËÒ[›ÚXÙR[\ÜÛÛ›Û\ŽŽ˜Û\ÜË	Ü™[˜[YSX\[™É×JKO›˜[YJ	Ú[›ÚXÙ\Ëš[\Ü[X\[™Ë\™[˜[YIÊNÂˆ›Ý]NŽ™[]J	ËÚ[›ÚXÙ\ËÚ[\Ü[X\[™ÜËÞÚYIËÒ[›ÚXÙR[\ÜÛÛ›Û\ŽŽ˜Û\ÜË	Ù[]SX\[™É×JKO›˜[YJ	Ú[›ÚXÙ\Ëš[\Ü[X\[™ËY[]IÊNÂˆ›Ý]NŽœÜÝ
+	ËÚ[›ÚXÙ\ËÚ[\ÜÞØ˜]ÚYKÜ›ØÙ\ÜÉËÒ[›ÚXÙR[\ÜÛÛ›Û\ŽŽ˜Û\ÜË	Ü›ØÙ\ÜÉ×JKO›ZY]Ø\™J	Ü[‹›[Z]š[›ÚXÙ\ÉÊKO›˜[YJ	Ú[›ÚXÙ\Ëš[\Ü\›ØÙ\ÜÉÊNÂˆËÈ˜]Ú™]šY]ÎˆH˜YÈH[È\ØY›ÙXÙYÚ]”‰ÜÈÝÛ‚ˆËÈ™\™XÝ\ˆ›ÝË[›[™Hš^\È[™H™š^\È]™\ž]Ú\™HˆXÝ[Û‹‚ˆËÈÝ\_HH[\Ü
+^Ù[ÐÔÕˆ˜]ÚY
+HZH
+RHÝÈ˜]Ú]ZY
+K‚ˆ›Ý]NŽ™Ù]
+	ËÚ[›ÚXÙ\ËÜ™]šY]ËÞÝ\_KÞÜ™YŸIË×\ÛÛ›Û\œ×[Ñ˜Y™]šY]ÐÛÛ›Û\ŽŽ˜Û\ÜË	ÜÚÝÉ×JBˆOÚ\™R[Š	Ý\IËÉÚ[\Ü	Ë	ØZI×JKO›˜[YJ	Ú[›ÚXÙ\Ë˜˜]Ú\™]šY]ÉÊNÂˆ›Ý]NŽ™Ù]
+	ËÚ[›ÚXÙ\ËÜ™]šY]ËÞÝ\_KÞÜ™YŸKÜ›ÝÜÉË×\ÛÛ›Û\œ×[Ñ˜Y™]šY]ÐÛÛ›Û\ŽŽ˜Û\ÜË	Ü›ÝÜÉ×JBˆOÚ\™R[Š	Ý\IËÉÚ[\Ü	Ë	ØZI×JKO›˜[YJ	Ú[›ÚXÙ\Ë˜˜]Ú\™]šY]Ëœ›ÝÜÉÊNÂˆ›Ý]NŽœÜÝ
+	ËÚ[›ÚXÙ\ËÜ™]šY]ËÞÝ\_KÞÜ™YŸKÜØ]™IË×\ÛÛ›Û\œ×[Ñ˜Y™]šY]ÐÛÛ›Û\ŽŽ˜Û\ÜË	ÜØ]™I×JBˆOÚ\™R[Š	Ý\IËÉÚ[\Ü	Ë	ØZI×JKO›˜[YJ	Ú[›ÚXÙ\Ë˜˜]Ú\™]šY]ËœØ]™IÊNÂˆ›Ý]NŽœÜÝ
+	ËÚ[›ÚXÙ\ËÜ™]šY]ËÞÝ\_KÞÜ™YŸKØ[ËYš^	Ë×\ÛÛ›Û\œ×[Ñ˜Y™]šY]ÐÛÛ›Û\ŽŽ˜Û\ÜË	Ø[Ñš^	×JBˆOÚ\™R[Š	Ý\IËÉÚ[\Ü	Ë	ØZI×JKO›˜[YJ	Ú[›ÚXÙ\Ë˜˜]Ú\™]šY]Ë˜[ËYš^	ÊNÂˆ›Ý]NŽœÜÝ
+	ËÚ[›ÚXÙ\ËÜ™]šY]ËÞÝ\_KÞÜ™YŸKÛX]ÚXœ˜[˜Ú\ÉË×\ÛÛ›Û\œ×[Ñ˜Y™]šY]ÐÛÛ›Û\ŽŽ˜Û\ÜË	ÛX]Úœ˜[˜Ú\É×JBˆOÚ\™R[Š	Ý\IËÉÚ[\Ü	Ë	ØZI×JKO›˜[YJ	Ú[›ÚXÙ\Ë˜˜]Ú\™]šY]Ë›X]ÚXœ˜[˜Ú\ÉÊNÂˆ›Ý]NŽ™Ù]
+	ËÚ[›ÚXÙ\ËÜ™]šY]ËÞÝ\_KÞÜ™YŸKÙ^Ü	Ë×\ÛÛ›Û\œ×[Ñ˜Y™]šY]ÐÛÛ›Û\ŽŽ˜Û\ÜË	Ù^Ü	×JBˆOÚ\™R[Š	Ý\IËÉÚ[\Ü	Ë	ØZI×JKO›˜[YJ	Ú[›ÚXÙ\Ë˜˜]Ú\™]šY]Ë™^Ü	ÊNÂ‚ˆ›Ý]NŽ™Ù]
+	ËÚ[›ÚXÙ\ËÚ[\ÜÞØ˜]ÚYKÜÛÝ\˜ÙK\™]šY]ÉË×\ÛÛ›Û\œ×ÛX\[›ÚXÙR[\ÜÛÛ›Û\ŽŽ˜Û\ÜË	ÜÚÝÉ×JNÂˆ›Ý]NŽœÜÝ
+	ËÚ[›ÚXÙ\ËÚ[\ÜÞØ˜]ÚYKÜÛÝ\˜ÙK\™]šY]ÉË×\ÛÛ›Û\œ×ÛX\[›ÚXÙR[\ÜÛÛ›Û\ŽŽ˜Û\ÜË	Ü™]šY]É×JNÂˆ›Ý]NŽœÜÝ
+	ËÚ[›ÚXÙ\ËÚ[\ÜÞØ˜]ÚYKÝ™\šYšYY[X\[™ÉË×\ÛÛ›Û\œ×ÛX\[›ÚXÙR[\ÜÛÛ›Û\ŽŽ˜Û\ÜË	ÜØ]™SX\[™É×JNÂˆ›Ý]NŽ™Ù]
+	ËÚ[›ÚXÙ\ËÚ[\ÜZ\ÝÜžIËÒ[›ÚXÙR[\ÜÛÛ›Û\ŽŽ˜Û\ÜË	Ú\ÝÜžI×JKO›˜[YJ	Ú[›ÚXÙ\Ëš[\ÜZ\ÝÜžIÊNÂˆ›Ý]NŽ™Ù]
+	ËÚ[›ÚXÙ\ËÚ[\ÜÞØ˜]ÚYKÜÝ]\ÉËÒ[›ÚXÙR[\ÜÛÛ›Û\ŽŽ˜Û\ÜË	ÜÝ]\É×JKO›˜[YJ	Ú[›ÚXÙ\Ëš[\Ü\Ý]\ÉÊNÂˆ›Ý]NŽ™Ù]
+	ËÚ[›ÚXÙ\ËÚ[\ÜÞØ˜]ÚYKÙ\œ›Ü‹\™\Ü	ËÒ[›ÚXÙR[\ÜÛÛ›Û\ŽŽ˜Û\ÜË	Ù\œ›Ü”™\Ü	×JKO›˜[YJ	Ú[›ÚXÙ\Ëš[\ÜY\œ›Ü‹\™\Ü	ÊNÂ‚ˆËÈ\ÚÈLŒÎˆRH\ÜÚ\Ý›ÜˆH[È[\Ü8 %X\[™ÈÝYÙÙ\Ý[ÛœÈÛˆBˆËÈX\[™ÈØÜ™Y[‹\‹\›ÝÈš^ÝYÙÙ\Ý[ÛœÈÛˆH˜[Y][Ûˆ™]šY]ÂˆËÈ
+›ÝRK›ÝYZÙHHRH™XY\ŠK[™H\Ù\‹XÛÛ™š\›YYˆËÈ\JÜ™]˜[Y]HÝ\
+]\›Z[š\ÝXË›ÈRJK‚ˆ›Ý]NŽœÜÝ
+	ËÚ[›ÚXÙ\ËÚ[\ÜXZK[X\	ËÒ[›ÚXÙR[\ÜÛÛ›Û\ŽŽ˜Û\ÜË	ØZSX\ÝYÙÙ\Ý	×JBˆO›ZY]Ø\™J	Ý›ÝN‹IÊBˆO›˜[YJ	Ú[›ÚXÙ\Ëš[\ÜXZK[X\	ÊNÂˆ›Ý]NŽœÜÝ
+	ËÚ[›ÚXÙ\ËÚ[\ÜÞØ˜]ÚYKØZKYš^\ÉËÒ[›ÚXÙR[\ÜÛÛ›Û\ŽŽ˜Û\ÜË	ØZT›ÝÑš^\É×JBˆO›ZY]Ø\™J	Ý›ÝN‹IÊBˆO›˜[YJ	Ú[›ÚXÙ\Ëš[\ÜXZKYš^\ÉÊNÂˆ›Ý]NŽœÜÝ
+	ËÚ[›ÚXÙ\ËÚ[\ÜÞØ˜]ÚYKØ\KYš^\ÉËÒ[›ÚXÙR[\ÜÛÛ›Û\ŽŽ˜Û\ÜË	Ø\T›ÝÑš^\É×JBˆO›˜[YJ	Ú[›ÚXÙ\Ëš[\ÜX\KYš^\ÉÊNÂ‚ˆËÈ\ÚÈMŽˆRH[›ÚXÙH™XY\ˆ
+™[Z][HØ]H	ØZWÜ™XY\‰ÊH8 %\ØYÛÜÝ\Y\‚ˆËÈ[›ÚXÙH
+‹ÜÝËÑ^Ù[
+HOˆRH^˜XÝ[ÛˆOˆ™]šY]ÈOˆØ]™HQ•Û›K‚ˆ›Ý]NŽ™Ù]
+	ËÚ[›ÚXÙ\ËØZK\™XY\‰ËÐZR[›ÚXÙT™XY\ÛÛ›Û\ŽŽ˜Û\ÜË	ÜÚÝÉ×JKO›˜[YJ	Ú[›ÚXÙ\Ë˜ZK\™XY\‰ÊNÂˆ›Ý]NŽœÜÝ
+	ËÚ[›ÚXÙ\ËØZK\™XY\‹Ü\œÙIËÐZR[›ÚXÙT™XY\ÛÛ›Û\ŽŽ˜Û\ÜË	Ü\œÙI×JBˆO›ZY]Ø\™J	Ý›ÝN‹IÊBˆO›˜[YJ	Ú[›ÚXÙ\Ë˜ZK\™XY\‹œ\œÙIÊNÂˆËÈÛ™H\ÚXØ[ÝÈHÛ™H[™\[™[H]Y]YY™]šY]È˜YˆÚ[šÜÂˆËÈÙY\›ZÞH[Øš[HÛÛ›™XÝ[ÛœÈœ›ÛH›Ü˜Ú[™ÈH[˜]ÚÈ™\Ý\‚ˆ›Ý]NŽ™Ù]
+	ËÚ[›ÚXÙ\ËØZK\™XY\‹Ø[ËZ[XYÙ\ÉËÐZR[›ÚXÙT™XY\ÛÛ›Û\ŽŽ˜Û\ÜË	Ø[É×JBˆO›˜[YJ	Ú[›ÚXÙ\Ë˜ZK\™XY\‹˜[ÉÊNÂˆËÈ\Ý˜]Ú\ÈÝ^H™XXÚX›HY\ˆHXˆ\ÈÛÜÙYˆH\Ý[™ˆËÈØ˜]ÚHÛˆHÛÜšÜÜXÙHX›Ý™HÈ™[Ü[ˆÛ™K‚ˆ›Ý]NŽ™Ù]
+	ËÚ[›ÚXÙ\ËØZK\™XY\‹Ø[ËZ[XYÙ\ËÚ\ÝÜžIËÐZR[›ÚXÙT™XY\ÛÛ›Û\ŽŽ˜Û\ÜË	Ø[Ò\ÝÜžI×JBˆO›˜[YJ	Ú[›ÚXÙ\Ë˜ZK\™XY\‹˜[Ëš\ÝÜžIÊNÂˆ›Ý]NŽœÜÝ
+	ËÚ[›ÚXÙ\ËØZK\™XY\‹Ø[ËZ[XYÙ\ËÜÝ\	ËÐZR[›ÚXÙT™XY\ÛÛ›Û\ŽŽ˜Û\ÜË	Ø[ÔÝ\	×JBˆO›ZY]Ø\™J	Ý›ÝNŒLIÊKO›˜[YJ	Ú[›ÚXÙ\Ë˜ZK\™XY\‹˜[ËœÝ\	ÊNÂˆ›Ý]NŽœÜÝ
+	ËÚ[›ÚXÙ\ËØZK\™XY\‹Ø[ËZ[XYÙ\ËÞØ˜]ÚYKØ[›™^\™IËÐZR[›ÚXÙT™XY\ÛÛ›Û\ŽŽ˜Û\ÜË	Ø[Ð[›™^\™U\ØY	×JBˆO›ZY]Ø\™J	Ý›ÝNŒLIÊKO›˜[YJ	Ú[›ÚXÙ\Ë˜ZK\™XY\‹˜[Ë˜[›™^\™IÊNÂˆ›Ý]NŽœÜÝ
+	ËÚ[›ÚXÙ\ËØZK\™XY\‹Ø[ËZ[XYÙ\ËÞØ˜]ÚYKØ[›™^\™KØ\IËÐZR[›ÚXÙT™XY\ÛÛ›Û\ŽŽ˜Û\ÜË	Ø[Ð[›™^\™P\I×JBˆO›˜[YJ	Ú[›ÚXÙ\Ë˜ZK\™XY\‹˜[Ë˜[›™^\™K˜\IÊNÂˆ›Ý]NŽœÜÝ
+	ËÚ[›ÚXÙ\ËØZK\™XY\‹Ø[ËZ[XYÙ\ËÞØ˜]ÚYKØ[›™^\™KØØ][ÙÉËÐZR[›ÚXÙT™XY\ÛÛ›Û\ŽŽ˜Û\ÜË	Ø[Ð[›™^\™PØ][ÙÐXÝ[Û‰×JBˆO›˜[YJ	Ú[›ÚXÙ\Ë˜ZK\™XY\‹˜[Ë˜[›™^\™K˜Ø][ÙÉÊNÂˆ›Ý]NŽœÜÝ
+	ËÚ[›ÚXÙ\ËØZK\™XY\‹Ø[ËZ[XYÙ\ËÞØ˜]ÚYKØ[›™^\™KØ]Y]ËÞØ]Y]YKÜ™]™\œÙIËÐZR[›ÚXÙT™XY\ÛÛ›Û\ŽŽ˜Û\ÜË	Ø[Ð[›™^\™T™]™\œÙI×JBˆO›˜[YJ	Ú[›ÚXÙ\Ë˜ZK\™XY\‹˜[Ë˜[›™^\™Kœ™]™\œÙIÊNÂˆ›Ý]NŽœÜÝ
+	ËÚ[›ÚXÙ\ËØZK\™XY\‹Ø[ËZ[XYÙ\ËÞØ˜]ÚYKÚ][\ËÞÚ][RYKØÚ[šÉËÐZR[›ÚXÙT™XY\ÛÛ›Û\ŽŽ˜Û\ÜË	Ø[ÐÚ[šÉ×JBˆO›ZY]Ø\™J	Ý›ÝNŒLŒIÊKO›˜[YJ	Ú[›ÚXÙ\Ë˜ZK\™XY\‹˜[Ë˜Ú[šÉÊNÂˆ›Ý]NŽœÜÝ
+	ËÚ[›ÚXÙ\ËØZK\™XY\‹Ø[ËZ[XYÙ\ËÞØ˜]ÚYKÚ][\ËÞÚ][RYKØÛÛ\]IËÐZR[›ÚXÙT™XY\ÛÛ›Û\ŽŽ˜Û\ÜË	Ø[ÐÛÛ\]I×JBˆO›ZY]Ø\™J	Ý›ÝNŒÌIÊKO›˜[YJ	Ú[›ÚXÙ\Ë˜ZK\™XY\‹˜[Ë˜ÛÛ\]IÊNÂˆ›Ý]NŽ™Ù]
+	ËÚ[›ÚXÙ\ËØZK\™XY\‹Ø[ËZ[XYÙ\ËÞØ˜]ÚYKÜÝ]\ÉËÐZR[›ÚXÙT™XY\ÛÛ›Û\ŽŽ˜Û\ÜË	Ø[ÔÝ]\É×JBˆO›˜[YJ	Ú[›ÚXÙ\Ë˜ZK\™XY\‹˜[ËœÝ]\ÉÊNÂˆ›Ý]NŽœÜÝ
+	ËÚ[›ÚXÙ\ËØZK\™XY\‹Ø[ËZ[XYÙ\ËÞØ˜]ÚYKÚ][\ËÞÚ][RYKÜ™]žIËÐZR[›ÚXÙT™XY\ÛÛ›Û\ŽŽ˜Û\ÜË	Ø[Ô™]žI×JBˆO›ZY]Ø\™J	Ý›ÝNŒLIÊKO›˜[YJ	Ú[›ÚXÙ\Ë˜ZK\™XY\‹˜[Ëœ™]žIÊNÂˆËÈÚ\™XX›H™]šY]ÈÝ[[X\žHÙˆÛ™H˜]Ú
+Ù›Ü›X]XÜÝŸŠH8 %ÛÛ\[žBˆËÈØÛÜY[™]™]™\ˆ[šÜÈÜˆ[X™YÈHš]˜]HÛÝ\˜ÙHÝË‚ˆ›Ý]NŽ™Ù]
+	ËÚ[›ÚXÙ\ËØZK\™XY\‹Ø[ËZ[XYÙ\ËÞØ˜]ÚYKÜ™\Ü	ËÐZR[›ÚXÙT™XY\ÛÛ›Û\ŽŽ˜Û\ÜË	Ø[Ô™\Ü	×JBˆO›ZY]Ø\™J	Ý›ÝNŒŒIÊKO›˜[YJ	Ú[›ÚXÙ\Ë˜ZK\™XY\‹˜[Ëœ™\Ü	ÊNÂˆËÈ\ÚÈLÍÎˆ[XZ[]Ø[YHˆÝ[[X\žHÈ[›Ý\ˆ™]šY]Ù\‹ˆ›ÝYˆËÈ\ˆZ[]H\™NÈH\‹XÛÛ\[žHØ\]™\È[ˆHÛÛ›Û\‹‚ˆ›Ý]NŽœÜÝ
+	ËÚ[›ÚXÙ\ËØZK\™XY\‹Ø[ËZ[XYÙ\ËÞØ˜]ÚYKÜ™\ÜÙ[XZ[	ËÐZR[›ÚXÙT™XY\ÛÛ›Û\ŽŽ˜Û\ÜË	Ø[Ô™\Ü[XZ[	×JBˆO›ZY]Ø\™J	Ý›ÝNKIÊKO›˜[YJ	Ú[›ÚXÙ\Ë˜ZK\™XY\‹˜[Ëœ™\Ü™[XZ[	ÊNÂ‚ˆ›Ý]NŽ™Ù]
+	ËØÝ\ÝÛY\œÉËÐÝ\ÝÛY\“YÙ\ÛÛ›Û\ŽŽ˜Û\ÜË	Ú[™^	×JKO›˜[YJ	ØÝ\ÝÛY\œËš[™^	ÊNÂˆ›Ý]NŽ™Ù]
+	ËØÝ\ÝÛY\œËÞÛŸKÛYÙ\‰ËÐÝ\ÝÛY\“YÙ\ÛÛ›Û\ŽŽ˜Û\ÜË	ÜÚÝÉ×JNÂˆ›Ý]NŽœÜÝ
+	ËØÝ\ÝÛY\œËÜ^[Y[	ËÐÝ\ÝÛY\“YÙ\ÛÛ›Û\ŽŽ˜Û\ÜË	ØY^[Y[	×JNÂˆ›Ý]NŽœÜÝ
+	ËØÝ\ÝÛY\œËØY\ÝY[	ËÐÝ\ÝÛY\“YÙ\ÛÛ›Û\ŽŽ˜Û\ÜË	ØYY\ÝY[	×JNÂ‚ˆ›Ý]NŽ™Ù]
+	ËÜÜ›Ë\™Y™\™[˜ÙIËÔÜ›Ô™Y™\™[˜ÙPÛÛ›Û\ŽŽ˜Û\ÜË	Ú[™^	×JKO›˜[YJ	ÜÜ›Ë\™Y™\™[˜ÙIÊNÂˆ›Ý]NŽ™Ù]
+	ËØ\KÜÜ›Ë\™Y™\™[˜ÙKÜÙX\˜Ú	ËÔÜ›Ô™Y™\™[˜ÙPÛÛ›Û\ŽŽ˜Û\ÜË	Ø\TÙX\˜Ú	×JKO›˜[YJ	ÜÜ›Ë\™Y™\™[˜ÙKœÙX\˜Ú	ÊNÂ‚ˆ›Ý]NŽ™Ù]
+	ËÜ›ÙXÝÉËÔ›ÙXÝÛÛ›Û\ŽŽ˜Û\ÜË	Ú[™^	×JKO›˜[YJ	Ü›ÙXÝËš[™^	ÊNÂˆ›Ý]NŽ™Ù]
+	ËÜ›ÙXÝËØÜ™X]IËÔ›ÙXÝÛÛ›Û\ŽŽ˜Û\ÜË	ØÜ™X]I×JKO›˜[YJ	Ü›ÙXÝË˜Ü™X]IÊNÂˆ›Ý]NŽœÜÝ
+	ËÜ›ÙXÝÉËÔ›ÙXÝÛÛ›Û\ŽŽ˜Û\ÜË	ÜÝÜ™I×JKO›˜[YJ	Ü›ÙXÝËœÝÜ™IÊKO›ZY]Ø\™J	Ü[‹›[Z]œ›ÙXÝÉÊNÂˆ›Ý]NŽ™Ù]
+	ËÜ›ÙXÝËÞÜ›ÙXÝKÙY]	ËÔ›ÙXÝÛÛ›Û\ŽŽ˜Û\ÜË	ÙY]	×JKO›˜[YJ	Ü›ÙXÝË™Y]	ÊNÂˆ›Ý]NŽœ]
+	ËÜ›ÙXÝËÞÜ›ÙXÝIËÔ›ÙXÝÛÛ›Û\ŽŽ˜Û\ÜË	Ý\]I×JKO›˜[YJ	Ü›ÙXÝË\]IÊNÂˆ›Ý]NŽœÜÝ
+	ËÜ›ÙXÝËÞÜ›ÙXÝKÝÙÙÛIËÔ›ÙXÝÛÛ›Û\ŽŽ˜Û\ÜË	ÙXXÝ]˜]I×JKO›˜[YJ	Ü›ÙXÝËÙÙÛIÊNÂˆ›Ý]NŽ™[]J	ËÜ›ÙXÝËÞÜ›ÙXÝIËÔ›ÙXÝÛÛ›Û\ŽŽ˜Û\ÜË	Ù\Ý›ÞI×JKO›˜[YJ	Ü›ÙXÝË™\Ý›ÞIÊNÂˆ›Ý]NŽ™Ù]
+	ËÜ›ÙXÝËÜÙX\˜Ú	ËÔ›ÙXÝÛÛ›Û\ŽŽ˜Û\ÜË	ÜÙX\˜Ú	×JKO›˜[YJ	Ü›ÙXÝËœÙX\˜Ú	ÊNÂ‚ˆ›Ý]NŽ™Ù]
+	ËØÝ\ÝÛY\‹\›Ùš[\ÉËÐÝ\ÝÛY\”›Ùš[PÛÛ›Û\ŽŽ˜Û\ÜË	Ú[™^	×JKO›˜[YJ	ØÝ\ÝÛY\‹\›Ùš[\Ëš[™^	ÊNÂˆ›Ý]NŽ™Ù]
+	ËØÝ\ÝÛY\‹\›Ùš[\ËØÜ™X]IËÐÝ\ÝÛY\”›Ùš[PÛÛ›Û\ŽŽ˜Û\ÜË	ØÜ™X]I×JKO›˜[YJ	ØÝ\ÝÛY\‹\›Ùš[\Ë˜Ü™X]IÊNÂˆ›Ý]NŽœÜÝ
+	ËØÝ\ÝÛY\‹\›Ùš[\ÉËÐÝ\ÝÛY\”›Ùš[PÛÛ›Û\ŽŽ˜Û\ÜË	ÜÝÜ™I×JKO›˜[YJ	ØÝ\ÝÛY\‹\›Ùš[\ËœÝÜ™IÊNÂˆ›Ý]NŽ™Ù]
+	ËØÝ\ÝÛY\‹\›Ùš[\ËÞØÝ\ÝÛY\”›Ùš[_KÙY]	ËÐÝ\ÝÛY\”›Ùš[PÛÛ›Û\ŽŽ˜Û\ÜË	ÙY]	×JKO›˜[YJ	ØÝ\ÝÛY\‹\›Ùš[\Ë™Y]	ÊNÂˆ›Ý]NŽœ]
+	ËØÝ\ÝÛY\‹\›Ùš[\ËÞØÝ\ÝÛY\”›Ùš[_IËÐÝ\ÝÛY\”›Ùš[PÛÛ›Û\ŽŽ˜Û\ÜË	Ý\]I×JKO›˜[YJ	ØÝ\ÝÛY\‹\›Ùš[\Ë\]IÊNÂˆ›Ý]NŽœÜÝ
+	ËØÝ\ÝÛY\‹\›Ùš[\ËÞØÝ\ÝÛY\”›Ùš[_KÝÙÙÛIËÐÝ\ÝÛY\”›Ùš[PÛÛ›Û\ŽŽ˜Û\ÜË	ÝÙÙÛI×JKO›˜[YJ	ØÝ\ÝÛY\‹\›Ùš[\ËÙÙÛIÊNÂˆJNÂ‚‚ˆ›Ý]NŽ›ZY]Ø\™JÉÜ›ÛN˜ÛÛ\[žWØYZ[‰×JKO™Ü›Ý\
+[˜Ý[Ûˆ
+
+HÂˆËÈÛY[\ÚYHÛÛœÝ[[ÛÛœÙ[ˆ[š]\Ë\›Ý˜[Ë™]›ÚÙ\Ë‚ˆ›Ý]NŽ™Ù]
+	ËØÛÛ\[žKØÛÛœÝ[[ÉËÐÛÛ\[žPÛÛœÝ[[ÛÛ›Û\ŽŽ˜Û\ÜË	Ú[™^	×JKO›˜[YJ	ØÛÛ\[žK˜ÛÛœÝ[[ÉÊNÂˆ›Ý]NŽœÜÝ
+	ËØÛÛ\[žKØÛÛœÝ[[ËÚ[š]IËÐÛÛ\[žPÛÛœÝ[[ÛÛ›Û\ŽŽ˜Û\ÜË	ØÜ™X]R[š]I×JKO›˜[YJ	ØÛÛ\[žK˜ÛÛœÝ[[Ëš[š]IÊNÂˆ›Ý]NŽœÜÝ
+	ËØÛÛ\[žKØÛÛœÝ[[ËÚ[š]\ËÞÚ[š]_KÜ™]›ÚÙIËÐÛÛ\[žPÛÛœÝ[[ÛÛ›Û\ŽŽ˜Û\ÜË	Ü™]›ÚÙR[š]I×JKO›˜[YJ	ØÛÛ\[žK˜ÛÛœÝ[[Ëš[š]K\™]›ÚÙIÊNÂˆ›Ý]NŽœÜÝ
+	ËØÛÛ\[žKØÛÛœÝ[[ËÛ[šÜËÞÛ[šßKØ\›Ý™IËÐÛÛ\[žPÛÛœÝ[[ÛÛ›Û\ŽŽ˜Û\ÜË	Ø\›Ý™I×JKO›˜[YJ	ØÛÛ\[žK˜ÛÛœÝ[[Ë˜\›Ý™IÊNÂˆ›Ý]NŽœÜÝ
+	ËØÛÛ\[žKØÛÛœÝ[[ËÛ[šÜËÞÛ[šßKÜ™Z™XÝ	ËÐÛÛ\[žPÛÛœÝ[[ÛÛ›Û\ŽŽ˜Û\ÜË	Ü™Z™XÝ	×JKO›˜[YJ	ØÛÛ\[žK˜ÛÛœÝ[[Ëœ™Z™XÝ	ÊNÂˆ›Ý]NŽœÜÝ
+	ËØÛÛ\[žKØÛÛœÝ[[ËÛ[šÜËÞÛ[šßKÜ™]›ÚÙIËÐÛÛ\[žPÛÛœÝ[[ÛÛ›Û\ŽŽ˜Û\ÜË	Ü™]›ÚÙS[šÉ×JKO›˜[YJ	ØÛÛ\[žK˜ÛÛœÝ[[Ëœ™]›ÚÙIÊNÂ‚ˆ›Ý]NŽ™Ù]
+	ËØÛÛ\X[˜ÙIËÐÛÛ\X[˜ÙPÛÛ›Û\ŽŽ˜Û\ÜË	Ú[™^	×JKO›˜[YJ	ØÛÛ\X[˜ÙKš[™^	ÊNÂˆ›Ý]NŽœÜÝ
+	ËØÛÛ\X[˜ÙKØ]Y]\XÚÜÉËÐÛÛ\X[˜ÙPÛÛ›Û\ŽŽ˜Û\ÜË	ÜÝÜ™I×JKO›˜[YJ	ØÛÛ\X[˜ÙKœXÚÜËœÝÜ™IÊNÂˆ›Ý]NŽ™Ù]
+	ËØÛÛ\X[˜ÙKØ]Y]\XÚÜËÞÜXÚßKÜÝ]\ÉËÐÛÛ\X[˜ÙPÛÛ›Û\ŽŽ˜Û\ÜË	ÜÝ]\É×JKO›˜[YJ	ØÛÛ\X[˜ÙKœXÚÜËœÝ]\ÉÊNÂˆ›Ý]NŽœÜÝ
+	ËØÛÛ\X[˜ÙKØ]Y]\XÚÜËÞÜXÚßKØY˜[˜ÙIËÐÛÛ\X[˜ÙPÛÛ›Û\ŽŽ˜Û\ÜË	ØY˜[˜ÙI×JKO›ZY]Ø\™J	Ý›ÝNŒÌIÊKO›˜[YJ	ØÛÛ\X[˜ÙKœXÚÜË˜Y˜[˜ÙIÊNÂˆ›Ý]NŽ™Ù]
+	ËØÛÛ\X[˜ÙKØ]Y]\XÚÜËÞÜXÚßKÙÝÛ›ØY	ËÐÛÛ\X[˜ÙPÛÛ›Û\ŽŽ˜Û\ÜË	ÙÝÛ›ØY	×JKO›˜[YJ	ØÛÛ\X[˜ÙKœXÚÜË™ÝÛ›ØY	ÊNÂˆ›Ý]NŽ™[]J	ËØÛÛ\X[˜ÙKØ]Y]\XÚÜËÞÜXÚßIËÐÛÛ\X[˜ÙPÛÛ›Û\ŽŽ˜Û\ÜË	Ù\Ý›ÞI×JKO›˜[YJ	ØÛÛ\X[˜ÙKœXÚÜË™\Ý›ÞIÊNÂ‚ˆ›Ý]NŽ™Ù]
+	ËØÛÛ\[žKÝ\Ù\œÉËÐÛÛ\[žU\Ù\ÛÛ›Û\ŽŽ˜Û\ÜË	Ú[™^	×JNÂˆ›Ý]NŽœÜÝ
+	ËØÛÛ\[žKÝ\Ù\œÉËÐÛÛ\[žU\Ù\ÛÛ›Û\ŽŽ˜Û\ÜË	ÜÝÜ™I×JKO›ZY]Ø\™J	Ü[‹›[Z]\Ù\œÉÊNÂˆ›Ý]NŽœ]Ú
+	ËØÛÛ\[žKÝ\Ù\œËÞÝ\Ù\ŸKÜ›ÛIËÐÛÛ\[žU\Ù\ÛÛ›Û\ŽŽ˜Û\ÜË	Ý\]T›ÛI×JNÂˆ›Ý]NŽœ]Ú
+	ËØÛÛ\[žKÝ\Ù\œËÞÝ\Ù\ŸKÜ™\Ù]\\ÜÝÛÜ™	ËÐÛÛ\[žU\Ù\ÛÛ›Û\ŽŽ˜Û\ÜË	Ü™\Ù]\ÜÝÛÜ™	×JNÂˆ›Ý]NŽœ]Ú
+	ËØÛÛ\[žKÝ\Ù\œËÞÝ\Ù\ŸKÝÙÙÛIËÐÛÛ\[žU\Ù\ÛÛ›Û\ŽŽ˜Û\ÜË	ÝÙÙÛPXÝ]™I×JNÂ‚ˆ›Ý]NŽ™Ù]
+	ËØÛÛ\[žKÜ›Ùš[IËÐÛÛ\[žTÙ][™ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ü›Ùš[I×JNÂˆ›Ý]NŽœ]
+	ËØÛÛ\[žKÜ›Ùš[IËÐÛÛ\[žTÙ][™ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ý\]T›Ùš[I×JNÂˆ›Ý]NŽ™Ù]
+	ËØÛÛ\[žKÙ˜œ‹\Ù][™ÜÉËÐÛÛ\[žTÙ][™ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ù˜œ”Ù][™ÜÉ×JNÂˆ›Ý]NŽœ]
+	ËØÛÛ\[žKÙ˜œ‹\Ù][™ÜÉËÐÛÛ\[žTÙ][™ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ý\]Q˜œ”Ù][™ÜÉ×JNÂˆËÈ\ÚÈMˆH™[Z][HÚ]K[X™[œ˜[™[™È
+Ú]WÛX™[[ˆØ]H[™›Ü˜ÙY[‹XÛÛ›Û\ŠBˆ›Ý]NŽ™Ù]
+	ËØÛÛ\[žKØœ˜[™[™ÉËÐÛÛ\[žTÙ][™ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Øœ˜[™[™É×JKO›˜[YJ	ØÛÛ\[žK˜œ˜[™[™ÉÊNÂˆ›Ý]NŽœ]
+	ËØÛÛ\[žKØœ˜[™[™ÉËÐÛÛ\[žTÙ][™ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ý\]Pœ˜[™[™É×JKO›˜[YJ	ØÛÛ\[žK˜œ˜[™[™Ë\]IÊNÂˆ›Ý]NŽœÜÝ
+	ËØÛÛ\[žKÙ˜œ‹\Ù][™ÜËXZ˜^	ËÐÛÛ\[žTÙ][™ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ý\]Q˜œ”Ù][™ÜÐZ˜^	×JNÂˆËÈÚ]Ð\\Ú[™\ÜÈTH
+\ÙHŠH8 %Ù\™\‹\ÚYH[›ÚXÙHÙ[™Ü™Y[X[Âˆ›Ý]NŽ™Ù]
+	ËØÛÛ\[žKÝÚ]Ø\\Ù][™ÜÉËÐÛÛ\[žTÙ][™ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	ÝÚ]Ø\Ù][™ÜÉ×JNÂˆ›Ý]NŽœ]
+	ËØÛÛ\[žKÝÚ]Ø\\Ù][™ÜÉËÐÛÛ\[žTÙ][™ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ý\]UÚ]Ø\Ù][™ÜÉ×JNÂˆËÈ\ÚÈLŒÌNˆH[›ÚXÙH\ÚTH8 %Ù^HX[˜YÙ[Y[
+È[YÜ˜][ÛˆØÜÂˆ›Ý]NŽ™Ù]
+	ËØÛÛ\[žKØ\KXXØÙ\ÜÉË×\ÛÛ›Û\œ×P\RÙ^PÛÛ›Û\ŽŽ˜Û\ÜË	Ú[™^	×JKO›˜[YJ	ØÛÛ\[žK˜\KXXØÙ\ÜÉÊNÂˆ›Ý]NŽœÜÝ
+	ËØÛÛ\[žKØ\KXXØÙ\ÜËÙÙ[™\˜]IË×\ÛÛ›Û\œ×P\RÙ^PÛÛ›Û\ŽŽ˜Û\ÜË	ÙÙ[™\˜]I×JKO›˜[YJ	ØÛÛ\[žK˜\KXXØÙ\ÜË™Ù[™\˜]IÊNÂˆ›Ý]NŽœÜÝ
+	ËØÛÛ\[žKØ\KXXØÙ\ÜËÜ™]›ÚÙIË×\ÛÛ›Û\œ×P\RÙ^PÛÛ›Û\ŽŽ˜Û\ÜË	Ü™]›ÚÙI×JKO›˜[YJ	ØÛÛ\[žK˜\KXXØÙ\ÜËœ™]›ÚÙIÊNÂˆ›Ý]NŽ™Ù]
+	ËØÛÛ\[žKØ\KYØÜÉË×\ÛÛ›Û\œ×P\RÙ^PÛÛ›Û\ŽŽ˜Û\ÜË	ÙØÜÉ×JKO›˜[YJ	ØÛÛ\[žK˜\KYØÜÉÊNÂˆ›Ý]NŽœÜÝ
+	ËØÛÛ\[žKÝ\ÝXÛÛ›™XÝ[Û‰ËÐÛÛ\[žTÙ][™ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ý\ÝÛÛ›™XÝ[Û‰×JNÂˆ›Ý]NŽœÜÝ
+	ËØÛÛ\[žKÜØ[™›Þ]\ÝÞÝ\_IËÐÛÛ\[žTÙ][™ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	ÜØ[™›Þ\Ý	×JNÂ‚ˆ›Ý]NŽ™Ù]
+	ËØœ˜[˜Ú\ÉËÐœ˜[˜ÚÛÛ›Û\ŽŽ˜Û\ÜË	Ú[™^	×JKO›˜[YJ	Øœ˜[˜Ú\Ëš[™^	ÊNÂˆ›Ý]NŽ™Ù]
+	ËØœ˜[˜Ú\ËØÜ™X]IËÐœ˜[˜ÚÛÛ›Û\ŽŽ˜Û\ÜË	ØÜ™X]I×JKO›˜[YJ	Øœ˜[˜Ú\Ë˜Ü™X]IÊNÂˆ›Ý]NŽœÜÝ
+	ËØœ˜[˜Ú\ÉËÐœ˜[˜ÚÛÛ›Û\ŽŽ˜Û\ÜË	ÜÝÜ™I×JKO›˜[YJ	Øœ˜[˜Ú\ËœÝÜ™IÊNÂˆ›Ý]NŽ™Ù]
+	ËØœ˜[˜Ú\ËÞØœ˜[˜ÚKÙY]	ËÐœ˜[˜ÚÛÛ›Û\ŽŽ˜Û\ÜË	ÙY]	×JKO›˜[YJ	Øœ˜[˜Ú\Ë™Y]	ÊNÂˆ›Ý]NŽœ]
+	ËØœ˜[˜Ú\ËÞØœ˜[˜ÚIËÐœ˜[˜ÚÛÛ›Û\ŽŽ˜Û\ÜË	Ý\]I×JKO›˜[YJ	Øœ˜[˜Ú\Ë\]IÊNÂˆ›Ý]NŽ™[]J	ËØœ˜[˜Ú\ËÞØœ˜[˜ÚIËÐœ˜[˜ÚÛÛ›Û\ŽŽ˜Û\ÜË	Ù\Ý›ÞI×JKO›˜[YJ	Øœ˜[˜Ú\Ë™\Ý›ÞIÊNÂˆJNÂ‚ˆ›Ý]NŽ™Ù]
+	ËØ\KÜ›ÙXÝËÜÙX\˜Ú	ËÔ›ÙXÝÛÛ›Û\ŽŽ˜Û\ÜË	ÜÙX\˜Ú	×JNÂˆ›Ý]NŽœÜÝ
+	ËØ\KÜ›ÙXÝËÜ]ZXÚËXÜ™X]IËÔ›ÙXÝÛÛ›Û\ŽŽ˜Û\ÜË	Ü]ZXÚÐÜ™X]I×JNÂˆ›Ý]NŽ™Ù]
+	ËØ\KØÝ\ÝÛY\‹\›Ùš[\ËÜÙX\˜Ú	ËÐÝ\ÝÛY\”›Ùš[PÛÛ›Û\ŽŽ˜Û\ÜË	ÜÙX\˜Ú	×JNÂˆ›Ý]NŽ™Ù]
+	ËØ\KÜØÚY[KØÛÛ™šYÉË[˜Ý[Ûˆ
+
+HÂˆ™]\›ˆ™\ÜÛœÙJ
+KOšœÛÛŠ\Ù\šXÙ\×ØÚY[Q[™Ú[™NŽ‰ØÚY[U\\ÊNÂˆJNÂˆ›Ý]NŽ™Ù]
+	ËØ\KÚË[ÛÚÝ\	ËÑÛØ˜[ÓX\Ý\ÛÛ›Û\ŽŽ˜Û\ÜË	Ø\SÛÚÝ\	×JNÂˆ›Ý]NŽ™Ù]
+	ËØ\KÚË\ÙX\˜Ú	ËÑÛØ˜[ÓX\Ý\ÛÛ›Û\ŽŽ˜Û\ÜË	Ø\TÙX\˜Ú	×JNÂˆ›Ý]NŽ™Ù]
+	ËØ\KÚË[X\[™Ë\ÝYÙÙ\Ý[ÛœËÞÚÐÛÙ_IËÒÐÛÙSX\[™ÐÛÛ›Û\ŽŽ˜Û\ÜË	Ø\TÝYÙÙ\Ý[ÛœÉ×JNÂˆ›Ý]NŽœÜÝ
+	ËØ\KÚË[X\[™Ë\™\ÜÛœÙIËÒÐÛÙSX\[™ÐÛÛ›Û\ŽŽ˜Û\ÜË	Ø\T™XÛÜ™™\ÜÛœÙI×JNÂˆ›Ý]NŽ™Ù]
+	ËØ\KÜÜ›Ë\ÝYÙÙ\Ý	Ë[˜Ý[Ûˆ
+[[Z[˜]W™\]Y\Ý	™\]Y\Ý
+HÂˆ	ØÚY[U\HH	™\]Y\ÝO™Ù]
+	ÜØÚY[WÝ\IË	ÜÝ[™\™	ÊNÂˆ	^˜]HH	™\]Y\ÝO™Ù]
+	Ý^Ü˜]IÊHÈ›Ø]˜[
+	™\]Y\ÝO™Ù]
+	Ý^Ü˜]IÊJHˆ[Âˆ	ÐÛÙHH	™\]Y\ÝO™Ù]
+	Ú×ØÛÙIÊNÂˆ	ÛÛ\[žRYH\
+	ØÝ\œ™[ÛÛ\[žRY	ÊNÂˆ	ÛÛ\[žHH\[Ù[×ÛÛ\[žNŽ™š[™
+	ÛÛ\[žRY
+NÂˆ	Ý[™\™^˜]HH	ÛÛ\[žHÈ	ÛÛ\[žKO™Ù]Ý[™\™^˜]U˜[YJ
+HˆNŒÂˆ™]\›ˆ™\ÜÛœÙJ
+KOšœÛÛŠ\Ù\šXÙ\×Ü›ÔÝYÙÙ\Ý[Û”Ù\šXÙNŽ™Ù]\T™\ÜÛœÙJ	ØÚY[U\K	^˜]K	ÐÛÙK	Ý[™\™^˜]JJNÂˆJNÂˆ›Ý]NŽ™Ù]
+	ËØ\KÝ^\™\ÛÛ™IË[˜Ý[Ûˆ
+[[Z[˜]W™\]Y\Ý	™\]Y\Ý
+HÂˆ	ÛÛ\[žRYH\
+	ØÝ\œ™[ÛÛ\[žRY	ÊNÂˆ	ÐÛÙHH	™\]Y\ÝO™Ù]
+	Ú×ØÛÙIË	ÉÊNÂˆ	Ý\ÝÛY\“ˆH	™\]Y\ÝO™Ù]
+	ØÝ\ÝÛY\—Û‰ÊNÂˆ™]\›ˆ™\ÜÛœÙJ
+KOšœÛÛŠ\Ù\šXÙ\×^™\ÛÛ][Û”Ù\šXÙNŽœ™\ÛÛ™Q›Ü\J	ÐÛÙK	ÛÛ\[žRY	Ý\ÝÛY\“ŠJNÂˆJNÂˆ›Ý]NŽ™Ù]
+	ËØ\KÚ[›ÚXÙKÞÚ[›ÚXÙ_KÜš\ÚËX[˜[\Ú\ÉË[˜Ý[Ûˆ
+[[Z[˜]W™\]Y\Ý	™\]Y\Ý\[Ù[×[›ÚXÙH	[›ÚXÙJHÂˆ	ÛÛ\[žRYH\
+	ØÝ\œ™[ÛÛ\[žRY	ÊNÂˆYˆ
+	[›ÚXÙKO˜ÛÛ\[žWÚYOOH	ÛÛ\[žRY	‰ˆ]]
+
+KO\Ù\Š
+KOœ›ÛHOOH	ÜÝ\\—ØYZ[‰ÊHÂˆX›Ü
+ÊNÂˆBˆ™]\›ˆ™\ÜÛœÙJ
+KOšœÛÛŠ\Ù\šXÙ\×š\ÚÒ[[YÙ[˜ÙQ[™Ú[™NŽ˜[˜[^™R[›ÚXÙJ	[›ÚXÙJJNÂˆJNÂˆ›Ý]NŽ™Ù]
+	ËØ\KÚË]\ØYÙK\ÝYÙÙ\Ý[ÛœËÞÚÐÛÙ_IË[˜Ý[Ûˆ
+Ýš[™È	ÐÛÙJHÂˆ	ÝYÙÙ\Ý[ÛœÈH\Ù\šXÙ\×Õ\ØYÙT]\›”Ù\šXÙNŽ™Ù]ÝYÙÙ\Ý[ÛœÊ	ÐÛÙJNÂˆYˆ
+	ÝYÙÙ\Ý[ÛœÈ	‰ˆÛÝ[
+	ÝYÙÙ\Ý[ÛœÊHˆ
+HÂˆ	™\ÝH	ÝYÙÙ\Ý[ÛœÖÌNÂˆ	™\ÝÉÚ×ØÛÙI×HH	ÐÛÙNÂˆ	™\ÝÉØ[ÜÝYÙÙ\Ý[ÛœÉ×HH	ÝYÙÙ\Ý[ÛœÎÂˆ™]\›ˆ™\ÜÛœÙJ
+KOšœÛÛŠ	™\Ý
+NÂˆBˆ™]\›ˆ™\ÜÛœÙJ
+KOšœÛÛŠÉÚ×ØÛÙIÈOˆ	ÐÛÙWJNÂˆJNÂ‚ˆ›Ý]NŽ™Ù]
+	ËØ\KÜÛX\]^\™XÛÛ[Y[™	Ë[˜Ý[Ûˆ
+[[Z[˜]W™\]Y\Ý	™\]Y\Ý
+HÂˆ	ÛÛ\[žRYH\
+	ØÝ\œ™[ÛÛ\[žRY	ÊNÂˆ	ÐÛÙHH	™\]Y\ÝO™Ù]
+	Ú×ØÛÙIË	ÉÊNÂˆ	›Ýš[˜ÙHH	™\]Y\ÝO™Ù]
+	Ü›Ýš[˜ÙIÊNÂˆ	^Y\”™YÕ\HH	™\]Y\ÝO™Ù]
+	Ø^Y\—Ü™YÚ\Ý˜][Û—Ý\IÊNÂˆ	ÙXÝÜ•\HH	™\]Y\ÝO™Ù]
+	ÜÙXÝÜ—Ý\IÊNÂˆ™]\›ˆ™\ÜÛœÙJ
+KOšœÛÛŠ\Ù\šXÙ\×ÛX\^[™Ú[™NŽœ™XÛÛ[Y[™
+	ÐÛÙK	›Ýš[˜ÙK	^Y\”™YÕ\K	ÙXÝÜ•\K	ÛÛ\[žRY
+JNÂˆJNÂ‚ˆ›Ý]NŽœÜÝ
+	ËØ\KÜ™Z™XÝ[Û‹\›Ø˜Xš[]IË[˜Ý[Ûˆ
+[[Z[˜]W™\]Y\Ý	™\]Y\Ý
+HÂˆ	ÛÛ\[žRYH\
+	ØÝ\œ™[ÛÛ\[žRY	ÊNÂˆ™]\›ˆ™\ÜÛœÙJ
+KOšœÛÛŠ\Ù\šXÙ\×™Z™XÝ[Û”›Ø˜Xš[]Q[™Ú[™NŽœÚ[][]Qœ›ÛT™\]Y\Ý
+	™\]Y\ÝO˜[
+
+K	ÛÛ\[žRY
+JNÂˆJNÂ‚ˆ›Ý]NŽ™Ù]
+	ËØ\KÚ[›ÚXÙKÞÚ[›ÚXÙ_KÜ™Z™XÝ[Û‹\›Ø˜Xš[]IË[˜Ý[Ûˆ
+\[Ù[×[›ÚXÙH	[›ÚXÙJHÂˆ	ÛÛ\[žRYH\
+	ØÝ\œ™[ÛÛ\[žRY	ÊNÂˆYˆ
+	[›ÚXÙKO˜ÛÛ\[žWÚYOOH	ÛÛ\[žRY	‰ˆ]]
+
+KO\Ù\Š
+KOœ›ÛHOOH	ÜÝ\\—ØYZ[‰ÊHÂˆX›Ü
+ÊNÂˆBˆ™]\›ˆ™\ÜÛœÙJ
+KOšœÛÛŠ\Ù\šXÙ\×™Z™XÝ[Û”›Ø˜Xš[]Q[™Ú[™NŽœÚ[][]J	[›ÚXÙJJNÂˆJNÂ‚ˆ›Ý]NŽ™Ù]
+	ËØ\KØ]Y]\›Ø˜Xš[]IË[˜Ý[Ûˆ
+
+HÂˆ	ÛÛ\[žRYH\
+	ØÝ\œ™[ÛÛ\[žRY	ÊNÂˆ™]\›ˆ™\ÜÛœÙJ
+KOšœÛÛŠ\Ù\šXÙ\×]Y]›Ø˜Xš[]Q[™Ú[™NŽ˜Ø[Ý[]J	ÛÛ\[žRY
+JNÂˆJNÂ‚ˆ›Ý]NŽ™Ù]
+	ËØ\KÜš\ÚËZX]X\	ËÑ\Ú›Ø\™ÛÛ›Û\ŽŽ˜Û\ÜË	Üš\ÚÒX]X\	×JNÂ‚ˆ›Ý]NŽ™Ù]
+	ËÙ^XÝ]]™KY\Ú›Ø\™	ËÑ\Ú›Ø\™ÛÛ›Û\ŽŽ˜Û\ÜË	Ù^XÝ]]™I×JKO›˜[YJ	Ù^XÝ]]™K™\Ú›Ø\™	ÊNÂ‚ˆ›Ý]NŽœÜÝ
+	ËÝÙÙÛKY\šË[[ÙIË[˜Ý[Ûˆ
+
+HÂˆ	\Ù\ˆH]]
+
+KO\Ù\Š
+NÂˆ	\Ù\‹O™\š×Û[ÙHHI\Ù\‹O™\š×Û[ÙNÂˆ	\Ù\‹OœØ]™J
+NÂˆ™]\›ˆ˜XÚÊ
+NÂˆJKO›˜[YJ	ÝÙÙÛK™\šË[[ÙIÊNÂ‚ˆ›Ý]NŽœÜÝ
+	ËØ\KØÛÛ\X[˜ÙKØÚXÚÉËÒ[›ÚXÙPÛÛ›Û\ŽŽ˜Û\ÜË	ØÛÛ\X[˜ÙPÚXÚÉ×JNÂˆ›Ý]NŽ™Ù]
+	ËØ\KÙ[\œš\ÙKÚ[›ÚXÙKÞÚ[›ÚXÙ_KÜÝ]\ÉËÒ[›ÚXÙPÛÛ›Û\ŽŽ˜Û\ÜË	Ø\TÝ]\É×JNÂˆ›Ý]NŽ™Ù]
+	ËØ\KÙ[\œš\ÙKØÛÛ\[žKØÛÛ\X[˜ÙIËÒ[›ÚXÙPÛÛ›Û\ŽŽ˜Û\ÜË	Ø\PÛÛ\X[˜ÙTÝ]\É×JNÂ‚ˆ›Ý]NŽ™Ù]
+	ËÚ[›ÚXÙKÞÚ[›ÚXÙ_IËÒ[›ÚXÙPÛÛ›Û\ŽŽ˜Û\ÜË	ÜÚÝÉ×JKO›˜[YJ	Ú[›ÚXÙKœÚÝÉÊNÂˆ›Ý]NŽ™Ù]
+	ËÚ[›ÚXÙKÞÚ[›ÚXÙ_KÜÝ]\ËZœÛÛ‰ËÒ[›ÚXÙPÛÛ›Û\ŽŽ˜Û\ÜË	ÜÝ]\ÒœÛÛ‰×JNÂˆ›Ý]NŽ™Ù]
+	ËÚ[›ÚXÙKÞÚ[›ÚXÙ_KÜ™]šY]ÉËÒ[›ÚXÙPÛÛ›Û\ŽŽ˜Û\ÜË	Ü™]šY]É×JNÂˆ›Ý]NŽ™Ù]
+	ËÚ[›ÚXÙKÞÚ[›ÚXÙ_KÜ‰ËÒ[›ÚXÙPÛÛ›Û\ŽŽ˜Û\ÜË	Ü‰×JNÂˆ›Ý]NŽ™Ù]
+	ËÚ[›ÚXÙKÞÚ[›ÚXÙ_KÜ‹XË\™]šY]ÉËÒ[›ÚXÙPÛÛ›Û\ŽŽ˜Û\ÜË	ÜÔ™]šY]É×JKO›˜[YJ	Ú[›ÚXÙKœÔ™]šY]ÉÊNÂˆ›Ý]NŽ™Ù]
+	ËÚ[›ÚXÙKÞÚ[›ÚXÙ_KÙÝÛ›ØY	ËÒ[›ÚXÙPÛÛ›Û\ŽŽ˜Û\ÜË	ÙÝÛ›ØY	×JNÂˆ›Ý]NŽœÜÝ
+	ËÚ[›ÚXÙKÞÚ[›ÚXÙ_KÝ\]K]Ú	ËÒ[›ÚXÙPÛÛ›Û\ŽŽ˜Û\ÜË	Ý\]UÚ	×JKO›˜[YJ	Ú[›ÚXÙK\]UÚ	ÊNÂˆ›Ý]NŽœÜÝ
+	ËÚ[›ÚXÙKÞÚ[›ÚXÙ_KÝ\]K]ÚXZ˜^	ËÒ[›ÚXÙPÛÛ›Û\ŽŽ˜Û\ÜË	Ý\]UÚZ˜^	×JKO›˜[YJ	Ú[›ÚXÙK\]UÚZ˜^	ÊNÂˆ›Ý]NŽœÜÝ
+	ËÚ[›ÚXÙKÞÚ[›ÚXÙ_KØÛÜœ™XÝ]ÚXZ˜^	ËÒ[›ÚXÙPÛÛ›Û\ŽŽ˜Û\ÜË	ØÛÜœ™XÝÚZ˜^	×JKO›˜[YJ	Ú[›ÚXÙK˜ÛÜœ™XÝÚZ˜^	ÊNÂˆ›Ý]NŽ™Ù]
+	ËÝÚ[X[˜YÙ[Y[	ËÒ[›ÚXÙPÛÛ›Û\ŽŽ˜Û\ÜË	ÝÚX[˜YÙ[Y[	×JKO›˜[YJ	ÝÚ›X[˜YÙ[Y[	ÊNÂˆ›Ý]NŽœÜÝ
+	ËÚ[›ÚXÙKÞÚ[›ÚXÙ_KÝ™\šYžIËÒ[›ÚXÙPÛÛ›Û\ŽŽ˜Û\ÜË	Ý™\šYžR[YÜš]I×JKO›˜[YJ	Ú[›ÚXÙK™\šYžIÊNÂ‚ˆ›Ý]NŽ™Ù]
+	ËØÛÛ\X[˜ÙKØÙ\YšXØ]IËÐÛÛ\X[˜ÙPÙ\YšXØ]PÛÛ›Û\ŽŽ˜Û\ÜË	ÙÙ[™\˜]I×JKO›˜[YJ	ØÛÛ\X[˜ÙK˜Ù\YšXØ]IÊNÂˆ›Ý]NŽ™Ù]
+	ËØÛÛ\X[˜ÙKÜš\ÚË\™\Ü	ËÔš\ÚÔ™\ÜÛÛ›Û\ŽŽ˜Û\ÜË	ÜÚÝÉ×JKO›˜[YJ	ØÛÛ\X[˜ÙKœš\ÚË\™\Ü	ÊNÂ‚ˆ›Ý]NŽ™Ù]
+	ËÜ™\ÜËÝÚ	ËÕÚ™\ÜÛÛ›Û\ŽŽ˜Û\ÜË	Ú[™^	×JKO›˜[YJ	Ü™\ÜËÚ	ÊNÂˆ›Ý]NŽ™Ù]
+	ËÜ™\ÜËÝÚÙÝÛ›ØY	ËÕÚ™\ÜÛÛ›Û\ŽŽ˜Û\ÜË	ÙÝÛ›ØYÚ	×JKO›˜[YJ	Ü™\ÜËÚ™ÝÛ›ØY	ÊNÂˆ›Ý]NŽ™Ù]
+	ËÜ™\ÜËÝÚÜ‰ËÕÚ™\ÜÛÛ›Û\ŽŽ˜Û\ÜË	Ü•Ú	×JKO›˜[YJ	Ü™\ÜËÚœ‰ÊNÂˆ›Ý]NŽ™Ù]
+	ËÜ™\ÜËÝ^\Ý[[X\žIËÕÚ™\ÜÛÛ›Û\ŽŽ˜Û\ÜË	Ý^Ý[[X\žI×JKO›˜[YJ	Ü™\ÜË^\Ý[[X\žIÊNÂˆ›Ý]NŽ™Ù]
+	ËÜ™\ÜËÝ^\Ý[[X\žKÙÝÛ›ØY	ËÕÚ™\ÜÛÛ›Û\ŽŽ˜Û\ÜË	ÙÝÛ›ØY^Ý[[X\žI×JKO›˜[YJ	Ü™\ÜË^\Ý[[X\žK™ÝÛ›ØY	ÊNÂˆ›Ý]NŽ™Ù]
+	ËÜ™\ÜËÝ^\Ý[[X\žKÜ‰ËÕÚ™\ÜÛÛ›Û\ŽŽ˜Û\ÜË	Ü•^Ý[[X\žI×JKO›˜[YJ	Ü™\ÜË^\Ý[[X\žKœ‰ÊNÂ‚ˆ›Ý]NŽ™Ù]
+	ËÛZ\ÉËÓRTÐÛÛ›Û\ŽŽ˜Û\ÜË	Ú[™^	×JKO›˜[YJ	ÛZ\Ëš[™^	ÊNÂˆ›Ý]NŽ™Ù]
+	ËÛZ\ËÙ^Ü	ËÓRTÐÛÛ›Û\ŽŽ˜Û\ÜË	Ù^ÜÜÝ‰×JKO›˜[YJ	ÛZ\Ë™^Ü	ÊNÂˆ›Ý]NŽ™Ù]
+	ËÛZ\ËÜ‰ËÓRTÐÛÛ›Û\ŽŽ˜Û\ÜË	Ù^Ü‰×JKO›˜[YJ	ÛZ\Ëœ‰ÊNÂ‚ˆ›Ý]NŽ›ZY]Ø\™JÉÜ›ÛN˜ÛÛ\[žWØYZ[‹Ý\\—ØYZ[‰×JKO™Ü›Ý\
+[˜Ý[Ûˆ
+
+HÂˆ›Ý]NŽ™Ù]
+	ËÝ^[Ý™\œšY\ÉËÕ^Ý™\œšYPÛÛ›Û\ŽŽ˜Û\ÜË	Ú[™^	×JKO›˜[YJ	Ý^[Ý™\œšY\Ëš[™^	ÊNÂˆ›Ý]NŽœÜÝ
+	ËÝ^[Ý™\œšY\ËØÝ\ÝÛY\‰ËÕ^Ý™\œšYPÛÛ›Û\ŽŽ˜Û\ÜË	ÜÝÜ™PÝ\ÝÛY\”[I×JKO›˜[YJ	Ý^[Ý™\œšY\Ë˜Ý\ÝÛY\‹œÝÜ™IÊNÂˆ›Ý]NŽœ]
+	ËÝ^[Ý™\œšY\ËØÝ\ÝÛY\‹ÞÚYIËÕ^Ý™\œšYPÛÛ›Û\ŽŽ˜Û\ÜË	Ý\]PÝ\ÝÛY\”[I×JKO›˜[YJ	Ý^[Ý™\œšY\Ë˜Ý\ÝÛY\‹\]IÊNÂˆ›Ý]NŽ™[]J	ËÝ^[Ý™\œšY\ËØÝ\ÝÛY\‹ÞÚYIËÕ^Ý™\œšYPÛÛ›Û\ŽŽ˜Û\ÜË	Ù[]PÝ\ÝÛY\”[I×JKO›˜[YJ	Ý^[Ý™\œšY\Ë˜Ý\ÝÛY\‹™[]IÊNÂˆJNÂ‚ˆ›Ý]NŽ›ZY]Ø\™JÉÜ›ÛNœÝ\\—ØYZ[‰×JKO™Ü›Ý\
+[˜Ý[Ûˆ
+
+HÂˆ›Ý]NŽœÜÝ
+	ËÝ^[Ý™\œšY\ËÜÙXÝÜ‰ËÕ^Ý™\œšYPÛÛ›Û\ŽŽ˜Û\ÜË	ÜÝÜ™TÙXÝÜ”[I×JKO›˜[YJ	Ý^[Ý™\œšY\ËœÙXÝÜ‹œÝÜ™IÊNÂˆ›Ý]NŽœ]
+	ËÝ^[Ý™\œšY\ËÜÙXÝÜ‹ÞÚYIËÕ^Ý™\œšYPÛÛ›Û\ŽŽ˜Û\ÜË	Ý\]TÙXÝÜ”[I×JKO›˜[YJ	Ý^[Ý™\œšY\ËœÙXÝÜ‹\]IÊNÂˆ›Ý]NŽ™[]J	ËÝ^[Ý™\œšY\ËÜÙXÝÜ‹ÞÚYIËÕ^Ý™\œšYPÛÛ›Û\ŽŽ˜Û\ÜË	Ù[]TÙXÝÜ”[I×JKO›˜[YJ	Ý^[Ý™\œšY\ËœÙXÝÜ‹™[]IÊNÂˆ›Ý]NŽœÜÝ
+	ËÝ^[Ý™\œšY\ËÜ›Ýš[˜ÙIËÕ^Ý™\œšYPÛÛ›Û\ŽŽ˜Û\ÜË	ÜÝÜ™T›Ýš[˜ÙT[I×JKO›˜[YJ	Ý^[Ý™\œšY\Ëœ›Ýš[˜ÙKœÝÜ™IÊNÂˆ›Ý]NŽœ]
+	ËÝ^[Ý™\œšY\ËÜ›Ýš[˜ÙKÞÚYIËÕ^Ý™\œšYPÛÛ›Û\ŽŽ˜Û\ÜË	Ý\]T›Ýš[˜ÙT[I×JKO›˜[YJ	Ý^[Ý™\œšY\Ëœ›Ýš[˜ÙK\]IÊNÂˆ›Ý]NŽ™[]J	ËÝ^[Ý™\œšY\ËÜ›Ýš[˜ÙKÞÚYIËÕ^Ý™\œšYPÛÛ›Û\ŽŽ˜Û\ÜË	Ù[]T›Ýš[˜ÙT[I×JKO›˜[YJ	Ý^[Ý™\œšY\Ëœ›Ýš[˜ÙK™[]IÊNÂˆ›Ý]NŽœÜÝ
+	ËÝ^[Ý™\œšY\ËÜÜ›ÉËÕ^Ý™\œšYPÛÛ›Û\ŽŽ˜Û\ÜË	ÜÝÜ™TÜ›Ô[I×JKO›˜[YJ	Ý^[Ý™\œšY\ËœÜ›ËœÝÜ™IÊNÂˆ›Ý]NŽœ]
+	ËÝ^[Ý™\œšY\ËÜÜ›ËÞÚYIËÕ^Ý™\œšYPÛÛ›Û\ŽŽ˜Û\ÜË	Ý\]TÜ›Ô[I×JKO›˜[YJ	Ý^[Ý™\œšY\ËœÜ›Ë\]IÊNÂˆ›Ý]NŽ™[]J	ËÝ^[Ý™\œšY\ËÜÜ›ËÞÚYIËÕ^Ý™\œšYPÛÛ›Û\ŽŽ˜Û\ÜË	Ù[]TÜ›Ô[I×JKO›˜[YJ	Ý^[Ý™\œšY\ËœÜ›Ë™[]IÊNÂˆ›Ý]NŽ™Ù]
+	ËÝ^[Ý™\œšY\ËØ[˜[]XÜÉËÕ^Ý™\œšYPÛÛ›Û\ŽŽ˜Û\ÜË	ÛÝ™\œšYP[˜[]XÜÉ×JKO›˜[YJ	Ý^[Ý™\œšY\Ë˜[˜[]XÜÉÊNÂ‚ˆJNÂŸJNÂ‚‹ËÈÛÛœÝ[[^]ˆ	Ø]]	ÈÓ“H
+›ÈÛÛ\[žKØ\›Ý˜[Ø]\ÊHÛÈX]š[™ÈHÛY[‹ËÈÙ\ÜÚ[ÛˆSÐVTÈÛÜšÜË]™[ˆYˆHÛY[ÛÛ\[žHÛÝ[[ÝYZY\Ù\ÜÚ[Û‹‚”›Ý]NŽ›ZY]Ø\™J	Ø]]	ÊKOœÜÝ
+	ËØÛÛœÝ[[Ù^]	ËÐÛÛœÝ[[ÛÛœÛÛPÛÛ›Û\ŽŽ˜Û\ÜË	Ù^]ÝÚ]Ú	×JKO›˜[YJ	ØÛÛœÝ[[™^]	ÊNÂ‚”›Ý]NŽ›ZY]Ø\™J	Ø]]	ÊKO™Ü›Ý\
+[˜Ý[Ûˆ
+
+HÂˆ›Ý]NŽ™Ù]
+	ËÜ›Ùš[IËÔ›Ùš[PÛÛ›Û\ŽŽ˜Û\ÜË	ÙY]	×JKO›˜[YJ	Ü›Ùš[K™Y]	ÊNÂˆ›Ý]NŽœ]Ú
+	ËÜ›Ùš[IËÔ›Ùš[PÛÛ›Û\ŽŽ˜Û\ÜË	Ý\]I×JKO›˜[YJ	Ü›Ùš[K\]IÊNÂˆ›Ý]NŽœ]
+	ËÜ›Ùš[KØÛÛ\[žIËÔ›Ùš[PÛÛ›Û\ŽŽ˜Û\ÜË	Ý\]PÛÛ\[žI×JKO›˜[YJ	Ü›Ùš[K\]PÛÛ\[žIÊNÂˆ›Ý]NŽ™[]J	ËÜ›Ùš[IËÔ›Ùš[PÛÛ›Û\ŽŽ˜Û\ÜË	Ù\Ý›ÞI×JKO›˜[YJ	Ü›Ùš[K™\Ý›ÞIÊNÂŸJNÂ‚”›Ý]NŽ›ZY]Ø\™J	Ø]]	ÊKO™Ü›Ý\
+[˜Ý[Ûˆ
+
+HÂˆ›Ý]NŽœÜÝ
+	ËØ[››Ý[˜Ù[Y[ËÞÚYKÙ\ÛZ\ÜÉËÐ[››Ý[˜Ù[Y[ÛÛ›Û\ŽŽ˜Û\ÜË	Ù\ÛZ\ÜÉ×JKO›˜[YJ	Ø[››Ý[˜Ù[Y[Ë™\ÛZ\ÜÉÊNÂ‚ˆ›Ý]NŽ™Ù]
+	ËÚ[™[ÜžIËÒ[™[ÜžPÛÛ›Û\ŽŽ˜Û\ÜË	Ú[™^	×JKO›˜[YJ	Ú[™[ÜžKš[™^	ÊNÂˆ›Ý]NŽ™Ù]
+	ËÚ[™[ÜžKÛ[Ý™[Y[ÉËÒ[™[ÜžPÛÛ›Û\ŽŽ˜Û\ÜË	Û[Ý™[Y[É×JKO›˜[YJ	Ú[™[ÜžK›[Ý™[Y[ÉÊNÂˆ›Ý]NŽœÜÝ
+	ËÚ[™[ÜžKØY\Ý	ËÒ[™[ÜžPÛÛ›Û\ŽŽ˜Û\ÜË	ØY\Ý	×JKO›˜[YJ	Ú[™[ÜžK˜Y\Ý	ÊNÂˆ›Ý]NŽœ]
+	ËÚ[™[ÜžKÜÝØÚËÞÚYKÛZ[‹\ÝØÚÉËÒ[™[ÜžPÛÛ›Û\ŽŽ˜Û\ÜË	Ý\]SZ[”ÝØÚÉ×JKO›˜[YJ	Ú[™[ÜžK\]K[Z[‹\ÝØÚÉÊNÂˆ›Ý]NŽ™Ù]
+	ËÚ[™[ÜžKÜ›ÙXÝÞÜ›ÙXÝYKÛ[Ý™[Y[ÉËÒ[™[ÜžPÛÛ›Û\ŽŽ˜Û\ÜË	Ü›ÙXÝ[Ý™[Y[É×JKO›˜[YJ	Ú[™[ÜžKœ›ÙXÝ[[Ý™[Y[ÉÊNÂˆ›Ý]NŽ™Ù]
+	ËØ\KÚ[™[ÜžKÜÝØÚËÞÜ›ÙXÝYIËÒ[™[ÜžPÛÛ›Û\ŽŽ˜Û\ÜË	Ø\TÝØÚÐÚXÚÉ×JKO›˜[YJ	Ø\Kš[™[ÜžKœÝØÚËXÚXÚÉÊNÂ‚ˆ›Ý]NŽ™Ù]
+	ËÜÝ\Y\œÉËÔÝ\Y\ÛÛ›Û\ŽŽ˜Û\ÜË	Ú[™^	×JKO›˜[YJ	ÜÝ\Y\œËš[™^	ÊNÂˆ›Ý]NŽœÜÝ
+	ËÜÝ\Y\œÉËÔÝ\Y\ÛÛ›Û\ŽŽ˜Û\ÜË	ÜÝÜ™I×JKO›˜[YJ	ÜÝ\Y\œËœÝÜ™IÊNÂˆ›Ý]NŽœ]
+	ËÜÝ\Y\œËÞÚYIËÔÝ\Y\ÛÛ›Û\ŽŽ˜Û\ÜË	Ý\]I×JKO›˜[YJ	ÜÝ\Y\œË\]IÊNÂˆ›Ý]NŽ™[]J	ËÜÝ\Y\œËÞÚYIËÔÝ\Y\ÛÛ›Û\ŽŽ˜Û\ÜË	Ù\Ý›ÞI×JKO›˜[YJ	ÜÝ\Y\œË™\Ý›ÞIÊNÂ‚ˆ›Ý]NŽ™Ù]
+	ËÜ\˜Ú\ÙK[Ü™\œÉËÔÝ\Y\ÛÛ›Û\ŽŽ˜Û\ÜË	Ü\˜Ú\ÙSÜ™\œÉ×JKO›˜[YJ	Ü\˜Ú\ÙK[Ü™\œËš[™^	ÊNÂˆ›Ý]NŽœÜÝ
+	ËÜ\˜Ú\ÙK[Ü™\œÉËÔÝ\Y\ÛÛ›Û\ŽŽ˜Û\ÜË	ÜÝÜ™T\˜Ú\ÙSÜ™\‰×JKO›˜[YJ	Ü\˜Ú\ÙK[Ü™\œËœÝÜ™IÊNÂˆ›Ý]NŽœÜÝ
+	ËÜ\˜Ú\ÙK[Ü™\œËÞÚYKÜ™XÙZ]™IËÔÝ\Y\ÛÛ›Û\ŽŽ˜Û\ÜË	Ü™XÙZ]™T\˜Ú\ÙSÜ™\‰×JKO›˜[YJ	Ü\˜Ú\ÙK[Ü™\œËœ™XÙZ]™IÊNÂˆ›Ý]NŽœÜÝ
+	ËÜ\˜Ú\ÙK[Ü™\œËÞÚYKØØ[˜Ù[	ËÔÝ\Y\ÛÛ›Û\ŽŽ˜Û\ÜË	ØØ[˜Ù[\˜Ú\ÙSÜ™\‰×JKO›˜[YJ	Ü\˜Ú\ÙK[Ü™\œË˜Ø[˜Ù[	ÊNÂ‚ˆËÈ^[Y[›ÛÙˆÝX›Z\ÜÚ[Ûˆ
+ØÚÙYÈšX[Y[™YHÛÛ\[žJH8 %[[[Û˜[H“Õ™Z[™[‹›[Z]‚ˆ›Ý]NŽœÜÝ
+	ËÜ^[Y[\›ÛÙ‰Ë×\ÛÛ›Û\œ×^[Y[›ÛÙÛÛ›Û\ŽŽ˜Û\ÜË	ÜÝÜ™I×JBˆO›˜[YJ	Ü^[Y[\›ÛÙ‹œÝÜ™IÊKO›ZY]Ø\™J	Ý›ÝN‹IÊNÂŸJNÂ‚‹ËÈXYYØ\ˆRHÝ\Ü›Ý
+ÝÛ™\ˆ™\]Y\ÝŒˆ[ŒŠH8 %ÜË˜]]Ó“K“Â‹ËÈÛÛ\[žK˜\›Ý˜[ˆ[™[™ÈÛÛ\[šY\ÈX^HÚ]
+Z\ˆÔÕÈÛÝ[™HÉÙ‹ËÈÝ\Ú\ÙJKˆSÔÈ›Û\È[ÝÙY[˜ÛY[™ÈØ\ÚY\œÈ
+ÝÛ™\ˆ^XÚ]
+K‚‹ËÈÔÈÚ[X\ÓHÚÙ[ˆ™YÚ\Ý˜][Ûˆ
+\ÚÈÌLMŠH8 %ÜË˜]]Ó“K›Â‹ËÈÛÛ\[žK˜\›Ý˜[
+H[™[™ÈÚÜ	ÜÈ]šXÙH™YÚ\Ý\š[™È\È\›[\ÜÎÈ\›Ý˜[‹ËÈØ][™ÈÛˆHš\™KX[™Y›Ü™Ù]ÔÕÛÝ[Û›HÜ™X]HÚ[[™]žH›Ú\ÙJK‚‹ËÈHÚ[ÜÝÈ˜]]™[HÚ]HÙX•šY]ÈÙ\ÜÚ[ÛˆÛÛÚÚYNÈÜÜËÊˆ\È[™XYB‹ËÈÔÔ‘‹Y^[\[™HÛÛ›Û\ˆ™\]Z\™\ÈHU^™\ÝP\XY\ˆ[œÝXY‚”›Ý]NŽ›ZY]Ø\™JÉÜÜË˜]]	×JKOœÜÝ
+	ËÜÜËØ\Ù˜ÛK]ÚÙ[‰Ë×\ÛÛ›Û\œ×ÜÐ\\ÚÛÛ›Û\ŽŽ˜Û\ÜË	Ü™YÚ\Ý\‰×JBˆO›ZY]Ø\™J	Ý›ÝNŒÌIÊKO›˜[YJ	ÜÜË˜\™˜ÛK]ÚÙ[‰ÊNÂ‹ËÈÙÛÝ]][YHÛX\ˆ\ÈÕUSTÔÈ
+Ù\ÜÚ[Ûˆ[™XYH\Ý›ÞYYÚ[ˆHÚ[‹ËÈ]XÝÈHÙÚ[ˆYÙJH8 %]][XØ]YžHÜÜÙ\ÜÚ[ÛˆÙˆHÚÙ[ˆ]Ù[‹‚”›Ý]NŽœÜÝ
+	ËØ\KÜÜËX\Ù˜ÛK]ÚÙ[‹ØÛX\‰Ë×\ÛÛ›Û\œ×ÜÐ\\ÚÛÛ›Û\ŽŽ˜Û\ÜË	ØÛX\‰×JBˆO›ZY]Ø\™J	Ý›ÝNŒÌIÊKOÚ]Ý]ZY]Ø\™J	Ý][\ÜÓXXÚ[™JKO›˜[YJ	ÜÜË˜\™˜ÛKXÛX\‰ÊNÂ‚”›Ý]NŽ›ZY]Ø\™JÉÜÜË˜]]	×JKOœ™Yš^
+	ÜÜËÛXYYØ\‰ÊKO™Ü›Ý\
+[˜Ý[Ûˆ
+
+HÂˆ›Ý]NŽ™Ù]
+	ËÝ\ØYÙIË×\ÛÛ›Û\œ×XYYØ\•\ØYÙPÛÛ›Û\ŽŽ˜Û\ÜË	ÜÚÝÉ×JKO›˜[YJ	ÜÜË›XYYØ\‹\ØYÙIÊNÂˆ›Ý]NŽ™Ù]
+	ËÚ\ÝÜžIË×\ÛÛ›Û\œ×XYYØ\ÛÛ›Û\ŽŽ˜Û\ÜË	Ú\ÝÜžI×JKO›˜[YJ	ÜÜË›XYYØ\‹š\ÝÜžIÊNÂˆ›Ý]NŽœÜÝ
+	ËÛY\ÜØYÙIË×\ÛÛ›Û\œ×XYYØ\ÛÛ›Û\ŽŽ˜Û\ÜË	ÛY\ÜØYÙI×JKO›˜[YJ	ÜÜË›XYYØ\‹›Y\ÜØYÙIÊKO›ZY]Ø\™J	Ý›ÝNŒŒIÊNÂˆ›Ý]NŽœÜÝ
+	ËÙ\ØØ[]IË×\ÛÛ›Û\œ×XYYØ\ÛÛ›Û\ŽŽ˜Û\ÜË	Ù\ØØ[]I×JKO›˜[YJ	ÜÜË›XYYØ\‹™\ØØ[]IÊKO›ZY]Ø\™J	Ý›ÝNŒLIÊNÂŸJNÂ‚‹ËÈ”ˆÔÈÚ[œÈ
+\ÚÈLÍJH8 %Ø[YHÛÛ›Û\œÈ]XÝH[™[žHT“™Yš^‚‹ËÈ\Ú™YÚ\Ý˜][ÛŽˆ˜œœÜË˜]]Ó“H
+Ø[YH˜][Û˜[H\ÈJKˆÙ˜œ‹\ÜËÊˆ\Â‹ËÈ“Õ[ˆH]›Ü›HÔÔ‘‹Y^[\\ÝÛÈ˜[Y]PÜÜ™•ÚÙ[ˆ\È›ÜY]‹ËÈ›Ý]H]™[8 %H™\]Z\™YU^™\ÝP\XY\ˆÝ^\ÈH›Ü™Ù\žHÝX\™‚”›Ý]NŽ›ZY]Ø\™JÉÙ˜œœÜË˜]]	×JKOœÜÝ
+	ËÙ˜œ‹\ÜËØ\Ù˜ÛK]ÚÙ[‰Ë×\ÛÛ›Û\œ×ÜÐ\\ÚÛÛ›Û\ŽŽ˜Û\ÜË	Ü™YÚ\Ý\‘˜œ‰×JBˆO›ZY]Ø\™J	Ý›ÝNŒÌIÊBˆOÚ]Ý]ZY]Ø\™J[[Z[˜]W›Ý[™][Û—ZY]Ø\™W˜[Y]PÜÜ™•ÚÙ[ŽŽ˜Û\ÜÊBˆO›˜[YJ	Ù˜œœÜË˜\™˜ÛK]ÚÙ[‰ÊNÂ‹ËÈÝ][\ÜÈÙÛÝ]][YHÛX\ˆ8 %ÚÙ[ˆÜÜÙ\ÜÚ[ÛˆTÈH]]ÈÛX\Š
+H\Â‹ËÈÝX\™XYÛ›ÜÝXÈ
+[]\ÈžHÚÙ[—Ú\Ú
+KÛÈH”ˆÚ[Ù]È]ÈÝÛˆ[X\Ë‚”›Ý]NŽœÜÝ
+	ËØ\KÙ˜œ‹\ÜËX\Ù˜ÛK]ÚÙ[‹ØÛX\‰Ë×\ÛÛ›Û\œ×ÜÐ\\ÚÛÛ›Û\ŽŽ˜Û\ÜË	ØÛX\‰×JBˆO›ZY]Ø\™J	Ý›ÝNŒÌIÊKOÚ]Ý]ZY]Ø\™J	Ý][\ÜÓXXÚ[™JKO›˜[YJ	Ù˜œœÜË˜\™˜ÛKXÛX\‰ÊNÂ‚‹ËÈXYYØ\ˆ›ÜˆH”ˆ[™[8 %˜œœÜË˜]]Ó“K“ÈÛÛ\[žK˜\›Ý˜[
+[™[™Â‹ËÈÛÛ\[šY\ÈX^HÚ]
+KS›Û\ËˆØ[YH›Ý\È\ÈHHÜ›Ý\‚”›Ý]NŽ›ZY]Ø\™JÉÙ˜œœÜË˜]]	×JKOœ™Yš^
+	Ù˜œ‹\ÜËÛXYYØ\‰ÊKO™Ü›Ý\
+[˜Ý[Ûˆ
+
+HÂˆ›Ý]NŽ™Ù]
+	ËÝ\ØYÙIË×\ÛÛ›Û\œ×XYYØ\•\ØYÙPÛÛ›Û\ŽŽ˜Û\ÜË	ÜÚÝÉ×JKO›˜[YJ	Ù˜œœÜË›XYYØ\‹\ØYÙIÊNÂˆ›Ý]NŽ™Ù]
+	ËÚ\ÝÜžIË×\ÛÛ›Û\œ×XYYØ\ÛÛ›Û\ŽŽ˜Û\ÜË	Ú\ÝÜžI×JKO›˜[YJ	Ù˜œœÜË›XYYØ\‹š\ÝÜžIÊNÂˆ›Ý]NŽœÜÝ
+	ËÛY\ÜØYÙIË×\ÛÛ›Û\œ×XYYØ\ÛÛ›Û\ŽŽ˜Û\ÜË	ÛY\ÜØYÙI×JKO›˜[YJ	Ù˜œœÜË›XYYØ\‹›Y\ÜØYÙIÊKO›ZY]Ø\™J	Ý›ÝNŒŒIÊNÂˆ›Ý]NŽœÜÝ
+	ËÙ\ØØ[]IË×\ÛÛ›Û\œ×XYYØ\ÛÛ›Û\ŽŽ˜Û\ÜË	Ù\ØØ[]I×JKO›˜[YJ	Ù˜œœÜË›XYYØ\‹™\ØØ[]IÊKO›ZY]Ø\™J	Ý›ÝNŒLIÊNÂŸJNÂ‚‹ËÈ]ÜšX[šY[ÜÈ[œÚYHHÔÈÙÚ[ˆ
+ÝÛ™\ˆ™\]Y\Ýˆ]YÈŒŠH8 %ÜË˜]]‹ËÈÓ“K“ÈÛÛ\[žK˜\›Ý˜[ˆ[™[™ÈÛÛ\[šY\ÈX^HØ]Ú[™X\›ˆÚ[H^B‹ËÈØZ]
+Ø[YH™XÙY[\ÈXYYØ\ŠKˆ[›Û\È[ÝÙYÈ]\È[›X\Y[‚‹ËÈÜÐXØÙ\ÜÔÙ\šXÙHÛÈÝ\ÝÛKXXØÙ\ÜÈY[X™\œÈØ[ˆ[Ø^\È™XXÚ]‚”›Ý]NŽ›ZY]Ø\™JÉÜÜË˜]]	×JKO™Ù]
+	ËÜÜËÝ]ÜšX[ÉË×\ÛÛ›Û\œ×]ÜšX[ÛÛ›Û\ŽŽ˜Û\ÜË	ÜÜÒ[™^	×JKO›˜[YJ	ÜÜË]ÜšX[ÉÊNÂ‚‹ËÈ”ˆÔÈ[™[ÚH\šH]ÜšX[ÈYÙH
+ÝÛ™\‹ˆ]YÈŒŠH8 %˜œœÜË˜]]Ó“K‹ËÈ“ÈÛÛ\[žK˜\›Ý˜[
+Ø[YH™XÙY[\ÈÜÜËÝ]ÜšX[ÊNˆÚ\™ˆ˜œœÜÈšY[ÜË‚”›Ý]NŽ›ZY]Ø\™JÉÙ˜œœÜË˜]]	×JKO™Ù]
+	ËÙ˜œ‹\ÜËÝ]ÜšX[ÉË×\ÛÛ›Û\œ×]ÜšX[ÛÛ›Û\ŽŽ˜Û\ÜË	Ù˜œ’[™^	×JKO›˜[YJ	Ù˜œœÜË]ÜšX[ÉÊNÂ‚‹ËÈ\‹]\Ù\ˆØ[KYÜšYš\ÚXš[]H
+ÝÛ™\‹H[ŒŠH8 %ÜË˜]]Ó“K“Â‹ËÈÛÛ\[žK˜\›Ý˜[
+\œÛÛ˜[\Ü^H™YŽÈØ[YH™XÙY[\ÈXYYØ\ŠK‚‹ËÈSÔÈ›Û\È[ÝÙY[˜ÛY[™ÈØ\ÚY\œÈ[™ØZ]\œÈ
+ÝÛ™\ˆ^XÚ]
+K‚”›Ý]NŽ›ZY]Ø\™JÉÜÜË˜]]	×JKOœ™Yš^
+	ÜÜËÙÜšY\™YœÉÊKO™Ü›Ý\
+[˜Ý[Ûˆ
+
+HÂˆ›Ý]NŽœÜÝ
+	ËÝÙÙÛIË×\ÛÛ›Û\œ×ÜÑÜšY™YÛÛ›Û\ŽŽ˜Û\ÜË	ÝÙÙÛI×JKO›˜[YJ	ÜÜË™ÜšY\™YœËÙÙÛIÊKO›ZY]Ø\™J	Ý›ÝNŒIÊNÂˆ›Ý]NŽœÜÝ
+	ËÜ™\Ù]	Ë×\ÛÛ›Û\œ×ÜÑÜšY™YÛÛ›Û\ŽŽ˜Û\ÜË	Ü™\Ù]	×JKO›˜[YJ	ÜÜË™ÜšY\™YœËœ™\Ù]	ÊKO›ZY]Ø\™J	Ý›ÝNŒLIÊNÂŸJNÂ‚‹ËÈ\ÚÈLÌNˆ”ˆÚ[ˆÙˆH\‹]\Ù\ˆÜšY™YœÈ8 %˜œœÜË˜]]Ó“K“Â‹ËÈÛÛ\[žK˜\›Ý˜[
+\œÛÛ˜[\Ü^H™YŽÈØ[YH™XÙY[\ÈHH›Ý]\ÊK‚”›Ý]NŽ›ZY]Ø\™JÉÙ˜œœÜË˜]]	×JKOœ™Yš^
+	Ù˜œ‹\ÜËÙÜšY\™YœÉÊKO™Ü›Ý\
+[˜Ý[Ûˆ
+
+HÂˆ›Ý]NŽœÜÝ
+	ËÝÙÙÛIË×\ÛÛ›Û\œ×˜œ”ÜÑÜšY™YÛÛ›Û\ŽŽ˜Û\ÜË	ÝÙÙÛI×JKO›˜[YJ	Ù˜œœÜË™ÜšY\™YœËÙÙÛIÊKO›ZY]Ø\™J	Ý›ÝNŒIÊNÂˆ›Ý]NŽœÜÝ
+	ËÜ™\Ù]	Ë×\ÛÛ›Û\œ×˜œ”ÜÑÜšY™YÛÛ›Û\ŽŽ˜Û\ÜË	Ü™\Ù]	×JKO›˜[YJ	Ù˜œœÜË™ÜšY\™YœËœ™\Ù]	ÊKO›ZY]Ø\™J	Ý›ÝNŒLIÊNÂŸJNÂ‚”›Ý]NŽ›ZY]Ø\™JÉÜÜË˜]]	Ë	ØÛÛ\[žK˜\›Ý˜[	×JKOœ™Yš^
+	ÜÜÉÊKO™Ü›Ý\
+[˜Ý[Ûˆ
+
+HÂˆ›Ý]NŽ™Ù]
+	ËÝ^Z[YÜ˜][ÛœÉË×\ÛÛ›Û\œ×ÜÕ^[YÜ˜][ÛÛÛ›Û\ŽŽ˜Û\ÜË	Ú[™^	×JKO›˜[YJ	ÜÜË^Z[YÜ˜][ÛœÉÊNÂˆ›Ý]NŽ™Ù]
+	ËÝ^Z[YÜ˜][ÛœËØ]]ÛX]XÉË×\ÛÛ›Û\œ×ÜÑ™Y\˜[]]ÛX][ÛÛÛ›Û\ŽŽ˜Û\ÜË	Ú[™^	×JKO›˜[YJ	ÜÜË™™Y\˜[X]]ÉÊNÂˆ›Ý]NŽœÜÝ
+	ËÝ^Z[YÜ˜][ÛœËØ]]ÛX]XÉË×\ÛÛ›Û\œ×ÜÑ™Y\˜[]]ÛX][ÛÛÛ›Û\ŽŽ˜Û\ÜË	ÜØ]™I×JKO›ZY]Ø\™J	Ý›ÝN‹IÊKO›˜[YJ	ÜÜË™™Y\˜[X]]ËœØ]™IÊNÂˆ›Ý]NŽœ™Yš^
+	Ý^Z[YÜ˜][ÛœËÙ˜œ‹\ÜÉÊKO›˜[YJ	ÜÜË^Z[YÜ˜][ÛœËš[\ÉÊKO˜ÛÛ›Û\Š\ÛÛ›Û\œ×ÜÕ^[YÜ˜][ÛÛÛ›Û\ŽŽ˜Û\ÜÊKO™Ü›Ý\
+[˜Ý[ÛŠ
+^Âˆ›Ý]NŽ™Ù]
+	ËÉË	Ú[\ÉÊNÂˆ›Ý]NŽœÜÝ
+	ËÜÙ]\	Ë	ÜØ]™R[\ÉÊKO›ZY]Ø\™J	Ý›ÝN‹IÊKO›˜[YJ	ËœØ]™IÊNÂˆ›Ý]NŽœÜÝ
+	ËØØ\\™IË	ØØ\\™IÊKO›˜[YJ	Ë˜Ø\\™IÊNÂˆ›Ý]NŽ™Ù]
+	ËÞÚYIË	ÜÚÝÉÊKOÚ\™S[X™\Š	ÚY	ÊKO›˜[YJ	ËœÚÝÉÊNÂˆ›Ý]NŽœÜÝ
+	ËÞÚYKÜ™\\™IË	Ü™\\™IÊKOÚ\™S[X™\Š	ÚY	ÊKO›˜[YJ	Ëœ™\\™IÊNÂˆ›Ý]NŽœÜÝ
+	ËÞÚYKØÛÛ›™XÝ[Û‰Ë	Ü™Yœ™\ÚÛÛ›™XÝ[Û‰ÊKOÚ\™S[X™\Š	ÚY	ÊKO›˜[YJ	Ë˜ÛÛ›™XÝ[Û‰ÊNÂˆ›Ý]NŽœÜÝ
+	ËÞÚYKÜ™XÛÛ˜Ú[IË	Ü™XÛÛ˜Ú[TÜ[	ÊKOÚ\™S[X™\Š	ÚY	ÊKO›ZY]Ø\™J	Ý›ÝN‹IÊKO›˜[YJ	Ëœ™XÛÛ˜Ú[IÊNÂˆ›Ý]NŽœÜÝ
+	ËÞÚYKÜÝX›Z]	Ë	ÜÝX›Z]	ÊKOÚ\™S[X™\Š	ÚY	ÊKO›ZY]Ø\™J	Ý›ÝN‹IÊKO›˜[YJ	ËœÝX›Z]	ÊNÂˆ›Ý]NŽ™Ù]
+	ËÞÚYKÜ™XÙZ\	Ë	Ü™XÙZ\	ÊKOÚ\™S[X™\Š	ÚY	ÊKO›˜[YJ	Ëœ™XÙZ\	ÊNÂˆJNÂ‚ˆËÈ^XÚ]ÛÛ\[žHÜZ[ŽÈš^YØ[™›Þ\Ý[˜][Û‹ÝÛ™\ˆ
+ÈÔÔ‘ˆÚXÚÜË‚ˆ›Ý]NŽœ™Yš^
+	ÙK\Ø[™›Þ	ÊKO›˜[YJ	ÜÜË™K\Ø[™›Þ‰ÊKO˜ÛÛ›Û\Š\ÛÛ›Û\œ×˜QTØ[™›ÞÛÛ›Û\ŽŽ˜Û\ÜÊKO™Ü›Ý\
+[˜Ý[Ûˆ
+
+HÂˆ›Ý]NŽ™Ù]
+	ËÉË	Ú[™^	ÊKO›˜[YJ	Ú[™^	ÊNÂˆ›Ý]NŽ™Ù]
+	ËÜÙ]\	Ë	ÜÙ]\	ÊKO›˜[YJ	ÜÙ]\	ÊNÂˆ›Ý]NŽœÜÝ
+	ËÜÙ]\	Ë	ÜØ]™TÙ]\	ÊKO›ZY]Ø\™J	Ý›ÝN‹IÊKO›˜[YJ	ÜÙ]\œØ]™IÊNÂˆ›Ý]NŽœÜÝ
+	ËØÚXÚÉË	ØÚXÚÉÊKO›ZY]Ø\™J	Ý›ÝN‹IÊKO›˜[YJ	ØÚXÚÉÊNÂˆ›Ý]NŽœÜÝ
+	ËØØ\\™IË	ØØ\\™IÊKO›˜[YJ	ØØ\\™IÊNÂˆ›Ý]NŽ™Ù]
+	ËÞÚYIË	ÜÚÝÉÊKOÚ\™S[X™\Š	ÚY	ÊKO›˜[YJ	ÜÚÝÉÊNÂˆ›Ý]NŽœÜÝ
+	ËÞÚYKÜ™\\™IË	Ü™\\™IÊKOÚ\™S[X™\Š	ÚY	ÊKO›˜[YJ	Ü™\\™IÊNÂˆ›Ý]NŽœÜÝ
+	ËÞÚYKÜÝX›Z]	Ë	ÜÝX›Z]	ÊKOÚ\™S[X™\Š	ÚY	ÊKO›ZY]Ø\™J	Ý›ÝN‹IÊKO›˜[YJ	ÜÝX›Z]	ÊNÂˆ›Ý]NŽ™Ù]
+	ËÞÚYKÜ™XÙZ\	Ë	Ü™XÙZ\	ÊKOÚ\™S[X™\Š	ÚY	ÊKO›˜[YJ	Ü™XÙZ\	ÊNÂˆJNÂˆ›Ý]NŽœÜÝ
+	ËÙ\ÚÝÜÛØØ[XÛÜ™K[X\ÙIË×\ÛÛ›Û\œ×\WYÙ[ÛÜ™PÛÛ›Û\ŽŽ˜Û\ÜË	Ú\ÜÝYSX\ÙI×JBˆO›ZY]Ø\™J	Ý›ÝNŒLIÊKO›˜[YJ	ÜÜË™\ÚÝÜ›ØØ[XÛÜ™K[X\ÙIÊNÂˆ›Ý]NŽ™Ù]
+	ËÙ\ÚÝÜÛØØ[XÛÜ™K\ØÛÜIËÔÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ù\ÚÝÜØØ[ÛÜ™TØÛÜI×JBˆO›˜[YJ	ÜÜË™\ÚÝÜ›ØØ[XÛÜ™K\ØÛÜIÊNÂˆ›Ý]NŽ™Ù]
+	ËØYÙ[	Ë×\ÛÛ›Û\œ×YÙ[X[˜YÙ[Y[ÛÛ›Û\ŽŽ˜Û\ÜË	ÜÚÝÉ×JKO›˜[YJ	ÜÜË˜YÙ[	ÊNÂˆ›Ý]NŽœÜÝ
+	ËØYÙ[ÙÙ[™\˜]KZÙ^IË×\ÛÛ›Û\œ×YÙ[X[˜YÙ[Y[ÛÛ›Û\ŽŽ˜Û\ÜË	ÙÙ[™\˜]RÙ^I×JKO›˜[YJ	ÜÜË˜YÙ[™Ù[™\˜]IÊNÂˆ›Ý]NŽœÜÝ
+	ËØYÙ[Ü™YÙ[™\˜]KZÙ^IË×\ÛÛ›Û\œ×YÙ[X[˜YÙ[Y[ÛÛ›Û\ŽŽ˜Û\ÜË	Ü™YÙ[™\˜]RÙ^I×JKO›˜[YJ	ÜÜË˜YÙ[œ™YÙ[™\˜]IÊNÂˆ›Ý]NŽœÜÝ
+	ËØYÙ[ÝÙÙÛIË×\ÛÛ›Û\œ×YÙ[X[˜YÙ[Y[ÛÛ›Û\ŽŽ˜Û\ÜË	ÝÙÙÛI×JKO›˜[YJ	ÜÜË˜YÙ[ÙÙÛIÊNÂˆ›Ý]NŽœÜÝ
+	ËØYÙ[ÛØØ[XÛÜ™KÝÙÙÛIË×\ÛÛ›Û\œ×YÙ[X[˜YÙ[Y[ÛÛ›Û\ŽŽ˜Û\ÜË	ÝÙÙÛSØØ[ÛÜ™I×JBˆO›ZY]Ø\™J\ZY]Ø\™WÜÐYZ[“Û›NŽ˜Û\ÜÊKO›˜[YJ	ÜÜË˜YÙ[›ØØ[XÛÜ™KÙÙÛIÊNÂˆ›Ý]NŽ™Ù]
+	ËØYÙ[ÙÝÛ›ØY	Ë×\ÛÛ›Û\œ×YÙ[X[˜YÙ[Y[ÛÛ›Û\ŽŽ˜Û\ÜË	ÙÝÛ›ØYYÙ[	×JKO›˜[YJ	ÜÜË˜YÙ[™ÝÛ›ØY	ÊNÂˆËÈ™\ÝÔÈ\ÚÝÜÚ[]]ËXÛÛ™šYÎˆÚ[™]Ú\ÈYÙ[Ü™Y[X[ÈÚ]BˆËÈÙÙÙYZ[ˆÔÈÙ\ÜÚ[ÛˆÛÛÚÚYHšYÚY\ˆÙÚ[ˆ
+™\›ÈX[X[YÙ[Ù]\
+K‚ˆ›Ý]NŽ™Ù]
+	ËÙ\ÚÝÜØYÙ[\Z\š[™ÉË×\ÛÛ›Û\œ×\ÚÝÜYÙ[Z\š[™ÐÛÛ›Û\ŽŽ˜Û\ÜË	Ü™]šY]É×JBˆO™Y˜][Ê	Ü[™[	Ë	ÜÜÉÊKO›ZY]Ø\™J	Ý›ÝNŒLIÊKO˜›ØÚÊLL
+KO›˜[YJ	ÜÜË™\ÚÝÜœZ\š[™ÉÊNÂˆ›Ý]NŽœÜÝ
+	ËÙ\ÚÝÜØYÙ[\Z\š[™ÉË×\ÛÛ›Û\œ×\ÚÝÜYÙ[Z\š[™ÐÛÛ›Û\ŽŽ˜Û\ÜË	ØÛÛ™š\›I×JBˆO™Y˜][Ê	Ü[™[	Ë	ÜÜÉÊKO›ZY]Ø\™J	Ý›ÝNŒLIÊKO˜›ØÚÊLL
+KO›˜[YJ	ÜÜË™\ÚÝÜœZ\š[™Ë˜ÛÛ™š\›IÊNÂˆ›Ý]NŽ™Ù]
+	ËÙ\ÚÝÜØYÙ[XÛÛ™šYÉË×\ÛÛ›Û\œ×YÙ[X[˜YÙ[Y[ÛÛ›Û\ŽŽ˜Û\ÜË	Ù\ÚÝÜÛÛ™šYÉ×JKO›˜[YJ	ÜÜË™\ÚÝÜ˜YÙ[XÛÛ™šYÉÊNÂ‚ˆ›Ý]NŽ™Ù]
+	ËÙ\Ú›Ø\™	ËÔÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ù\Ú›Ø\™	×JKO›˜[YJ	ÜÜË™\Ú›Ø\™	ÊNÂˆ›Ý]NŽ™Ù]
+	ËÙ\Ú›Ø\™Ù]Z[ÞÛY]šXßIËÔÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ù\Ú›Ø\™]Z[	×JKO›˜[YJ	ÜÜË™\Ú›Ø\™™]Z[	ÊNÂˆ›Ý]NŽœÜÝ
+	ËÛ›ÝYšXØ][ÛœËÞÚYKÙ\ÛZ\ÜÉËÔÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ù\ÛZ\ÜÓ›ÝYšXØ][Û‰×JKO›˜[YJ	ÜÜË››ÝYšXØ][ÛœË™\ÛZ\ÜÉÊNÂˆ›Ý]NŽœÜÝ
+	ËÛ›ÝYšXØ][ÛœËÙ\ÛZ\ÜËX[	ËÔÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ù\ÛZ\ÜÐ[›ÝYšXØ][ÛœÉ×JKO›˜[YJ	ÜÜË››ÝYšXØ][ÛœË™\ÛZ\ÜËX[	ÊNÂˆ›Ý]NŽ™Ù]
+	ËÝÚ]Ë[™]ËÚ\ÝÜžIË×\ÛÛ›Û\œ×\\]PÛÛ›Û\ŽŽ˜Û\ÜË	Ú\ÝÜžI×JKO™Y˜][Ê	Ø[››Ý[˜Ù[Y[Ü[™[	Ë	Ü˜IÊKO›˜[YJ	ÜÜËÚ]Ë[™]Ëš\ÝÜžIÊNÂˆ›Ý]NŽœÜÝ
+	ËÝÚ]Ë[™]ËÜÙY[‰Ë×\ÛÛ›Û\œ×\\]PÛÛ›Û\ŽŽ˜Û\ÜË	ÛX\šÔÙY[‰×JKO›˜[YJ	ÜÜËÚ]Ë[™]ËœÙY[‰ÊNÂˆËÈ\ÚÈLŒŽˆÔÈÝ\™^HÜ\
+Ø[\ˆQ[X[ŠH8 %YZ[‹ÛX[˜YÙ\ˆØ]Y[ˆÛÛ›Û\‹‚ˆ›Ý]NŽœÜÝ
+	ËÜÝ\™^KÞÚYKÜ™\ÜÛ™	Ë×\ÛÛ›Û\œ×ÜÔÝ\™^PÛÛ›Û\ŽŽ˜Û\ÜË	Ü™\ÜÛ™	×JKO›˜[YJ	ÜÜËœÝ\™^Kœ™\ÜÛ™	ÊNÂˆ›Ý]NŽœÜÝ
+	ËÜÝ\™^KÞÚYKÙ\ÛZ\ÜÉË×\ÛÛ›Û\œ×ÜÔÝ\™^PÛÛ›Û\ŽŽ˜Û\ÜË	Ù\ÛZ\ÜÉ×JKO›˜[YJ	ÜÜËœÝ\™^K™\ÛZ\ÜÉÊNÂˆËÈ\ÚÈÍÎˆÛ™K][YH’ÓÕÙ[\š[™ÈÝ[Óˆ8 %™\šYžH[Ý\ˆš[Ý]ˆ˜[›™\ˆ\ÛZ\ÜÈ
+YZ[‹ÛX[˜YÙ\ˆÛ›KØ]Y[ˆÛÛ›Û\ŠK‚ˆ›Ý]NŽœÜÝ
+	ËÚÛÝXÙ[\‹[›ÝXÙKÙ\ÛZ\ÜÉËÔÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ù\ÛZ\ÜÒÛÝÙ[\“›ÝXÙI×JKO›˜[YJ	ÜÜËšÛÝXÙ[\‹[›ÝXÙK™\ÛZ\ÜÉÊNÂˆËÈ\ÚÈLŒŽˆH›Ýš\Ú[Û˜[Xš[[™È[X[ˆÜ\8 %˜X^HÛÛXÝ[Ûˆ
+YZ[‹ÛX[˜YÙ\ˆØ]Y[ˆÛÛ›Û\ŠK‚ˆ›Ý]NŽœÜÝ
+	ËÜ˜KY[X[‹Ü™\ÜÛ™	Ë×\ÛÛ›Û\œ×™X]\™TÝYÙÙ\Ý[ÛÛÛ›Û\ŽŽ˜Û\ÜË	Ü˜Q[X[”™\ÜÛ™	×JKO›˜[YJ	ÜÜËœ˜KY[X[‹œ™\ÜÛ™	ÊKO›ZY]Ø\™J	Ý›ÝNŒLIÊNÂˆ›Ý]NŽœÜÝ
+	ËÜ˜KY[X[‹Ù\ÛZ\ÜÉË×\ÛÛ›Û\œ×™X]\™TÝYÙÙ\Ý[ÛÛÛ›Û\ŽŽ˜Û\ÜË	Ü˜Q[X[‘\ÛZ\ÜÉ×JKO›˜[YJ	ÜÜËœ˜KY[X[‹™\ÛZ\ÜÉÊNÂˆËÈ™X]\™HÝYÙÙ\Ý[Ûˆ›Þ
+ÝÛ™\ˆ™\]Y\ÝŒ[ŒŠH8 %Ý\ÝÛY\œÈÝX›Z]™X]\™H™\]Y\ÝË‚ˆ›Ý]NŽ™Ù]
+	ËÜÝYÙÙ\Ý[ÛœÉË×\ÛÛ›Û\œ×™X]\™TÝYÙÙ\Ý[ÛÛÛ›Û\ŽŽ˜Û\ÜË	Ú[™^	×JKO›˜[YJ	ÜÜËœÝYÙÙ\Ý[ÛœÉÊNÂˆ›Ý]NŽœÜÝ
+	ËÜÝYÙÙ\Ý[ÛœÉË×\ÛÛ›Û\œ×™X]\™TÝYÙÙ\Ý[ÛÛÛ›Û\ŽŽ˜Û\ÜË	ÜÝÜ™I×JKO›˜[YJ	ÜÜËœÝYÙÙ\Ý[ÛœËœÝÜ™IÊKO›ZY]Ø\™J	Ý›ÝNŒLIÊNÂˆ›Ý]NŽœÜÝ
+	ËÜ^[Y[\›ÛÙ‰Ë×\ÛÛ›Û\œ×^[Y[›ÛÙÛÛ›Û\ŽŽ˜Û\ÜË	ÜÝÜ™I×JBˆO›˜[YJ	ÜÜËœ^[Y[\›ÛÙ‹œÝÜ™IÊKO›ZY]Ø\™J	Ý›ÝN‹IÊNÂˆ›Ý]NŽ™Ù]
+	ËØš[[™ËØÚXÚÛÝ]	Ë×\ÛÛ›Û\œ×XÚØYÙPÚXÚÛÝ]ÛÛ›Û\ŽŽ˜Û\ÜË	Ú[™^	×JKO›˜[YJ	ÜÜËœXÚØYÙKXÚXÚÛÝ]	ÊNÂˆ›Ý]NŽœÜÝ
+	ËØš[[™ËØÚXÚÛÝ]	Ë×\ÛÛ›Û\œ×XÚØYÙPÚXÚÛÝ]ÛÛ›Û\ŽŽ˜Û\ÜË	ÜÙ[XÝ	×JKO›˜[YJ	ÜÜËœXÚØYÙKXÚXÚÛÝ]œÙ[XÝ	ÊNÂˆ›Ý]NŽœÜÝ
+	ËÜÙ][™ÜËÝ[YIËÔÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ý\]U[YI×JKO›˜[YJ	ÜÜËœÙ][™ÜË[YIÊNÂˆËÈ\šÈ[ÙH
+ÝÛ™\ˆšY[ËH]YÈŒŠNˆ\‹UTÑTˆ™Y™\™[˜ÙKZÙHBˆËÈ[™ÝXYÙHXÚÈX›Ý™H8 %HÝ›
+ÒÈ[]H\ÙYÈ›\HÛ\ÜÈ[ˆBˆËÈœ›ÝÜÙ\ˆÛ›KÛÈ]YYÛˆH™^YÙHØYˆ[X™\˜][H“Õ[™\‚ˆËÈÜÙ][™ÜËÈ
+ÜÙH\™HÚÜÙ][™ÜÈHØ\ÚY\ˆX^H›ÝÝXÚ
+K‚ˆ›Ý]NŽœÜÝ
+	ËÜÙ]Y\šË[[ÙIËÔÜÐÛÛ›Û\ŽŽ˜Û\ÜË	ÝÙÙÛQ\šÓ[ÙI×JKO›˜[YJ	ÜÜËœÙ]Y\šË[[ÙIÊNÂˆ›Ý]NŽœÜÝ
+	ËÜÙ][™ÜËÙ\Ú›Ø\™\Ý[IËÔÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ý\]Q\Ú›Ø\™Ý[I×JKO›˜[YJ	ÜÜËœÙ][™ÜË™\Ú›Ø\™\Ý[IÊNÂˆ›Ý]NŽœÜÝ
+	ËÜÙ][™ÜËÙÝZYYY›ÝÉËÔÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ý\]QÝZYY›ÝÉ×JKO›˜[YJ	ÜÜËœÙ][™ÜË™ÝZYYY›ÝÉÊNÂˆËÈ[™ÝXYÙHÞ\Ý[H
+ˆ]YÈŒŠNˆ\‹]\Ù\ˆÚÚXÙH
+ÈÛÛ\[žHY˜][ˆÜÓØØ[Nˆ	Ù[‰ÈÈ	Ü\‰È›ÛX[ˆ\™HÈ	Ý\‰È\™HØÜš\‚ˆ›Ý]NŽœÜÝ
+	ËÜÙ][[™ÝXYÙIË[˜Ý[Ûˆ
+[[Z[˜]W™\]Y\Ý	™\]Y\Ý
+HÂˆ	[™ÈH	™\]Y\ÝOš[œ]
+	Û[™ÝXYÙIÊNÂˆYˆ
+[—Ø\œ˜^J	[™Ë\Ý\ÜÜÓØØ[NŽSYJJHÂˆ	HH]]
+
+KO™ÝX\™
+	ÜÜÉÊKO\Ù\Š
+NÂˆ	KO›[™ÝXYÙHH	[™ÎÂˆ	KOœØ]™J
+NÂˆBˆ™]\›ˆ˜XÚÊ
+KOÚ]
+	ÜÝXØÙ\ÜÉË×Ê	ÜÜË›[™ÝXYÙWÜØ]™Y	ÊJNÂˆJKO›˜[YJ	ÜÜËœÙ][[™ÝXYÙIÊNÂˆ›Ý]NŽœÜÝ
+	ËÜÙ][™ÜËÙY˜][[[™ÝXYÙIË[˜Ý[Ûˆ
+[[Z[˜]W™\]Y\Ý	™\]Y\Ý
+HÂˆ	HH]]
+
+KO™ÝX\™
+	ÜÜÉÊKO\Ù\Š
+NÂˆX›ÜÝ[›\ÜÊ	H	‰ˆ	KOš\ÔÜÐYZ[Š
+KÊNÂˆ	[™ÈH	™\]Y\ÝOš[œ]
+	ÙY˜][Û[™ÝXYÙIÊNÂˆYˆ
+[—Ø\œ˜^J	[™Ë\Ý\ÜÜÓØØ[NŽSYJJHÂˆ	KO˜ÛÛ\[žKO\]JÉÙY˜][Û[™ÝXYÙIÈOˆ	[™×JNÂˆBˆ™]\›ˆ˜XÚÊ
+KOÚ]
+	ÜÝXØÙ\ÜÉË×Ê	ÜÜË›[™ÝXYÙWÜØ]™Y	ÊJNÂˆJKO›˜[YJ	ÜÜËœÙ][™ÜË™Y˜][[[™ÝXYÙIÊNÂˆ›Ý]NŽœÜÝ
+	ËÜÙ][™ÜËÜ]ZXÚË]\IËÔÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ý\]T]ZXÚÕ\I×JKO›˜[YJ	ÜÜËœÙ][™ÜËœ]ZXÚË]\IÊNÂˆËÈØ[\ˆQ
+\ÚÈLÎJNˆYZ[ˆÙÙÛH
+ÈÛÛ›™XÝY\Û™HÝ]\È]™HÛˆÝ\ÝÛZ^™K‚ˆ›Ý]NŽœÜÝ
+	ËÜÙ][™ÜËØØ[\‹ZY	Ë×\ÛÛ›Û\œ×ÜÐØ[\’YÛÛ›Û\ŽŽ˜Û\ÜË	ÝÙÙÛI×JKO›˜[YJ	ÜÜËœÙ][™ÜË˜Ø[\‹ZY	ÊNÂˆ›Ý]NŽœÜÝ
+	ËÜÙ][™ÜËØØ[\‹Y]šXÙ\ËÜ™]›ÚÙIË×\ÛÛ›Û\œ×ÜÐØ[\’YÛÛ›Û\ŽŽ˜Û\ÜË	Ü™]›ÚÙQ]šXÙI×JKO›˜[YJ	ÜÜËœÙ][™ÜË˜Ø[\‹Y]šXÙ\Ëœ™]›ÚÙIÊNÂˆ›Ý]NŽœÜÝ
+	ËÜÙ][™ÜËÜ™XÙZ\X]]ØÛÜÙIËÔÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ý\]T™XÙZyß]7¶‰žËkºwµçH›Ý]NŽ™Ù]
+	ËÙ^[œÙ\ÉËÒX[XØÛÝ[ÐÛÛ›Û\ŽŽ˜Û\ÜË	Ù^[œÙ\É×JKO›˜[YJ	ÚX[˜XØÛÝ[Ë™^[œÙ\ÉÊNÂˆ›Ý]NŽ™Ù]
+	ËÝ˜[œÙ™\œÉËÒX[XØÛÝ[ÐÛÛ›Û\ŽŽ˜Û\ÜË	Ý˜[œÙ™\œÉ×JKO›˜[YJ	ÚX[˜XØÛÝ[Ë˜[œÙ™\œÉÊNÂˆ›Ý]NŽ™Ù]
+	ËÜ™XÛÛ˜Ú[X][ÛœÉËÒX[XØÛÝ[ÐÛÛ›Û\ŽŽ˜Û\ÜË	Ü™XÛÛ˜Ú[X][ÛœÉ×JKO›˜[YJ	ÚX[˜XØÛÝ[Ëœ™XÛÛ˜Ú[X][ÛœÉÊNÂˆ›Ý]NŽ™Ù]
+	ËÜ\š[ÙÉËÒX[XØÛÝ[ÐÛÛ›Û\ŽŽ˜Û\ÜË	Ü\š[ÙÉ×JKO›˜[YJ	ÚX[˜XØÛÝ[Ëœ\š[ÙÉÊNÂˆ›Ý]NŽ™Ù]
+	ËÜÙ][™ÜÉËÒX[XØÛÝ[ÐÛÛ›Û\ŽŽ˜Û\ÜË	ÜÙ][™ÜÉ×JKO›˜[YJ	ÚX[˜XØÛÝ[ËœÙ][™ÜÉÊNÂ‚ˆÊˆØÝÜˆÛÛ\[œØ][Ûˆ8 %™XY[™È]ˆ
+‹Âˆ›Ý]NŽ™Ù]
+	ËÙØÝÜ‹\Ú\™\ËÜ[\ÉËÒX[ØÝÜ”Ú\™PÛÛ›Û\ŽŽ˜Û\ÜË	Ü[\É×JKO›˜[YJ	ÚX[˜XØÛÝ[ËœÚ\™K\[\ÉÊNÂˆ›Ý]NŽ™Ù]
+	ËÙØÝÜ‹\Ú\™\ÉËÒX[ØÝÜ”Ú\™PÛÛ›Û\ŽŽ˜Û\ÜË	ØXØÜX[É×JKO›˜[YJ	ÚX[˜XØÛÝ[ËœÚ\™\ÉÊNÂˆ›Ý]NŽ™Ù]
+	ËÜÙ][Y[ÉËÒX[ØÝÜ”Ú\™PÛÛ›Û\ŽŽ˜Û\ÜË	ÜÙ][Y[É×JKO›˜[YJ	ÚX[˜XØÛÝ[ËœÙ][Y[ÉÊNÂˆ›Ý]NŽ™Ù]
+	ËÜÙ][Y[ËÞÚYIËÒX[ØÝÜ”Ú\™PÛÛ›Û\ŽŽ˜Û\ÜË	ÜÙ][Y[	×JKOÚ\™S[X™\Š	ÚY	ÊKO›˜[YJ	ÚX[˜XØÛÝ[ËœÙ][Y[	ÊNÂˆ›Ý]NŽ™Ù]
+	ËÙØÝÜœËÞÚYKÜÝ][Y[	ËÒX[ØÝÜ”Ú\™PÛÛ›Û\ŽŽ˜Û\ÜË	ÜÝ][Y[	×JKOÚ\™S[X™\Š	ÚY	ÊKO›˜[YJ	ÚX[˜XØÛÝ[Ë™ØÝÜ‹\Ý][Y[	ÊNÂ‚ˆÊˆ™\ÜËˆ]™\žHÛ™HÙˆ[H[ÛÈÙ\™\È]ÈÝÛˆÔÕˆšXHÙ^ÜXÜÝ‹ˆ
+‹Âˆ›Ý]NŽ™Ù]
+	ËÜ™\ÜÉËÒX[XØÛÝ[Ô™\ÜÛÛ›Û\ŽŽ˜Û\ÜË	Ú[™^	×JKO›˜[YJ	ÚX[˜XØÛÝ[Ëœ™\ÜÉÊNÂˆ›Ý]NŽ™Ù]
+	ËÜ™\ÜËÝšX[X˜[[˜ÙIËÒX[XØÛÝ[Ô™\ÜÛÛ›Û\ŽŽ˜Û\ÜË	ÝšX[˜[[˜ÙI×JKO›˜[YJ	ÚX[˜XØÛÝ[Ëœ™\ÜËšX[X˜[[˜ÙIÊNÂˆ›Ý]NŽ™Ù]
+	ËÜ™\ÜËÛYÙ\‰ËÒX[XØÛÝ[Ô™\ÜÛÛ›Û\ŽŽ˜Û\ÜË	ÛYÙ\‰×JKO›˜[YJ	ÚX[˜XØÛÝ[Ëœ™\ÜË›YÙ\‰ÊNÂˆ›Ý]NŽ™Ù]
+	ËÜ™\ÜËÜ›Ùš][ÜÜÉËÒX[XØÛÝ[Ô™\ÜÛÛ›Û\ŽŽ˜Û\ÜË	Ü›Ùš][™ÜÜÉ×JKO›˜[YJ	ÚX[˜XØÛÝ[Ëœ™\ÜËœ›Ùš][ÜÜÉÊNÂˆ›Ý]NŽ™Ù]
+	ËÜ™\ÜËØ˜[[˜ÙK\ÚY]	ËÒX[XØÛÝ[Ô™\ÜÛÛ›Û\ŽŽ˜Û\ÜË	Ø˜[[˜ÙTÚY]	×JKO›˜[YJ	ÚX[˜XØÛÝ[Ëœ™\ÜË˜˜[[˜ÙK\ÚY]	ÊNÂˆ›Ý]NŽ™Ù]
+	ËÜ™\ÜËØØ\ÚY›ÝÉËÒX[XØÛÝ[Ô™\ÜÛÛ›Û\ŽŽ˜Û\ÜË	ØØ\Ú›ÝÉ×JKO›˜[YJ	ÚX[˜XØÛÝ[Ëœ™\ÜË˜Ø\ÚY›ÝÉÊNÂˆ›Ý]NŽ™Ù]
+	ËÜ™\ÜËÜ™XÙZ]˜X›\ÉËÒX[XØÛÝ[Ô™\ÜÛÛ›Û\ŽŽ˜Û\ÜË	Ü™XÙZ]˜X›\É×JKO›˜[YJ	ÚX[˜XØÛÝ[Ëœ™\ÜËœ™XÙZ]˜X›\ÉÊNÂˆ›Ý]NŽ™Ù]
+	ËÜ™\ÜËÜ^XX›\ÉËÒX[XØÛÝ[Ô™\ÜÛÛ›Û\ŽŽ˜Û\ÜË	Ü^XX›\É×JKO›˜[YJ	ÚX[˜XØÛÝ[Ëœ™\ÜËœ^XX›\ÉÊNÂˆ›Ý]NŽ™Ù]
+	ËÜ™\ÜËÜÝ\Y\œËÞÚYIËÒX[XØÛÝ[Ô™\ÜÛÛ›Û\ŽŽ˜Û\ÜË	ÜÝ\Y\‰×JKOÚ\™S[X™\Š	ÚY	ÊKO›˜[YJ	ÚX[˜XØÛÝ[Ëœ™\ÜËœÝ\Y\‰ÊNÂˆ›Ý]NŽ™Ù]
+	ËÜ™\ÜËÜ›Ùš]Xš[]IËÒX[XØÛÝ[Ô™\ÜÛÛ›Û\ŽŽ˜Û\ÜË	Ü›Ùš]Xš[]I×JKO›˜[YJ	ÚX[˜XØÛÝ[Ëœ™\ÜËœ›Ùš]Xš[]IÊNÂˆJNÂ‚ˆÊˆÜÝ[™ÈÈH›ÛÚÜËˆ
+‹Âˆ›Ý]NŽ›ZY]Ø\™J	ÚX[˜Ø[Ž˜XØÛÝ[Ë›X[˜YÙIÊKO™Ü›Ý\
+[˜Ý[Ûˆ
+
+HÂˆ›Ý]NŽœÜÝ
+	ËÜÝÙY\	ËÒX[XØÛÝ[ÐÛÛ›Û\ŽŽ˜Û\ÜË	ÜÝÙY\	×JKO›˜[YJ	ÚX[˜XØÛÝ[ËœÝÙY\	ÊNÂˆ›Ý]NŽœÜÝ
+	ËØÚ\	ËÒX[XØÛÝ[ÐÛÛ›Û\ŽŽ˜Û\ÜË	ÜÝÜ™PXØÛÝ[	×JKO›˜[YJ	ÚX[˜XØÛÝ[Ë˜Ú\œÝÜ™IÊNÂˆ›Ý]NŽœ]
+	ËØÚ\ÞÚYIËÒX[XØÛÝ[ÐÛÛ›Û\ŽŽ˜Û\ÜË	Ý\]PXØÛÝ[	×JKOÚ\™S[X™\Š	ÚY	ÊKO›˜[YJ	ÚX[˜XØÛÝ[Ë˜Ú\\]IÊNÂˆ›Ý]NŽœÜÝ
+	ËØÚ\ÞÚYKÝÙÙÛIËÒX[XØÛÝ[ÐÛÛ›Û\ŽŽ˜Û\ÜË	ÝÙÙÛPXØÛÝ[	×JKOÚ\™S[X™\Š	ÚY	ÊKO›˜[YJ	ÚX[˜XØÛÝ[Ë˜Ú\ÙÙÛIÊNÂˆ›Ý]NŽœÜÝ
+	ËÚ›Ý\›˜[ÉËÒX[XØÛÝ[ÐÛÛ›Û\ŽŽ˜Û\ÜË	ÜÝÜ™R›Ý\›˜[	×JKO›˜[YJ	ÚX[˜XØÛÝ[Ëš›Ý\›˜[ËœÝÜ™IÊNÂˆ›Ý]NŽœÜÝ
+	ËÚ›Ý\›˜[ËÞÚYKÜ™]™\œÙIËÒX[XØÛÝ[ÐÛÛ›Û\ŽŽ˜Û\ÜË	Ü™]™\œÙR›Ý\›˜[	×JKOÚ\™S[X™\Š	ÚY	ÊKO›˜[YJ	ÚX[˜XØÛÝ[Ëš›Ý\›˜[Ëœ™]™\œÙIÊNÂˆ›Ý]NŽœÜÝ
+	ËÙ^[œÙKXØ]YÛÜšY\ÉËÒX[XØÛÝ[ÐÛÛ›Û\ŽŽ˜Û\ÜË	ÜÝÜ™Q^[œÙPØ]YÛÜžI×JKO›˜[YJ	ÚX[˜XØÛÝ[Ë™^[œÙKXØ]YÛÜšY\ËœÝÜ™IÊNÂˆ›Ý]NŽœÜÝ
+	ËÙ^[œÙKXØ]YÛÜšY\ËÞÚYKÝÙÙÛIËÒX[XØÛÝ[ÐÛÛ›Û\ŽŽ˜Û\ÜË	ÝÙÙÛQ^[œÙPØ]YÛÜžI×JKOÚ\™S[X™\Š	ÚY	ÊKO›˜[YJ	ÚX[˜XØÛÝ[Ë™^[œÙKXØ]YÛÜšY\ËÙÙÛIÊNÂˆ›Ý]NŽœÜÝ
+	ËÙ^[œÙ\ÉËÒX[XØÛÝ[ÐÛÛ›Û\ŽŽ˜Û\ÜË	ÜÝÜ™Q^[œÙI×JKO›˜[YJ	ÚX[˜XØÛÝ[Ë™^[œÙ\ËœÝÜ™IÊNÂˆ›Ý]NŽœÜÝ
+	ËÙ^[œÙ\ËÞÚYKÜ™]™\œÙIËÒX[XØÛÝ[ÐÛÛ›Û\ŽŽ˜Û\ÜË	Ü™]™\œÙQ^[œÙI×JKOÚ\™S[X™\Š	ÚY	ÊKO›˜[YJ	ÚX[˜XØÛÝ[Ë™^[œÙ\Ëœ™]™\œÙIÊNÂˆ›Ý]NŽœÜÝ
+	ËÝ˜[œÙ™\œÉËÒX[XØÛÝ[ÐÛÛ›Û\ŽŽ˜Û\ÜË	ÜÝÜ™U˜[œÙ™\‰×JKO›˜[YJ	ÚX[˜XØÛÝ[Ë˜[œÙ™\œËœÝÜ™IÊNÂˆ›Ý]NŽœÜÝ
+	ËÝ˜[œÙ™\œËÞÚYKÜ™]™\œÙIËÒX[XØÛÝ[ÐÛÛ›Û\ŽŽ˜Û\ÜË	Ü™]™\œÙU˜[œÙ™\‰×JKOÚ\™S[X™\Š	ÚY	ÊKO›˜[YJ	ÚX[˜XØÛÝ[Ë˜[œÙ™\œËœ™]™\œÙIÊNÂˆ›Ý]NŽœÜÝ
+	ËØ˜[šËXXØÛÝ[ÉËÒX[XØÛÝ[ÐÛÛ›Û\ŽŽ˜Û\ÜË	ÜÝÜ™P˜[šÐXØÛÝ[	×JKO›˜[YJ	ÚX[˜XØÛÝ[Ë˜˜[šËXXØÛÝ[ËœÝÜ™IÊNÂˆ›Ý]NŽœÜÝ
+	ËÜ™XÛÛ˜Ú[X][ÛœÉËÒX[XØÛÝ[ÐÛÛ›Û\ŽŽ˜Û\ÜË	ÜÝÜ™T™XÛÛ˜Ú[X][Û‰×JKO›˜[YJ	ÚX[˜XØÛÝ[Ëœ™XÛÛ˜Ú[X][ÛœËœÝÜ™IÊNÂˆ›Ý]NŽœÜÝ
+	ËÜ™XÛÛ˜Ú[X][ÛœËÞÚYKØÛÜÙIËÒX[XØÛÝ[ÐÛÛ›Û\ŽŽ˜Û\ÜË	ØÛÜÙT™XÛÛ˜Ú[X][Û‰×JKOÚ\™S[X™\Š	ÚY	ÊKO›˜[YJ	ÚX[˜XØÛÝ[Ëœ™XÛÛ˜Ú[X][ÛœË˜ÛÜÙIÊNÂˆ›Ý]NŽœÜÝ
+	ËÜ\š[ÙËÙ[œÝ\™IËÒX[XØÛÝ[ÐÛÛ›Û\ŽŽ˜Û\ÜË	Ù[œÝ\™T\š[Ù	×JKO›˜[YJ	ÚX[˜XØÛÝ[Ëœ\š[ÙË™[œÝ\™IÊNÂˆ›Ý]NŽœÜÝ
+	ËÜÙ][™ÜÉËÒX[XØÛÝ[ÐÛÛ›Û\ŽŽ˜Û\ÜË	Ý\]TÙ][™ÜÉ×JKO›˜[YJ	ÚX[˜XØÛÝ[ËœÙ][™ÜË\]IÊNÂˆ›Ý]NŽœÜÝ
+	ËÙØÝÜ‹\Ú\™\ËØXØÜYIËÒX[XØÛÝ[ÐÛÛ›Û\ŽŽ˜Û\ÜË	ØXØÜYTÚ\™\É×JKO›˜[YJ	ÚX[˜XØÛÝ[ËœÚ\™\Ë˜XØÜYIÊNÂˆ›Ý]NŽœÜÝ
+	ËÙØÝÜ‹\Ú\™\ËÜ[\ÉËÒX[ØÝÜ”Ú\™PÛÛ›Û\ŽŽ˜Û\ÜË	ÜÝÜ™T[I×JKO›˜[YJ	ÚX[˜XØÛÝ[ËœÚ\™K\[\ËœÝÜ™IÊNÂˆ›Ý]NŽœ]
+	ËÙØÝÜ‹\Ú\™\ËÜ[\ËÞÚYIËÒX[ØÝÜ”Ú\™PÛÛ›Û\ŽŽ˜Û\ÜË	Ý\]T[I×JKOÚ\™S[X™\Š	ÚY	ÊKO›˜[YJ	ÚX[˜XØÛÝ[ËœÚ\™K\[\Ë\]IÊNÂˆ›Ý]NŽœÜÝ
+	ËÙØÝÜ‹\Ú\™\ËÜ[\ËÞÚYKÝÙÙÛIËÒX[ØÝÜ”Ú\™PÛÛ›Û\ŽŽ˜Û\ÜË	ÝÙÙÛT[I×JKOÚ\™S[X™\Š	ÚY	ÊKO›˜[YJ	ÚX[˜XØÛÝ[ËœÚ\™K\[\ËÙÙÛIÊNÂˆ›Ý]NŽœÜÝ
+	ËÙØÝÜ‹\Ú\™\ËÞÚYKÙ^ÛYIËÒX[ØÝÜ”Ú\™PÛÛ›Û\ŽŽ˜Û\ÜË	Ù^ÛYTÚ\™I×JKOÚ\™S[X™\Š	ÚY	ÊKO›˜[YJ	ÚX[˜XØÛÝ[ËœÚ\™\Ë™^ÛYIÊNÂˆ›Ý]NŽœÜÝ
+	ËÙØÝÜ‹\Ú\™\ËÞÚYKÜ™\ÝÜ™IËÒX[ØÝÜ”Ú\™PÛÛ›Û\ŽŽ˜Û\ÜË	Ü™\ÝÜ™TÚ\™I×JKOÚ\™S[X™\Š	ÚY	ÊKO›˜[YJ	ÚX[˜XØÛÝ[ËœÚ\™\Ëœ™\ÝÜ™IÊNÂˆ›Ý]NŽœÜÝ
+	ËÜÙ][Y[ÉËÒX[ØÝÜ”Ú\™PÛÛ›Û\ŽŽ˜Û\ÜË	ØZ[Ù][Y[	×JKO›˜[YJ	ÚX[˜XØÛÝ[ËœÙ][Y[Ë˜Z[	ÊNÂˆ›Ý]NŽœ]
+	ËÜÙ][Y[ËÞÚYIËÒX[ØÝÜ”Ú\™PÛÛ›Û\ŽŽ˜Û\ÜË	Ý\]TÙ][Y[	×JKOÚ\™S[X™\Š	ÚY	ÊKO›˜[YJ	ÚX[˜XØÛÝ[ËœÙ][Y[Ë\]IÊNÂˆ›Ý]NŽœÜÝ
+	ËÜÙ][Y[ËÞÚYKÜÚ\™\ËÞÜÚ\™RYKÙ]XÚ	ËÒX[ØÝÜ”Ú\™PÛÛ›Û\ŽŽ˜Û\ÜË	Ù]XÚÚ\™I×JBˆOÚ\™S[X™\Š	ÚY	ÊKOÚ\™S[X™\Š	ÜÚ\™RY	ÊKO›˜[YJ	ÚX[˜XØÛÝ[ËœÙ][Y[Ë™]XÚ	ÊNÂˆ›Ý]NŽœÜÝ
+	ËÜÙ][Y[ËÞÚYKÜ^IËÒX[ØÝÜ”Ú\™PÛÛ›Û\ŽŽ˜Û\ÜË	Ü^TÙ][Y[	×JKOÚ\™S[X™\Š	ÚY	ÊKO›˜[YJ	ÚX[˜XØÛÝ[ËœÙ][Y[Ëœ^IÊNÂˆJNÂ‚ˆÊ‚ˆ
+ˆH\›Ý™\‰ÜÈÛÈXÝËˆÙ\\˜]Yœ›ÛHX[˜YÙXÛÈHXØÛÝ[[ˆ
+ˆÚÈZ[H^[Ý]\È›ÝH\œÛÛˆÚÈÚYÛœÈ][™H[Ûˆ
+ˆ^HÜÝY[È\È›ÝÛÜÙYžHZ\ˆÝÛˆ[™‚ˆ
+‹Âˆ›Ý]NŽ›ZY]Ø\™J	ÚX[˜Ø[Ž˜XØÛÝ[Ë˜\›Ý™IÊKO™Ü›Ý\
+[˜Ý[Ûˆ
+
+HÂˆ›Ý]NŽœÜÝ
+	ËÜ\š[ÙËÞÚYKØÛÜÙIËÒX[XØÛÝ[ÐÛÛ›Û\ŽŽ˜Û\ÜË	ØÛÜÙT\š[Ù	×JKOÚ\™S[X™\Š	ÚY	ÊKO›˜[YJ	ÚX[˜XØÛÝ[Ëœ\š[ÙË˜ÛÜÙIÊNÂˆ›Ý]NŽœÜÝ
+	ËÜÙ][Y[ËÞÚYKØ\›Ý™IËÒX[ØÝÜ”Ú\™PÛÛ›Û\ŽŽ˜Û\ÜË	Ø\›Ý™TÙ][Y[	×JKOÚ\™S[X™\Š	ÚY	ÊKO›˜[YJ	ÚX[˜XØÛÝ[ËœÙ][Y[Ë˜\›Ý™IÊNÂˆ›Ý]NŽœÜÝ
+	ËÜÙ][Y[ËÞÚYKÜ™]™\œÙIËÒX[ØÝÜ”Ú\™PÛÛ›Û\ŽŽ˜Û\ÜË	Ü™]™\œÙTÙ][Y[	×JKOÚ\™S[X™\Š	ÚY	ÊKO›˜[YJ	ÚX[˜XØÛÝ[ËœÙ][Y[Ëœ™]™\œÙIÊNÂˆJNÂˆJNÂ‚ˆÊ‚ˆ
+ˆHØÝÜ‰ÜÈÕÓˆX\›š[™ÜËˆ[X™\˜][HÕUÒQHHXØÛÝ[ÈÜ›Ý\ˆ]ˆ
+ˆšY\È\Ú›Ø\™šY]È[™™\ÛÛ™\ÈHØÝÜˆœ›ÛHHÚYÛ™YZ[ˆXØÛÝ[	ÜÂˆ
+ˆ[šÙY›Ùš[KÛÈHÛÛœÝ[[ÙY\ÈZ\ˆÝÛˆ[Û™^HÚ]Ý]™Z[™ÈÚ]™[‚ˆ
+ˆ[žHšYÚÝ™\ˆ[žX›ÙH[ÙIÜË‚ˆ
+‹Âˆ›Ý]NŽ™Ù]
+	ËÛ^KÙX\›š[™ÜÉËÒX[ØÝÜ”Ú\™PÛÛ›Û\ŽŽ˜Û\ÜË	Û^QX\›š[™ÜÉ×JBˆO›ZY]Ø\™J	ÚX[›[Ù[N˜XØÛÝ[ÉÊBˆO›˜[YJ	ÚX[›^K™X\›š[™ÜÉÊNÂŸJNÂ‚”›Ý]NŽœ™Yš^
+	Ù˜œ‹\ÜÉÊKO›ZY]Ø\™JÉÙ˜œœÜË˜]]	Ë	ØÛÛ\[žK˜\›Ý˜[	Ë\ZY]Ø\™WØÚÛÛÛÜšÜÜXÙNŽ˜Û\Ü×JKO™Ü›Ý\
+[˜Ý[Ûˆ
+
+HÂˆ›Ý]NŽœÜÝ
+	ËÜÝ\™^KÞÚYKÜ™\ÜÛ™	Ë×\ÛÛ›Û\œ×ÜÔÝ\™^PÛÛ›Û\ŽŽ˜Û\ÜË	Ü™\ÜÛ™	×JKO™Y˜][Ê	ÜÝ\™^WÙÝX\™	Ë	Ù˜œœÜÉÊKO›˜[YJ	Ù˜œœÜËœÝ\™^Kœ™\ÜÛ™	ÊNÂˆ›Ý]NŽœÜÝ
+	ËÜÝ\™^KÞÚYKÙ\ÛZ\ÜÉË×\ÛÛ›Û\œ×ÜÔÝ\™^PÛÛ›Û\ŽŽ˜Û\ÜË	Ù\ÛZ\ÜÉ×JKO™Y˜][Ê	ÜÝ\™^WÙÝX\™	Ë	Ù˜œœÜÉÊKO›˜[YJ	Ù˜œœÜËœÝ\™^K™\ÛZ\ÜÉÊNÂˆËÈØ[YHÚ\™Y\Ù\œË™\š×Û[ÙH™Y™\™[˜ÙH\ÈHÔËˆ\È\È[X™\˜][BˆËÈÝ]ÚYHÛÛ\[žHÙ][™ÜÎˆXXÚ]][XØ]YØ\ÚY\ˆÝÛœÈZ\ˆ\Ü^K‚ˆ›Ý]NŽœÜÝ
+	ËÜÙ]Y\šË[[ÙIËÔÜÐÛÛ›Û\ŽŽ˜Û\ÜË	ÝÙÙÛQ\šÓ[ÙI×JKO›˜[YJ	Ù˜œœÜËœÙ]Y\šË[[ÙIÊNÂˆ›Ý]NŽ™Ù]
+	ËÙ\Ú›Ø\™	ËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ù\Ú›Ø\™	×JKO›˜[YJ	Ù˜œœÜË™\Ú›Ø\™	ÊNÂˆ›Ý]NŽœÜÝ
+	ËÛ›ÝYšXØ][ÛœËÞÚYKÙ\ÛZ\ÜÉËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ù\ÛZ\ÜÓ›ÝYšXØ][Û‰×JKO›˜[YJ	Ù˜œœÜË››ÝYšXØ][ÛœË™\ÛZ\ÜÉÊNÂˆ›Ý]NŽœÜÝ
+	ËÛ›ÝYšXØ][ÛœËÙ\ÛZ\ÜËX[	ËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ù\ÛZ\ÜÐ[›ÝYšXØ][ÛœÉ×JKO›˜[YJ	Ù˜œœÜË››ÝYšXØ][ÛœË™\ÛZ\ÜËX[	ÊNÂˆ›Ý]NŽ™Ù]
+	ËÝÚ]Ë[™]ËÚ\ÝÜžIË×\ÛÛ›Û\œ×\\]PÛÛ›Û\ŽŽ˜Û\ÜË	Ú\ÝÜžI×JKO™Y˜][Ê	Ø[››Ý[˜Ù[Y[Ü[™[	Ë	Ù˜œ‰ÊKO›˜[YJ	Ù˜œœÜËÚ]Ë[™]Ëš\ÝÜžIÊNÂˆ›Ý]NŽœÜÝ
+	ËÝÚ]Ë[™]ËÜÙY[‰Ë×\ÛÛ›Û\œ×\\]PÛÛ›Û\ŽŽ˜Û\ÜË	ÛX\šÔÙY[‰×JKO›˜[YJ	Ù˜œœÜËÚ]Ë[™]ËœÙY[‰ÊNÂˆ›Ý]NŽœÜÝ
+	ËÜ^[Y[\›ÛÙ‰Ë×\ÛÛ›Û\œ×^[Y[›ÛÙÛÛ›Û\ŽŽ˜Û\ÜË	ÜÝÜ™I×JBˆO›˜[YJ	Ù˜œœÜËœ^[Y[\›ÛÙ‹œÝÜ™IÊKO›ZY]Ø\™J	Ý›ÝN‹IÊNÂˆ›Ý]NŽ™Ù]
+	ËØš[[™ËØÚXÚÛÝ]	Ë×\ÛÛ›Û\œ×XÚØYÙPÚXÚÛÝ]ÛÛ›Û\ŽŽ˜Û\ÜË	Ú[™^	×JKO›˜[YJ	Ù˜œœÜËœXÚØYÙKXÚXÚÛÝ]	ÊNÂˆ›Ý]NŽœÜÝ
+	ËØš[[™ËØÚXÚÛÝ]	Ë×\ÛÛ›Û\œ×XÚØYÙPÚXÚÛÝ]ÛÛ›Û\ŽŽ˜Û\ÜË	ÜÙ[XÝ	×JKO›˜[YJ	Ù˜œœÜËœXÚØYÙKXÚXÚÛÝ]œÙ[XÝ	ÊNÂˆËÈ™X]\™HÝYÙÙ\Ý[Ûˆ›Þ
+\ÚÈLÍJH8 %YZ[‹ÛX[˜YÙ\‹[Û›H
+[‹XÛÛ›Û\‚ˆËÈØ]JKLÙ^HØ\È›ÝÜÈ[™›ÙXÝIÙ˜œœÜÉÈ[ˆHÚ\™YYZ[ˆšY]Ë‚ˆ›Ý]NŽ™Ù]
+	ËÜÝYÙÙ\Ý[ÛœÉË×\ÛÛ›Û\œ×™X]\™TÝYÙÙ\Ý[ÛÛÛ›Û\ŽŽ˜Û\ÜË	Ù˜œ’[™^	×JKO›˜[YJ	Ù˜œœÜËœÝYÙÙ\Ý[ÛœÉÊNÂˆ›Ý]NŽœÜÝ
+	ËÜÝYÙÙ\Ý[ÛœÉË×\ÛÛ›Û\œ×™X]\™TÝYÙÙ\Ý[ÛÛÛ›Û\ŽŽ˜Û\ÜË	Ù˜œ”ÝÜ™I×JKO›˜[YJ	Ù˜œœÜËœÝYÙÙ\Ý[ÛœËœÝÜ™IÊKO›ZY]Ø\™J	Ý›ÝNŒLIÊNÂˆ›Ý]NŽ™Ù]
+	ËÜØÚÛÛY™Y\ËÛYØXÞK\™]Z[	Ë×\ÛÛ›Û\œ×˜œ”ÜÔØÚÛÛ™YPÛÛ›Û\ŽŽ˜Û\ÜË	ÛYØXÞR[™^	×JKO›˜[YJ	Ù˜œœÜËœØÚÛÛY™Y\Ë›YØXÞIÊNÂˆ›Ý]NŽœÜÝ
+	ËÜØÚÛÛY™Y\ËÛYØXÞK\™]Z[Ý[›ØÚÉË×\ÛÛ›Û\œ×˜œ”ÜÔØÚÛÛ™YPÛÛ›Û\ŽŽ˜Û\ÜË	ÛYØXÞU[›ØÚÉ×JKO›ZY]Ø\™J	Ý›ÝNŒLIÊKO›˜[YJ	Ù˜œœÜËœØÚÛÛY™Y\Ë›YØXÞK][›ØÚÉÊNÂˆ›Ý]NŽ™Ù]
+	ËÜØÚÛÛY™Y\ËÛYØXÞK\™]Z[ÞÚYIË×\ÛÛ›Û\œ×˜œ”ÜÔØÚÛÛ™YPÛÛ›Û\ŽŽ˜Û\ÜË	ÛYØXÞTÚÝÉ×JKOÚ\™S[X™\Š	ÚY	ÊKO›˜[YJ	Ù˜œœÜËœØÚÛÛY™Y\Ë›YØXÞK\ÚÝÉÊNÂˆ›Ý]NŽ™Ù]
+	ËÚÜÜ][	Ë×\ÛÛ›Û\œ×˜œ”ÜÒÜÜ][ÛÛ›Û\ŽŽ˜Û\ÜË	Ú[™^	×JKO›˜[YJ	Ù˜œœÜËšÜÜ][š[™^	ÊNÂˆ›Ý]NŽœÜÝ
+	ËÚÜÜ][	Ë×\ÛÛ›Û\œ×˜œ”ÜÒÜÜ][ÛÛ›Û\ŽŽ˜Û\ÜË	ÜÝÜ™I×JKO›˜[YJ	Ù˜œœÜËšÜÜ][œÝÜ™IÊKO›ZY]Ø\™J	Ü[‹›[Z]š[›ÚXÙ\ÉÊNÂˆ›Ý]NŽ™Ù]
+	ËÚÜÜ][Ù\Ú›Ø\™	Ë×\ÛÛ›Û\œ×˜œ”ÜÒÜÜ][ÛÛ›Û\ŽŽ˜Û\ÜË	Ù\Ú›Ø\™	×JKO›˜[YJ	Ù˜œœÜËšÜÜ][™\Ú›Ø\™	ÊNÂˆ›Ý]NŽ™Ù]
+	ËÚÜÜ][Ú\ÝÜžIË×\ÛÛ›Û\œ×˜œ”ÜÒÜÜ][ÛÛ›Û\ŽŽ˜Û\ÜË	Ú\ÝÜžI×JKO›˜[YJ	Ù˜œœÜËšÜÜ][š\ÝÜžIÊNÂˆ›Ý]NŽ™Ù]
+	ËÚÜÜ][Ù^KXÛÜÙIË×\ÛÛ›Û\œ×˜œ”ÜÒÜÜ][ÛÛ›Û\ŽŽ˜Û\ÜË	Ù^PÛÜÙI×JKO›˜[YJ	Ù˜œœÜËšÜÜ][™^KXÛÜÙIÊNÂˆ›Ý]NŽœÜÝ
+	ËÚÜÜ][Ù^KXÛÜÙIË×\ÛÛ›Û\œ×˜œ”ÜÒÜÜ][ÛÛ›Û\ŽŽ˜Û\ÜË	ØÛÜÙI×JKO›˜[YJ	Ù˜œœÜËšÜÜ][˜ÛÜÙIÊNÂˆ›Ý]NŽœÜÝ
+	ËÚÜÜ][ØØ[\\ÉË×\ÛÛ›Û\œ×˜œ”ÜÒÜÜ][ÛÛ›Û\ŽŽ˜Û\ÜË	ÜÝÚ]ÚØ[\\É×JKO›˜[YJ	Ù˜œœÜËšÜÜ][˜Ø[\\ÉÊNÂˆ›Ý]NŽ™Ù]
+	ËÚÜÜ][ÜÙ][™ÜÉË×\ÛÛ›Û\œ×ÜÜ][ÛÜšÜÜXÙTÙ][™ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ú[™^	×JKO›˜[YJ	Ù˜œœÜËšÜÜ][œÙ][™ÜÉÊNÂˆ›Ý]NŽœÜÝ
+	ËÚÜÜ][ÜÙ][™ÜËÜÙ\šXÙ\ÉË×\ÛÛ›Û\œ×ÜÜ][ÛÜšÜÜXÙTÙ][™ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	ÜØ]™TÙ\šXÙI×JKO›˜[YJ	Ù˜œœÜËšÜÜ][œÙ][™ÜËœÙ\šXÙ\ÉÊNÂˆ›Ý]NŽœÜÝ
+	ËÚÜÜ][ÜÙ][™ÜËØØ[\\ÉË×\ÛÛ›Û\œ×ÜÜ][ÛÜšÜÜXÙTÙ][™ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	ØYØ[\\É×JKO›˜[YJ	Ù˜œœÜËšÜÜ][œÙ][™ÜË˜Ø[\\ÉÊNÂˆ›Ý]NŽ™Ù]
+	ËÚÜÜ][Üš[[™ÉË×\ÛÛ›Û\œ×ÜÜ][™XÙZ\Ù][™ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ú[™^	×JKO›˜[YJ	Ù˜œœÜËšÜÜ][œš[[™ÉÊNÂˆ›Ý]NŽœÜÝ
+	ËÚÜÜ][Üš[[™ÉË×\ÛÛ›Û\œ×ÜÜ][™XÙZ\Ù][™ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ý\]I×JKO›˜[YJ	Ù˜œœÜËšÜÜ][œš[[™Ë\]IÊNÂˆ›Ý]NŽ™Ù]
+	ËÚÜÜ][Üš[[™ËÜ™]šY]ÉË×\ÛÛ›Û\œ×ÜÜ][™XÙZ\Ù][™ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ü™]šY]É×JKO›˜[YJ	Ù˜œœÜËšÜÜ][œš[[™Ëœ™]šY]ÉÊNÂˆ›Ý]NŽ™Ù]
+	ËÚÜÜ][Ú[›ÚXÙ\ËÞÚYIË×\ÛÛ›Û\œ×˜œ”ÜÒÜÜ][ÛÛ›Û\ŽŽ˜Û\ÜË	Ú[›ÚXÙI×JKOÚ\™S[X™\Š	ÚY	ÊKO›˜[YJ	Ù˜œœÜËšÜÜ][š[›ÚXÙIÊNÂˆ›Ý]NŽœÜÝ
+	ËÚÜÜ][Ú[›ÚXÙ\ËÞÚYKÜ^[Y[ÉË×\ÛÛ›Û\œ×˜œ”ÜÒÜÜ][ÛÛ›Û\ŽŽ˜Û\ÜË	Ü^[Y[	×JKOÚ\™S[X™\Š	ÚY	ÊKO›˜[YJ	Ù˜œœÜËšÜÜ][œ^[Y[	ÊNÂˆ›Ý]NŽ™Ù]
+	ËÚÜÜ][Ü™XÙZ\ËÞÚYIË×\ÛÛ›Û\œ×˜œ”ÜÒÜÜ][ÛÛ›Û\ŽŽ˜Û\ÜË	Ü™XÙZ\	×JKOÚ\™S[X™\Š	ÚY	ÊKO›˜[YJ	Ù˜œœÜËšÜÜ][œ™XÙZ\	ÊNÂˆ›Ý]NŽ™Ù]
+	ËÜØÚÛÛY™Y\ËÜš[[™ÉË×\ÛÛ›Û\œ×ØÚÛÛ™XÙZ\Ù][™ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ú[™^	×JKO›˜[YJ	Ù˜œœÜËœØÚÛÛY™Y\Ëœš[[™ÉÊNÂˆ›Ý]NŽœÜÝ
+	ËÜØÚÛÛY™Y\ËÜš[[™ÉË×\ÛÛ›Û\œ×ØÚÛÛ™XÙZ\Ù][™ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ý\]I×JKO›˜[YJ	Ù˜œœÜËœØÚÛÛY™Y\Ëœš[[™Ë\]IÊNÂˆ›Ý]NŽ™Ù]
+	ËÜØÚÛÛY™Y\ËÜš[[™ËÜ™]šY]ÉË×\ÛÛ›Û\œ×ØÚÛÛ™XÙZ\Ù][™ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ü™]šY]É×JKO›˜[YJ	Ù˜œœÜËœØÚÛÛY™Y\Ëœš[[™Ëœ™]šY]ÉÊNÂˆ›Ý]NŽ™Ù]
+	ËÜØÚÛÛY™Y\ËÜ™XÛÝ™\‰Ë×\ÛÛ›Û\œ×˜œ”ÜÔØÚÛÛ™YPÛÛ›Û\ŽŽ˜Û\ÜË	Ü™XÛÝ™\‰×JKO›˜[YJ	Ù˜œœÜËœØÚÛÛY™Y\Ëœ™XÛÝ™\‰ÊNÂˆ›Ý]NŽ™Ù]
+	ËÜØÚÛÛY™Y\ËÜÙ][™ÜÉË×\ÛÛ›Û\œ×˜œ”ÜÔØÚÛÛ™YPÛÛ›Û\ŽŽ˜Û\ÜË	ÜÙ][™ÜÉ×JKO›˜[YJ	Ù˜œœÜËœØÚÛÛY™Y\ËœÙ][™ÜÉÊNÂˆ›Ý]NŽœÜÝ
+	ËÜØÚÛÛY™Y\ËÜÙ][™ÜËÙ™YKZXY	Ë×\ÛÛ›Û\œ×˜œ”ÜÔØÚÛÛ™YPÛÛ›Û\ŽŽ˜Û\ÜË	ÜØ]™Q™YRXY	×JKO›˜[YJ	Ù˜œœÜËœØÚÛÛY™Y\Ë™™YKZXY	ÊNÂˆ›Ý]NŽœÜÝ
+	ËÜØÚÛÛY™Y\ËÜÙ][™ÜËØØ[\\ÉË×\ÛÛ›Û\œ×˜œ”ÜÔØÚÛÛ™YPÛÛ›Û\ŽŽ˜Û\ÜË	ØYØ[\\É×JKO›˜[YJ	Ù˜œœÜËœØÚÛÛY™Y\Ë˜YXØ[\\ÉÊNÂˆ›Ý]NŽœÜÝ
+	ËÜØÚÛÛY™Y\ËÜÙ][™ÜËÚ[\ÉË×\ÛÛ›Û\œ×˜œ”ÜÔØÚÛÛ™YPÛÛ›Û\ŽŽ˜Û\ÜË	ÜØ]™R[\ÔÙ][™ÜÉ×JKO›˜[YJ	Ù˜œœÜËœØÚÛÛY™Y\Ëš[\Ë\Ù][™ÜÉÊNÂˆ›Ý]NŽ™Ù]
+	ËÜØÚÛÛY™Y\ËÜÝY[[YÙ\‰Ë×\ÛÛ›Û\œ×˜œ”ÜÔØÚÛÛ™YPÛÛ›Û\ŽŽ˜Û\ÜË	ÜÝY[YÙ\‰×JKO›˜[YJ	Ù˜œœÜËœØÚÛÛY™Y\ËœÝY[[YÙ\‰ÊNÂˆ›Ý]NŽ™Ù]
+	ËÜØÚÛÛY™Y\ËÛÝ]Ý[™[™ÉË×\ÛÛ›Û\œ×˜œ”ÜÔØÚÛÛ™YPÛÛ›Û\ŽŽ˜Û\ÜË	ÛÝ]Ý[™[™É×JKO›˜[YJ	Ù˜œœÜËœØÚÛÛY™Y\Ë›Ý]Ý[™[™ÉÊNÂˆ›Ý]NŽ™Ù]
+	ËÜØÚÛÛY™Y\ËÜ™\ÜÉË×\ÛÛ›Û\œ×ØÚÛÛ™YT™\ÜÛÛ›Û\ŽŽ˜Û\ÜË	Ú[™^	×JKO›˜[YJ	Ù˜œœÜËœØÚÛÛY™Y\Ëœ™\ÜÉÊNÂˆ›Ý]NŽ™Ù]
+	ËÜØÚÛÛY™Y\ËÜ™\ÜË˜ÜÝ‰Ë×\ÛÛ›Û\œ×ØÚÛÛ™YT™\ÜÛÛ›Û\ŽŽ˜Û\ÜË	ØÜÝ‰×JKO›˜[YJ	Ù˜œœÜËœØÚÛÛY™Y\Ëœ™\ÜË˜ÜÝ‰ÊNÂˆ›Ý]NŽ™Ù]
+	ËÜØÚÛÛY™Y\ËÜ™\ÜËœ‰Ë×\ÛÛ›Û\œ×ØÚÛÛ™YT™\ÜÛÛ›Û\ŽŽ˜Û\ÜË	Ü‰×JKO›˜[YJ	Ù˜œœÜËœØÚÛÛY™Y\Ëœ™\ÜËœ‰ÊNÂˆ›Ý]NŽ™Ù]
+	ËÜØÚÛÛY™Y\ÉË×\ÛÛ›Û\œ×˜œ”ÜÔØÚÛÛ™YPÛÛ›Û\ŽŽ˜Û\ÜË	Ú[™^	×JKO›˜[YJ	Ù˜œœÜËœØÚÛÛY™Y\Ëš[™^	ÊNÂˆ›Ý]NŽœÜÝ
+	ËÜØÚÛÛY™Y\ÉË×\ÛÛ›Û\œ×˜œ”ÜÔØÚÛÛ™YPÛÛ›Û\ŽŽ˜Û\ÜË	ÜÝÜ™I×JKO›˜[YJ	Ù˜œœÜËœØÚÛÛY™Y\ËœÝÜ™IÊKO›ZY]Ø\™J	Ü[‹›[Z]š[›ÚXÙ\ÉÊNÂˆ›Ý]NŽœÜÝ
+	ËÜØÚÛÛY™Y\ËØØ[\\ÉË×\ÛÛ›Û\œ×˜œ”ÜÔØÚÛÛ™YPÛÛ›Û\ŽŽ˜Û\ÜË	ÜÝÚ]ÚØ[\\É×JKO›˜[YJ	Ù˜œœÜËœØÚÛÛY™Y\Ë˜Ø[\\ÉÊNÂˆ›Ý]NŽ™Ù]
+	ËÜØÚÛÛY™Y\ËÞÚYKÜ™XÙZ\	Ë×\ÛÛ›Û\œ×˜œ”ÜÔØÚÛÛ™YPÛÛ›Û\ŽŽ˜Û\ÜË	Ü™XÙZ\	×JKOÚ\™S[X™\Š	ÚY	ÊKO›˜[YJ	Ù˜œœÜËœØÚÛÛY™Y\Ëœ™XÙZ\	ÊNÂˆ›Ý]NŽ™Ù]
+	ËØÜ™X]IËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	ØÜ™X]I×JKO›˜[YJ	Ù˜œœÜË˜Ü™X]IÊNÂˆ›Ý]NŽœÜÝ
+	ËÜÝÜ™IËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	ÜÝÜ™I×JKO›˜[YJ	Ù˜œœÜËœÝÜ™IÊKO›ZY]Ø\™J	Ü[‹›[Z]š[›ÚXÙ\ÉÊNÂˆ›Ý]NŽ™Ù]
+	ËÝ˜[œØXÝ[ÛœÉËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ý˜[œØXÝ[ÛœÉ×JKO›˜[YJ	Ù˜œœÜË˜[œØXÝ[ÛœÉÊNÂˆ›Ý]NŽ™Ù]
+	ËÝ˜[œØXÝ[ÛœËÞÚYIËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	ÜÚÝÉ×JKO›˜[YJ	Ù˜œœÜËœÚÝÉÊNÂˆ›Ý]NŽœÜÝ
+	ËÝ˜[œØXÝ[ÛœËÞÚYKÜ™]žKY˜œ‰ËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ü™]žQ˜œ‰×JKO›˜[YJ	Ù˜œœÜËœ™]žQ˜œ‰ÊNÂˆËÈ\ÚÈMNˆ^[Y[XÛÛ\]HÜ\ÛÈ\ÈÛˆš\ØØ[Ù]šXÙH	Ü[™[™ÉÈš[Ë‚ˆ›Ý]NŽ™Ù]
+	ËÝ˜[œØXÝ[Û‹ÞÚYKÙ˜œ‹\Ý]\ÉËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ø\Q˜œ”Ý]\É×JKO›˜[YJ	Ù˜œœÜË˜[œØXÝ[Û‹™˜œ‹\Ý]\ÉÊNÂˆ›Ý]NŽ™Ù]
+	ËÝ˜[œØXÝ[ÛœËÞÚYKÙY]Y˜Z[Y	ËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	ÙY]˜Z[Y	×JKO›˜[YJ	Ù˜œœÜË™Y]˜Z[Y	ÊNÂˆ›Ý]NŽœÜÝ
+	ËÝ˜[œØXÝ[ÛœËÞÚYKÝ\]KX[™\™]žIËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ý\]P[™™]žI×JKO›˜[YJ	Ù˜œœÜË\]P[™™]žIÊNÂˆ›Ý]NŽ™Ù]
+	ËÙ˜Z[\]Y]YIËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ù˜Z[]Y]YI×JKO›˜[YJ	Ù˜œœÜË™˜Z[]Y]YIÊNÂˆ›Ý]NŽ™Ù]
+	ËÙ˜Z[\]Y]YKÞÚYKÜ™XÛÛ˜Ú[IË×\ÛÛ›Û\œ×˜œ”ÜÔ™XÛÛ˜Ú[X][ÛÛÛ›Û\ŽŽ˜Û\ÜË	ÜÚÝÉ×JKO›˜[YJ	Ù˜œœÜËœ™XÛÛ˜Ú[IÊNÂˆ›Ý]NŽœÜÝ
+	ËÙ˜Z[\]Y]YKÞÚYKÜ™XÛÛ˜Ú[IË×\ÛÛ›Û\œ×˜œ”ÜÔ™XÛÛ˜Ú[X][ÛÛÛ›Û\ŽŽ˜Û\ÜË	ÜÝÜ™I×JKO›˜[YJ	Ù˜œœÜËœ™XÛÛ˜Ú[KœÝÜ™IÊNÂˆ›Ý]NŽœÜÝ
+	ËÙ˜Z[\]Y]YKÜ™]žKX[	ËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ù˜Z[]Y]YT™]žP[	×JKO›˜[YJ	Ù˜œœÜË™˜Z[]Y]YKœ™]žP[	ÊNÂˆ›Ý]NŽœÜÝ
+	ËÙ˜Z[\]Y]YKÞÚYKÜ™]žIËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ù˜Z[]Y]YT™]žSÛ™I×JKO›˜[YJ	Ù˜œœÜË™˜Z[]Y]YKœ™]žSÛ™IÊNÂˆ›Ý]NŽ›X]Ú
+ÉÙÙ]	Ë	ÜÜÝ	×K	ËÜÙ][™ÜËÚY[]Y\ÉË×\ÛÛ›Û\œ×˜œ”ÜÒY[]PÛÛ›Û\ŽŽ˜Û\ÜË	Ú[™^	×JKO›˜[YJ	Ù˜œœÜËšY[]Y\ÉÊNÂˆ›Ý]NŽ›X]Ú
+ÉÙÙ]	Ë	ÜÜÝ	×K	ËÜÙ][™ÜÉËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ù˜œ”Ù][™ÜÉ×JKO›˜[YJ	Ù˜œœÜËœÙ][™ÜÉÊNÂˆËÈ<'å©H\ÚÝÜYÙ[8 %”‹[ÝÛ™YYÙH
+\ÚÈMÊKˆSÑKRS‘TS‘S•ˆBˆËÈYÙ[\ÈÚ]XZÙ\ÈÚ[[’S
+ÈÕÔ‘HÓTš[[™ÈÛÜšËÛÈHÛÝYˆËÈÚÜ]\Ý™HX›HÈZ\ˆÛ™HÛËˆZ[[™ÈHÙ^H\™H™]™\ˆÝXÚ\ÂˆËÈ˜œ—ØÛÛ›™XÝ[Û—Û[ÙHÈÝX›Z\ÜÚ[Ûˆ›Ý][™È
+]Ý^\ÈÛˆ”ˆÙ][™ÜÊK‚ˆËÈHÝÛ›ØY[X\È[Ý™YÙ™ˆYÙ[X[˜YÙ[Y[ÛÛ›Û\ˆ™XØ]\ÙH]Û™BˆËÈ™\ÛÛ™\ÈHÛÛ\[žHœ›ÛHHÔÈÝX\™Û›H8 %Ûˆ”ˆ›Ý]\È]›Ý[™›ÂˆËÈ\Ù\ˆ[™ÚÚ\YH[ˆØ]H[\™[K‚ˆ›Ý]NŽ™Ù]
+	ËØYÙ[	Ë×\ÛÛ›Û\œ×˜œYÙ[ÛÛ›Û\ŽŽ˜Û\ÜË	ÜÚÝÉ×JKO›˜[YJ	Ù˜œœÜË˜YÙ[	ÊNÂˆ›Ý]NŽ™Ù]
+	ËÙ\ÚÝÜØYÙ[\Z\š[™ÉË×\ÛÛ›Û\œ×\ÚÝÜYÙ[Z\š[™ÐÛÛ›Û\ŽŽ˜Û\ÜË	Ü™]šY]É×JBˆO™Y˜][Ê	Ü[™[	Ë	Ù˜œœÜÉÊKO›ZY]Ø\™J	Ý›ÝNŒLIÊKO˜›ØÚÊLL
+KO›˜[YJ	Ù˜œœÜË™\ÚÝÜœZ\š[™ÉÊNÂˆ›Ý]NŽœÜÝ
+	ËÙ\ÚÝÜØYÙ[\Z\š[™ÉË×\ÛÛ›Û\œ×\ÚÝÜYÙ[Z\š[™ÐÛÛ›Û\ŽŽ˜Û\ÜË	ØÛÛ™š\›I×JBˆO™Y˜][Ê	Ü[™[	Ë	Ù˜œœÜÉÊKO›ZY]Ø\™J	Ý›ÝNŒLIÊKO˜›ØÚÊLL
+KO›˜[YJ	Ù˜œœÜË™\ÚÝÜœZ\š[™Ë˜ÛÛ™š\›IÊNÂˆ›Ý]NŽœÜÝ
+	ËØYÙ[ÙÙ[™\˜]IË×\ÛÛ›Û\œ×˜œYÙ[ÛÛ›Û\ŽŽ˜Û\ÜË	ÙÙ[™\˜]RÙ^I×JKO›˜[YJ	Ù˜œœÜË˜YÙ[™Ù[™\˜]IÊNÂˆ›Ý]NŽœÜÝ
+	ËØYÙ[Ü™YÙ[™\˜]IË×\ÛÛ›Û\œ×˜œYÙ[ÛÛ›Û\ŽŽ˜Û\ÜË	Ü™YÙ[™\˜]RÙ^I×JKO›˜[YJ	Ù˜œœÜË˜YÙ[œ™YÙ[™\˜]IÊNÂˆ›Ý]NŽ™Ù]
+	ËØYÙ[ÙÝÛ›ØY	Ë×\ÛÛ›Û\œ×˜œYÙ[ÛÛ›Û\ŽŽ˜Û\ÜË	ÙÝÛ›ØY	×JKO›˜[YJ	Ù˜œœÜË˜YÙ[™ÝÛ›ØY	ÊNÂˆ›Ý]NŽœÜÝ
+	ËÝ\ÝXÛÛ›™XÝ[Û‰ËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ý\ÝÛÛ›™XÝ[Û‰×JKO›˜[YJ	Ù˜œœÜË\ÝÛÛ›™XÝ[Û‰ÊNÂˆ›Ý]NŽœÜÝ
+	ËØ\KÝÙÙÛKY˜œ‹\™\Ü[™ÉËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	ÝÙÙÛQ˜œ”™\Ü[™É×JKO›˜[YJ	Ù˜œœÜË˜\KÙÙÛKY˜œ‹\™\Ü[™ÉÊNÂˆËÈÜ[Û˜[”ˆ[YÜ˜][Ûˆ
+Ù\ŒŠNˆÛ™K][YHXÚ\Ú[ÛˆØ\™
+ÛÛ›™XÝÈÚ]Ý]Ù˜œˆÈ]\ˆÈ™\Ù]
+K‚ˆ›Ý]NŽœÜÝ
+	ËÚ[YÜ˜][Û‹ÙXÚ\Ú[Û‰ËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ù˜œ’[YÜ˜][Û‘XÚ\Ú[Û‰×JKO›˜[YJ	Ù˜œœÜËš[YÜ˜][Û‹™XÚ\Ú[Û‰ÊNÂˆËÈÑ‘“S‘KQ’T”Õ“ÓÕ
+]YÈŒˆ8 %HÜ
+Nˆœ™\Ú™\ÜÈ›Ø™H›ÜˆHÕËXØXÚYØ[HØÜ™Y[‹‚ˆ›Ý]NŽ™Ù]
+	ËØ\KØ›ÛÝXÚXÚÉËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ø›ÛÝÚXÚÉ×JKO›˜[YJ	Ù˜œœÜË˜\K˜›ÛÝXÚXÚÉÊNÂˆ›Ý]NŽœÜÝ
+	ËØ\KØ›ÛÝYXYÛ›ÜÝXÜÉËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ø›ÛÝXYÛ›ÜÝXÜÉ×JBˆO›ZY]Ø\™J	Ý›ÝNŒLIÊKO›˜[YJ	Ù˜œœÜË˜\K˜›ÛÝYXYÛ›ÜÝXÜÉÊNÂˆ›Ý]NŽœÜÝ
+	ËØ\KÝÙÙÛK][š]™\œØ[	ËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	ÝÙÙÛU[š]™\œØ[	×JKO›˜[YJ	Ù˜œœÜË˜\KÙÙÛK][š]™\œØ[	ÊNÂˆ›Ý]NŽœÜÝ
+	ËØ\KÝÙÙÛKX]]ËZÛÝ	ËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	ÝÙÙÛP]]ÒÛÝ	×JKO›˜[YJ	Ù˜œœÜË˜\KÙÙÛKX]]ËZÛÝ	ÊNÂˆ›Ý]NŽœÜÝ
+	ËÜÙ][™ÜËÙ\Ú›Ø\™\Ý[IËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ý\]Q\Ú›Ø\™Ý[I×JKO›˜[YJ	Ù˜œœÜËœÙ][™ÜË™\Ú›Ø\™\Ý[IÊNÂˆ›Ý]NŽœÜÝ
+	ËÜÙ][™ÜËÝ[YIËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ý\]U[YI×JKO›˜[YJ	Ù˜œœÜËœÙ][™ÜË[YIÊNÂˆ›Ý]NŽœÜÝ
+	ËÜÙ][™ÜËÙÝZYYY›ÝÉËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ý\]QÝZYY›ÝÉ×JKO›˜[YJ	Ù˜œœÜËœÙ][™ÜË™ÝZYYY›ÝÉÊNÂˆËÈ\ÚÈLŒÈ8 %Ý\ÝÛZ^™H\š]HÙÙÛ\È
+”ˆÚ[œÈÙˆHH[™Ú[ÎÈYZ[‹YØ]Y[ˆÛÛ›Û\ŠK‚ˆ›Ý]NŽœÜÝ
+	ËÜÙ][™ÜËÜ]ZXÚË]\IËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ý\]T]ZXÚÕ\I×JKO›˜[YJ	Ù˜œœÜËœÙ][™ÜËœ]ZXÚË]\IÊNÂˆ›Ý]NŽœÜÝ
+	ËÜÙ][™ÜËÜ™XÙZ\X]]ØÛÜÙIËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ý\]T™XÙZ\]]ØÛÜÙI×JKO›˜[YJ	Ù˜œœÜËœÙ][™ÜËœ™XÙZ\X]]ØÛÜÙIÊNÂˆ›Ý]NŽœÜÝ
+	ËÜÙ][™ÜËØØ\Ú\™XÙZ]™Y]ÙÙÛIËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	ÝÙÙÛPØ\Ú™XÙZ]™Y	×JKO›˜[YJ	Ù˜œœÜËœÙ][™ÜË˜Ø\Ú\™XÙZ]™Y]ÙÙÛIÊNÂˆ›Ý]NŽœÜÝ
+	ËÜÙ][™ÜËÚÛÝ\™\š[]ÙÙÛIËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ý\]RÛÝ™\š[	×JKO›˜[YJ	Ù˜œœÜËœÙ][™ÜËšÛÝ\™\š[]ÙÙÛIÊNÂˆ›Ý]NŽœÜÝ
+	ËÜÙ][™ÜËÜ™\ÝØÚË]ÙÙÛIËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ý\]T™\ÝØÚÕÙÙÛI×JKO›˜[YJ	Ù˜œœÜËœÙ][™ÜËœ™\ÝØÚË]ÙÙÛIÊNÂˆ›Ý]NŽœÜÝ
+	ËÜÙ][™ÜËÚ[™[ÜžK]ÙÙÛIËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ý\]R[™[ÜžUÙÙÛI×JKO›˜[YJ	Ù˜œœÜËœÙ][™ÜËš[™[ÜžK]ÙÙÛIÊNÂˆ›Ý]NŽœÜÝ
+	ËÜÙ][™ÜËØØ\ÚY\‹Y^XÛÜÙK]ÙÙÛIËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	ÝÙÙÛPØ\ÚY\‘^XÛÜÙI×JKO›˜[YJ	Ù˜œœÜËœÙ][™ÜË˜Ø\ÚY\‹Y^XÛÜÙK]ÙÙÛIÊNÂˆËÈ\ÚÈLŒÈ8 %š[\ˆÙ][™ÜÈYÙH
+ÈÚ[[š[Z›Øˆ[œ]Y]YH
+\ÚÝÜYÙ[Ú\™YÚ]JK‚ˆ›Ý]NŽ›X]Ú
+ÉÙÙ]	Ë	ÜÜÝ	×K	ËÜš[\‹\Ù][™ÜÉËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ù˜œ”š[\”Ù][™ÜÉ×JKO›˜[YJ	Ù˜œœÜËœš[\‹\Ù][™ÜÉÊNÂˆ›Ý]NŽœÜÝ
+	ËØ\KÜš[Z›ØœÉËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ù˜œ\PÜ™X]Tš[›Ø‰×JKO›˜[YJ	Ù˜œœÜË˜\Kœš[Z›ØœÉÊNÂˆËÈ\ÚÈLÌNˆÚ]Ð\š[Ú\™H
+H\š]JH8 %Ý\ÝÛZ^™HÙÙÛKÚÙ[™YˆËÈÚ\™K[[šÈZ[ÚYšXHY[]HÝÚ]Ú›ÙXÝÙX\˜Ú[[ÙH™Y‹‚ˆ›Ý]NŽœÜÝ
+	ËÜÙ][™ÜËÝÚ]Ø\Xš[]ÙÙÛIËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	ÝÙÙÛUÚ]Ø\š[	×JKO›˜[YJ	Ù˜œœÜËœÙ][™ÜËÚ]Ø\Xš[]ÙÙÛIÊNÂˆ›Ý]NŽœÜÝ
+	ËÝ˜[œØXÝ[Û‹ÞÚYKÜÚ\™K[[šÉËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	ÙÙ[™\˜]TÚ\™S[šÉ×JKO›˜[YJ	Ù˜œœÜËš[›ÚXÙKœÚ\™K[[šÉÊNÂˆ›Ý]NŽœÜÝ
+	ËØ\KÚY[]K\ÝÚ]Ú	ËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	ÚY[]TÝÚ]Ú	×JKO›˜[YJ	Ù˜œœÜË˜\KšY[]K\ÝÚ]Ú	ÊNÂˆ›Ý]NŽœÜÝ
+	ËÜ›ÙXÝËÜÙX\˜Ú[[ÙIËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ü›ÙXÝÙX\˜Ú[ÙI×JKO›˜[YJ	Ù˜œœÜËœ›ÙXÝËœÙX\˜Ú[[ÙIÊNÂˆËÈ[™ÝXYÙHÞ\Ý[H
+ˆ]YÈŒŠNˆ\‹]\Ù\ˆÚÚXÙH
+ÈÛÛ\[žHY˜][ˆÜÓØØ[Nˆ	Ù[‰ÈÈ	Ü\‰È›ÛX[ˆ\™HÈ	Ý\‰È\™HØÜš\‚ˆ›Ý]NŽœÜÝ
+	ËÜÙ][[™ÝXYÙIË[˜Ý[Ûˆ
+[[Z[˜]W™\]Y\Ý	™\]Y\Ý
+HÂˆ	[™ÈH	™\]Y\ÝOš[œ]
+	Û[™ÝXYÙIÊNÂˆYˆ
+[—Ø\œ˜^J	[™Ë\Ý\ÜÜÓØØ[NŽSYJJHÂˆ	HH]]
+
+KO™ÝX\™
+	Ù˜œœÜÉÊKO\Ù\Š
+NÂˆ	KO›[™ÝXYÙHH	[™ÎÂˆ	KOœØ]™J
+NÂˆBˆ™]\›ˆ˜XÚÊ
+KOÚ]
+	ÜÝXØÙ\ÜÉË×Ê	ÜÜË›[™ÝXYÙWÜØ]™Y	ÊJNÂˆJKO›˜[YJ	Ù˜œœÜËœÙ][[™ÝXYÙIÊNÂˆ›Ý]NŽœÜÝ
+	ËÜÙ][™ÜËÙY˜][[[™ÝXYÙIË[˜Ý[Ûˆ
+[[Z[˜]W™\]Y\Ý	™\]Y\Ý
+HÂˆ	HH]]
+
+KO™ÝX\™
+	Ù˜œœÜÉÊKO\Ù\Š
+NÂˆX›ÜÝ[›\ÜÊ	H	‰ˆ	KOš\ÔÜÐYZ[Š
+KÊNÂˆ	[™ÈH	™\]Y\ÝOš[œ]
+	ÙY˜][Û[™ÝXYÙIÊNÂˆYˆ
+[—Ø\œ˜^J	[™Ë\Ý\ÜÜÓØØ[NŽSYJJHÂˆ	KO˜ÛÛ\[žKO\]JÉÙY˜][Û[™ÝXYÙIÈOˆ	[™×JNÂˆBˆ™]\›ˆ˜XÚÊ
+KOÚ]
+	ÜÝXØÙ\ÜÉË×Ê	ÜÜË›[™ÝXYÙWÜØ]™Y	ÊJNÂˆJKO›˜[YJ	Ù˜œœÜËœÙ][™ÜË™Y˜][[[™ÝXYÙIÊNÂˆËÈ\ÚÈMÈ8 %”ˆ‘™X]\™\ÈˆØ\™ÛˆHÝ\ÝÛZ^™HX‹ˆÛ™HYZ[‹[Û›BˆËÈ[™Ú[›ÜˆH™YH”‹[ÝÛ™Y™X]\™HÝÚ]Ú\È
+ÝÜ™HÛ\[]™\žKˆËÈ\‹Z][HÝÜ™H›Ý\ÊNÈXXÚØ\œšY\È]ÈÝÛˆ[ˆØ]H[‹XÛÛ›Û\‹‚ˆ›Ý]NŽœÜÝ
+	ËÜÙ][™ÜËÙ™X]\™K]ÙÙÛIËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ý\]Q˜œ‘™X]\™UÙÙÛI×JKO›˜[YJ	Ù˜œœÜËœÙ][™ÜË™™X]\™K]ÙÙÛIÊNÂˆ›Ý]NŽ™Ù]
+	ËØÝ\ÝÛZ^™IËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	ØÝ\ÝÛZ^™I×JKO›˜[YJ	Ù˜œœÜË˜Ý\ÝÛZ^™IÊNÂˆ›Ý]NŽ™Ù]
+	ËÛØØ[\Ý\ÜXÛÜY\ÉË×\ÛÛ›Û\œ×Ü[Û˜[ØØ[š[\˜Ú]™PÛÛ›Û\ŽŽ˜Û\ÜË	Ú[™^	×JKO›˜[YJ	Ù˜œœÜË›ØØ[\Ý\ÜXÛÜY\ÉÊNÂˆ›Ý]NŽœÜÝ
+	ËÛØØ[\Ý\ÜXÛÜY\ÉË×\ÛÛ›Û\œ×Ü[Û˜[ØØ[š[\˜Ú]™PÛÛ›Û\ŽŽ˜Û\ÜË	Ý\]I×JKO›ZY]Ø\™J	Ý›ÝNŒLIÊKO›˜[YJ	Ù˜œœÜË›ØØ[\Ý\ÜXÛÜY\Ë\]IÊNÂˆ›Ý]NŽ™Ù]
+	ËÛØØ[\Ý\ÜXÛÜY\ËÞÚYKÙÝÛ›ØY	Ë×\ÛÛ›Û\œ×Ü[Û˜[ØØ[š[\˜Ú]™PÛÛ›Û\ŽŽ˜Û\ÜË	ÙÝÛ›ØY	×JKOÚ\™S[X™\Š	ÚY	ÊKO›ZY]Ø\™J	Ý›ÝNŒŒIÊKO›˜[YJ	Ù˜œœÜË›ØØ[\Ý\ÜXÛÜY\Ë™ÝÛ›ØY	ÊNÂ‚ˆËÈØ[\ˆQ
+\ÚÈLÍLÈ8 %”ˆÚ[ˆÙˆHH›Ý]\ÊNˆYZ[ˆÙÙÛH
+ÂˆËÈZ\™Y\Û™H™]›ÚÙHÛˆHÝ\ÝÛZ^™HX‹ˆÜÐØ[\’YÛÛ›Û\ˆ™\ÛÛ™\ÂˆËÈHÛÛ\[žHœ›ÛHÝ\œ™[ÛÛ\[žRY
+›Ý[™žH˜œ”ÜÐ]]ÛÊH[™H\Ù\‚ˆËÈœ›ÛHÚXÚ]™\ˆ[™[ÝX\™ÝÛœÈH™\]Y\ÝÛÈ›Ý[™\œÈ\™H™]\ÙYˆËÈ\ËZ\È8 %Û™HÙ\™\‹\ÚYHØ]K›È”‹[Û›HÛÜH]Ø[ˆšY‚ˆ›Ý]NŽœÜÝ
+	ËÜÙ][™ÜËØØ[\‹ZY	Ë×\ÛÛ›Û\œ×ÜÐØ[\’YÛÛ›Û\ŽŽ˜Û\ÜË	ÝÙÙÛI×JKO›˜[YJ	Ù˜œœÜËœÙ][™ÜË˜Ø[\‹ZY	ÊNÂˆ›Ý]NŽœÜÝ
+	ËÜÙ][™ÜËØØ[\‹Y]šXÙ\ËÜ™]›ÚÙIË×\ÛÛ›Û\œ×ÜÐØ[\’YÛÛ›Û\ŽŽ˜Û\ÜË	Ü™]›ÚÙQ]šXÙI×JKO›˜[YJ	Ù˜œœÜËœÙ][™ÜË˜Ø[\‹Y]šXÙ\Ëœ™]›ÚÙIÊNÂˆ›Ý]NŽ›X]Ú
+ÉÙÙ]	Ë	ÜÜÝ	×K	ËÜ™XÙZ\\Ù][™ÜÉËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ù˜œ”™XÙZ\Ù][™ÜÉ×JKO›˜[YJ	Ù˜œœÜËœ™XÙZ\\Ù][™ÜÉÊNÂ‚ˆËÈ<'ã«È[š]™\œØ[XY\ˆTH8 %ØØ[È›Ýš\Ú[Û˜[š[È
+ŒL
+H
+È˜Z[Yš[È
+ŒLJBˆ›Ý]NŽ™Ù]
+	ËØ\KÜ›Ýš\Ú[Û˜[Xš[ÉËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ø\T›Ýš\Ú[Û˜[š[É×JKO›˜[YJ	Ù˜œœÜË˜\Kœ›Ýš\Ú[Û˜[Xš[ÉÊNÂˆ›Ý]NŽœÜÝ
+	ËØ\KÜ›Ýš\Ú[Û˜[Xš[ËÞÚYKÙ[]IËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ø\Q[]T›Ýš\Ú[Û˜[	×JKO›˜[YJ	Ù˜œœÜË˜\Kœ›Ýš\Ú[Û˜[™[]IÊNÂˆ›Ý]NŽœÜÝ
+	ËØ\KÜ›Ýš\Ú[Û˜[Xš[ËÞÚYKÜ›Û[ÝIËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ø\T›Û[ÝT›Ýš\Ú[Û˜[	×JKO›˜[YJ	Ù˜œœÜË˜\Kœ›Ýš\Ú[Û˜[œ›Û[ÝIÊNÂˆ›Ý]NŽœÜÝ
+	ËØ\KÝ™\šYžK\[‰ËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ý™\šYžT[‰×JKO›˜[YJ	Ù˜œœÜË˜\K™\šYžK\[‰ÊNÂˆ›Ý]NŽ™Ù]
+	ËØ\KØÚXÚË\[‹\Ù\ÜÚ[Û‰ËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	ØÚXÚÔ[”Ù\ÜÚ[Û‰×JKO›˜[YJ	Ù˜œœÜË˜\K˜ÚXÚË\[‹\Ù\ÜÚ[Û‰ÊNÂˆ›Ý]NŽ™Ù]
+	ËØš[[™ÉËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Øš[[™É×JKO›˜[YJ	Ù˜œœÜË˜š[[™ÉÊNÂˆ›Ý]NŽ™Ù]
+	ËØš[[™ËÙØÝ[Y[ËÚ[›ÚXÙ\ËÞÚ[›ÚXÙ_IË×\ÛÛ›Û\œ×ÝXœØÜš\[Û‘ØÝ[Y[ÛÛ›Û\ŽŽ˜Û\ÜË	ØÛÛ\[žR[›ÚXÙI×JKOÚ\™S[X™\Š	Ú[›ÚXÙIÊKO›˜[YJ	Ù˜œœÜË˜š[[™Ë™ØÝ[Y[Ëš[›ÚXÙIÊNÂˆ›Ý]NŽ™Ù]
+	ËØš[[™ËÙØÝ[Y[ËÜ™XÙZ\ËÞÜ^[Y[IË×\ÛÛ›Û\œ×ÝXœØÜš\[Û‘ØÝ[Y[ÛÛ›Û\ŽŽ˜Û\ÜË	ØÛÛ\[žT™XÙZ\	×JKOÚ\™S[X™\Š	Ü^[Y[	ÊKO›˜[YJ	Ù˜œœÜË˜š[[™Ë™ØÝ[Y[Ëœ™XÙZ\	ÊNÂˆ›Ý]NŽ™Ù]
+	ËÜ™\ÜÉËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ü™\ÜÉ×JKO›˜[YJ	Ù˜œœÜËœ™\ÜÉÊNÂˆËÈÝY™ˆ^œšH8 %”ˆZ\œ›Üˆ
+\ÚÈÍMŒ
+H8 %QRS‹ÓPSQÑT‹SÓ“H
+È[ˆÛÛ›Û\ŠK‚ˆ›Ý]NŽ™Ù]
+	ËÜ™\ÜËÚ^œšIËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ú^œšT™\Ü	×JKO›˜[YJ	Ù˜œœÜËœ™\ÜËš^œšIÊNÂˆËÈ^\›Ûˆ^Ü8 %”ˆZ\œ›ÜˆÙˆÜËœ™\ÜËš^œšKœ^\›Û\ˆ
+Ø[YHØ]\ÊK‚ˆ›Ý]NŽ™Ù]
+	ËÜ™\ÜËÚ^œšKÜ^\›Û\‰ËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ü^\›Û^œšT‰×JKO›˜[YJ	Ù˜œœÜËœ™\ÜËš^œšKœ^\›Û\‰ÊNÂˆËÈš[ÛY]šXÈ]šXÙHÙ]\
+È^Ù[[\Ü8 %”ˆZ\œ›ÜˆÙˆHHš[Ë\Þ[˜ÂˆËÈYÙ\È
+YZ[ˆÛ›KÈ[ˆÛÛ›Û\ŠKˆHX›XÈQTÈ[™Ù\Ý[™Ú[ÂˆËÈÝ^HÒT‘Q
+ÚÙ[‹ÔÓ‹\ØÛÜY[™[XYÛ›ÜÝXÊH8 %ÙYHØš[Ë\Þ[˜ÈX›Ý™K‚ˆ›Ý]NŽ™Ù]
+	ËØš[Ë\Þ[˜ÉË×\ÛÛ›Û\œ×˜œ”ÜÐš[ÛY]šXÐÛÛ›Û\ŽŽ˜Û\ÜË	ÜÙ]\	×JKO›˜[YJ	Ù˜œœÜË˜š[Ë\Þ[˜ËœÙ]\	ÊNÂˆ›Ý]NŽœÜÝ
+	ËØš[Ë\Þ[˜ËÙ]šXÙIË×\ÛÛ›Û\œ×˜œ”ÜÐš[ÛY]šXÐÛÛ›Û\ŽŽ˜Û\ÜË	ÜÝÜ™Q]šXÙI×JKO›˜[YJ	Ù˜œœÜË˜š[Ë\Þ[˜ËœÝÜ™KY]šXÙIÊNÂˆ›Ý]NŽœÜÝ
+	ËØš[Ë\Þ[˜ËÛ]K][YIË×\ÛÛ›Û\œ×˜œ”ÜÐš[ÛY]šXÐÛÛ›Û\ŽŽ˜Û\ÜË	ÜØ]™S]U[YI×JKO›˜[YJ	Ù˜œœÜË˜š[Ë\Þ[˜ËœØ]™K[]IÊNÂˆ›Ý]NŽœÜÝ
+	ËØš[Ë\Þ[˜ËÙ]šXÙKÞÚYKÝÙÙÛIË×\ÛÛ›Û\œ×˜œ”ÜÐš[ÛY]šXÐÛÛ›Û\ŽŽ˜Û\ÜË	ÝÙÙÛQ]šXÙI×JKO›˜[YJ	Ù˜œœÜË˜š[Ë\Þ[˜ËÙÙÛKY]šXÙIÊNÂˆ›Ý]NŽ™[]J	ËØš[Ë\Þ[˜ËÙ]šXÙKÞÚYIË×\ÛÛ›Û\œ×˜œ”ÜÐš[ÛY]šXÐÛÛ›Û\ŽŽ˜Û\ÜË	Ù\Ý›ÞQ]šXÙI×JKO›˜[YJ	Ù˜œœÜË˜š[Ë\Þ[˜Ë™\Ý›ÞKY]šXÙIÊNÂˆ›Ý]NŽœÜÝ
+	ËØš[Ë\Þ[˜ËÙ]šXÙKÞÚYKÛX\	Ë×\ÛÛ›Û\œ×˜œ”ÜÐš[ÛY]šXÐÛÛ›Û\ŽŽ˜Û\ÜË	ÜØ]™SX\[™É×JKO›˜[YJ	Ù˜œœÜË˜š[Ë\Þ[˜ËœØ]™K[X\[™ÉÊNÂˆ›Ý]NŽ™Ù]
+	ËØš[Ë\Þ[˜ËÚ[\Ü	Ë×\ÛÛ›Û\œ×˜œ”ÜÐš[ÛY]šXÐÛÛ›Û\ŽŽ˜Û\ÜË	ÜÚÝÒ[\Ü	×JKO›˜[YJ	Ù˜œœÜË˜š[Ë\Þ[˜Ëš[\Ü	ÊNÂˆ›Ý]NŽœÜÝ
+	ËØš[Ë\Þ[˜ËÚ[\Ü	Ë×\ÛÛ›Û\œ×˜œ”ÜÐš[ÛY]šXÐÛÛ›Û\ŽŽ˜Û\ÜË	Ü›ØÙ\ÜÒ[\Ü	×JKO›˜[YJ	Ù˜œœÜË˜š[Ë\Þ[˜Ëœ›ØÙ\ÜËZ[\Ü	ÊNÂˆ›Ý]NŽœÜÝ
+	ËØš[Ë\Þ[˜ËÜ]ZXÚË[X\	Ë×\ÛÛ›Û\œ×˜œ”ÜÐš[ÛY]šXÐÛÛ›Û\ŽŽ˜Û\ÜË	Ü]ZXÚÓX\[‰×JKO›˜[YJ	Ù˜œœÜË˜š[Ë\Þ[˜Ëœ]ZXÚË[X\	ÊNÂˆËÈ[›X\YSˆ[™[X˜[›™\ˆ\ÛZ\ÜÈ8 %YZ[‹[Û›K›Ü›X[˜œœÜÈÙXˆZY]Ø\™H
+ÔÔ‘ŠK‚ˆ›Ý]NŽœÜÝ
+	ËØš[Ë\Þ[˜ËÜ[‹X[\Ù\ÛZ\ÜÉË×\ÛÛ›Û\œ×˜œ”ÜÐš[ÛY]šXÐÛÛ›Û\ŽŽ˜Û\ÜË	Ù\ÛZ\ÜÔ[[\	×JKO›˜[YJ	Ù˜œœÜË˜š[Ë\Þ[˜Ë™\ÛZ\ÜË\[‹X[\	ÊNÂˆ›Ý]NŽ™Ù]
+	ËÜ™\ÜËÙ^ÜXÜÝ‰ËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ù^Ü™\ÜÜÝ‰×JKO›˜[YJ	Ù˜œœÜËœ™\ÜË™^ÜXÜÝ‰ÊNÂ‚ˆËÈ<'äiHX[HX[˜YÙ[Y[
+”ˆÚ[ˆÙˆÜÜËÝX[JH8 %YZ[‹[Û›H[ˆÛÛ›Û\‹‚ˆ›Ý]NŽ™Ù]
+	ËÝX[IË×\ÛÛ›Û\œ×[ÝX[PÛÛ›Û\ŽŽ˜Û\ÜË	Ú[™^	×JKO›˜[YJ	Ù˜œœÜËX[IÊNÂˆ›Ý]NŽœÜÝ
+	ËÝX[IËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ù˜œ”ÝÜ™UX[SY[X™\‰×JKO›˜[YJ	Ù˜œœÜËX[KœÝÜ™IÊNÂˆ›Ý]NŽœ]
+	ËÝX[KÞÚYIËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ù˜œ•\]UX[SY[X™\‰×JKO›˜[YJ	Ù˜œœÜËX[K\]IÊNÂˆ›Ý]NŽœÜÝ
+	ËÝX[KÞÚYKÝÙÙÛIËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ù˜œ•ÙÙÛUX[SY[X™\‰×JKO›˜[YJ	Ù˜œœÜËX[KÙÙÛIÊNÂ‚ˆËÈ<'ãëœ˜[˜ÚX[˜YÙ[Y[
+][KXœ˜[˜ÚŒJH8 %YZ[‹[Û›H[ˆÛÛ›Û\‹‚ˆ›Ý]NŽ™Ù]
+	ËØœ˜[˜Ú\ÉË×\ÛÛ›Û\œ×˜œ”ÜÐœ˜[˜ÚÛÛ›Û\ŽŽ˜Û\ÜË	Ú[™^	×JKO›˜[YJ	Ù˜œœÜË˜œ˜[˜Ú\ÉÊNÂˆ›Ý]NŽœÜÝ
+	ËØœ˜[˜Ú\ÉË×\ÛÛ›Û\œ×˜œ”ÜÐœ˜[˜ÚÛÛ›Û\ŽŽ˜Û\ÜË	ÜÝÜ™I×JKO›˜[YJ	Ù˜œœÜË˜œ˜[˜Ú\ËœÝÜ™IÊNÂˆ›Ý]NŽœ]
+	ËØœ˜[˜Ú\ËÞÚYIË×\ÛÛ›Û\œ×˜œ”ÜÐœ˜[˜ÚÛÛ›Û\ŽŽ˜Û\ÜË	Ý\]I×JKO›˜[YJ	Ù˜œœÜË˜œ˜[˜Ú\Ë\]IÊNÂˆ›Ý]NŽœÜÝ
+	ËØœ˜[˜Ú\ËÞÚYKÝÙÙÛIË×\ÛÛ›Û\œ×˜œ”ÜÐœ˜[˜ÚÛÛ›Û\ŽŽ˜Û\ÜË	ÝÙÙÛI×JKO›˜[YJ	Ù˜œœÜË˜œ˜[˜Ú\ËÙÙÛIÊNÂˆ›Ý]NŽ™Ù]
+	ËÝ^\™\ÜÉËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ý^™\ÜÉ×JKO›˜[YJ	Ù˜œœÜË^\™\ÜÉÊNÂˆËÈ\ÚÈŽNˆÔÕ‹Ôˆ^ÜÙˆH[ÛH”ˆ^™\Ü
+H\š]JK‚ˆ›Ý]NŽ™Ù]
+	ËÝ^\™\ÜËØÜÝ‰ËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ù^Ü^™\ÜÜÝ‰×JKO›˜[YJ	Ù˜œœÜË^\™\ÜË˜ÜÝ‰ÊNÂˆ›Ý]NŽ™Ù]
+	ËÝ^\™\ÜËÜ‰ËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ù^Ü^™\Ü‰×JKO›˜[YJ	Ù˜œœÜË^\™\ÜËœ‰ÊNÂˆ›Ý]NŽ›X]Ú
+ÉÙÙ]	Ë	ÜÜÝ	×K	ËØ\Ú[™\ÜË\›Ùš[IËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ø\Ú[™\ÜÔ›Ùš[I×JKO›˜[YJ	Ù˜œœÜË˜\Ú[™\ÜË\›Ùš[IÊNÂˆ›Ý]NŽ›X]Ú
+ÉÙÙ]	Ë	ÜÜÝ	×K	ËÛ^K\›Ùš[IËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Û^T›Ùš[I×JKO›˜[YJ	Ù˜œœÜË›^K\›Ùš[IÊNÂˆ›Ý]NŽ™Ù]
+	ËÝ˜[œØXÝ[Û‹ÞÚYKÜ™XÙZ\	ËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ü™XÙZ\	×JKO›˜[YJ	Ù˜œœÜËœ™XÙZ\	ÊNÂˆËÈÜ™\ˆX]Ú[™È
+]YÈŒŠH8 %”ˆÓÕš[[™Ú[Âˆ›Ý]NŽ™Ù]
+	ËÚ[ÞÚYKÚÚ]Ú[‹]XÚÙ]	ËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	ÚÛÝXÚÙ]	×JKO›˜[YJ	Ù˜œœÜËš[šÛÝ	ÊNÂˆ›Ý]NŽ™Ù]
+	ËÝ˜[œØXÝ[Û‹ÞÚYKÚÛÝ\™\š[	ËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	ÚÛÝ™\š[	×JKO›˜[YJ	Ù˜œœÜË˜[œØXÝ[Û‹šÛÝ\™\š[	ÊNÂˆ›Ý]NŽ™Ù]
+	ËÝ˜[œØXÝ[Û‹ÞÚYKÜ‰ËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	ÙÝÛ›ØY‰×JKO›˜[YJ	Ù˜œœÜËœ‰ÊNÂˆ›Ý]NŽ™Ù]
+	ËÝ˜[œØXÝ[Û‹ÞÚYKÜ‹\™]šY]ÉËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ü™]šY]Ô‰×JKO›˜[YJ	Ù˜œœÜËœ‹œ™]šY]ÉÊNÂˆ›Ý]NŽ™Ù]
+	ËÙ^KXÛÜÙIËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ù^PÛÜÙT™\Ü	×JKO›˜[YJ	Ù˜œœÜË™^KXÛÜÙIÊNÂˆ›Ý]NŽœÜÝ
+	ËÙ^KXÛÜÙIËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	ØÛÜÙQ^T™\Ü	×JKO›˜[YJ	Ù˜œœÜË˜ÛÜÙKY^IÊNÂˆ›Ý]NŽœÜÝ
+	ËÙ^KXÛÜÙKØÛÜÙKX[\š[Ü‰ËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	ØÛÜÙP[š[Ü‘^\É×JKO›˜[YJ	Ù˜œœÜË˜ÛÜÙKX[Y^\ÉÊNÂˆËÈ\ÚÈÍˆ
+”ˆZ\œ›ÜˆÙˆH\ÚÈŒJNˆ]]È^KXÛÜÙHÚXÚØ›Þ
+ÈÝ]Ù™‚ˆËÈÙ[XÝÜˆÛˆH”ˆ^KXÛÜÙHYÙH8 %Ø\ÚY\‹X›ØÚÙY[ˆHÛÛ›Û\‹‚ˆ›Ý]NŽœÜÝ
+	ËÜÙ][™ÜËØ]]ËY^XÛÜÙK]ÙÙÛIËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	ÝÙÙÛP]]Ñ^XÛÜÙI×JKO›˜[YJ	Ù˜œœÜËœÙ][™ÜË˜]]ËY^XÛÜÙK]ÙÙÛIÊNÂˆ›Ý]NŽœÜÝ
+	ËÜÙ][™ÜËØ]]ËY^XÛÜÙK][YIËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ý\]P]]Ñ^XÛÜÙU[YI×JKO›˜[YJ	Ù˜œœÜËœÙ][™ÜË˜]]ËY^XÛÜÙK][YIÊNÂˆ›Ý]NŽœÜÝ
+	ËÜÙ][™ÜËÝ[˜\ÜÚYÛ™YY[]™\žKY^XÛÜÙIËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ý\]U[˜\ÜÚYÛ™Y[]™\žQ^XÛÜÙI×JKO›˜[YJ	Ù˜œœÜËœÙ][™ÜË[˜\ÜÚYÛ™YY[]™\žKY^XÛÜÙIÊNÂˆ›Ý]NŽœÜÝ
+	ËÜÙ][™ÜËÙ^XÛÜÙKXÝ]Ù™‰ËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ý\]Q^XÛÜÙPÝ]Ù™‰×JKO›˜[YJ	Ù˜œœÜËœÙ][™ÜË™^XÛÜÙKXÝ]Ù™‰ÊNÂˆ›Ý]NŽ™Ù]
+	ËÙ^KXÛÜÙKÞÚYKÜ‰ËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ù^PÛÜÙT™\Ü‰×JKO›˜[YJ	Ù˜œœÜË™^KXÛÜÙK\‰ÊNÂˆ›Ý]NŽ™Ù]
+	ËÙ^KXÛÜÙKÞÚYKÜ‹ÙÝÛ›ØY	ËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ù^PÛÜÙT™\Ü‰×JKO™Y˜][Ê	ÙÝÛ›ØY	ËYJKO›˜[YJ	Ù˜œœÜË™^KXÛÜÙK\‹YÝÛ›ØY	ÊNÂˆ›Ý]NŽ™Ù]
+	ËÙ^KXÛÜÙKÞÚYKÝ\›X[	ËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ù^PÛÜÙU\›X[	×JKO›˜[YJ	Ù˜œœÜË™^KXÛÜÙK]\›X[	ÊNÂˆ›Ý]NŽ™Ù]
+	ËÜ™\ÜËØ[˜[]XÜË\‰ËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ü™\ÜÐ[˜[]XÜÔ‰×JKO›˜[YJ	Ù˜œœÜËœ™\ÜË˜[˜[]XÜË\‰ÊNÂˆËÈ<'æ ÛX\]]ËXÛÜÙH
+\ÚÚÛY^H™XÛÝ™\žH8 %ÛÜÙ\È[žH\Ý^HÚ]Ø[\È]›È‹\™\Ü
+Bˆ›Ý]NŽœÜÝ
+	ËØ\KØ]]ËXÛÜÙKY^IËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ø\P]]ÐÛÜÙQ^I×JKO›˜[YJ	Ù˜œœÜË˜\K˜]]ËXÛÜÙKY^IÊNÂ‚ˆ›Ý]NŽ™Ù]
+	ËÜ›ÙXÝÉËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ü›ÙXÝÉ×JKO›˜[YJ	Ù˜œœÜËœ›ÙXÝÉÊNÂˆ›Ý]NŽ™Ù]
+	ËÜ›ÙXÝËØÜ™X]IËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	ØÜ™X]T›ÙXÝ	×JKO›˜[YJ	Ù˜œœÜËœ›ÙXÝË˜Ü™X]IÊNÂˆËÈ<'ãíÈ˜\˜ÛÙHX™[š[YÙH
+\ÚÈLÌˆ8 %HÜ
+ÈXÚÙ\ˆ\Ü˜YJBˆ›Ý]NŽ™Ù]
+	ËÜ›ÙXÝËÛX™[ÉËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ü›ÙXÝX™[É×JKO›˜[YJ	Ù˜œœÜËœ›ÙXÝË›X™[ÉÊKO›ZY]Ø\™J	Ù™X]\™N˜˜\˜ÛÙK™[]˜[	ÊNÂˆËÈ[ÈÜÈÛˆÑSPÕQ›ÙXÝÈ8 %YZ[‹YØ]Y[‹XÛÛ›Û\ˆ
+”ˆÛÛ™[[ÛŠBˆ›Ý]NŽœÜÝ
+	ËÜ›ÙXÝËØ[ÉËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ø[Ô›ÙXÝXÝ[Û‰×JKO›˜[YJ	Ù˜œœÜËœ›ÙXÝË˜[ÉÊNÂˆËÈ<'äéˆ^Ù[^ÜÝ[\]H
+È[È[\Ü
+”ˆZ\œ›ÜˆÙˆÜËœ›ÙXÝË[\]KÚ[\Ü
+K‚ˆËÈ“È[‹›[Z]ZY]Ø\™HÛˆ[\Ü
+\ÚÈÍŒJNˆ]XØ\ÚÜÈ]\ÝÝ[™BˆËÈX›HÈ[ˆTUK[Û›H[\ÜÈ
+HZY]Ø\™HÜÈHÚÛH™\]Y\Ý]ˆËÈØ\
+KˆXØÙ\ÜÈ
+È\‹\›ÝÈ[ˆØ\\™H[™›Ü˜ÙY[œÚYH[\Ü›ÙXÝÂˆËÈ
+ÝXœØÜš\[ÛXØÙ\ÜÔÙ\šXÙHØ]H
+È™[XZ[š[™È[ÝØ[˜ÙJK‚ˆ›Ý]NŽ™Ù]
+	ËÜ›ÙXÝËÝ[\]IËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	ÙÝÛ›ØY›ÙXÝ[\]I×JKO›˜[YJ	Ù˜œœÜËœ›ÙXÝË[\]IÊNÂˆ›Ý]NŽœÜÝ
+	ËÜ›ÙXÝËÚ[\Ü	ËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ú[\Ü›ÙXÝÉ×JKO›˜[YJ	Ù˜œœÜËœ›ÙXÝËš[\Ü	ÊNÂˆ›Ý]NŽœÜÝ
+	ËÜ›ÙXÝÉËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	ÜÝÜ™T›ÙXÝ	×JKO›˜[YJ	Ù˜œœÜËœ›ÙXÝËœÝÜ™IÊKO›ZY]Ø\™J	Ü[‹›[Z]œ›ÙXÝÉÊNÂˆ›Ý]NŽ™Ù]
+	ËÜ›ÙXÝËÞÚYKÙY]	ËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	ÙY]›ÙXÝ	×JKO›˜[YJ	Ù˜œœÜËœ›ÙXÝË™Y]	ÊNÂˆ›Ý]NŽœ]
+	ËÜ›ÙXÝËÞÚYIËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ý\]T›ÙXÝ	×JKO›˜[YJ	Ù˜œœÜËœ›ÙXÝË\]IÊNÂˆ›Ý]NŽœÜÝ
+	ËÜ›ÙXÝËÞÚYKÝÙÙÛIËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	ÝÙÙÛT›ÙXÝ	×JKO›˜[YJ	Ù˜œœÜËœ›ÙXÝËÙÙÛIÊNÂˆ›Ý]NŽœÜÝ
+	ËÜ›ÙXÝËÞÚYKÝÙÙÛK\Ø[IËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	ÝÙÙÛT›ÙXÝØ[I×JKO›˜[YJ	Ù˜œœÜËœ›ÙXÝËÙÙÛK\Ø[IÊNÂˆ›Ý]NŽœÜÝ
+	ËÜ›ÙXÝËØ[Ë\Ø[IËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ø[ÕÙÙÛTØ[I×JKO›˜[YJ	Ù˜œœÜËœ›ÙXÝË˜[Ë\Ø[IÊNÂˆ›Ý]NŽ™[]J	ËÜ›ÙXÝËÞÚYIËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ù\Ý›ÞT›ÙXÝ	×JKO›˜[YJ	Ù˜œœÜËœ›ÙXÝË™\Ý›ÞIÊNÂˆËÈ<'æèÙ\šXÙ\È
+\ÚÈLÌˆ8 %HÜ
+Nˆ›Û‹\ÝØÚÈÙ\šXÙH][\ÎÈYZ[‹YØ]Y[‹XÛÛ›Û\‚ˆËÈØ]YÛÜžH›Ùš[H
+\ÚÈMNŠNˆY[ˆ›ÜˆÛÛÙÈÚÜÈH[œ™XXÚX›HžHT“‚ˆ›Ý]NŽ›ZY]Ø\™JÉÙ™X]\™NœÙ\šXÙWÚ›ØœË™[]˜[	×JKO™Ü›Ý\
+[˜Ý[Ûˆ
+
+HÂˆ›Ý]NŽ™Ù]
+	ËÜÙ\šXÙ\ÉËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	ÜÙ\šXÙ\É×JKO›˜[YJ	Ù˜œœÜËœÙ\šXÙ\ÉÊNÂˆ›Ý]NŽœÜÝ
+	ËÜÙ\šXÙ\ÉËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	ÜÝÜ™TÙ\šXÙI×JKO›˜[YJ	Ù˜œœÜËœÙ\šXÙ\ËœÝÜ™IÊNÂˆ›Ý]NŽœ]
+	ËÜÙ\šXÙ\ËÞÚYIËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ý\]TÙ\šXÙI×JKO›˜[YJ	Ù˜œœÜËœÙ\šXÙ\Ë\]IÊNÂˆ›Ý]NŽ™[]J	ËÜÙ\šXÙ\ËÞÚYIËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ù[]TÙ\šXÙI×JKO›˜[YJ	Ù˜œœÜËœÙ\šXÙ\Ë™[]IÊNÂˆJNÂˆ›Ý]NŽ™Ù]
+	ËØ\KÜ›ÙXÝËÜÙX\˜Ú	ËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	ÜÙX\˜Ú›ÙXÝÉ×JKO›˜[YJ	Ù˜œœÜË˜\Kœ›ÙXÝËœÙX\˜Ú	ÊNÂˆ›Ý]NŽ™Ù]
+	ËØ\KÜ›ÙXÝËØ˜\˜ÛÙIËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	ÛÛÚÝ\žP˜\˜ÛÙI×JKO›˜[YJ	Ù˜œœÜË˜\Kœ›ÙXÝË˜˜\˜ÛÙIÊNÂˆËÈ<'å!]]ËTÞ[˜È[™Ú[™H8 %Ú[[Ì\ÙXÈœ›Û[™Û\ˆ
+ÈX[X[˜Z[Y[Ù[ˆ›Ý]NŽ™Ù]
+	ËØ\KÙ˜Z[YXš[ÉËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ø\Q˜Z[Yš[É×JKO›˜[YJ	Ù˜œœÜË˜\K™˜Z[YXš[ÉÊNÂˆ›Ý]NŽœÜÝ
+	ËØ\KÙ˜Z[YXš[ËÞÚYKÜ™]žIËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ø\T™]žQ˜Z[Y	×JKO›˜[YJ	Ù˜œœÜË˜\K™˜Z[Yœ™]žIÊNÂˆËÈÙ™›[™H]Y]YH[[Y]žH8 %Ø[YHÚ[™ÛHÛÛ›Û\ˆ\ÈHHØÜ™Y[‹‚ˆ›Ý]NŽœÜÝ
+	ËØ\KÛÙ™›[™K\]Y]YK\™\Ü	ËÙ™›[™T]Y]YT™\ÜÛÛ›Û\ŽŽ˜Û\ÜÊKO›˜[YJ	Ù˜œœÜË˜\K›Ù™›[™K\]Y]YK\™\Ü	ÊNÂ‚ˆËÈ<'ã$[š]™\œØ[Ø[HØÜ™Y[ˆT\È8 %Ý\ÝÛY\ˆ
+È]ZXÚÈ›ÙXÝ
+K\Ú\HZ\œ›ÜœÊBˆ›Ý]NŽ™Ù]
+	ËØ\KØÝ\ÝÛY\‹\ÙX\˜Ú	ËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ø\PÝ\ÝÛY\”ÙX\˜Ú	×JKO›˜[YJ	Ù˜œœÜË˜\K˜Ý\ÝÛY\‹\ÙX\˜Ú	ÊNÂˆ›Ý]NŽ™Ù]
+	ËØ\KØÝ\ÝÛY\‹[ÛÚÝ\	ËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ø\PÝ\ÝÛY\“ÛÚÝ\	×JKO›˜[YJ	Ù˜œœÜË˜\K˜Ý\ÝÛY\‹[ÛÚÝ\	ÊNÂˆ›Ý]NŽœÜÝ
+	ËØ\KØÝ\ÝÛY\‹\ÝÜ™IËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ø\PÝ\ÝÛY\”ÝÜ™I×JKO›˜[YJ	Ù˜œœÜË˜\K˜Ý\ÝÛY\‹\ÝÜ™IÊNÂˆ›Ý]NŽ™Ù]
+	ËØ\KØÝ\ÝÛY\‹Z\ÝÜžKÞÚYIËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ø\PÝ\ÝÛY\’\ÝÜžI×JKO›˜[YJ	Ù˜œœÜË˜\K˜Ý\ÝÛY\‹Z\ÝÜžIÊNÂˆËÈ\ÚÈMŒÎˆØ\ÚY\‹YY]X›H[]™\žHY™\ÜÙ\È8 %Ý\ÝÛY\œÈ]™H[ˆHÚ\™YˆËÈÜ×ØÝ\ÝÛY\œËÜÜ×ØÝ\ÝÛY\—ØY™\ÜÙ\ÈX›\ËÛÈÜÐÛÛ›Û\ˆ[™\œÈ\™BˆËÈ™]\ÙY\ËZ\È
+^HÛ›H\[™ÛˆÝ\œ™[ÛÛ\[žRY›Ý[™\™HÛÊK‚ˆ›Ý]NŽ™Ù]
+	ËØ\KØÝ\ÝÛY\‹XY™\ÜÙ\ÉËÔÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ø\PÝ\ÝÛY\Y™\ÜÙ\É×JKO›˜[YJ	Ù˜œœÜË˜\K˜Ý\ÝÛY\‹XY™\ÜÙ\ÉÊNÂˆ›Ý]NŽœÜÝ
+	ËØ\KØÝ\ÝÛY\‹XY™\ÜÙ\ÉËÔÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ø\TÝÜ™PÝ\ÝÛY\Y™\ÜÉ×JKO›˜[YJ	Ù˜œœÜË˜\K˜Ý\ÝÛY\‹XY™\ÜÙ\ËœÝÜ™IÊNÂˆ›Ý]NŽœÜÝ
+	ËØ\KØÝ\ÝÛY\‹XY™\ÜÙ\ËÙ[]IËÔÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ø\Q[]PÝ\ÝÛY\Y™\ÜÉ×JKO›˜[YJ	Ù˜œœÜË˜\K˜Ý\ÝÛY\‹XY™\ÜÙ\Ë™[]IÊNÂˆ›Ý]NŽœ]Ú
+	ËØ\KØÝ\ÝÛY\œËÞÚYKÛ˜[YIËÔÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ø\U\]PÝ\ÝÛY\“˜[YI×JKO›˜[YJ	Ù˜œœÜË˜\K˜Ý\ÝÛY\œË›˜[YIÊNÂˆËÈØ[\ˆQÜ\Û
+\ÚÈLÍLÊH8 %^XÝ”ˆZ\œ›ÜœÈÙˆHHØ[K\ØÜ™Y[‚ˆËÈ[™Ú[ËˆØ[YH[™\œÎˆH[ˆØ]H
+[›[Z]Y
+H
+ÈØ[\—ÚYÙ[˜X›YˆËÈÚXÚÈ]™HS”ÒQH[KÛÈH›Û‹U[›[Z]YÜˆÙÙÛY[Ù™ˆ”ˆÚÜÙ]ÈBˆËÈØ[YH[\H^[ØYHHØÜ™Y[ˆÙ]È8 %›È]HXZÜÈ[ÈH”ˆÛ‚ˆ›Ý]NŽ™Ù]
+	ËØ\KØØ[\‹Y]™[ÉË×\ÛÛ›Û\œ×ÜÐØ[\’YÛÛ›Û\ŽŽ˜Û\ÜË	Ù]™[É×JKO›˜[YJ	Ù˜œœÜË˜\K˜Ø[\‹Y]™[ÉÊNÂˆ›Ý]NŽ™Ù]
+	ËØ\KØØ[\‹\™XÙ[	Ë×\ÛÛ›Û\œ×ÜÐØ[\’YÛÛ›Û\ŽŽ˜Û\ÜË	Ü™XÙ[Ø[É×JKO›˜[YJ	Ù˜œœÜË˜\K˜Ø[\‹\™XÙ[	ÊNÂˆ›Ý]NŽœÜÝ
+	ËØ\KØØ[\‹XÛX\‰Ë×\ÛÛ›Û\œ×ÜÐØ[\’YÛÛ›Û\ŽŽ˜Û\ÜË	ØÛX\Ø[É×JKO›˜[YJ	Ù˜œœÜË˜\K˜Ø[\‹XÛX\‰ÊNÂˆ›Ý]NŽœÜÝ
+	ËØ\KØØ[\‹YX[	Ë×\ÛÛ›Û\œ×ÜÐØ[\’YÛÛ›Û\ŽŽ˜Û\ÜË	ÙX[˜XÚÉ×JBˆO›ZY]Ø\™J	Ý›ÝNŒIÊKO›˜[YJ	Ù˜œœÜË˜\K˜Ø[\‹YX[	ÊNÂˆ›Ý]NŽ™Ù]
+	ËØ\KØØ[\‹[\Ý[Ü™\‰Ë×\ÛÛ›Û\œ×ÜÐØ[\’YÛÛ›Û\ŽŽ˜Û\ÜË	Û\ÝÜ™\‰×JKO›˜[YJ	Ù˜œœÜË˜\K˜Ø[\‹[\Ý[Ü™\‰ÊNÂˆËÈ“È[‹›[Z]ZY]Ø\™H
+\ÚÈÍŒŠNˆHZY]Ø\™HÛÝ[ÈHÚÛBˆËÈ™\]Y\Ý]Ø\œ™XZÚ[™ÈY\KØ˜\˜ÛÙK\™\ØÝYHÙˆVTÕS‘È›ÙXÝÈ›Ü‚ˆËÈ]XØ\ÚÜËˆHÛÛ›Û\ˆ[™›Ü˜Ù\ÈHØ\ÛˆÙ[Z[™[H‘UÈ›ÝÜÈÛ›K‚ˆ›Ý]NŽœÜÝ
+	ËØ\KÜ›ÙXÝËÜ]ZXÚËXÜ™X]IËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ø\T]ZXÚÐÜ™X]T›ÙXÝ	×JKO›˜[YJ	Ù˜œœÜË˜\Kœ›ÙXÝËœ]ZXÚËXÜ™X]IÊNÂˆ›Ý]NŽœÜÝ
+	ËØ\KÜ›ÙXÝËÞÚYKÜ]ZXÚË\šXÙIËÑ˜œ”ÜÐÛÛ›Û\ŽŽ˜Û\ÜË	Ø\T]ZXÚÕ\]TšXÙI×JKO›˜[YJ	Ù˜œœÜË˜\Kœ›ÙXÝËœ]ZXÚË\šXÙIÊNÂ‚ˆËÈKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKH\ÙHŽˆX[QÜ˜YH[š]™\œØ[™X]\™\ÈKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKBˆËÈ\›Z[˜[È
+][KXÛÝ[\ŠBˆ›Ý]NŽ™Ù]
+	ËÝ\›Z[˜[ÉË×\ÛÛ›Û\œ×˜œ”ÜÔ\ÙLÛÛ›Û\ŽŽ˜Û\ÜË	Ý\›Z[˜[É×JKO›˜[YJ	Ù˜œœÜËœ\ÙL‹\›Z[˜[ÉÊNÂˆ›Ý]NŽœÜÝ
+	ËÝ\›Z[˜[ÉË×\ÛÛ›Û\œ×˜œ”ÜÔ\ÙLÛÛ›Û\ŽŽ˜Û\ÜË	ÜÝÜ™U\›Z[˜[	×JKO›ZY]Ø\™J	Ü[‹›[Z]\›Z[˜[ÉÊKO›˜[YJ	Ù˜œœÜËœ\ÙL‹\›Z[˜[ËœÝÜ™IÊNÂˆ›Ý]NŽœÜÝ
+	ËÝ\›Z[˜[ËÞÚYKÝÙÙÛIË×\ÛÛ›Û\œ×˜œ”ÜÔ\ÙLÛÛ›Û\ŽŽ˜Û\ÜË	ÝÙÙÛU\›Z[˜[	×JKO›˜[YJ	Ù˜œœÜËœ\ÙL‹\›Z[˜[ËÙÙÛIÊNÂˆ›Ý]NŽ™[]J	ËÝ\›Z[˜[ËÞÚYIË×\ÛÛ›Û\œ×˜œ”ÜÔ\ÙLÛÛ›Û\ŽŽ˜Û\ÜË	Ù[]U\›Z[˜[	×JKO›˜[YJ	Ù˜œœÜËœ\ÙL‹\›Z[˜[Ë™[]IÊNÂ‚ˆËÈ[Ø[\ÈÈ\šÈØ[Bˆ›Ý]NŽœÜÝ
+	ËØ\KÚÛ	Ë×\ÛÛ›Û\œ×˜œ”ÜÔ\ÙLÛÛ›Û\ŽŽ˜Û\ÜË	ÚÛØ[I×JKO›˜[YJ	Ù˜œœÜËœ\ÙL‹šÛ	ÊNÂˆ›Ý]NŽ™Ù]
+	ËØ\KÚ[	Ë×\ÛÛ›Û\œ×˜œ”ÜÔ\ÙLÛÛ›Û\ŽŽ˜Û\ÜË	Û\Ý[	×JKO›˜[YJ	Ù˜œœÜËœ\ÙL‹š[›\Ý	ÊNÂˆ›Ý]NŽ™Ù]
+	ËØ\KÚ[ÞÚYKÜ™XØ[	Ë×\ÛÛ›Û\œ×˜œ”ÜÔ\ÙLÛÛ›Û\ŽŽ˜Û\ÜË	Ü™XØ[[	×JKO›˜[YJ	Ù˜œœÜËœ\ÙL‹š[œ™XØ[	ÊNÂˆ›Ý]NŽ™[]J	ËØ\KÚ[ÞÚYIË×\ÛÛ›Û\œ×˜œ”ÜÔ\ÙLÛÛ›Û\ŽŽ˜Û\ÜË	Ù[]R[	×JKO›˜[YJ	Ù˜œœÜËœ\ÙL‹š[™[]IÊNÂ‚ˆËÈØ\˜YÈ
+\ÚÈLÌH8 %H\š]NÈÝÛˆ”ÓÓˆX›K™]™\ˆ”ˆÙ\šX[ÊBˆ›Ý]NŽœÜÝ
+	ËØ\KÙ˜YÉË×\ÛÛ›Û\œ×˜œ”ÜÔ\ÙLÛÛ›Û\ŽŽ˜Û\ÜË	ÜØ]™Q˜Y	×JKO›˜[YJ	Ù˜œœÜË™˜YËœØ]™IÊNÂˆ›Ý]NŽ™Ù]
+	ËØ\KÙ˜YÉË×\ÛÛ›Û\œ×˜œ”ÜÔ\ÙLÛÛ›Û\ŽŽ˜Û\ÜË	Û\Ý˜YÉ×JKO›˜[YJ	Ù˜œœÜË™˜YË›\Ý	ÊNÂˆ›Ý]NŽ™Ù]
+	ËØ\KÙ˜YËÞÚYKÜ™XØ[	Ë×\ÛÛ›Û\œ×˜œ”ÜÔ\ÙLÛÛ›Û\ŽŽ˜Û\ÜË	Ü™XØ[˜Y	×JKO›˜[YJ	Ù˜œœÜË™˜YËœ™XØ[	ÊNÂˆ›Ý]NŽ™[]J	ËØ\KÙ˜YËÞÚYIË×\ÛÛ›Û\œ×˜œ”ÜÔ\ÙLÛÛ›Û\ŽŽ˜Û\ÜË	Ù[]Q˜Y	×JKO›˜[YJ	Ù˜œœÜË™˜YË™[]IÊNÂˆ›Ý]NŽœÜÝ
+	ËØ\KÙ˜YËÞÚYKÛØÚÉË×\ÛÛ›Û\œ×˜œ”ÜÔ\ÙLÛÛ›Û\ŽŽ˜Û\ÜË	ÛØÚÑ˜Y	×JKO›˜[YJ	Ù˜œœÜË™˜YË›ØÚÉÊNÂˆ›Ý]NŽœÜÝ
+	ËØ\KÙ˜YËÞÚYKÝ[›ØÚÉË×\ÛÛ›Û\œ×˜œ”ÜÔ\ÙLÛÛ›Û\ŽŽ˜Û\ÜË	Ý[›ØÚÑ˜Y	×JKO›˜[YJ	Ù˜œœÜË™˜YË[›ØÚÉÊNÂ‚ˆËÈX[È
+\ÚÈLÌÈ8 %š^Y\šXÙHÛÛX›ÜÎÈYZ[‹[Û›H
+È[‹YØ]Y[‹XÛÛ›Û\ŠBˆ›Ý]NŽ™Ù]
+	ËÙX[ÉË×\ÛÛ›Û\œ×˜œ”ÜÔ\ÙLÛÛ›Û\ŽŽ˜Û\ÜË	ÙX[É×JKO›˜[YJ	Ù˜œœÜË™X[ÉÊNÂˆ›Ý]NŽœÜÝ
+	ËÙX[ÉË×\ÛÛ›Û\œ×˜œ”ÜÔ\ÙLÛÛ›Û\ŽŽ˜Û\ÜË	ÜÝÜ™QX[	×JKO›˜[YJ	Ù˜œœÜË™X[ËœÝÜ™IÊNÂˆ›Ý]NŽœ]
+	ËÙX[ËÞÚYIË×\ÛÛ›Û\œ×˜œ”ÜÔ\ÙLÛÛ›Û\ŽŽ˜Û\ÜË	Ý\]QX[	×JKO›˜[YJ	Ù˜œœÜË™X[Ë\]IÊNÂˆ›Ý]NŽ™[]J	ËÙX[ËÞÚYIË×\ÛÛ›Û\œ×˜œ”ÜÔ\ÙLÛÛ›Û\ŽŽ˜Û\ÜË	Ù[]QX[	×JKO›˜[YJ	Ù˜œœÜË™X[Ë™[]IÊNÂ‚ˆËÈ›Û[Ý[ÛœÂˆ›Ý]NŽ™Ù]
+	ËÜ›Û[Ý[ÛœÉË×\ÛÛ›Û\œ×˜œ”ÜÔ\ÙLÛÛ›Û\ŽŽ˜Û\ÜË	Ü›Û[Ý[ÛœÉ×JKO›˜[YJ	Ù˜œœÜËœ\ÙL‹œ›Û[Ý[ÛœÉÊNÂˆ›Ý]NŽœÜÝ
+	ËÜ›Û[Ý[ÛœÉË×\ÛÛ›Û\œ×˜œ”ÜÔ\ÙLÛÛ›Û\ŽŽ˜Û\ÜË	ÜÝÜ™T›Û[Ý[Û‰×JKO›˜[YJ	Ù˜œœÜËœ\ÙL‹œ›Û[Ý[ÛœËœÝÜ™IÊNÂˆ›Ý]NŽœÜÝ
+	ËÜ›Û[Ý[ÛœËÞÚYKÝÙÙÛIË×\ÛÛ›Û\œ×˜œ”ÜÔ\ÙLÛÛ›Û\ŽŽ˜Û\ÜË	ÝÙÙÛT›Û[Ý[Û‰×JKO›˜[YJ	Ù˜œœÜËœ\ÙL‹œ›Û[Ý[ÛœËÙÙÛIÊNÂˆ›Ý]NŽ™[]J	ËÜ›Û[Ý[ÛœËÞÚYIË×\ÛÛ›Û\œ×˜œ”ÜÔ\ÙLÛÛ›Û\ŽŽ˜Û\ÜË	Ù[]T›Û[Ý[Û‰×JKO›˜[YJ	Ù˜œœÜËœ\ÙL‹œ›Û[Ý[ÛœË™[]IÊNÂˆ›Ý]NŽœÜÝ
+	ËØ\KÜ›Û[ËÝ˜[Y]IË×\ÛÛ›Û\œ×˜œ”ÜÔ\ÙLÛÛ›Û\ŽŽ˜Û\ÜË	Ý˜[Y]T›Û[É×JKO›˜[YJ	Ù˜œœÜËœ\ÙL‹œ›Û[Ë˜[Y]IÊNÂ‚ˆËÈÞX[Bˆ›Ý]NŽ›X]Ú
+ÉÙÙ]	Ë	ÜÜÝ	×K	ËÛÞX[IË×\ÛÛ›Û\œ×˜œ”ÜÔ\ÙLÛÛ›Û\ŽŽ˜Û\ÜË	ÛÞX[TÙ][™ÜÉ×JKO›˜[YJ	Ù˜œœÜËœ\ÙL‹›ÞX[IÊNÂˆ›Ý]NŽ™Ù]
+	ËØ\KØÝ\ÝÛY\‹ÞÜÛ™_KÜÚ[ÉË×\ÛÛ›Û\œ×˜œ”ÜÔ\ÙLÛÛ›Û\ŽŽ˜Û\ÜË	ØÝ\ÝÛY\”Ú[É×JKO›˜[YJ	Ù˜œœÜËœ\ÙL‹˜Ý\ÝÛY\‹œÚ[ÉÊNÂ‚ˆËÈÚYÈÈØ\Ú˜]Ù\‚ˆ›Ý]NŽ™Ù]
+	ËÜÚYÉË×\ÛÛ›Û\œ×˜œ”ÜÔ\ÙLÛÛ›Û\ŽŽ˜Û\ÜË	ÜÚYÒ[™^	×JKO›˜[YJ	Ù˜œœÜËœ\ÙL‹œÚYÉÊNÂˆ›Ý]NŽœÜÝ
+	ËÜÚYËÛÜ[‰Ë×\ÛÛ›Û\œ×˜œ”ÜÔ\ÙLÛÛ›Û\ŽŽ˜Û\ÜË	ÛÜ[”ÚY	×JKO›˜[YJ	Ù˜œœÜËœ\ÙL‹œÚY›Ü[‰ÊNÂˆ›Ý]NŽœÜÝ
+	ËÜÚYËØÛÜÙIË×\ÛÛ›Û\œ×˜œ”ÜÔ\ÙLÛÛ›Û\ŽŽ˜Û\ÜË	ØÛÜÙTÚY	×JKO›˜[YJ	Ù˜œœÜËœ\ÙL‹œÚY˜ÛÜÙIÊNÂˆ›Ý]NŽ™Ù]
+	ËÜÚYËÞÚYKÜ™\Ü	Ë×\ÛÛ›Û\œ×˜œ”ÜÔ\ÙLÛÛ›Û\ŽŽ˜Û\ÜË	ÜÚY™\Ü	×JKO›˜[YJ	Ù˜œœÜËœ\ÙL‹œÚYœ™\Ü	ÊNÂˆ›Ý]NŽœÜÝ
+	ËÜÚYËØØ\Ú[[Ý™[Y[	Ë×\ÛÛ›Û\œ×˜œ”ÜÔ\ÙLÛÛ›Û\ŽŽ˜Û\ÜË	ØØ\Ú[Ý™[Y[	×JKO›˜[YJ	Ù˜œœÜËœ\ÙL‹œÚY˜Ø\Ú	ÊNÂ‚ˆËÈ™]\›œÈÈ™Y[™ÂˆËÈ]ZXÚÈ™]\›ˆÛÚÝ\
+\ÚÈŽJH8 %Ø[HØÜ™Y[ˆÙHš[[X™\ˆ8¡¤ˆ™]\›ˆ›Ü›K‚ˆËÈØ\KÈ™Yš^ÙY\È][œÚYHÝËšœÈÚÚ\]\›œÈ
+™]™\ˆÕËXØXÚY
+K‚ˆ›Ý]NŽ™Ù]
+	ËØ\KÜ™]\›‹[ÛÚÝ\	Ë×\ÛÛ›Û\œ×˜œ”ÜÔ\ÙLÛÛ›Û\ŽŽ˜Û\ÜË	Ü]ZXÚÔ™]\›“ÛÚÝ\	×JKO›˜[YJ	Ù˜œœÜËœ\ÙL‹œ™]\›‹›ÛÚÝ\	ÊNÂˆ›Ý]NŽ™Ù]
+	ËÝ˜[œØXÝ[ÛœËÞÚYKÜ™]\›‰Ë×\ÛÛ›Û\œ×˜œ”ÜÔ\ÙLÛÛ›Û\ŽŽ˜Û\ÜË	Ü™]\›‘›Ü›I×JKO›˜[YJ	Ù˜œœÜËœ\ÙL‹œ™]\›‹™›Ü›IÊNÂˆ›Ý]NŽœÜÝ
+	ËÝ˜[œØXÝ[ÛœËÞÚYKÜ™]\›‰Ë×\ÛÛ›Û\œ×˜œ”ÜÔ\ÙLÛÛ›Û\ŽŽ˜Û\ÜË	Ü›ØÙ\ÜÔ™]\›‰×JKO›˜[YJ	Ù˜œœÜËœ\ÙL‹œ™]\›‹œ›ØÙ\ÜÉÊNÂ‚ˆËÈYX\ˆÈÚ]H
+]YÈŒˆ8 %™]Z[ÛÜ™JBˆ›Ý]NŽ™Ù]
+	ËÚÚ]IË×\ÛÛ›Û\œ×˜œ”ÜÒÚ]PÛÛ›Û\ŽŽ˜Û\ÜË	Ú[™^	×JKO›˜[YJ	Ù˜œœÜËšÚ]IÊNÂˆ›Ý]NŽ™Ù]
+	ËÚÚ]KÞØÝ\ÝÛY\ŸKÛYÙ\‰Ë×\ÛÛ›Û\œ×˜œ”ÜÒÚ]PÛÛ›Û\ŽŽ˜Û\ÜË	ÛYÙ\‰×JKO›˜[YJ	Ù˜œœÜËšÚ]K›YÙ\‰ÊNÂˆ›Ý]NŽœÜÝ
+	ËÚÚ]KÝØ\ÛÛÛIË×\ÛÛ›Û\œ×˜œ”ÜÒÚ]PÛÛ›Û\ŽŽ˜Û\ÜË	ÝØ\ÛÛÛI×JKO›˜[YJ	Ù˜œœÜËšÚ]KØ\ÛÛÛIÊNÂˆËÈ
+Ú]H\Ü˜YH]YÈŒŠHX[˜YÙ\‹[Û›H\›X[Ø\ÛÛÛHÚH˜\ÚYÙ^YYÛˆBˆËÈØ\ÛÛÛHYÙ\ˆ[žKˆÛÛ\[žK\ØÛÜY
+È\ÜÙ\›ÝØ\ÚY\ˆ[œÚYHHÛÛ›Û\‹‚ˆ›Ý]NŽ™Ù]
+	ËÚÚ]KÝØ\ÛÛÛKÞÙ[ž_KÜ™XÙZ\	Ë×\ÛÛ›Û\œ×˜œ”ÜÒÚ]PÛÛ›Û\ŽŽ˜Û\ÜË	ÝØ\ÛÛÛT™XÙZ\	×JKO›˜[YJ	Ù˜œœÜËšÚ]KØ\ÛÛÛKœ™XÙZ\	ÊNÂˆËÈ
+Ú]H\Ü˜YH]YÈŒŠH™XÛÜ™HÚ]Ð\XXYYZ[šHÙ[™
+Ý[\ÂˆËÈÚ]WÛ\ÝÜ™[Z[™\—Ø]
+H8 %X[˜YÙ\‹[Û›KÛÛ\[žK\ØÛÜY‚ˆ›Ý]NŽœÜÝ
+	ËÚÚ]KÞØÝ\ÝÛY\ŸKÜ™[Z[™\‹\Ù[	Ë×\ÛÛ›Û\œ×˜œ”ÜÒÚ]PÛÛ›Û\ŽŽ˜Û\ÜË	ÛX\šÔ™[Z[™\”Ù[	×JKO›˜[YJ	Ù˜œœÜËšÚ]Kœ™[Z[™\‹\Ù[	ÊNÂ‚ˆËÈ<'äiHÝ\ÝÛY\œÈYÙH
+\ÚÈLŒ8 %”ˆÚ[ˆÙˆÜÜËØÝ\ÝÛY\œÎÈÚ\™YˆËÈÜ×ØÝ\ÝÛY\œÈX›KÝ]ËÚ\ÝÜžHœ›ÛH˜œ—ÜÜ×Ý˜[œØXÝ[ÛœÈÛ›JK‚ˆËÈ\Ý
+ÈYˆ]™\žH›ÛH
+Z\œ›ÜœÈJKˆX[˜YÙHXÝ[ÛœÎˆYZ[‹ÛX[˜YÙ\ˆÛ›BˆËÈ8 %\ÜÙ\›ÝØ\ÚY\ˆ[ˆHÛÛ›Û\ˆ™]\›œÈHYHÈ
+Ú]H™XÙY[ÂˆËÈ\™H\È›È”ˆYZ[‹[Û›HZY]Ø\™HÜ›Ý\
+K‚ˆ›Ý]NŽ™Ù]
+	ËØÝ\ÝÛY\œÉË×\ÛÛ›Û\œ×˜œ”ÜÐÝ\ÝÛY\ÛÛ›Û\ŽŽ˜Û\ÜË	Ú[™^	×JKO›˜[YJ	Ù˜œœÜË˜Ý\ÝÛY\œÉÊNÂˆ›Ý]NŽœÜÝ
+	ËØÝ\ÝÛY\œÉË×\ÛÛ›Û\œ×˜œ”ÜÐÝ\ÝÛY\ÛÛ›Û\ŽŽ˜Û\ÜË	ÜÝÜ™I×JKO›˜[YJ	Ù˜œœÜË˜Ý\ÝÛY\œËœÝÜ™IÊNÂˆ›Ý]NŽ™Ù]
+	ËØÝ\ÝÛY\œËÙ^Ü	Ë×\ÛÛ›Û\œ×˜œ”ÜÐÝ\ÝÛY\ÛÛ›Û\ŽŽ˜Û\ÜË	Ù^Ü	×JKO›˜[YJ	Ù˜œœÜË˜Ý\ÝÛY\œË™^Ü	ÊNÂˆ›Ý]NŽ™Ù]
+	ËØÝ\ÝÛY\œËÝ[\]IË×\ÛÛ›Û\œ×˜œ”ÜÐÝ\ÝÛY\ÛÛ›Û\ŽŽ˜Û\ÜË	Ý[\]I×JKO›˜[YJ	Ù˜œœÜË˜Ý\ÝÛY\œË[\]IÊNÂˆ›Ý]NŽœÜÝ
+	ËØÝ\ÝÛY\œËÚ[\Ü	Ë×\ÛÛ›Û\œ×˜œ”ÜÐÝ\ÝÛY\ÛÛ›Û\ŽŽ˜Û\ÜË	Ú[\Ü	×JKO›˜[YJ	Ù˜œœÜË˜Ý\ÝÛY\œËš[\Ü	ÊNÂˆ›Ý]NŽœ]
+	ËØÝ\ÝÛY\œËÞÚYIË×\ÛÛ›Û\œ×˜œ”ÜÐÝ\ÝÛY\ÛÛ›Û\ŽŽ˜Û\ÜË	Ý\]I×JKO›˜[YJ	Ù˜œœÜË˜Ý\ÝÛY\œË\]IÊNÂˆ›Ý]NŽ™[]J	ËØÝ\ÝÛY\œËÞÚYIË×\ÛÛ›Û\œ×˜œ”ÜÐÝ\ÝÛY\ÛÛ›Û\ŽŽ˜Û\ÜË	Ù\Ý›ÞI×JKO›˜[YJ	Ù˜œœÜË˜Ý\ÝÛY\œË™[]IÊNÂˆ›Ý]NŽœÜÝ
+	ËØÝ\ÝÛY\œËÞÚYKÝÙÙÛIË×\ÛÛ›Û\œ×˜œ”ÜÐÝ\ÝÛY\ÛÛ›Û\ŽŽ˜Û\ÜË	ÝÙÙÛI×JKO›˜[YJ	Ù˜œœÜË˜Ý\ÝÛY\œËÙÙÛIÊNÂˆ›Ý]NŽ™Ù]
+	ËØÝ\ÝÛY\œËÞÚYKÚ\ÝÜžIË×\ÛÛ›Û\œ×˜œ”ÜÐÝ\ÝÛY\ÛÛ›Û\ŽŽ˜Û\ÜË	Ú\ÝÜžI×JKO›˜[YJ	Ù˜œœÜË˜Ý\ÝÛY\œËš\ÝÜžIÊNÂˆ›Ý]NŽ™Ù]
+	ËØÝ\ÝÛY\œËÞÚYKÚ\ÝÜžKÙ^Ü	Ë×\ÛÛ›Û\œ×˜œ”ÜÐÝ\ÝÛY\ÛÛ›Û\ŽŽ˜Û\ÜË	Ú\ÝÜžQ^Ü	×JKO›˜[YJ	Ù˜œœÜË˜Ý\ÝÛY\œËš\ÝÜžK™^Ü	ÊNÂˆ›Ý]NŽ™Ù]
+	ËØÝ\ÝÛY\œËÞÚYKÚ\ÝÜžKÜ‰Ë×\ÛÛ›Û\œ×˜œ”ÜÐÝ\ÝÛY\ÛÛ›Û\ŽŽ˜Û\ÜË	Ú\ÝÜžT‰×JKO›˜[YJ	Ù˜œœÜË˜Ý\ÝÛY\œËš\ÝÜžKœ‰ÊNÂ‚ˆËÈØ]YÛÜžH›Ùš[H
+\ÚÈMNŠNˆÝØÚË\˜Ú\Ù\ËÝ\Y\œË][˜Y˜H[™BˆËÈ\ÝšX]ÜˆYÙ\ˆ™[Û™ÈÈÛÛÙËÜ\›XXÞHÚÜÈ
+Üˆ[ˆYZ[ˆ^˜HÂˆËÈÜ˜[™˜]\™YÚÜ
+H8 %™[]˜[˜ÙK[Û›HÛÈÜÝØÚÈÙY\È]ÈÝÛˆÓˆÝÚ]Ú‚ˆ›Ý]NŽ›ZY]Ø\™JÉÙ™X]\™Nš[™[ÜžK™[]˜[	×JKO™Ü›Ý\
+[˜Ý[Ûˆ
+
+HÂˆËÈÝØÚÈÈ\˜Ú\ÙHÈÝ\Y\œÈ
+]YÈŒˆ8 %™]Z[ÛÜ™JBˆ›Ý]NŽ™Ù]
+	ËÜÝØÚÉË×\ÛÛ›Û\œ×˜œ”ÜÔÝØÚÐÛÛ›Û\ŽŽ˜Û\ÜË	Ú[™^	×JKO›˜[YJ	Ù˜œœÜËœÝØÚÉÊNÂˆ›Ý]NŽ™Ù]
+	ËÜÝØÚËÜ\˜Ú\Ù\ÉË×\ÛÛ›Û\œ×˜œ”ÜÔÝØÚÐÛÛ›Û\ŽŽ˜Û\ÜË	Ü\˜Ú\Ù\É×JKO›˜[YJ	Ù˜œœÜËœÝØÚËœ\˜Ú\Ù\ÉÊNÂˆ›Ý]NŽ™Ù]
+	ËÜÝØÚËÛ[Ý™[Y[ÉË×\ÛÛ›Û\œ×˜œ”ÜÔÝØÚÐÛÛ›Û\ŽŽ˜Û\ÜË	Û[Ý™[Y[É×JKO›˜[YJ	Ù˜œœÜËœÝØÚË›[Ý™[Y[ÉÊNÂˆ›Ý]NŽ™Ù]
+	ËÜÝØÚËØÛÜœ™XÝ[ÛœÉË×\ÛÛ›Û\œ×˜œ”ÜÔÝØÚÐÛÛ›Û\ŽŽ˜Û\ÜË	ØÛÜœ™XÝ[ÛœÉ×JKO›˜[YJ	Ù˜œœÜËœÝØÚË˜ÛÜœ™XÝ[ÛœÉÊNÂˆ›Ý]NŽœÜÝ
+	ËÜÝØÚËÝÙÙÛIË×\ÛÛ›Û\œ×˜œ”ÜÔÝØÚÐÛÛ›Û\ŽŽ˜Û\ÜË	ÝÙÙÛI×JKO›˜[YJ	Ù˜œœÜËœÝØÚËÙÙÛIÊKO›ZY]Ø\™J	Ü[‹›[Z]š[™[ÜžIÊNÂˆ›Ý]NŽœÜÝ
+	ËÜÝØÚËÜÝ\Y\‰Ë×\ÛÛ›Û\œ×˜œ”ÜÔÝØÚÐÛÛ›Û\ŽŽ˜Û\ÜË	ÜÝÜ™TÝ\Y\‰×JKO›˜[YJ	Ù˜œœÜËœÝØÚËœÝ\Y\‰ÊKO›ZY]Ø\™J	Ü[‹›[Z]š[™[ÜžIÊNÂˆ›Ý]NŽœÜÝ
+	ËÜÝØÚËÜÝ\Y\‹ÞÚYKÝ\]IË×\ÛÛ›Û\œ×˜œ”ÜÔÝØÚÐÛÛ›Û\ŽŽ˜Û\ÜË	Ý\]TÝ\Y\‰×JKO›˜[YJ	Ù˜œœÜËœÝØÚËœÝ\Y\‹\]IÊKO›ZY]Ø\™J	Ü[‹›[Z]š[™[ÜžIÊNÂˆ›Ý]NŽœÜÝ
+	ËÜÝØÚËÜÝ\Y\‹ÞÚYKÙ[]IË×\ÛÛ›Û\œ×˜œ”ÜÔÝØÚÐÛÛ›Û\ŽŽ˜Û\ÜË	Ù[]TÝ\Y\‰×JKO›˜[YJ	Ù˜œœÜËœÝØÚËœÝ\Y\‹™[]IÊKO›ZY]Ø\™J	Ü[‹›[Z]š[™[ÜžIÊNÂˆ›Ý]NŽœÜÝ
+	ËÜÝØÚËÜÝ\Y\‹ÞÚYKÜ™XXÝ]˜]IË×\ÛÛ›Û\œ×˜œ”ÜÔÝØÚÐÛÛ›Û\ŽŽ˜Û\ÜË	Ü™XXÝ]˜]TÝ\Y\‰×JKO›˜[YJ	Ù˜œœÜËœÝØÚËœÝ\Y\‹œ™XXÝ]˜]IÊKO›ZY]Ø\™J	Ü[‹›[Z]š[™[ÜžIÊNÂˆ›Ý]NŽœÜÝ
+	ËÜÝØÚËÜ\˜Ú\ÙIË×\ÛÛ›Û\œ×˜œ”ÜÔÝØÚÐÛÛ›Û\ŽŽ˜Û\ÜË	ÜÝÜ™T\˜Ú\ÙI×JKO›˜[YJ	Ù˜œœÜËœÝØÚËœ\˜Ú\ÙIÊKO›ZY]Ø\™J	Ü[‹›[Z]š[™[ÜžIÊNÂˆ›Ý]NŽœÜÝ
+	ËÜÝØÚËÜ\˜Ú\ÙKÞÚYKÝ›ÚY	Ë×\ÛÛ›Û\œ×˜œ”ÜÔÝØÚÐÛÛ›Û\ŽŽ˜Û\ÜË	Ý›ÚY\˜Ú\ÙI×JKO›˜[YJ	Ù˜œœÜËœÝØÚËœ\˜Ú\ÙK›ÚY	ÊKO›ZY]Ø\™J	Ü[‹›[Z]š[™[ÜžIÊNÂˆËÈœ˜[˜Ú]ËXœ˜[˜ÚÝØÚÈ˜[œÙ™\ˆ
+\ÚÈLÍJH8 %ÝÛ™\‹ÛX[˜YÙ\ˆÛ›K‚ˆ›Ý]NŽ™Ù]
+	ËÜÝØÚËÝ˜[œÙ™\‰Ë×\ÛÛ›Û\œ×˜œ”ÜÔÝØÚÐÛÛ›Û\ŽŽ˜Û\ÜË	Ý˜[œÙ™\œÉ×JKO›˜[YJ	Ù˜œœÜËœÝØÚË˜[œÙ™\œÉÊNÂˆ›Ý]NŽœÜÝ
+	ËÜÝØÚËÝ˜[œÙ™\‰Ë×\ÛÛ›Û\œ×˜œ”ÜÔÝØÚÐÛÛ›Û\ŽŽ˜Û\ÜË	ÜÝÜ™U˜[œÙ™\‰×JKO›˜[YJ	Ù˜œœÜËœÝØÚË˜[œÙ™\‹œÝÜ™IÊKO›ZY]Ø\™J	Ü[‹›[Z]š[™[ÜžIÊNÂˆ›Ý]NŽœÜÝ
+	ËÜÝØÚËÛZ[‹[]™[	Ë×\ÛÛ›Û\œ×˜œ”ÜÔÝØÚÐÛÛ›Û\ŽŽ˜Û\ÜË	Ý\]SZ[“]™[	×JKO›˜[YJ	Ù˜œœÜËœÝØÚË›Z[›]™[	ÊKO›ZY]Ø\™J	Ü[‹›[Z]š[™[ÜžIÊNÂˆ›Ý]NŽœÜÝ
+	ËÜÝØÚËÚ][IË×\ÛÛ›Û\œ×˜œ”ÜÔÝØÚÐÛÛ›Û\ŽŽ˜Û\ÜË	Ý\]R][I×JKO›˜[YJ	Ù˜œœÜËœÝØÚËš][IÊKO›ZY]Ø\™J	Ü[‹›[Z]š[™[ÜžIÊNÂˆ›Ý]NŽ™Ù]
+	ËÛ][˜Y˜IË×\ÛÛ›Û\œ×˜œ”ÜÔÝØÚÐÛÛ›Û\ŽŽ˜Û\ÜË	Û][˜Y˜I×JKO›˜[YJ	Ù˜œœÜË›][˜Y˜IÊNÂˆËÈ<'éïˆ\ÝšX]ÜˆYÙ\ˆ
+\ÚÈMN
+H8 %Ý\Y\ˆ^[Y[ËÝ][Y[È[™ˆËÈ\˜Ú\ÙH™]\›œËˆØ[YHÝÛ™\‹ÛX[˜YÙ\ˆØ]H
+Èœ˜[˜ÚØÛÜ[™È\ÈÜÝØÚÎÂˆËÈ]™\žH[Û™^H]]][ÛˆÚ]È™Z[™[‹›[Z]š[™[ÜžHZÙHH™\Ý‚ˆ›Ý]NŽœÜÝ
+	ËÜÝØÚËÜ^[Y[ÉË×\ÛÛ›Û\œ×˜œ”ÜÔÝ\Y\“YÙ\ÛÛ›Û\ŽŽ˜Û\ÜË	ÜÝÜ™T^[Y[	×JKO›˜[YJ	Ù˜œœÜËœÝØÚËœ^[Y[œÝÜ™IÊKO›ZY]Ø\™J	Ü[‹›[Z]š[™[ÜžIÊNÂˆ›Ý]NŽœÜÝ
+	ËÜÝØÚËÜ^[Y[ËÞÚYKÝ›ÚY	Ë×\ÛÛ›Û\œ×˜œ”ÜÔÝ\Y\“YÙ\ÛÛ›Û\ŽŽ˜Û\ÜË	Ý›ÚY^[Y[	×JKO›˜[YJ	Ù˜œœÜËœÝØÚËœ^[Y[›ÚY	ÊKO›ZY]Ø\™J	Ü[‹›[Z]š[™[ÜžIÊNÂˆ›Ý]NŽ™Ù]
+	ËÜÝØÚËÜÝ\Y\œËÞÚYKÜÝ][Y[	Ë×\ÛÛ›Û\œ×˜œ”ÜÔÝ\Y\“YÙ\ÛÛ›Û\ŽŽ˜Û\ÜË	ÜÝ][Y[	×JKO›˜[YJ	Ù˜œœÜËœÝØÚËœÝ\Y\‹œÝ][Y[	ÊNÂˆ›Ý]NŽ™Ù]
+	ËÜÝØÚËÜÝ\Y\œËÞÚYKÜÝ][Y[Ü‰Ë×\ÛÛ›Û\œ×˜œ”ÜÔÝ\Y\“YÙ\ÛÛ›Û\ŽŽ˜Û\ÜË	ÜÝ][Y[‰×JKO›˜[YJ	Ù˜œœÜËœÝØÚËœÝ\Y\‹œÝ][Y[œ‰ÊNÂˆ›Ý]NŽ™Ù]
+	ËÜÝØÚËÜ™]\›œÉË×\ÛÛ›Û\œ×˜œ”ÜÔÝ\Y\“YÙ\ÛÛ›Û\ŽŽ˜Û\ÜË	Ü™]\›œÉ×JKO›˜[YJ	Ù˜œœÜËœÝØÚËœ™]\›œÉÊNÂˆ›Ý]NŽœÜÝ
+	ËÜÝØÚËÜ™]\›œÉË×\ÛÛ›Û\œ×˜œ”ÜÔÝ\Y\“YÙ\ÛÛ›Û\ŽŽ˜Û\ÜË	ÜÝÜ™T™]\›‰×JKO›˜[YJ	Ù˜œœÜËœÝØÚËœ™]\›‹œÝÜ™IÊKO›ZY]Ø\™J	Ü[‹›[Z]š[™[ÜžIÊNÂˆ›Ý]NŽ™Ù]
+	ËÜÝØÚËÜ™]\›œËÞÚYKÜš[	Ë×\ÛÛ›Û\œ×˜œ”ÜÔÝ\Y\“YÙ\ÛÛ›Û\ŽŽ˜Û\ÜË	Ü™]\›”š[	×JKO›˜[YJ	Ù˜œœÜËœÝØÚËœ™]\›‹œš[	ÊNÂˆ›Ý]NŽ™Ù]
+	ËÜÝØÚËÜ\˜Ú\Ù\ËÞÚYKÛ[™\ÉË×\ÛÛ›Û\œ×˜œ”ÜÔÝ\Y\“YÙ\ÛÛ›Û\ŽŽ˜Û\ÜË	Ü\˜Ú\ÙS[™\É×JKO›˜[YJ	Ù˜œœÜËœÝØÚËœ\˜Ú\ÙK›[™\ÉÊNÂˆJNÂ‚ˆËÈ<'ä¢ˆ\›XXÞH[ÙH
+\ÚÈMMN
+H8 %˜]ÚÙ^\žHÝØÚË\ÝšX]Üˆ^\žBˆËÈÛZ[\È[™\›XXÞH™\ÜËˆ]™\žHXÝ[Ûˆ™KXÚXÚÜÈ\›XXÞS]™J
+H[‚ˆËÈHÛÛ›Û\‹ÛÈH›ÛÚÛX\šÙYT“Ø[››ÝØ[È\›Ý[™H˜]ˆY[™Ë‚ˆËÈ<'ä¢ˆYYXÚ[™HØ][ÙÝYH
+ÈT”\]H›ÝXÙ\È
+\ÚÈMMÎJH8 %\›XXÞS]™J
+BˆËÈ™KXÚXÚÙY[‹XÛÛ›Û\ŽÈÜš]\È\™HÛÛ\[žWØYZ[ˆÛ›K‚ˆ›Ý]NŽ™Ù]
+	ËÜ\›XXÞKØØ][ÙÝYKÜÙX\˜Ú	Ë×\ÛÛ›Û\œ×˜œ”ÜÐØ][ÙÝYPÛÛ›Û\ŽŽ˜Û\ÜË	ÜÙX\˜Ú	×JKO›˜[YJ	Ù˜œœÜËœ\›XXÞK˜Ø][ÙÝYKœÙX\˜Ú	ÊNÂˆ›Ý]NŽœÜÝ
+	ËÜ\›XXÞKØØ][ÙÝYKØY	Ë×\ÛÛ›Û\œ×˜œ”ÜÐØ][ÙÝYPÛÛ›Û\ŽŽ˜Û\ÜË	ØY	×JKO›˜[YJ	Ù˜œœÜËœ\›XXÞK˜Ø][ÙÝYK˜Y	ÊKO›ZY]Ø\™J	Ü[‹›[Z]œ›ÙXÝÉÊNÂˆ›Ý]NŽ™Ù]
+	ËÜ\›XXÞKÜšXÙK]\]\ÉË×\ÛÛ›Û\œ×˜œ”ÜÐØ][ÙÝYPÛÛ›Û\ŽŽ˜Û\ÜË	ÜšXÙU\]\É×JKO›˜[YJ	Ù˜œœÜËœ\›XXÞKœšXÙK]\]\ÉÊNÂˆ›Ý]NŽœÜÝ
+	ËÜ\›XXÞKÜšXÙK]\]\ËØ\KX[	Ë×\ÛÛ›Û\œ×˜œ”ÜÐØ][ÙÝYPÛÛ›Û\ŽŽ˜Û\ÜË	Ø\P[	×JKO›˜[YJ	Ù˜œœÜËœ\›XXÞKœšXÙK]\]\Ë˜\KX[	ÊNÂˆ›Ý]NŽœÜÝ
+	ËÜ\›XXÞKÜšXÙK]\]\ËÞÚYKØ\IË×\ÛÛ›Û\œ×˜œ”ÜÐØ][ÙÝYPÛÛ›Û\ŽŽ˜Û\ÜË	Ø\I×JKO›˜[YJ	Ù˜œœÜËœ\›XXÞKœšXÙK]\]\Ë˜\IÊNÂˆ›Ý]NŽœÜÝ
+	ËÜ\›XXÞKÜšXÙK]\]\ËÞÚYKÙ\ÛZ\ÜÉË×\ÛÛ›Û\œ×˜œ”ÜÐØ][ÙÝYPÛÛ›Û\ŽŽ˜Û\ÜË	Ù\ÛZ\ÜÉ×JKO›˜[YJ	Ù˜œœÜËœ\›XXÞKœšXÙK]\]\Ë™\ÛZ\ÜÉÊNÂˆ›Ý]NŽ™Ù]
+	ËÜ\›XXÞKØ˜]Ú\ÉË×\ÛÛ›Û\œ×˜œ”ÜÔ\›XXÞPÛÛ›Û\ŽŽ˜Û\ÜË	Ø˜]Ú\É×JKO›˜[YJ	Ù˜œœÜËœ\›XXÞK˜˜]Ú\ÉÊNÂˆ›Ý]NŽœÜÝ
+	ËÜ\›XXÞKØ˜]Ú\ÉË×\ÛÛ›Û\œ×˜œ”ÜÔ\›XXÞPÛÛ›Û\ŽŽ˜Û\ÜË	ÜÝÜ™P˜]Ú	×JKO›˜[YJ	Ù˜œœÜËœ\›XXÞK˜˜]ÚœÝÜ™IÊKO›ZY]Ø\™J	Ü[‹›[Z]š[™[ÜžIÊNÂˆ›Ý]NŽœÜÝ
+	ËÜ\›XXÞKØ˜]Ú\ËÞÚYKØXÝ[Û‰Ë×\ÛÛ›Û\œ×˜œ”ÜÔ\›XXÞPÛÛ›Û\ŽŽ˜Û\ÜË	Ø˜]ÚXÝ[Û‰×JKO›˜[YJ	Ù˜œœÜËœ\›XXÞK˜˜]Ú˜XÝ[Û‰ÊKO›ZY]Ø\™J	Ü[‹›[Z]š[™[ÜžIÊNÂˆ›Ý]NŽ™Ù]
+	ËÜ\›XXÞKØ˜]Ú[Ü[ÛœÉË×\ÛÛ›Û\œ×˜œ”ÜÔ\›XXÞPÛÛ›Û\ŽŽ˜Û\ÜË	Ø˜]ÚÜ[ÛœÉ×JKO›˜[YJ	Ù˜œœÜËœ\›XXÞK˜˜]Ú›Ü[ÛœÉÊNÂˆ›Ý]NŽ™Ù]
+	ËÜ\›XXÞKØÛZ[\ÉË×\ÛÛ›Û\œ×˜œ”ÜÔ\›XXÞPÛÛ›Û\ŽŽ˜Û\ÜË	ØÛZ[\É×JKO›˜[YJ	Ù˜œœÜËœ\›XXÞK˜ÛZ[\ÉÊNÂˆ›Ý]NŽœÜÝ
+	ËÜ\›XXÞKØÛZ[\ÉË×\ÛÛ›Û\œ×˜œ”ÜÔ\›XXÞPÛÛ›Û\ŽŽ˜Û\ÜË	ÜÝÜ™PÛZ[I×JKO›˜[YJ	Ù˜œœÜËœ\›XXÞK˜ÛZ[KœÝÜ™IÊKO›ZY]Ø\™J	Ü[‹›[Z]š[™[ÜžIÊNÂˆ›Ý]NŽ™Ù]
+	ËÜ\›XXÞKØÛZ[\ËÞÚYIË×\ÛÛ›Û\œ×˜œ”ÜÔ\›XXÞPÛÛ›Û\ŽŽ˜Û\ÜË	ÜÚÝÐÛZ[I×JKO›˜[YJ	Ù˜œœÜËœ\›XXÞK˜ÛZ[IÊNÂˆ›Ý]NŽ™Ù]
+	ËÜ\›XXÞKØÛZ[\ËÞÚYKÜš[	Ë×\ÛÛ›Û\œ×˜œ”ÜÔ\›XXÞPÛÛ›Û\ŽŽ˜Û\ÜË	Üš[ÛZ[I×JKO›˜[YJ	Ù˜œœÜËœ\›XXÞK˜ÛZ[Kœš[	ÊNÂˆ›Ý]NŽœÜÝ
+	ËÜ\›XXÞKØÛZ[\ËÞÚYKÜÝ]\ÉË×\ÛÛ›Û\œ×˜œ”ÜÔ\›XXÞPÛÛ›Û\ŽŽ˜Û\ÜË	Ý\]PÛZ[TÝ]\É×JKO›˜[YJ	Ù˜œœÜËœ\›XXÞK˜ÛZ[KœÝ]\ÉÊKO›ZY]Ø\™J	Ü[‹›[Z]š[™[ÜžIÊNÂˆ›Ý]NŽ™Ù]
+	ËÜ\›XXÞKÜ™\ÜÉË×\ÛÛ›Û\œ×˜œ”ÜÔ\›XXÞPÛÛ›Û\ŽŽ˜Û\ÜË	Ü™\ÜÉ×JKO›˜[YJ	Ù˜œœÜËœ\›XXÞKœ™\ÜÉÊNÂˆËÈÛÝ[\‹\ÚYH\›XXÞH
+Ù\ŒŠNˆ™X\‹Y^\žHÚ[™ÝËØ[X[\›˜]]™BˆËÈÝØÚÈÚXÚË[™H˜Ý\ÝÛY\ˆ\ÚÙYÚÜXÚÙYˆZ\ÜÙY\Ø[HÙË‚ˆ›Ý]NŽœÜÝ
+	ËÜ\›XXÞKÛ™X\‹Y^\ÉË×\ÛÛ›Û\œ×˜œ”ÜÔ\›XXÞPÛÛ›Û\ŽŽ˜Û\ÜË	Ý\]S™X\‘^\É×JKO›˜[YJ	Ù˜œœÜËœ\›XXÞK›™X\‹Y^\ÉÊNÂˆ›Ý]NŽ™Ù]
+	ËÜ\›XXÞKÜÝØÚËXÚXÚÉË×\ÛÛ›Û\œ×˜œ”ÜÔ\›XXÞPÛÛ›Û\ŽŽ˜Û\ÜË	ÜÝØÚÐÚXÚÉ×JKO›˜[YJ	Ù˜œœÜËœ\›XXÞKœÝØÚËXÚXÚÉÊNÂˆ›Ý]NŽœÜÝ
+	ËÜ\›XXÞKÛZ\ÜÙY\Ø[\ÉË×\ÛÛ›Û\œ×˜œ”ÜÔ\›XXÞPÛÛ›Û\ŽŽ˜Û\ÜË	ÜÝÜ™SZ\ÜÙYØ[I×JKO›˜[YJ	Ù˜œœÜËœ\›XXÞK›Z\ÜÙY\Ø[\ËœÝÜ™IÊNÂˆ›Ý]NŽ™Ù]
+	ËÜ\›XXÞKÛZ\ÜÙY\Ø[\ÉË×\ÛÛ›Û\œ×˜œ”ÜÔ\›XXÞPÛÛ›Û\ŽŽ˜Û\ÜË	ÛZ\ÜÙYØ[\É×JKO›˜[YJ	Ù˜œœÜËœ\›XXÞK›Z\ÜÙY\Ø[\ÉÊNÂˆ›Ý]NŽœÜÝ
+	ËÜ\›XXÞKÛZ\ÜÙY\Ø[\ËÚ[™Y	Ë×\ÛÛ›Û\œ×˜œ”ÜÔ\›XXÞPÛÛ›Û\ŽŽ˜Û\ÜË	ÛZ\ÜÙYØ[R[™Y	×JKO›˜[YJ	Ù˜œœÜËœ\›XXÞK›Z\ÜÙY\Ø[\Ëš[™Y	ÊNÂ‚ˆËÈ<'æ¦ˆ[]™\žHšY\œÈ
+]YÈŒˆ8 %”ˆÜÙˆHÜÔšY\ÛÛ›Û\ŠBˆËÈ›Ø\™
+È]]][ÛœÎˆYZ[ˆ
+ÈØ\ÚY\‹ˆšY\ˆÔ•QˆYZ[‹[Û›H
+ÚXÚÙY[ˆÛÛ›Û\ŠK‚ˆ›Ý]NŽ™Ù]
+	ËÙ[]™\šY\ÉË×\ÛÛ›Û\œ×˜œ”ÜÔšY\ÛÛ›Û\ŽŽ˜Û\ÜË	Ù[]™\šY\É×JKO›˜[YJ	Ù˜œœÜË™[]™\šY\ÉÊNÂˆ›Ý]NŽœÜÝ
+	ËÙ[]™\šY\ËÞÚYKØ\ÜÚYÛ‰Ë×\ÛÛ›Û\œ×˜œ”ÜÔšY\ÛÛ›Û\ŽŽ˜Û\ÜË	Ø\ÜÚYÛ‰×JKO›˜[YJ	Ù˜œœÜË™[]™\šY\Ë˜\ÜÚYÛ‰ÊNÂˆ›Ý]NŽœÜÝ
+	ËÙ[]™\šY\ËÞÚYKÜÝ]\ÉË×\ÛÛ›Û\œ×˜œ”ÜÔšY\ÛÛ›Û\ŽŽ˜Û\ÜË	Ý\]TÝ]\É×JKO›˜[YJ	Ù˜œœÜË™[]™\šY\ËœÝ]\ÉÊNÂˆ›Ý]NŽœÜÝ
+	ËÙ[]™\šY\ËÞÚYKÛX\šË\™\ZY	Ë×\ÛÛ›Û\œ×˜œ”ÜÔšY\ÛÛ›Û\ŽŽ˜Û\ÜË	ÛX\šÔ™\ZY	×JKO›˜[YJ	Ù˜œœÜË™[]™\šY\Ë›X\šË\™\ZY	ÊNÂˆ›Ý]NŽœÜÝ
+	ËÙ[]™\šY\ËÞÚYKÝ[›X\šË\™\ZY	Ë×\ÛÛ›Û\œ×˜œ”ÜÔšY\ÛÛ›Û\ŽŽ˜Û\ÜË	Ý[›X\šÔ™\ZY	×JKO›˜[YJ	Ù˜œœÜË™[]™\šY\Ë[›X\šË\™\ZY	ÊNÂˆ›Ý]NŽœÜÝ
+	ËÙ[]™\šY\ËÜšY\‹ÞÜšY\’YKØ[Ë\Ý]\ÉË×\ÛÛ›Û\œ×˜œ”ÜÔšY\ÛÛ›Û\ŽŽ˜Û\ÜË	Ø[ÔÝ]\É×JKO›˜[YJ	Ù˜œœÜË™[]™\šY\Ë˜[ÉÊNÂˆ›Ý]NŽœÜÝ
+	ËÜšY\œËÞÚYKÜÙ]IË×\ÛÛ›Û\œ×˜œ”ÜÔšY\ÛÛ›Û\ŽŽ˜Û\ÜË	ÜÙ]I×JKO›˜[YJ	Ù˜œœÜËœšY\œËœÙ]IÊNÂˆ›Ý]NŽ™Ù]
+	ËÜšY\œÉË×\ÛÛ›Û\œ×˜œ”ÜÔšY\ÛÛ›Û\ŽŽ˜Û\ÜË	Ú[™^	×JKO›˜[YJ	Ù˜œœÜËœšY\œÉÊNÂˆ›Ý]NŽœÜÝ
+	ËÜšY\œÉË×\ÛÛ›Û\œ×˜œ”ÜÔšY\ÛÛ›Û\ŽŽ˜Û\ÜË	ÜÝÜ™I×JKO›˜[YJ	Ù˜œœÜËœšY\œËœÝÜ™IÊNÂˆ›Ý]NŽœ]
+	ËÜšY\œËÞÚYIË×\ÛÛ›Û\œ×˜œ”ÜÔšY\ÛÛ›Û\ŽŽ˜Û\ÜË	Ý\]I×JKO›˜[YJ	Ù˜œœÜËœšY\œË\]IÊNÂˆ›Ý]NŽœÜÝ
+	ËÜšY\œËÞÚYKÛÙÚ[‰Ë×\ÛÛ›Û\œ×˜œ”ÜÔšY\ÛÛ›Û\ŽŽ˜Û\ÜË	ÜØ]™SÙÚ[‰×JKO›˜[YJ	Ù˜œœÜËœšY\œË›ÙÚ[‰ÊNÂŸJNÂ‚‹ËÈØÚ[XKÜÙYYÚ[™Ù\È\™HÓK[Û›Nˆ\\Ø[ˆZYÜ˜]HKY›Ü˜ÙX[œÈ[œÚYB‹ËÈØÜš\ËÛX‹Û]™K\™[[ÝKX\KœÚ\š[™ÈHÚ]XˆXÝ[ÛœÈ\ÞK[™‹ËÈ\\Ø[ˆŽœÙYY\ÈHØØ[Ù]ˆÛÛ[X[™ˆH›Ü›Y\ˆÙX‹\™XXÚX›B‹ËÈÜÙ]\[ZYÜ˜]KJˆ[™ÜÙ]\\ÙYYJˆÛÜÝ\™\ÈÙ\™H™[[Ý™Y
+[˜]][XØ]Y‹ËÈÑUÛÝ[[ˆZYÜ˜]KÜÙYYKY›Ü˜ÙJNÈ\ÝËÑ™X]\™KÔÙXÝ\š]KÔÙ]\›Ý]\Ô™[[Ý™Y\Ý‹ËÈÝX\™ÈYØZ[œÝZ\ˆ™]\›‹‚‚‹ËÈKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKB‹ËÈQÑS•TH
+^™\Ý\ÚÝÜÞ[˜ÈYÙ[
+B‹ËÈ™X\™\ˆÚÙ[ˆ]]›ÈÔÔ‘‚‹ËÈKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKB‹ËÈ8¥ 8¥ ^™\ÝšY\ˆ\TH
+]YÈŒŠH8 %Ý][\ÜÈ™X\™\‹]ÚÙ[ˆ”ÓÓ‹‚‹ËÈšY\ˆÚYÛœÈ[ˆÚ]\ÈÜ[ÙÚ[ŽÈÚÙ[ˆ›Ý]\È\ˆÙÚ[ˆ
+Û™H]šXÙJK‚‹ËÈÔÔ‘‹Y^[\šXH›ÛÝÝ˜\Ø\œ
+	Ø\KÜšY\‹X\Ê‰ÊK‚”›Ý]NŽœ™Yš^
+	Ø\KÜšY\‹X\ÝŒIÊKO›ZY]Ø\™JÉÝ›ÝNŒLŒI×JKOÚ]Ý]ZY]Ø\™J	Ý][\ÜÓXXÚ[™JKO™Ü›Ý\
+[˜Ý[Ûˆ
+
+HÂˆ›Ý]NŽœÜÝ
+	ËÛÙÚ[‰Ë×\ÛÛ›Û\œ×ÜÔšY\•˜XÚÚ[™ÐÛÛ›Û\ŽŽ˜Û\ÜË	Ø\ÙÚ[‰×JKO›ZY]Ø\™J	Ý›ÝNŒMKIÊKO›˜[YJ	ÜšY\˜\›ÙÚ[‰ÊNÂˆ›Ý]NŽœÜÝ
+	ËÙ]IË×\ÛÛ›Û\œ×ÜÔšY\•˜XÚÚ[™ÐÛÛ›Û\ŽŽ˜Û\ÜË	Ø\]I×JKO›˜[YJ	ÜšY\˜\™]IÊNÂˆËÈ\ÚÈÌLLŽˆÓH\Ú]ÚÙ[ˆ™YÚ\Ý˜][Ûˆ
+\Þ[˜È8 %ÚÙ[ˆ\œš]™\ÈY\ˆÙÚ[ˆÈ›Ý]\ÈšXHÛ“™]ÕÚÙ[ŠK‚ˆ›Ý]NŽœÜÝ
+	ËÙ˜ÛK]ÚÙ[‰Ë×\ÛÛ›Û\œ×ÜÔšY\•˜XÚÚ[™ÐÛÛ›Û\ŽŽ˜Û\ÜË	Ø\˜ÛUÚÙ[‰×JKO›˜[YJ	ÜšY\˜\™˜Û]ÚÙ[‰ÊNÂˆ›Ý]NŽœÜÝ
+	ËÛØØ][ÛœÉË×\ÛÛ›Û\œ×ÜÔšY\•˜XÚÚ[™ÐÛÛ›Û\ŽŽ˜Û\ÜË	Ø\ØØ][ÛœÉ×JKO›˜[YJ	ÜšY\˜\›ØØ][ÛœÉÊNÂˆ›Ý]NŽ™Ù]
+	ËÛYIË×\ÛÛ›Û\œ×ÜÔšY\•˜XÚÚ[™ÐÛÛ›Û\ŽŽ˜Û\ÜË	Ø\YI×JKO›˜[YJ	ÜšY\˜\›YIÊNÂˆ›Ý]NŽ™Ù]
+	ËÙ[]™\šY\ËÞÝ’YKÜ™]šY]ÉË×\ÛÛ›Û\œ×šY\š[™]šY]ÐÛÛ›Û\ŽŽ˜Û\ÜË	Ø\	×JKO›˜[YJ	ÜšY\˜\œ™]šY]ÉÊNÂˆËÈ\ÚÈÌLMŒˆšY\ˆX\šÜÈ\ÈÝÛˆš[[]™\™Yœ›ÛHH\
+Y]]™H8 %ÛTÜÈ[˜Y™™XÝY
+K‚ˆ›Ý]NŽœÜÝ
+	ËÙ[]™\šY\ËÞÝ’YKÙ[]™\™Y	Ë×\ÛÛ›Û\œ×ÜÔšY\•˜XÚÚ[™ÐÛÛ›Û\ŽŽ˜Û\ÜË	Ø\X\šÑ[]™\™Y	×JKO›˜[YJ	ÜšY\˜\™[]™\™Y	ÊNÂˆ›Ý]NŽ™Ù]
+	ËÝ™\œÚ[Û‰Ë×\ÛÛ›Û\œ×ÜÔšY\•˜XÚÚ[™ÐÛÛ›Û\ŽŽ˜Û\ÜË	Ø\™\œÚ[Û‰×JKO›˜[YJ	ÜšY\˜\™\œÚ[Û‰ÊNÂˆ›Ý]NŽœÜÝ
+	ËÛÙÛÝ]	Ë×\ÛÛ›Û\œ×ÜÔšY\•˜XÚÚ[™ÐÛÛ›Û\ŽŽ˜Û\ÜË	Ø\ÙÛÝ]	×JKO›˜[YJ	ÜšY\˜\›ÙÛÝ]	ÊNÂŸJNÂ‚‹ËÈ8¥ 8¥ ^™\ÝØ[\ˆQ\TH
+\ÚÈLÎJH8 %Ý][\ÜÈ™X\™\‹]ÚÙ[ˆ”ÓÓ‹‚‹ËÈÚÜYZ[‹ÛX[˜YÙ\ˆÚYÛœÈ[ˆÚ]HÜ[ÙÚ[ŽÈÚÙ[ˆ›Ý]\È\ˆÙÚ[‚‹ËÈ
+Û™HXÝ]™HÛ™H\ˆÛÛ\[žJKˆÔÔ‘‹Y^[\šXH›ÛÝÝ˜\Ø\œ‹ËÈ
+	Ø\KØØ[\‹X\Ê‰ÊKˆÜ[ˆÈ[ÔÈ[œÈ›Üˆ›ÝË‚”›Ý]NŽœ™Yš^
+	Ø\KØØ[\‹X\ÝŒIÊKO›ZY]Ø\™JÉÝ›ÝNŒLŒI×JKOÚ]Ý]ZY]Ø\™J	Ý][\ÜÓXXÚ[™JKO™Ü›Ý\
+[˜Ý[Ûˆ
+
+HÂˆ›Ý]NŽœÜÝ
+	ËÛÙÚ[‰Ë×\ÛÛ›Û\œ×ÜÐØ[\’YÛÛ›Û\ŽŽ˜Û\ÜË	Ø\ÙÚ[‰×JKO›ZY]Ø\™J	Ý›ÝNŒMKIÊKO›˜[YJ	ØØ[\˜\›ÙÚ[‰ÊNÂˆ›Ý]NŽœÜÝ
+	ËÜš[™ÉË×\ÛÛ›Û\œ×ÜÐØ[\’YÛÛ›Û\ŽŽ˜Û\ÜË	Ø\š[™É×JKO›˜[YJ	ØØ[\˜\œš[™ÉÊNÂˆ›Ý]NŽ™Ù]
+	ËÛYIË×\ÛÛ›Û\œ×ÜÐØ[\’YÛÛ›Û\ŽŽ˜Û\ÜË	Ø\YI×JKO›˜[YJ	ØØ[\˜\›YIÊNÂˆ›Ý]NŽ™Ù]
+	ËÝ™\œÚ[Û‰Ë×\ÛÛ›Û\œ×ÜÐØ[\’YÛÛ›Û\ŽŽ˜Û\ÜË	Ø\™\œÚ[Û‰×JKO›˜[YJ	ØØ[\˜\™\œÚ[Û‰ÊNÂˆ›Ý]NŽœÜÝ
+	ËÛÙÛÝ]	Ë×\ÛÛ›Û\œ×ÜÐØ[\’YÛÛ›Û\ŽŽ˜Û\ÜË	Ø\ÙÛÝ]	×JKO›˜[YJ	ØØ[\˜\›ÙÛÝ]	ÊNÂŸJNÂ‚‹ËÈ8¥ 8¥ Ø[\ˆQØ[X˜XÚÈ]Y]YH
+\ÚÈLÎJH8 %\˜H›ÝHÜ›Ý\‚‹ËÈZ\™YÛ™H[ˆÈ›Ý]\ÈÛÈ\ˆÚ[™ÙXÛÛ™\ˆXX\HZH
+YZH\ÚØB‹ËÈ›XZ[ˆš[™HÛÛˆ]\ˆØ[˜XÚÈØ\ˆØZÝHÛÛˆˆX\™X]šHZJKˆ\\ˆØ[B‹ËÈÜ›Ý\ØH›ÝNŒLŒHT\ˆYÝHZH8 %ZÈUÙHYXÚHØZHÚÜÈÙB‹ËÈÛ™HZ[Ø\ˆ\ÙHÚÛÈ]K\È^YH[YËÚ[HÜ›Ý\‚”›Ý]NŽœ™Yš^
+	Ø\KØØ[\‹X\ÝŒIÊKO›ZY]Ø\™JÉÝ›ÝNŒI×JKOÚ]Ý]ZY]Ø\™J	Ý][\ÜÓXXÚ[™JKO™Ü›Ý\
+[˜Ý[Ûˆ
+
+HÂˆ›Ý]NŽ™Ù]
+	ËÙX[\™\]Y\ÝÉË×\ÛÛ›Û\œ×ÜÐØ[\’YÛÛ›Û\ŽŽ˜Û\ÜË	Ø\X[™\]Y\ÝÉ×JKO›˜[YJ	ØØ[\˜\™X[œ™\]Y\ÝÉÊNÂˆ›Ý]NŽœÜÝ
+	ËÙX[\™\Ý[	Ë×\ÛÛ›Û\œ×ÜÐØ[\’YÛÛ›Û\ŽŽ˜Û\ÜË	Ø\X[™\Ý[	×JKO›˜[YJ	ØØ[\˜\™X[œ™\Ý[	ÊNÂŸJNÂ‚‹ËÈ8¥ 8¥ H[›ÚXÙH\ÚTH
+\ÚÈLŒÌJH8 %Ý][\ÜÈ™X\™\‹ZÙ^H”ÓÓˆ›Üˆ\™\\B‹ËÈTËÑT”ÛÙØ\™H
+ÐSTË[[Xš^‹X\ÞQTÑ›ÝËÝ\ÝÛH\ÝšX]ÜˆÞ\Ý[\ÊK‚‹ËÈ™\œÚ[Û™YŒNÈÙ^HX[˜YÙY]ØÛÛ\[žKØ\KXXØÙ\ÜÎÈÔÔ‘‹Y^[\šXB‹ËÈ›ÛÝÝ˜\Ø\œ
+	Ø\KÙKÊ‰ÊKˆÝ\Ü[™YÜ[™[™ÈÛÛ\[šY\È™Z™XÝYžHK˜\K‚”›Ý]NŽœ™Yš^
+	Ø\KÙKÝŒIÊKO›ZY]Ø\™JÉÙK˜\IË	Ý›ÝNŒLŒI×JKOÚ]Ý]ZY]Ø\™J	Ý][\ÜÓXXÚ[™JKO™Ü›Ý\
+[˜Ý[Ûˆ
+
+HÂˆËÈš[X›H[™Ú[ˆÝXœØÜš\[ÛˆXØÙ\ÜÈØ]H
+Ø[YH\ÐXØÙ\ÜÊ
+HXÚ\Ú[Û‚ˆËÈÚXÚÔ[“[Z]\Y\ÈÈH[™[
+HÚ]ÈÓ“H\™H8 %Ý]\ÈÝ^\È™XYX›BˆËÈ›ÜˆHØÚÙYÛÛ\[žHÛÈ[ˆT”Ø[ˆÝ[™XÛÛ˜Ú[HÚ]][™XYHš[Y‚ˆ›Ý]NŽœÜÝ
+	ËÚ[›ÚXÙ\ÉË×\ÛÛ›Û\œ×\WR[›ÚXÙP\PÛÛ›Û\ŽŽ˜Û\ÜË	ÜÝÜ™I×JBˆO›ZY]Ø\™J×\ZY]Ø\™WP\TÝXœØÜš\[ÛXØÙ\ÜÎŽ˜Û\ÜË	Ý›ÝNŒI×JKO›˜[YJ	ÙX\Kš[›ÚXÙ\ËœÝÜ™IÊNÂˆ›Ý]NŽ™Ù]
+	ËÚ[›ÚXÙ\ËÜÝ]\ÉË×\ÛÛ›Û\œ×\WR[›ÚXÙP\PÛÛ›Û\ŽŽ˜Û\ÜË	ÜÝ]\É×JKO›˜[YJ	ÙX\Kš[›ÚXÙ\ËœÝ]\ÉÊNÂŸJNÂ‚‹ËÈ]™HÜÈ[›™\ˆTH8 %\ÝYÚ]XˆXÝ[ÛœÈÈÙ\™\ˆÛ›H
+S]™KSÜËUÚÙ[ŠK‚‹ËÈÛÝYYÙ[È™]™\ˆÛU‘WÓÔ×Ô•S“‘T—ÕÒÑS‹‚”›Ý]NŽœ™Yš^
+	Ø\KÛ]™K[ÜËÝŒIÊKO›ZY]Ø\™JÉÝ›ÝNŒÌI×JKOÚ]Ý]ZY]Ø\™J	Ý][\ÜÓXXÚ[™JKO™Ü›Ý\
+[˜Ý[Ûˆ
+
+HÂˆ›Ý]NŽœÜÝ
+	ËÙXYÛ›ÜÙIË×\ÛÛ›Û\œ×\W]™SÜÔ[›™\ÛÛ›Û\ŽŽ˜Û\ÜË	ÙXYÛ›ÜÙI×JNÂˆ›Ý]NŽœÜÝ
+	ËÛÝÛ™\‹XÛÛ[X[™	Ë×\ÛÛ›Û\œ×\W]™SÜÔ[›™\ÛÛ›Û\ŽŽ˜Û\ÜË	ÛÝÛ™\ÛÛ[X[™	×JNÂˆ›Ý]NŽœÜÝ
+	ËÜØY™KX]]ËY\ÞIË×\ÛÛ›Û\œ×\W]™SÜÔ[›™\ÛÛ›Û\ŽŽ˜Û\ÜË	ÜØY™P]]Ñ\ÞI×JNÂˆ›Ý]NŽœÜÝ
+	ËÜ™[YYX]KÜ›ÜÜÙIË×\ÛÛ›Û\œ×\W]™SÜÔ[›™\ÛÛ›Û\ŽŽ˜Û\ÜË	Ü›ÜÜÙI×JNÂˆ›Ý]NŽœÜÝ
+	ËÜ™[YYX]KÞØXÝ[Û’YKØ\›Ý™IË×\ÛÛ›Û\œ×\W]™SÜÔ[›™\ÛÛ›Û\ŽŽ˜Û\ÜË	Ø\›Ý™I×JNÂˆ›Ý]NŽœÜÝ
+	ËÜ™[YYX]KÞØXÝ[Û’YKÙ^XÝ]IË×\ÛÛ›Û\œ×\W]™SÜÔ[›™\ÛÛ›Û\ŽŽ˜Û\ÜË	Ù^XÝ]I×JNÂŸJNÂ‚‹ËÈ›ÝN˜YÙ[X\H
+\Ù\šXÙT›ÝšY\ŠH8 %ŒÛZ[ˆ\ˆ™\Ù[YÙ^K™Y›Ü™B‹ËÈYÙ[˜]]ÛÈ[˜]][XØ]Y›ÛÙÈ\™H›Ý[™YÛËˆHŒˆÜ›Ý\™[ÝÂ‹ËÈÙY\È]ÈÝÛˆ\‹\›Ý]H›Ý\È[™\È“ÕÝX›K]Ü˜\Y‚”›Ý]NŽœ™Yš^
+	Ø\KØYÙ[	ÊKO›ZY]Ø\™JÉÝ›ÝN˜YÙ[X\IË	ØYÙ[˜]]	×JKOÚ]Ý]ZY]Ø\™J	Ý][\ÜÓXXÚ[™JKO™Ü›Ý\
+[˜Ý[Ûˆ
+
+HÂˆ›Ý]NŽœÜÝ
+	ËÜ˜KY˜œ‹Z[\ËØÛZ[IË×\ÛÛ›Û\œ×ÜÕ^[YÜ˜][ÛÛÛ›Û\ŽŽ˜Û\ÜË	ØYÙ[ÛZ[I×JNÂˆ›Ý]NŽœÜÝ
+	ËÜ˜KY˜œ‹Z[\ËÜ™\Ý[	Ë×\ÛÛ›Û\œ×ÜÕ^[YÜ˜][ÛÛÛ›Û\ŽŽ˜Û\ÜË	ØYÙ[™\Ý[	×JNÂˆËÈØØ[™X[[YHØ]]Ø^HÜ™Y[X[^Ú[™ÙNÈ[X™\˜][HÙ\ÜÚ[Û›\ÜË‚ˆ›Ý]NŽ™Ù]
+	ËÜ™X[[YKX]]	Ë×\ÛÛ›Û\œ×YÙ[ÛÛ›Û\ŽŽ˜Û\ÜË	Ü™X[[YP]]	×JNÂˆ›Ý]NŽœÜÝ
+	ËÚX\™X]	Ë×\ÛÛ›Û\œ×YÙ[ÛÛ›Û\ŽŽ˜Û\ÜË	ÚX\™X]	×JNÂˆ›Ý]NŽ™Ù]
+	ËÜ[™[™ËZ[›ÚXÙ\ÉË×\ÛÛ›Û\œ×YÙ[ÛÛ›Û\ŽŽ˜Û\ÜË	Ü[™[™Ò[›ÚXÙ\É×JNÂˆ›Ý]NŽœÜÝ
+	ËÜÝX›Z]\™\Ý[	Ë×\ÛÛ›Û\œ×YÙ[ÛÛ›Û\ŽŽ˜Û\ÜË	ÜÝX›Z]™\Ý[	×JNÂˆËÈÚ[[š[\ˆ›Ý][™È8 %YÙ[™\ÜÈš[\œÈ
+ÈÛËÜš[È]Y]YY›ØœË‚ˆËÈ\ÚÈLNÎˆYÙ[Ù]\›Ü›HØ]™\ÈHÚÜÙ[ˆ™XÙZ\š[\ˆ\™XÝK‚ˆ›Ý]NŽœÜÝ
+	ËÙ]šXÙK\š[\‰Ë×\ÛÛ›Û\œ×YÙ[ÛÛ›Û\ŽŽ˜Û\ÜË	ÜÙ]]šXÙTš[\‰×JNÂˆ›Ý]NŽœÜÝ
+	ËÜš[\œÉË×\ÛÛ›Û\œ×YÙ[ÛÛ›Û\ŽŽ˜Û\ÜË	Ü™\Üš[\œÉ×JNÂˆ›Ý]NŽ™Ù]
+	ËÜš[Z›ØœÉË×\ÛÛ›Û\œ×YÙ[ÛÛ›Û\ŽŽ˜Û\ÜË	ØÛZ[Tš[›ØœÉ×JNÂˆ›Ý]NŽ™Ù]
+	ËÜš[Z›ØœËÞÚYKØÛÛ[	Ë×\ÛÛ›Û\œ×YÙ[ÛÛ›Û\ŽŽ˜Û\ÜË	Üš[›ØÛÛ[	×JNÂˆ›Ý]NŽœÜÝ
+	ËÜš[Z›ØœËÞÚYKÜ™\Ý[	Ë×\ÛÛ›Û\œ×YÙ[ÛÛ›Û\ŽŽ˜Û\ÜË	Üš[›Ø”™\Ý[	×JNÂˆËÈSˆ[ÙNˆš[™ÜÈHÛ™HÛÝ[Û›H[]™\ˆÈHÚÜ	ÜÈÝÛˆÈÚ[BˆËÈH[\›™]Ø\ÈÝÛ‹›ÜØ\™YÛ˜ÙH]\È˜XÚÈ
+\ÝÜžHÛ›JK‚ˆ›Ý]NŽœÜÝ
+	ËØØ[\‹Y]™[ÉË×\ÛÛ›Û\œ×YÙ[ÛÛ›Û\ŽŽ˜Û\ÜË	ØØ[\‘]™[É×JNÂˆËÈ]™HÜÈ[™[™ËXÛÛ[X[™PÒËÜ™\Ý[
+[ÝË[\ÝYÛÛ[X[™ÈÛ›JK‚ˆ›Ý]NŽœÜÝ
+	ËØÛÛ[X[™\™\Ý[	Ë×\ÛÛ›Û\œ×YÙ[ÛÛ›Û\ŽŽ˜Û\ÜË	ØÛÛ[X[™™\Ý[	×JNÂŸJNÂ‚‹ËÈY]]™HØØ[^™\ÝÛÜ™H›ÝØÛÛˆ\È[[[Û˜[HÙ\È›Ý[\ˆB‹ËÈYØXÞHØ\KØYÙ[ÛÛ˜XÝˆÛÛ\[šY\È]\Ý^XÚ]HÜ[ˆ™Y›Ü™HŒˆ^\ÝË‚”›Ý]NŽœ™Yš^
+	Ø\KØYÙ[ÝŒ‰ÊKO›ZY]Ø\™JÉØYÙ[˜]]	Ë	ØYÙ[˜ÛÜ™K™[˜X›Y	×JKOÚ]Ý]ZY]Ø\™J	Ý][\ÜÓXXÚ[™JKO™Ü›Ý\
+[˜Ý[Ûˆ
+
+HÂˆ›Ý]NŽ™Ù]
+	ËØØ\Xš[]Y\ÉË×\ÛÛ›Û\œ×\WYÙ[ÛÜ™PÛÛ›Û\ŽŽ˜Û\ÜË	ØØ\Xš[]Y\É×JNÂˆ›Ý]NŽœÜÝ
+	ËÙ]™[ÉË×\ÛÛ›Û\œ×\WYÙ[ÛÜ™PÛÛ›Û\ŽŽ˜Û\ÜË	ÜÝÜ™Q]™[É×JBˆO›ZY]Ø\™J	Ý›ÝNŒIÊNÂˆ›Ý]NŽ™Ù]
+	ËÜÝ]\ÉË×\ÛÛ›Û\œ×\WYÙ[ÛÜ™PÛÛ›Û\ŽŽ˜Û\ÜË	ÜÝ]\É×JBˆO›ZY]Ø\™J	Ý›ÝNŒIÊNÂˆ›Ý]NŽœÜÝ
+	ËÜÛ˜\ÚÝ	Ë×\ÛÛ›Û\œ×\WYÙ[ÛÜ™PÛÛ›Û\ŽŽ˜Û\ÜË	ÜÛ˜\ÚÝ	×JBˆO›ZY]Ø\™J	Ý›ÝNŒLIÊNÂŸJNÂ‚‹ËÈOOHX›XÈ\Ú[™\ÜÈ›Ùš[H
+ÈY[H
+Ž
+H8 %ÛYË[Û›K›ÝYÛˆ[šÛ›ÝÛˆOOB”›Ý]NŽ™Ù]
+	ËÛY[KÞÜÛYßIË×\ÛÛ›Û\œ×X›XÔ›Ùš[PÛÛ›Û\ŽŽ˜Û\ÜË	ÜÚÝÉ×JBˆO›ZY]Ø\™J	Ý›ÝNŒIÊBˆO›˜[YJ	ÜX›XË˜ÛÛ\[žK\›Ùš[IÊNÂ‚‹ËÈOOHX›XÈš[YÙH
+\ÚÈÍÍÊH8 %H™XÙZ\TˆÛˆ›Û‹Yš\ØØ[
+ØØ[Â‹ËÈ›Ýš\Ú[Û˜[
+Hš[ÈÜ[œÈ\ËˆÚÙ[‹[Û›HÛÚÝ\
+Z^Ú\™WÝÚÙ[ŠK‹ËÈ›ÝYÛˆ[šÛ›ÝÛˆ8 %›ÈÙÚ[‹›È^\žH
+Ý\ÝÛY\œÈØØ[ˆ]JK‹ËÈ\˜Ú]™Yš[ÈÜ[ˆÛËˆOOB”›Ý]NŽ™Ù]
+	ËØš[ÞÝÚÙ[ŸIË×\ÛÛ›Û\œ×X›XÔ›Ùš[PÛÛ›Û\ŽŽ˜Û\ÜË	ÜÚÝÐš[	×JBˆO›ZY]Ø\™J	Ý›ÝNŒIÊBˆO›˜[YJ	ÜX›XË˜š[	ÊNÂ‚‹ËÈOOHÐHXYÛ›ÜÝXÜÈYÙH
+X›XÈ8 %›ÈÙ[œÚ]]™H]KÛ›HÛY[\ÚYHÚXÚÜÊHOOB”›Ý]NŽ™Ù]
+	ËÜØK\Ý]\ÉË[˜Ý[Ûˆ
+
+HÂˆ™]\›ˆ™\ÜÛœÙJ
+KOšY]Ê	ÜØK\Ý]\ÉÊBˆOšXY\Š	ÐØXÚKPÛÛ›Û	Ë	Û›Ë\ÝÜ™IÊNÂŸJKO›˜[YJ	ÜØKœÝ]\ÉÊNÂ‚‹ËÈOOHÐH\Ú›ÝYšXØ][ÛˆÝXœØÜš\[Ûˆ[™Ú[È
+ÛÜšÜÈ›Üˆ[žH]]ÝX\™
+HOOB”›Ý]NŽœÜÝ
+	ËØ\KÜ\ÚÜÝXœØÜšX™IË×\ÛÛ›Û\œ×\ÚÝXœØÜš\[ÛÛÛ›Û\ŽŽ˜Û\ÜË	ÜÝÜ™I×JBˆO›ZY]Ø\™J	Ý›ÝNŒÌIÊBˆO›˜[YJ	Ü\ÚœÝXœØÜšX™IÊNÂ”›Ý]NŽœÜÝ
+	ËØ\KÜ\ÚÝ[œÝXœØÜšX™IË×\ÛÛ›Û\œ×\ÚÝXœØÜš\[ÛÛÛ›Û\ŽŽ˜Û\ÜË	Ù\Ý›ÞI×JBˆO›ZY]Ø\™J	Ý›ÝNŒÌIÊBˆO›˜[YJ	Ü\Ú[œÝXœØÜšX™IÊNÂ‚‹ËÈ”ˆ™Y™\™[˜ÙH]H[[È
+X›XÈ8 %›È]]\ÝÚÝÜÈH]H\È]Y\žXX›JB”›Ý]NŽ™Ù]
+	ËÙ˜œ‹Ü™Y™\™[˜ÙKY[[ÉË×\ÛÛ›Û\œ×˜œ”™Y™\™[˜ÙPÛÛ›Û\ŽŽ˜Û\ÜË	Ù[[É×JKO›˜[YJ	Ù˜œ‹œ™Y™\™[˜ÙK™[[ÉÊNÂ”›Ý]NŽ™Ù]
+	ËØ\KÙ˜œ‹ÚË\ÙX\˜Ú	Ë×\ÛÛ›Û\œ×˜œ”™Y™\™[˜ÙPÛÛ›Û\ŽŽ˜Û\ÜË	ÜÙX\˜ÚÉ×JKO›˜[YJ	Ù˜œ‹˜\KšË\ÙX\˜Ú	ÊNÂ”›Ý]NŽ™Ù]
+	ËØ\KÙ˜œ‹ÜÜ›Ë\ÙX\˜Ú	Ë×\ÛÛ›Û\œ×˜œ”™Y™\™[˜ÙPÛÛ›Û\ŽŽ˜Û\ÜË	ÜÙX\˜ÚÜ›É×JKO›˜[YJ	Ù˜œ‹˜\KœÜ›Ë\ÙX\˜Ú	ÊNÂ”›Ý]NŽ™Ù]
+	ËØ\KÙ˜œ‹Ú][K\Ü‹\ÙX\˜Ú	Ë×\ÛÛ›Û\œ×˜œ”™Y™\™[˜ÙPÛÛ›Û\ŽŽ˜Û\ÜË	ÜÙX\˜Ú][TÜ‰×JKO›˜[YJ	Ù˜œ‹˜\Kš][K\Ü‹\ÙX\˜Ú	ÊNÂ”›Ý]NŽ™Ù]
+	ËØ\KÙ˜œ‹ÚËY]Z[	Ë×\ÛÛ›Û\œ×˜œ”™Y™\™[˜ÙPÛÛ›Û\ŽŽ˜Û\ÜË	ÚÑ]Z[	×JKO›˜[YJ	Ù˜œ‹˜\KšËY]Z[	ÊNÂ‚œ™\]Z\™H×ÑT—×Ë‰ËØ]]œ	ÎÂ‚‹ËÈÝÛ™\ˆ\Þ[Y[\›Ý˜[™[^Kˆœ›ÝÜÙ\ˆ›Ý]\È\™HYZ[‹\Ù\ÜÚ[Ûˆ›ÝXÝYÂ‹ËÈXXÚ[™H›Ý]\È\ÙHHÚYÛ™YÚ]XˆXÝ[ÛœÈÒQÈ•Õ
+™]™\ˆHÚ\™YÙXÜ™]
+K‚”›Ý]NŽœ™Yš^
+	ØYZ[‹Ù\Þ[Y[X\›Ý˜[	ÊKO›ZY]Ø\™JÉØYZ[‹˜]]	×JKO™Ü›Ý\
+[˜Ý[Ûˆ
+
+HÂˆ›Ý]NŽ™Ù]
+	ËÉË×\ÛÛ›Û\œ×ØX\ÐYZ[—ÝÛ™\‘\Þ[Y[\›Ý˜[ÛÛ›Û\ŽŽ˜Û\ÜË	Ú[™^	×JKO›˜[YJ	ÜØX\Ë˜YZ[‹™\Þ[Y[X\›Ý˜[	ÊNÂˆ›Ý]NŽœÜÝ
+	ËÉË×\ÛÛ›Û\œ×ØX\ÐYZ[—ÝÛ™\‘\Þ[Y[\›Ý˜[ÛÛ›Û\ŽŽ˜Û\ÜË	ÜÝÜ™I×JKO›˜[YJ	ÜØX\Ë˜YZ[‹™\Þ[Y[X\›Ý˜[œÝÜ™IÊNÂˆ›Ý]NŽ™Ù]
+	ËÞÜ™\]Y\ÝYKÜ™]šY]ÉË×\ÛÛ›Û\œ×ØX\ÐYZ[—ÝÛ™\‘\Þ[Y[\›Ý˜[ÛÛ›Û\ŽŽ˜Û\ÜË	Ü™]šY]É×JBˆO›ZY]Ø\™JÉÜÚYÛ™Y	Ë	Ý›ÝNŒLI×JKO›˜[YJ	ÜØX\Ë˜YZ[‹™\Þ[Y[X\›Ý˜[œ™]šY]ÉÊNÂˆ›Ý]NŽœÜÝ
+	ËÞÜ™\]Y\ÝYKØ\›Ý™IË×\ÛÛ›Û\œ×ØX\ÐYZ[—ÝÛ™\‘\Þ[Y[\›Ý˜[ÛÛ›Û\ŽŽ˜Û\ÜË	Ø\›Ý™I×JKO›˜[YJ	ÜØX\Ë˜YZ[‹™\Þ[Y[X\›Ý˜[˜\›Ý™IÊNÂŸJNÂ”›Ý]NŽœ™Yš^
+	Ø\KÙ\Þ[Y[X\›Ý˜[ÝŒIÊKO›ZY]Ø\™J	Ý›ÝNŒÌIÊKOÚ]Ý]ZY]Ø\™J	Ý][\ÜÓXXÚ[™JKO™Ü›Ý\
+[˜Ý[Ûˆ
+
+HÂˆ›Ý]NŽœÜÝ
+	ËÙ\Ü]ÚXÛZ[\ÉË×\ÛÛ›Û\œ×ØX\ÐYZ[—ÝÛ™\‘\Þ[Y[\›Ý˜[ÛÛ›Û\ŽŽ˜Û\ÜË	Ù\Ü]ÚÛZ[\É×JNÂˆ›Ý]NŽœÜÝ
+	ËØ\›Ý˜[XÛZ[\ÉË×\ÛÛ›Û\œ×ØX\ÐYZ[—ÝÛ™\‘\Þ[Y[\›Ý˜[ÛÛ›Û\ŽŽ˜Û\ÜË	ØÛZ[I×JNÂˆ›Ý]NŽœÜÝ
+	ËÛY\™ÙKXÛÛ\]IË×\ÛÛ›Û\œ×ØX\ÐYZ[—ÝÛ™\‘\Þ[Y[\›Ý˜[ÛÛ›Û\ŽŽ˜Û\ÜË	ÛY\™ÙPÛÛ\]I×JNÂˆ›Ý]NŽœÜÝ
+	ËÛÝÛ™\‹\Ý]\ÉË×\ÛÛ›Û\œ×ØX\ÐYZ[—ÝÛ™\‘\Þ[Y[\›Ý˜[ÛÛ›Û\ŽŽ˜Û\ÜË	ÛÝÛ™\”Ý]\É×JNÂˆ›Ý]NŽœÜÝ
+	ËÙ\ÞK\[‰Ë×\ÛÛ›Û\œ×ØX\ÐYZ[—ÝÛ™\‘\Þ[Y[\›Ý˜[ÛÛ›Û\ŽŽ˜Û\ÜË	Ù\ÞT[‰×JNÂˆ›Ý]NŽœÜÝ
+	ËÜ›Ý™[˜[˜ÙKÝ™\šYžIË×\ÛÛ›Û\œ×ØX\ÐYZ[—ÝÛ™\‘\Þ[Y[\›Ý˜[ÛÛ›Û\ŽŽ˜Û\ÜË	Ü›Ý™[˜[˜ÙI×JNÂˆ›Ý]NŽœÜÝ
+	ËÜÝ]\ÉË×\ÛÛ›Û\œ×ØX\ÐYZ[—ÝÛ™\‘\Þ[Y[\›Ý˜[ÛÛ›Û\ŽŽ˜Û\ÜË	ÜÝ]\É×JNÂŸJNÂ‚‹ËÈÝÛ™\‹X]]Üš^™Y™XY[Û›HPÔ™\Ü[™Ë\ÛÛ]Yœ›ÛH]™HÜÈ[›™\ˆÜ™Y[X[Ë‚”›Ý]NŽ›ZY]Ø\™J	Ý›ÝNŒIÊKOÚ]Ý]ZY]Ø\™J	Ý][\ÜÓXXÚ[™JKO™Ü›Ý\
+[˜Ý[Ûˆ
+
+HÂˆ›Ý]NŽ™Ù]
+	ËËÙ[ZÛ›ÝÛ‹ÛØ]]X]]Üš^˜][Û‹\Ù\™\‰Ë×\ÛÛ›Û\œ×™\Ü[™×Ð]]ÛÛ›Û\ŽŽ˜Û\ÜË	ÛY]Y]I×JNÂˆ›Ý]NŽ™Ù]
+	ËËÙ[ZÛ›ÝÛ‹ÛØ]]\›ÝXÝY\™\ÛÝ\˜ÙIË×\ÛÛ›Û\œ×™\Ü[™×Ð]]ÛÛ›Û\ŽŽ˜Û\ÜË	Ü™\ÛÝ\˜ÙI×JNÂˆ›Ý]NŽ™Ù]
+	ËËÙ[ZÛ›ÝÛ‹ÛØ]]\›ÝXÝY\™\ÛÝ\˜ÙKØ\KÜ™\Ü[™ËÛXÜ	Ë×\ÛÛ›Û\œ×™\Ü[™×Ð]]ÛÛ›Û\ŽŽ˜Û\ÜË	Ü™\ÛÝ\˜ÙI×JNÂˆ›Ý]NŽœÜÝ
+	ËØ\KÜ™\Ü[™ËÛØ]]Ü™YÚ\Ý\‰Ë×\ÛÛ›Û\œ×™\Ü[™×Ð]]ÛÛ›Û\ŽŽ˜Û\ÜË	Ü™YÚ\Ý\‰×JKO›ZY]Ø\™J	Ý›ÝNŒLIÊNÂˆ›Ý]NŽœÜÝ
+	ËØ\KÜ™\Ü[™ËÛØ]]ÝÚÙ[‰Ë×\ÛÛ›Û\œ×™\Ü[™×Ð]]ÛÛ›Û\ŽŽ˜Û\ÜË	ÝÚÙ[‰×JNÂˆ›Ý]NŽ›X]Ú
+ÉÑÑU	Ë	ÔÔÕ	Ë	ÑSUI×K	ËØ\KÜ™\Ü[™ËÛXÜ	Ë×\ÛÛ›Û\œ×™\Ü[™×XÜÛÛ›Û\ŽŽ˜Û\ÜË	Ú[™I×JNÂŸJNÂ”›Ý]NŽ›ZY]Ø\™JÉØYZ[‹˜]]	Ë	Ý›ÝNŒI×JKO™Ü›Ý\
+[˜Ý[Ûˆ
+
+HÂˆ›Ý]NŽ™Ù]
+	ËØYZ[‹Ü™\Ü[™ËÛØ]]Ø]]Üš^™IË×\ÛÛ›Û\œ×™\Ü[™×Ð]]ÛÛ›Û\ŽŽ˜Û\ÜË	ØÛÛœÙ[	×JNÂˆ›Ý]NŽœÜÝ
+	ËØYZ[‹Ü™\Ü[™ËÛØ]]Ø]]Üš^™IË×\ÛÛ›Û\œ×™\Ü[™×Ð]]ÛÛ›Û\ŽŽ˜Û\ÜË	Ø\›Ý™I×JNÂˆ›Ý]NŽ™Ù]
+	ËØYZ[‹Ü™\Ü[™ËØÛÛ›™XÝ[ÛœÉË×\ÛÛ›Û\œ×™\Ü[™×Ð]]ÛÛ›Û\ŽŽ˜Û\ÜË	ØÛÛ›™XÝ[ÛœÉ×JNÂˆ›Ý]NŽœÜÝ
+	ËØYZ[‹Ü™\Ü[™ËØÛÛ›™XÝ[ÛœËÞÚYKÜ™]›ÚÙIË×\ÛÛ›Û\œ×™\Ü[™×Ð]]ÛÛ›Û\ŽŽ˜Û\ÜË	Ü™]›ÚÙI×JKOÚ\™U]ZY
+	ÚY	ÊNÂŸJNÂ‚”›Ý]NŽ›ZY]Ø\™J	Ø]]	ÊKOœ™Yš^
+	Ü›Ùš[KÙÜ™Y][™ÜÉÊKO›˜[YJ	ÙÜ™Y][™ÜË‰ÊKO™Ü›Ý\
+[˜Ý[Ûˆ
+
+HÂˆ›Ý]NŽ™Ù]
+	ËÉË×\ÛÛ›Û\œ×Ü™Y][™Ô™Y™\™[˜Ù\ÐÛÛ›Û\ŽŽ˜Û\ÜË	Ú[™^	×JKO›˜[YJ	Ú[™^	ÊNÂˆ›Ý]NŽœÜÝ
+	ËÉË×\ÛÛ›Û\œ×Ü™Y][™Ô™Y™\™[˜Ù\ÐÛÛ›Û\ŽŽ˜Û\ÜË	ÜØ]™I×JKO›˜[YJ	ÜØ]™IÊNÂˆ›Ý]NŽœÜÝ
+	ËÜ™XÚ\Y[	Ë×\ÛÛ›Û\œ×Ü™Y][™Ô™Y™\™[˜Ù\ÐÛÛ›Û\ŽŽ˜Û\ÜË	Ü™XÚ\Y[	×JKO›˜[YJ	Ü™XÚ\Y[	ÊNÂˆ›Ý]NŽœÜÝ
+	ËÜ™]šY]ÉË×\ÛÛ›Û\œ×Ü™Y][™Ô™Y™\™[˜Ù\ÐÛÛ›Û\ŽŽ˜Û\ÜË	Ü™]šY]É×JKO›˜[YJ	Ü™]šY]ÉÊNÂŸJNÂ

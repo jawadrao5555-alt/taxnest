@@ -31,6 +31,7 @@
             <a @class(['active'=>request()->is('fbr-pos/school-fees')]) href="/fbr-pos/school-fees">{{ __('pos.school_nav_collect') }}</a>
             <a @class(['active'=>request()->routeIs('fbrpos.school-fees.student-ledger')]) href="{{ route('fbrpos.school-fees.student-ledger') }}">{{ __('school_audit.student_ledger') }}</a>
             <a @class(['active'=>request()->routeIs('fbrpos.school-fees.outstanding')]) href="{{ route('fbrpos.school-fees.outstanding') }}">{{ __('school_audit.outstanding_fees') }}</a>
+            <a @class(['active'=>request()->routeIs('fbrpos.school-fees.reports*')]) href="{{ route('fbrpos.school-fees.reports') }}">Reports</a>
             <a @class(['active'=>request()->is('fbr-pos/transactions*')]) href="/fbr-pos/transactions">{{ __('pos.school_nav_receipts') }}</a>
             @if(\App\Services\PosAccessService::dayCloseAllowed(Auth::guard('fbrpos')->user(), $company))<a @class(['active'=>request()->is('fbr-pos/day-close*')]) href="/fbr-pos/day-close">{{ __('pos.school_nav_close') }}</a>@endif
             @if($schoolCanConfigure ?? false)<a @class(['active'=>request()->is('fbr-pos/school-fees/settings*')]) href="/fbr-pos/school-fees/settings">{{ __('school.settings') }}</a>@endif

@@ -486,7 +486,33 @@ class FbrPosSchoolFeeController extends Controller
             'company' => $company, 'feeHeads' => $this->feeHeads($company),
             'campuses' => \App\Models\Branch::where('company_id', $company->id)->orderBy('name')->get(),
             'imsFeeHeadSettingsAvailable' => \Illuminate\Support\Facades\Schema::hasColumns('school_fee_heads', ['ims_pct_code', 'ims_tax_rate']),
+            'imsConfigured' => $company->fbrPosIntegrationConfigured(),
         ])->header('Cache-Control', 'private, no-store');
+    }
+
+    public function saveImsSettings(Request $request)
+    {
+        $company = $this->configurationCompany();
+        abort_if((bool) $request->session()->get('impersonation.readonly'), 403);
+        $data = $request->validate([
+            'fbr_pos_id' => ['nullable', 'string', 'max:100', 'regex:/^[0-9]+$/D'],
+            'fbr_pos_environment' => 'required|in:sandbox,production',
+        ]);
+        $posId = trim((string) ($data['fbr_pos_id'] ?? ''));
+        if ($posId === '' && (bool) $company->fbr_reporting_enabled) {
+            throw ValidationException::withMessages(['fbr_pos_id' => 'Turn FBR reporting OFF from SaaS Admin before removing the registered POS ID.']);
+        }
+
+        // Company owners may prepare their own registered IMS identity and
+        // environment, but reporting ON/OFF remains a separate SaaS-admin
+        // control. Saving this form never queues or backfills old receipts.
+        $company->fbr_pos_id = $posId !== '' ? $posId : null;
+        $company->fbr_pos_environment = $data['fbr_pos_environment'];
+        $company->fbr_connection_mode = 'fiscal_device';
+        $company->fbr_pos_enabled = $posId !== '';
+        $company->save();
+
+        return redirect()->away('/fbr-pos/school-fees/settings')->with('status', 'FBR IMS setup saved. Reporting status was not changed.');
     }
 
     public function saveFeeHead(Request $request)

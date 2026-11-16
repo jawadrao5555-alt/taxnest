@@ -18,7 +18,7 @@
 @if(!empty($hospitalUnassigned))<p class="notice">{{ __('hospital.unassigned_notice') }}</p>@endif
 <details class="no-print" id="hospital-workspace-menu"><summary>{{ __('hospital_workspace.menu') }}</summary><nav class="actions">
 @if($hospitalIsOwner ?? false)<a href="/fbr-pos/team">{{ __('hospital_workspace.team') }}</a><a href="/fbr-pos/hospital/settings">{{ __('hospital_workspace.campuses') }}</a><a href="/fbr-pos/hospital/printing">{{ __('hospital_workspace.profile_printing') }}</a><a href="/fbr-pos/billing">{{ __('hospital_workspace.billing') }}</a>@endif
-<a href="/fbr-pos/my-profile">{{ __('hospital_workspace.my_profile') }}</a><a href="/fbr-pos/suggestions">{{ __('hospital_workspace.help') }}</a>
+<a href="/fbr-pos/my-profile">{{ __('hospital_workspace.my_profile') }}</a><a href="/product-guide#hospital-standalone">{{ __('hospital_workspace.help') }}</a>
 </nav><form method="post" action="/fbr-pos/set-language">@csrf<label for="hospital-language">{{ __('hospital_workspace.language') }}</label><select id="hospital-language" name="language"><option value="en" @selected(app()->getLocale()==='en')>English</option><option value="rur" @selected(app()->getLocale()==='rur')>Roman Urdu</option><option value="ur" @selected(app()->getLocale()==='ur')>اردو</option></select><button>{{ __('hospital_workspace.save_language') }}</button></form></details>
 @if(isset($hospitalCampuses) && $hospitalCampuses->count()===1)<p class="muted">{{ __('hospital.campus') }}: {{ $hospitalCampuses->first()->name }}</p>@endif
 <x-prospective-policy-reminder guard="fbrpos" />

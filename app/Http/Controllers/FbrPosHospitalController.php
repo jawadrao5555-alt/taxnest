@@ -58,7 +58,15 @@ class FbrPosHospitalController extends Controller
     }
     public function dashboard() {
         $company=$this->company(); $date=today()->toDateString(); $totals=$this->totals($company,$date); $closed=$this->closed($company,$date);
-        return response()->view('fbr-pos.hospital.dashboard',compact('company','date','totals','closed'))->header('Cache-Control','private, no-store');
+        // Scope both sides of the balance to this company and active campus.
+        // A payment linked to a foreign/corrupt invoice cannot reduce this balance.
+        $paid = DB::table('hospital_payments as hp')->selectRaw('COALESCE(SUM(hp.amount_paisa),0)')
+            ->whereColumn('hp.invoice_id','hospital_invoices.id')->whereColumn('hp.company_id','hospital_invoices.company_id')
+            ->whereRaw('(hp.branch_id = hospital_invoices.branch_id OR (hp.branch_id IS NULL AND hospital_invoices.branch_id IS NULL))');
+        $balances = $this->rows('hospital_invoices',$company)->select('total_paisa')->selectSub($paid,'paid_paisa')->get();
+        $outstanding = (int)$balances->sum(fn($invoice)=>max(0,(int)$invoice->total_paisa-(int)$invoice->paid_paisa));
+        $campusName = $this->campus($company);
+        return response()->view('fbr-pos.hospital.dashboard',compact('company','date','totals','closed','outstanding','campusName'))->header('Cache-Control','private, no-store');
     }
     public function switchCampus(Request $r) {
         $this->company(); $d=$r->validate(['branch_id'=>'required|integer|min:1']);

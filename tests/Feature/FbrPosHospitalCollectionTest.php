@@ -135,6 +135,29 @@ class FbrPosHospitalCollectionTest extends TestCase
     private function denied(callable $f,int $status): void {
         try{$f();$this->fail('Expected denied');}catch(HttpExceptionInterface $e){$this->assertSame($status,$e->getStatusCode());}
     }
+    public function test_dashboard_separates_daily_collections_and_scoped_outstanding(): void
+    {
+        $this->withoutVite();
+        $this->collect($this->payload(['payment_method'=>'bank','payment_reference'=>'SYNTHETIC-BANK-01']));
+        $invoice=DB::table('hospital_invoices')->first();
+        // Corrupt foreign payment must never reduce this campus/company balance.
+        $foreign=(array)DB::table('hospital_payments')->first(); unset($foreign['id']);
+        $foreign['company_id']=999; $foreign['request_key']=(string)Str::uuid(); $foreign['amount_paisa']=50000;
+        DB::table('hospital_payments')->insert($foreign);
+        $response=app(FbrPosHospitalController::class)->dashboard();
+        $data=$response->original->getData();
+        $this->assertSame(60000,$data['outstanding']);
+        $this->assertSame(40000,$data['totals']['bank_paisa']);
+        $this->assertSame(0,$data['totals']['cash_paisa']);
+        $this->assertSame(1,$data['totals']['receipt_count']);
+        $this->assertSame('Synthetic Hospital',$data['campusName']);
+        $html=$response->getContent();
+        $this->assertStringContainsString('hospital-outstanding',$html);
+        $this->assertStringContainsString('data-paisa="60000"',$html);
+        $this->assertStringContainsString('FBR OFF',$html);
+        Http::assertNothingSent();
+    }
+
     public function test_partial_payments_are_immutable_and_replay_safe_with_correct_balance(): void {
         $first=$this->payload();$id=$this->collect($first)->getData(true)['receipt_id'];
         $invoice=DB::table('hospital_invoices')->first();$original=DB::table('hospital_payments')->find($id);

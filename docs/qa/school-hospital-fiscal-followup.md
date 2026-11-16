@@ -143,3 +143,15 @@ remain blocked as described above.
 `PilotFiscalSourceContext::inspect` is an internal, company-scoped, read-only preparation boundary. It reuses immutable route validation and preserves charge, this payment, cumulative paid at receipt, and historical balance separately. Hospital bill context has no implied payment; later installments do not change an earlier payment context. Legacy missing fields stay unknown. Local fee/service lines are not a regulator payload. `reportable_event`, `tax_mapping`, and `regulator_payload` remain null and `can_dispatch` false until an actual category-specific contract exists. No endpoint, token, route fallback, QR or fiscal number is fabricated.
 
 Synthetic acceptance covers distinct amounts, later installments, cross-company denial, unchanged receipt rows, zero HTTP requests and complete/partial/ambiguous acknowledgement classification. This is reusable preparation, not a working category adapter or sandbox acceptance. Official fee versus payment event, hospital service bill versus installment event, classification/tax/adjustment mapping, company enrollment, and authoritative same-route uncertain-response recovery remain required independently for each of School×IMS, School×DI, Hospital×IMS and Hospital×DI.
+
+## Owner-requested UI dependency reconciliation from #395
+
+The School/Hospital slice is now also included here, preserving #395's source work:
+- `bc4894e0`: Hospital scoped outstanding balances and campus/team context.
+- `ac72df1d`: School fee rates, required new bank/card payment references, immutable retry references, scoped outstanding accounts/search, collection dashboard/settings/history/receipt presentation and translations.
+- `50bf4c97`: native School reference/rate preservation acceptance.
+- School browser portion of `95e8cdce` and unassigned pilot-campus view portion of `c6fb1e0a`.
+
+School receipt insertion combines the payment-reference change with #394's immutable OFF route snapshot. Both source test sets are retained. Existing mandatory browser/native jobs already execute the selected School modules. The added nullable rate/reference migration performs no data backfill and retains historical columns on rollback. Unrelated franchise/security/public/tutorial/demo changes remain outside this integration; #395 retains its work for subsequent reconciliation, not deletion.
+
+These UI changes improve local collection usability. They do not establish IMS/DI applicability, activate reporting, replace the missing category contract or constitute sandbox acceptance. Both School and Hospital actual testable-route requirements remain open.

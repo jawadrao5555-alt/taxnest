@@ -76,3 +76,17 @@ Category checklist and forged-evidence tests are synthetic, not real sandbox
 acceptance. Required CI must finish on the final exact SHA. Keep this PR draft
 until both actual sandbox evidence and implementation/required checks are done.
 No migrations, tenant data changes, production submission, merge or deploy.
+
+## Company/category evidence isolation
+
+Each readiness response and requirement carries its server-resolved company ID
+and School/Hospital category. Evidence is non-transferable, including between two
+School companies. Request-supplied readiness, verified flags, company IDs or
+category labels never satisfy the gate. Reportable event and authentication are
+tracked separately from transport/schema; both remain unverified.
+
+A future verified OFF transition must stop new submissions without deleting
+in-flight requests or acknowledgements. Already uncertain requests must remain
+quarantined and be reconciled using the official recovery contract, not resent
+blindly or silently cancelled. This PR preserves those records but does not claim
+to implement that unavailable official reconciliation operation.

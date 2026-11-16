@@ -16,7 +16,11 @@ final class PilotFiscalReadiness
         // A generic retail/DI token or a legal schedule alone cannot satisfy this contract.
         $requirements = [
             'applicability' => 'Current official category applicability and exclusions for this company.',
-            'transport' => 'Applicable endpoint, versioned payload schema and authentication contract.',
+            'reportable_event' => $category === 'school'
+                ? 'Official fee receipt versus charge, period and adjustment reporting event.'
+                : 'Official service bill versus installment, payment and adjustment reporting event.',
+            'transport' => 'Applicable endpoint and versioned payload schema for this category.',
+            'authentication' => 'Official authentication and enrollment bound to this company and category.',
             'tax_mapping' => $category === 'school'
                 ? 'Fee-head, fee-period, discount, exemption and adjustment reporting/tax mapping.'
                 : 'Consultation, laboratory, procedure, discount and partial-payment reporting/tax mapping.',
@@ -27,12 +31,15 @@ final class PilotFiscalReadiness
         ];
 
         return [
+            'company_id' => $company->id,
             'category' => $category,
+            'evidence_transfer_allowed' => false,
             'integration_implemented' => false,
             'activation_available' => false,
             'sandbox_verified' => false,
             'requirements' => array_map(
                 static fn (string $id, string $description): array => [
+                    'company_id' => $company->id, 'category' => $category,
                     'id' => $id, 'status' => $id === 'implementation' ? 'pending' : 'unverified',
                     'description' => $description,
                 ],

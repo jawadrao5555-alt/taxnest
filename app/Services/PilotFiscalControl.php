@@ -26,7 +26,7 @@ final class PilotFiscalControl
             'required_evidence'=>['Official category-specific reporting route, payload and authentication contract.',
                 'Category-specific sandbox acceptance and timeout/retry/duplicate acknowledgement verification.',
                 'Reviewed new-bill eligibility and immutable acknowledgement handling before activation.'],
-            'historical_submission'=>false];
+            'historical_submission'=>false,'readiness'=>PilotFiscalReadiness::forCompany($company)];
     }
     public static function read(int $id): array
     {

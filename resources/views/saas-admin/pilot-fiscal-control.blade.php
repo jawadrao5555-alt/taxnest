@@ -7,6 +7,16 @@
 <p>This is not retail FBR POS or PRA approval. No bill will be submitted through automatic dispatch, manual retry or background queues. Existing receipts, payments, saved closings and acknowledgements are unchanged.</p>
 <h2 class="text-lg font-bold">Required before functional ON can be implemented</h2>
 <ul class="list-disc pl-6">@foreach($state['required_evidence'] as $requirement)<li>{{ $requirement }}</li>@endforeach</ul>
+<details data-pilot-fiscal-readiness>
+<summary class="font-semibold cursor-pointer">{{ ucfirst($state['readiness']['category']) }} verification checklist</summary>
+<p>This checklist reports missing evidence. It cannot approve or enable an integration.</p>
+<dl class="space-y-3">
+@foreach($state['readiness']['requirements'] as $requirement)
+<div><dt class="font-semibold">{{ $requirement['id'] }}: {{ $requirement['status'] }}</dt><dd>{{ $requirement['description'] }}</dd></div>
+@endforeach
+</dl>
+<p>{{ $state['readiness']['credential_instruction'] }}</p>
+</details>
 <p>Historical local bills must not be promoted by enabling a future verified route. Only newly eligible bills may qualify after a separately reviewed implementation.</p>
 <form method="post" action="{{ route('saas.admin.pilot-fiscal-control.update',$company->id) }}">@csrf
 <input type="hidden" name="enabled" value="0">

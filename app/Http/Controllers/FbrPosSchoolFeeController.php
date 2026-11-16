@@ -325,7 +325,8 @@ class FbrPosSchoolFeeController extends Controller
                 $accountId = $account->id;
                 DB::table('school_fee_accounts')->where('id', $accountId)->update(['paid_paisa' => $paid, 'updated_at' => $collectedAt]);
             }
-            return DB::table('school_fee_receipts')->insertGetId([
+            return DB::table('school_fee_receipts')->insertGetId((\Illuminate\Support\Facades\Schema::hasColumn('school_fee_receipts','fiscal_route_snapshot')
+                ? ['fiscal_route_snapshot'=>\App\Services\PilotFiscalRouteSnapshot::newBill($company,'school','school_receipt')] : []) + [
                 'account_id' => $accountId, 'requested_account_id' => $data['account_id'] ?? null, 'student_name' => $data['student_name'] ?: null, 'payment_method' => $data['payment_method'],
                 'fee_lines' => json_encode($savedLines), 'payable_paisa' => $payable, 'paid_paisa' => $paid, 'balance_paisa' => $payable - $paid,
                 'company_id' => $company->id, 'branch_id' => $branchId,

@@ -116,3 +116,22 @@ receipt with fiscal identity/QR; Agent printing is a separate verified step.
 Those active-route snapshots, actual adapters, official reconciliation and physical
 printing acceptance are **not implemented/verified by this blocked selector**.
 No schema backfill, migration, route transfer, or live company change is performed.
+
+## Implemented OFF snapshot and fail-closed recovery foundation
+
+New School receipts and Hospital invoices now atomically capture immutable routing
+metadata with route OFF, eligibility false, company/category/source and version.
+Hospital payment rows inherit the invoice's exact snapshot bytes; installments on
+legacy invoices retain null. Duplicate payment recovery never rewrites a snapshot.
+Nullable additive columns are intentionally not backfilled, and retained on rollback.
+During a rolling deploy before the column exists, local billing remains available
+but records have no snapshot and are treated as legacy/ineligible, never inferred ON.
+
+`PilotFiscalRouteSnapshot::recoveryPlan` only reads the allowlisted company-scoped
+source and its stored snapshot. It refuses cross-route/category/company matches,
+returns local-only for OFF, legacy hold for missing provenance, and same-route
+reconciliation-required for stored IMS/DI uncertainty. It never submits, retries,
+updates acknowledgements, trusts today's selector, or invents a regulator lookup.
+This is a safe recovery planner, not an implemented official reconciliation adapter.
+The actual active-route integration, regulator acceptance and Agent print verification
+remain blocked as described above.

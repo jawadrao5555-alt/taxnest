@@ -1196,24 +1196,13 @@ class AgentController extends Controller
         $fbrInvoiceNumber = trim((string) $request->input('pra_invoice_number', ''));
         $this->recordFbrCallbackDiagnostic($request, $company, $txn);
         $response = $request->input('response');
-        $code = null;
-        if (is_array($response)) {
-            foreach (['Code', 'response_code', 'code'] as $key) {
-                if (array_key_exists($key, $response) && $response[$key] !== null) {
-                    $candidate = trim((string) $response[$key]);
-                    if ($candidate !== '') {
-                        $code = $candidate;
-                        break;
-                    }
-                }
-            }
-        }
+        $code = \App\Services\FbrPosFiscalResult::code(is_array($response) ? $response : null);
         $explicitCode100 = $code === '100';
-        $returnedFiscalNumber = \App\Services\FbrPosFiscalResult::fromResponse(is_array($response) ? $response : null);
-        $treatAsSuccess = $request->boolean('success')
-            && $explicitCode100
-            && $returnedFiscalNumber !== null
-            && hash_equals($returnedFiscalNumber, $fbrInvoiceNumber);
+        $treatAsSuccess = \App\Services\FbrPosFiscalResult::explicitAcknowledgement(
+            is_array($response) ? $response : null,
+            $request->boolean('success'),
+            $fbrInvoiceNumber
+        ) !== null;
         $evidence = app(FbrPosSubmissionEvidenceService::class);
         $numberOnly = false;
         $reportedClaim = $request->input('submission_claim');

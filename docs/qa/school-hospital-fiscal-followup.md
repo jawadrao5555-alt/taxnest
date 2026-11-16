@@ -135,3 +135,11 @@ updates acknowledgements, trusts today's selector, or invents a regulator lookup
 This is a safe recovery planner, not an implemented official reconciliation adapter.
 The actual active-route integration, regulator acceptance and Agent print verification
 remain blocked as described above.
+
+## Reusable wiring without speculative fiscal mapping
+
+`FbrService::interpretPosDiAcknowledgement` now exposes the existing complete-header/all-item DI validation as a pure classifier; the established DI transport calls it. `FbrPosFiscalResult` supplies the existing explicit IMS success-code/number interpretation to the Agent callback. Company/device/exclusive-claim validation remains outside that classifier and mandatory. Neither classifier authorizes a company or writes a School/Hospital acknowledgement.
+
+`PilotFiscalSourceContext::inspect` is an internal, company-scoped, read-only preparation boundary. It reuses immutable route validation and preserves charge, this payment, cumulative paid at receipt, and historical balance separately. Hospital bill context has no implied payment; later installments do not change an earlier payment context. Legacy missing fields stay unknown. Local fee/service lines are not a regulator payload. `reportable_event`, `tax_mapping`, and `regulator_payload` remain null and `can_dispatch` false until an actual category-specific contract exists. No endpoint, token, route fallback, QR or fiscal number is fabricated.
+
+Synthetic acceptance covers distinct amounts, later installments, cross-company denial, unchanged receipt rows, zero HTTP requests and complete/partial/ambiguous acknowledgement classification. This is reusable preparation, not a working category adapter or sandbox acceptance. Official fee versus payment event, hospital service bill versus installment event, classification/tax/adjustment mapping, company enrollment, and authoritative same-route uncertain-response recovery remain required independently for each of School×IMS, School×DI, Hospital×IMS and Hospital×DI.

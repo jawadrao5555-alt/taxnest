@@ -17,6 +17,8 @@ final class DiagnosticCoverage
         'pos.fiscal' => ['pos', 'PRA submission and stored fiscal evidence', 'get_company_billing_summary'],
         'di.billing' => ['di', 'Digital invoices, credit notes and tax items', 'get_company_billing_summary'],
         'di.connection' => ['di', 'FBR connection, scenarios, retries and reconciliation', null],
+        'fbrpos.school.collections' => ['fbrpos', 'School local principal, payments, balances and saved closings (not fiscal)', 'get_company_billing_summary'],
+        'fbrpos.hospital.collections' => ['fbrpos', 'Hospital local principal, payments, balances and saved closings (not clinical/fiscal)', 'get_company_billing_summary'],
         'fbrpos.billing' => ['fbrpos', 'FBR POS sales, returns and stored fiscal evidence', 'get_company_billing_summary'],
         'fbrpos.operations' => ['fbrpos', 'FBR POS drawers, pharmacy, stock and offline operation', null],
         'health.operations' => ['health', 'Healthcare billing, pharmacy, appointments and clinical modules', null],

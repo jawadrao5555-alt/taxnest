@@ -6,11 +6,17 @@
      branch on it; the PRA rendering stays byte-identical.
      @keydown.stop on root: sale-screen F-key/Escape document listeners must
      never fire while typing in the chat (architect-mandated). --}}
-@props(['product' => 'pos'])
+@props(['product' => 'pos', 'placement' => 'floating'])
 @php
+    // Usage summaries must remain readable: only this read-only route uses an in-flow dock.
+    if (request()->routeIs('pos.madadgar.usage', 'fbrpos.madadgar.usage')) {
+        $placement = 'inline';
+    }
     $mIsFbr = ($product ?? 'pos') === 'fbrpos';
     $mBase = $mIsFbr ? '/fbr-pos/madadgar' : '/pos/madadgar';
     $mStoreKey = $mIsFbr ? 'tn_madadgar_session_fbr' : 'tn_madadgar_session';
+    $mActor = auth($product)->user();
+    $mStoreKey .= ':'.($mActor?->company_id ?? 'guest').':'.($mActor?->id ?? 'guest');
     $mWaNumber = preg_replace('/\D/', '', (string) \App\Models\SystemSetting::get('support_whatsapp_number', ''));
     $mAiEnabled = \App\Services\MadadgarService::enabled();
     $mc = $mIsFbr ? [
@@ -41,7 +47,8 @@
 @if($mAiEnabled || $mWaNumber)
 <div x-data="tnMadadgar({{ $mAiEnabled ? 'true' : 'false' }}, @js($mWaNumber), @js($mBase), @js($mStoreKey))"
      @keydown.stop @keydown.escape.prevent="open = false"
-     class="fixed z-[60] bottom-5 left-5"
+     data-madadgar-placement="{{ $placement === 'inline' ? 'inline' : 'floating' }}"
+     class="{{ $placement === 'inline' ? 'relative' : 'fixed z-[60] bottom-5 left-5' }}"
      style="padding-bottom: env(safe-area-inset-bottom, 0px);">
 
     {{-- Panel --}}
@@ -57,6 +64,7 @@
                 </div>
                 <div class="min-w-0">
                     <div class="text-white font-bold text-sm leading-tight">Madadgar</div>
+                    @if(auth($product ?? 'pos')->user()?->role==='company_admin' && in_array(auth($product ?? 'pos')->user()?->pos_role,[null,'','pos_admin'],true))<a class="text-xs text-white underline" href="{{ route(($product ?? 'pos').'.madadgar.usage') }}">{{ __('ai_usage.title') }}</a>@endif
                     <div class="{{ $mc['sub'] }} text-xs leading-tight" x-text="view === 'chat' ? @js(__($mSubChatKey)) : @js(__('pos.madadgar_sub_menu'))"></div>
                 </div>
             </div>
@@ -64,6 +72,8 @@
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
             </button>
         </div>
+
+        <p x-show="view === 'chat'" class="px-4 py-2 text-xs text-gray-600 border-b border-gray-200">{{ __('madadgar_scope.read_commands') }}</p>
 
         {{-- MENU VIEW: two options --}}
         <div x-show="view === 'menu'" class="p-4 space-y-3">
@@ -101,8 +111,18 @@
                         <div :class="m.role === 'user'
                                 ? '{{ $mUserBubble }}'
                                 : (m.error ? 'bg-red-50 text-red-700 border border-red-200 rounded-2xl rounded-bl-md' : 'bg-white text-gray-800 border border-gray-200 rounded-2xl rounded-bl-md')"
-                             class="px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap break-words shadow-sm"
-                             style="max-width: 85%;" x-text="m.content"></div>
+                             class="px-3.5 py-2.5 text-sm leading-relaxed break-words shadow-sm"
+                             style="max-width: 85%;">
+                            <span class="whitespace-pre-wrap" x-text="m.content"></span>
+                            <template x-if="m.role === 'assistant' && m.provenance">
+                                <div class="mt-2 pt-2 border-t border-gray-200 text-xs text-gray-600" data-madadgar-provenance>
+                                    <p x-show="m.provenance.answer_source !== 'company_read'">{{ __('madadgar_scope.guide_only') }}</p>
+                                    <p x-show="m.provenance.answer_source === 'company_read'">{{ __('madadgar_scope.company_read') }} <span x-text="m.provenance.source_reference"></span></p>
+                                    <p>{{ __('madadgar_scope.review_unknown') }}</p>
+                                    <p>{{ __('madadgar_scope.answered') }} <time x-text="new Date(m.provenance.answered_at).toLocaleString()"></time></p>
+                                </div>
+                            </template>
+                        </div>
                     </div>
                 </template>
 
@@ -129,14 +149,14 @@
                     <input x-ref="minput" x-model="draft" type="text" maxlength="1000"
                            placeholder="{{ __('pos.madadgar_placeholder') }}"
                            autocomplete="off" name="madadgar_q_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
-                           class="flex-1 rounded-xl border-gray-300 text-sm {{ $mc['input'] }}">
+                           class="min-w-0 flex-1 rounded-xl border-gray-300 text-sm {{ $mc['input'] }}">
                     <button type="submit" :disabled="busy || !draft.trim()"
-                            class="w-10 h-10 rounded-xl {{ $mc['primary'] }} text-white flex items-center justify-center transition cursor-pointer disabled:opacity-40 flex-shrink-0" aria-label="{{ __('pos.madadgar_send') }}">
+                            class="btn-inline w-10 h-10 rounded-xl {{ $mc['primary'] }} text-white flex items-center justify-center transition cursor-pointer disabled:opacity-40 flex-shrink-0" aria-label="{{ __('pos.madadgar_send') }}">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 19V5m0 0l-6 6m6-6l6 6"/></svg>
                     </button>
                 </form>
                 <div class="flex items-center justify-between mt-1.5 px-1">
-                    <button @click="newChat()" class="text-xs text-gray-400 {{ $mc['link'] }} transition cursor-pointer">{{ __('pos.madadgar_new_chat') }}</button>
+                    <button @click="newChat()" :disabled="busy" class="text-xs text-gray-400 {{ $mc['link'] }} transition cursor-pointer">{{ __('pos.madadgar_new_chat') }}</button>
                     <button @click="view = 'menu'" class="text-xs text-gray-400 {{ $mc['link'] }} transition cursor-pointer">{{ __('pos.madadgar_back') }}</button>
                     <span class="text-xs text-gray-400" x-show="remaining !== null && remaining <= 5" x-text="@js(__('pos.madadgar_remaining_prefix')) + remaining"></span>
                 </div>
@@ -174,6 +194,22 @@ function tnMadadgar(aiEnabled, waNumber, base, storeKey) {
                 this.sid = localStorage.getItem(this.storeKey) || null;
             } catch (e) { this.sid = null; }
             if (!this.sid) this.resetSid();
+            try {
+                const saved = JSON.parse(sessionStorage.getItem(this.storeKey + ':pending') || 'null');
+                if (saved && saved.sid === this.sid && saved.pending?.request_id) this.pending = saved.pending;
+            } catch (e) {}
+        },
+        savePending() {
+            try {
+                if (this.pending) sessionStorage.setItem(this.storeKey + ':pending', JSON.stringify({ sid: this.sid, pending: this.pending }));
+                else sessionStorage.removeItem(this.storeKey + ':pending');
+            } catch (e) {}
+        },
+        requestId() {
+            return (window.crypto && crypto.randomUUID) ? crypto.randomUUID() :
+                'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+                    const r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 3 | 8)).toString(16);
+                });
         },
         resetSid() {
             this.sid = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() :
@@ -213,7 +249,7 @@ function tnMadadgar(aiEnabled, waNumber, base, storeKey) {
             const q = this.draft.trim();
             if (!q || this.busy) return;
             this.draft = '';
-            this.pending = null;
+            this.pending = null; this.savePending();
             this.messages.push({ role: 'user', content: q });
             this.busy = true;
             this.scrollDown();
@@ -228,40 +264,52 @@ function tnMadadgar(aiEnabled, waNumber, base, storeKey) {
                     return d;
                 })
                 .then(d => {
-                    this.messages.push({ role: 'assistant', content: d.reply });
-                    this.pending = d.escalation || null;
+                    this.messages.push({ role: 'assistant', content: d.reply, provenance: d.provenance || null });
+                    this.pending = d.escalation ? { ...d.escalation, request_id: this.requestId() } : null;
+                    this.savePending();
                     this.remaining = d.remaining;
                 })
                 .catch(e => this.messages.push({ role: 'assistant', content: e.message || @js(__('pos.madadgar_err_generic')), error: true }))
                 .finally(() => { this.busy = false; this.scrollDown(); this.$nextTick(() => this.$refs.minput && this.$refs.minput.focus()); });
         },
+        appendEscalationConfirmation(result) {
+            // History may already contain the committed response after refresh.
+            // Identity, never text similarity, distinguishes a retry from a new request.
+            if (Number.isInteger(result.ref) && this.messages.some(m =>
+                m.role === 'assistant' && m.escalated === true && m.ref === result.ref)) return;
+            this.messages.push({ role: 'assistant', content: result.reply, escalated: true, ref: result.ref });
+        },
         confirmEscalation() {
             if (!this.pending || this.busy) return;
             this.busy = true;
             const p = this.pending;
+            p.request_id = p.request_id || this.requestId();
+            this.savePending();
             fetch(this.base + '/escalate', {
                 method: 'POST',
                 headers: this.headers(true),
-                body: JSON.stringify({ title: p.title, summary: p.summary, kind: p.kind, session_id: this.sid })
+                body: JSON.stringify({ title: p.title, summary: p.summary, kind: p.kind, session_id: this.sid, request_id: p.request_id })
             })
                 .then(async r => {
                     const d = await r.json().catch(() => ({}));
                     if (!r.ok) throw new Error(d.error || @js(__('pos.madadgar_err_send')));
                     return d;
                 })
-                .then(d => { this.pending = null; this.messages.push({ role: 'assistant', content: d.reply, escalated: true }); })
+                .then(d => { this.pending = null; this.savePending(); this.appendEscalationConfirmation(d); })
                 .catch(e => this.messages.push({ role: 'assistant', content: e.message, error: true }))
                 .finally(() => { this.busy = false; this.scrollDown(); });
         },
         rejectEscalation() {
-            this.pending = null;
+            this.pending = null; this.savePending();
             this.messages.push({ role: 'assistant', content: @js(__('pos.madadgar_not_sent')) });
             this.scrollDown();
         },
         newChat() {
+            // Do not discard a confirmation identity while its result is unknown.
+            if (this.busy) return;
             this.resetSid();
             this.messages = [];
-            this.pending = null;
+            this.pending = null; this.savePending();
             this.greet();
             this.$nextTick(() => this.$refs.minput && this.$refs.minput.focus());
         },

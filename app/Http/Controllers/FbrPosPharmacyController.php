@@ -221,6 +221,7 @@ class FbrPosPharmacyController extends Controller
         $cost = (float) ($data['cost_price'] ?? 0);
 
         DB::transaction(function () use ($companyId, $product, $branchId, $qty, $cost, $data) {
+            \App\Services\ProspectiveQuotaGuard::lockCompanyForInvoiceWork($companyId);
             $batch = PharmacyBatchService::receive(
                 $companyId,
                 $product->id,
@@ -434,6 +435,7 @@ class FbrPosPharmacyController extends Controller
             : null;
 
         $claim = DB::transaction(function () use ($companyId, $batches, $supplier, $data) {
+            \App\Services\ProspectiveQuotaGuard::lockCompanyForInvoiceWork($companyId);
             $claim = PharmacyClaim::create([
                 'company_id' => $companyId,
                 'branch_id' => $batches->first()->branch_id,
@@ -548,6 +550,7 @@ class FbrPosPharmacyController extends Controller
         }
 
         DB::transaction(function () use ($claim, $data, $companyId) {
+            \App\Services\ProspectiveQuotaGuard::lockCompanyForInvoiceWork($companyId);
             if ($data['status'] === PharmacyClaim::STATUS_RAISED) {
                 foreach ($claim->items as $item) {
                     if (!$item->batch_id) {

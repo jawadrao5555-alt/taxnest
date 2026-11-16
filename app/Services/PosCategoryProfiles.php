@@ -352,6 +352,11 @@ class PosCategoryProfiles
      */
     public static function modules(?string $category, string $panel = 'pra'): array
     {
+        if ($panel === 'fbr' && in_array($category, ['education', 'clinic'], true)) {
+            // Administrative collection ledgers are not Salon/Workshop jobs.
+            // This is relevance only: saved plan/grant/override rows are untouched.
+            return self::CORE_MODULES;
+        }
         $family = self::family($category);
         if ($family === 'general') {
             return self::knownModules();
@@ -377,7 +382,7 @@ class PosCategoryProfiles
         $prices = $fam['prices'];
 
         $isFbr = $panel === 'fbr';
-        return [
+        $profile = [
             'category' => $category ?? 'general',
             'family' => $family,
             'audiences' => self::audiences($category),
@@ -395,5 +400,18 @@ class PosCategoryProfiles
             'checklist' => $own['checklist'] ?? $fam['checklist'],
             'tiles' => $own['tiles'] ?? $fam['tiles'],
         ];
+        if ($isFbr && in_array($category, ['education', 'clinic'], true)) {
+            $school = $category === 'education';
+            return array_replace($profile, [
+                'landing' => $school ? 'school_fee_desk' : 'hospital_collection_desk',
+                'workflow' => 'local_administrative_collections',
+                'regression_fixture' => 'tests/Feature/LocalCollectionCategoryEntitlementsTest.php',
+                'grid' => $school ? 'fee_heads' : 'services',
+                'checklist' => ['profile', 'campus', 'team', $school ? 'fee_heads' : 'services', 'receipt', 'first_collection'],
+                'tiles' => ['collections', 'outstanding', 'receipts', 'day_close'],
+                'fiscal_submission' => 'blocked_pending_official_route_and_sandbox',
+            ]);
+        }
+        return $profile;
     }
 }

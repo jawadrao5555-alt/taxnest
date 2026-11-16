@@ -150,6 +150,16 @@ class AdminPlanController extends Controller
         return array_intersect_key($attributes, array_flip($columns));
     }
 
+    private function configuredCycleRates(Request $request, array $data, string $productType): array
+    {
+        // Legacy forms and annual-only edits must not overwrite retired rates.
+        // Shared rates need an explicit separate choice; availability remains
+        // controlled by the deployment policy, so preparation does not sell them.
+        $fields = $productType === 'di' ? ['price_quarterly', 'price_semi_annual']
+            : ($request->boolean('configure_shared_cycle_rates') ? ['price_monthly', 'price_quarterly', 'price_semi_annual'] : []);
+        return array_intersect_key($data, array_flip($fields));
+    }
+
     public function store(Request $request)
     {
         \App\Models\AdminUser::requireBillingAdministrator();
@@ -200,7 +210,7 @@ class AdminPlanController extends Controller
             NestErps::VERTICAL_COLUMN => $erpsVertical,
             'price' => $data['price'],
             'price_yearly' => $data['price_yearly'] ?? null,
-            ...($productType === 'di' ? array_intersect_key($data, array_flip(['price_monthly', 'price_quarterly', 'price_semi_annual'])) : []),
+            ...$this->configuredCycleRates($request, $data, $productType),
             'invoice_limit' => $data['invoice_limit'],
             'ai_page_limit' => $data['ai_page_limit'] ?? 0,
             'fair_use_limit' => $data['fair_use_limit'] ?? null,
@@ -272,7 +282,7 @@ class AdminPlanController extends Controller
             NestErps::VERTICAL_COLUMN => $erpsVertical,
             'price' => $data['price'],
             'price_yearly' => $data['price_yearly'] ?? ($plan->price_yearly ?? null),
-            ...($productType === 'di' ? array_intersect_key($data, array_flip(['price_monthly', 'price_quarterly', 'price_semi_annual'])) : []),
+            ...$this->configuredCycleRates($request, $data, $productType),
             'invoice_limit' => $data['invoice_limit'],
             'ai_page_limit' => $data['ai_page_limit'] ?? 0,
             'fair_use_limit' => $data['fair_use_limit'] ?? null,

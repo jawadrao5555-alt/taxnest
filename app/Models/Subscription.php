@@ -24,6 +24,7 @@ class Subscription extends Model
         'override_by',
         'distributor_quote_snapshot',
         'purchase_snapshot',
+        'lifecycle_snapshot',
     ];
 
     protected $casts = [
@@ -37,6 +38,7 @@ class Subscription extends Model
         'free_invoice_limit' => 'integer',
         'distributor_quote_snapshot' => 'array',
         'purchase_snapshot' => 'array',
+        'lifecycle_snapshot' => 'array',
     ];
 
     protected static function booted(): void
@@ -44,10 +46,16 @@ class Subscription extends Model
         static::updating(function (self $subscription) {
             // Assignment owns creation. Historical rows remain unknown; a
             // later update must not mint or replace their purchase evidence.
-            if ($subscription->isDirty('purchase_snapshot')) {
+            if ($subscription->isDirty('purchase_snapshot') || $subscription->isDirty('lifecycle_snapshot')) {
                 throw new \LogicException('Subscription purchase evidence cannot be changed after creation.');
             }
         });
+    }
+
+    /** SQL NULL alone is legacy; JSON null or malformed evidence is not. */
+    public function hasLifecycleSnapshot(): bool
+    {
+        return array_key_exists('lifecycle_snapshot', $this->attributes) && $this->attributes['lifecycle_snapshot'] !== null;
     }
 
     public function hasActiveOverride(): bool
@@ -75,22 +83,28 @@ class Subscription extends Model
 
     public function isTrialActive(): bool
     {
+        if ($this->hasLifecycleSnapshot() && !\App\Services\ProspectiveSubscriptionPolicy::snapshot($this)) return false;
+        if ($policy = \App\Services\ProspectiveSubscriptionPolicy::display($this)) return $policy['phase'] === 'trial';
         return $this->trial_ends_at && $this->trial_ends_at->isFuture();
     }
 
     public function isTrialExpired(): bool
     {
+        if ($this->hasLifecycleSnapshot() && !\App\Services\ProspectiveSubscriptionPolicy::snapshot($this)) return true;
         if ($this->hasActiveOverride()) {
             return false;
         }
+        if ($policy = \App\Services\ProspectiveSubscriptionPolicy::display($this)) return $policy['phase'] === 'expired' && !$policy['paid_starts_at'];
         return $this->trial_ends_at && $this->trial_ends_at->isPast();
     }
 
     public function isExpired(): bool
     {
+        if ($this->hasLifecycleSnapshot() && !\App\Services\ProspectiveSubscriptionPolicy::snapshot($this)) return true;
         if ($this->hasActiveOverride()) {
             return false;
         }
+        if ($policy = \App\Services\ProspectiveSubscriptionPolicy::display($this)) return $policy['phase'] === 'expired';
         return $this->end_date && \Carbon\Carbon::parse($this->end_date)->isPast();
     }
 
@@ -102,18 +116,19 @@ class Subscription extends Model
     /** A read-only plan view for access checks; quotes still use the catalogue. */
     public function entitlementPlan(): ?PricingPlan
     {
+        if ($this->hasLifecycleSnapshot() && !\App\Services\ProspectiveSubscriptionPolicy::snapshot($this)) return null;
         $plan = $this->pricingPlan;
-        $snapshot = $this->purchase_snapshot;
+        $snapshot = \App\Services\ProspectiveSubscriptionPolicy::effectivePurchase($this) ?? $this->purchase_snapshot;
         if (!is_array($snapshot) || ($snapshot['version'] ?? null) !== 1
             || (int) ($snapshot['company_id'] ?? 0) !== (int) $this->company_id
-            || (int) ($snapshot['plan']['id'] ?? 0) !== (int) $this->pricing_plan_id
+            || ((int) ($snapshot['plan']['id'] ?? 0) !== (int) $this->pricing_plan_id && !\App\Services\ProspectiveSubscriptionPolicy::effectivePurchase($this))
             || !is_array($snapshot['plan'] ?? null)) {
             return $plan;
         }
 
         // Missing legacy fields retain their existing catalogue meaning. Never
         // mutate the related catalogue model or overlay price/campaign fields.
-        $view = $plan ? clone $plan : new PricingPlan();
+        $view = $this->hasLifecycleSnapshot() ? new PricingPlan() : ($plan ? clone $plan : new PricingPlan());
         $fields = ['id', 'name', 'product_type', 'erps_vertical', 'is_trial', 'features', 'health_modules',
             'invoice_limit', 'user_limit', 'branch_limit', 'max_terminals', 'max_users', 'max_products',
             'ai_page_limit', 'fair_use_limit', 'health_department_limit'];

@@ -13,6 +13,22 @@ use Illuminate\Validation\ValidationException;
 
 class InventoryService
 {
+    /** Shared DI-only lock for invoice projection and generic receiving, including NULL branches. */
+    private static function lockDiStockProduct($companyId, $productId): bool
+    {
+        if (!Schema::hasTable('di_invoice_inventory_postings') || !Schema::hasColumn('companies', 'product_type')
+            || DB::table('companies')->where('id', $companyId)->value('product_type') !== 'di') return false;
+        Product::withoutGlobalScopes()->where('company_id', $companyId)->whereKey($productId)->lockForUpdate()->firstOrFail();
+        return true;
+    }
+
+    private static function diQuantity($before, $delta, bool $subtract = false): string
+    {
+        $base = \Brick\Math\BigDecimal::of((string) $before);
+        $quantity = \Brick\Math\BigDecimal::of((string) $delta);
+        return (string) ($subtract ? $base->minus($quantity) : $base->plus($quantity))->toScale(4, \Brick\Math\RoundingMode::UNNECESSARY);
+    }
+
     /**
      * Restore the stock that an FBR POS transaction actually deducted.
      *
@@ -36,6 +52,7 @@ class InventoryService
         ?int $branchId = null,
         ?int $userId = null
     ): array {
+        ProspectiveQuotaGuard::lockCompanyForWrite($companyId);
         $company = \App\Models\Company::find($companyId);
         if (!$company || !$company->inventory_enabled) {
             return ['skipped' => true, 'restored' => []];
@@ -260,6 +277,7 @@ class InventoryService
         int $companyId, int $branchId, array $sale, int $transactionId,
         string $invoiceNumber, ?int $userId = null
     ): array {
+        ProspectiveQuotaGuard::lockCompanyForWrite($companyId);
         $consumptions = self::canonicalConsumptions($companyId, $sale);
         if (InventoryMovement::where('company_id', $companyId)
             ->where('reference_type', 'pos_transaction')->where('reference_id', $transactionId)
@@ -432,12 +450,15 @@ class InventoryService
     public static function addStock($companyId, $productId, $quantity, $unitPrice, $type, $branchId = null, $reference = [], $notes = null, $userId = null, array $batchMeta = [])
     {
         return DB::transaction(function () use ($companyId, $productId, $quantity, $unitPrice, $type, $branchId, $reference, $notes, $userId, $batchMeta) {
+            ProspectiveQuotaGuard::lockCompanyForInvoiceWork((int)$companyId);
+            $di = self::lockDiStockProduct($companyId, $productId);
             $stock = InventoryStock::lockForUpdate()->firstOrCreate(
                 ['company_id' => $companyId, 'product_id' => $productId, 'branch_id' => $branchId],
                 ['quantity' => 0, 'min_stock_level' => 0, 'avg_purchase_price' => 0, 'last_purchase_price' => 0]
             );
 
-            $stock->quantity += $quantity;
+            $exactAfter = $di ? self::diQuantity($stock->getRawOriginal('quantity') ?? '0', $quantity) : null;
+            $stock->quantity = $di ? $exactAfter : $stock->quantity + $quantity;
 
             if ($type === InventoryMovement::TYPE_PURCHASE || $type === InventoryMovement::TYPE_OPENING) {
                 $stock->last_purchase_price = $unitPrice;
@@ -460,7 +481,7 @@ class InventoryService
                 'quantity' => $quantity,
                 'unit_price' => $unitPrice,
                 'total_price' => round($unitPrice * $quantity, 2),
-                'balance_after' => $stock->quantity,
+                'balance_after' => $di ? $exactAfter : $stock->quantity,
                 'reference_type' => $reference['type'] ?? null,
                 'reference_id' => $reference['id'] ?? null,
                 'reference_number' => $reference['number'] ?? null,
@@ -518,13 +539,16 @@ class InventoryService
     public static function reversePurchase($companyId, $productId, $quantity, $unitPrice, $branchId = null, $reference = [], $notes = null, $userId = null, $fallbackLastPrice = null)
     {
         return DB::transaction(function () use ($companyId, $productId, $quantity, $unitPrice, $branchId, $reference, $notes, $userId, $fallbackLastPrice) {
+            ProspectiveQuotaGuard::lockCompanyForInvoiceWork((int)$companyId);
+            $di = self::lockDiStockProduct($companyId, $productId);
             $stock = InventoryStock::lockForUpdate()->firstOrCreate(
                 ['company_id' => $companyId, 'product_id' => $productId, 'branch_id' => $branchId],
                 ['quantity' => 0, 'min_stock_level' => 0, 'avg_purchase_price' => 0, 'last_purchase_price' => 0]
             );
 
             $qtyBefore = (float) $stock->quantity;
-            $remaining = round($qtyBefore - $quantity, 3);
+            $exactAfter = $di ? self::diQuantity($stock->getRawOriginal('quantity') ?? '0', $quantity, true) : null;
+            $remaining = $di ? $exactAfter : round($qtyBefore - $quantity, 3);
 
             // $fallbackLastPrice === null means "no still-valid prior purchase
             // exists" — degenerate cases then RESET the rate to 0 (explicit
@@ -555,7 +579,7 @@ class InventoryService
                 'quantity' => $quantity,
                 'unit_price' => $unitPrice,
                 'total_price' => round($unitPrice * $quantity, 2),
-                'balance_after' => $stock->quantity,
+                'balance_after' => $di ? $exactAfter : $stock->quantity,
                 'reference_type' => $reference['type'] ?? null,
                 'reference_id' => $reference['id'] ?? null,
                 'reference_number' => $reference['number'] ?? null,
@@ -571,12 +595,15 @@ class InventoryService
     public static function deductStock($companyId, $productId, $quantity, $unitPrice, $type, $branchId = null, $reference = [], $notes = null, $userId = null, array $batchMeta = [])
     {
         return DB::transaction(function () use ($companyId, $productId, $quantity, $unitPrice, $type, $branchId, $reference, $notes, $userId, $batchMeta) {
+            ProspectiveQuotaGuard::lockCompanyForInvoiceWork((int)$companyId);
+            $di = self::lockDiStockProduct($companyId, $productId);
             $stock = InventoryStock::lockForUpdate()->firstOrCreate(
                 ['company_id' => $companyId, 'product_id' => $productId, 'branch_id' => $branchId],
                 ['quantity' => 0, 'min_stock_level' => 0, 'avg_purchase_price' => 0, 'last_purchase_price' => 0]
             );
 
-            $stock->quantity -= $quantity;
+            $exactAfter = $di ? self::diQuantity($stock->getRawOriginal('quantity') ?? '0', $quantity, true) : null;
+            $stock->quantity = $di ? $exactAfter : $stock->quantity - $quantity;
             $stock->save();
 
             InventoryMovement::create([
@@ -587,7 +614,7 @@ class InventoryService
                 'quantity' => $quantity,
                 'unit_price' => $unitPrice,
                 'total_price' => round($unitPrice * $quantity, 2),
-                'balance_after' => $stock->quantity,
+                'balance_after' => $di ? $exactAfter : $stock->quantity,
                 'reference_type' => $reference['type'] ?? null,
                 'reference_id' => $reference['id'] ?? null,
                 'reference_number' => $reference['number'] ?? null,

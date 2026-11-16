@@ -141,6 +141,7 @@ class SupplierController extends Controller
         $companyId = auth()->user()->company_id;
 
         DB::transaction(function () use ($validated, $companyId) {
+            \App\Services\ProspectiveQuotaGuard::lockCompanyForInvoiceWork($companyId);
             $lastPo = PurchaseOrder::where('company_id', $companyId)
                 ->orderByDesc('id')->first();
             $nextNum = $lastPo ? intval(preg_replace('/\D/', '', $lastPo->po_number)) + 1 : 1;
@@ -190,6 +191,7 @@ class SupplierController extends Controller
         }
 
         DB::transaction(function () use ($po, $companyId) {
+            \App\Services\ProspectiveQuotaGuard::lockCompanyForInvoiceWork($companyId);
             foreach ($po->items as $item) {
                 $remainingQty = $item->quantity - $item->received_quantity;
                 if ($remainingQty <= 0) continue;

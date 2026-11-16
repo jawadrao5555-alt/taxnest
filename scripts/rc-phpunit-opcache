@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# Test-only CLI runtime: unchanged 1GiB heap plus explicit 128MiB opcode cache.
+# Invoke INSIDE rc-safe-run. Never used by production/deployment.
+set -euo pipefail
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT"
+[[ "${RC_SAFE_RUN:-}" == 1 && -r "${LD_PRELOAD:-}" ]] || { echo 'FAIL: PHPUnit runtime requires the egress guard' >&2; exit 2; }
+git diff --quiet HEAD -- || { echo 'FAIL: PHPUnit source must be clean and committed' >&2; exit 2; }
+head_before=$(git rev-parse HEAD)
+source_digest() { git ls-files -z | xargs -0 sha256sum | sha256sum | cut -d' ' -f1; }
+digest_before=$(source_digest)
+runtime=$(mktemp -d "$ROOT/.phpunit-opcache-XXXXXXXX")
+cleanup() { rm -rf "$runtime"; }
+trap cleanup EXIT
+printf '%s\n' "$ROOT/storage/*" "$ROOT/bootstrap/cache/*" "$ROOT/.local/*" "$ROOT/public/*" "${TMPDIR:-/tmp}/*" '/tmp/*' "$runtime/dynamic.php" > "$runtime/blacklist"
+# No production ini edits. This is the installed official extension, not downloaded code.
+load=()
+if ! php -r 'exit(extension_loaded("Zend OPcache") ? 0 : 1);'; then load=(-d zend_extension=opcache.so); fi
+export TAXNEST_PHPUNIT_OPCACHE_RUNTIME="$runtime"
+set +e
+php "${load[@]}" -d memory_limit=1G -d opcache.enable_cli=1 -d opcache.memory_consumption=128 \
+ -d opcache.jit=0 -d opcache.jit_buffer_size=0 -d opcache.validate_timestamps=1 \
+ -d opcache.revalidate_freq=0 -d opcache.file_update_protection=2 \
+ -d "opcache.blacklist_filename=$runtime/blacklist" \
+ -d "auto_prepend_file=$ROOT/scripts/lib/phpunit-opcache-prepend.php" vendor/bin/phpunit "$@"
+status=$?
+set -e
+[[ "$(git rev-parse HEAD)" == "$head_before" && "$(source_digest)" == "$digest_before" ]] || { echo 'FAIL: PHPUnit source changed during execution' >&2; exit 2; }
+git diff --quiet HEAD -- || { echo 'FAIL: PHPUnit source is dirty after execution' >&2; exit 2; }
+exit "$status"

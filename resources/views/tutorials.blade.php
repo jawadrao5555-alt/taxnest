@@ -67,7 +67,8 @@
 
     <!-- Video sections -->
     <main class="max-w-[1100px] mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-14">
-        @forelse($products as $productKey => $product)
+        @include('tutorials._search')
+    @forelse($products as $productKey => $product)
         <!-- Product folder -->
         <section class="mb-14">
             <div class="flex items-center gap-3 rounded-2xl border border-gray-200 bg-white px-5 py-4 shadow-sm mb-8">
@@ -85,7 +86,8 @@
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     @foreach($group['videos'] as $v)
                     <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-                        <video class="tut-video tut-lazy" controls preload="none" playsinline data-src="{{ $v->video_url }}"></video>
+                        <video class="tut-video tut-lazy" controls preload="none" playsinline data-src="{{ $v->video_url }}" aria-label="{{ $v->title }}">@if($v->caption_path)<track kind="captions" src="{{ $v->caption_path }}" srclang="{{ $v->caption_language }}" label="{{ $v->caption_language }}">@endif</video>
+                @include('tutorials._metadata')
                         <div class="p-4 sm:p-5">
                             <h4 class="text-base sm:text-lg font-bold text-gray-900" style="font-family: 'Inter', sans-serif;">{{ $v->title }}</h4>
                             @if($v->description)

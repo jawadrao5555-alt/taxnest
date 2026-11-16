@@ -2091,9 +2091,16 @@ class PosRiderController extends Controller
             $txn = PosTransaction::withoutGlobalScope('hide_archived')
                 ->where('company_id', $companyId)
                 ->where('rider_id', $rider->id)
-                ->whereIn('delivery_status', ['assigned', 'dispatched'])
-                ->whereNull('rider_settlement_id')
+                ->whereIn('delivery_status', ['assigned', 'dispatched', 'delivered'])
                 ->lockForUpdate()->findOrFail($txnId);
+
+            if ($txn->delivery_status === 'delivered') {
+                if (!isset($data['received_amount'])) throw (new \Illuminate\Database\Eloquent\ModelNotFoundException)->setModel(PosTransaction::class, [$txnId]);
+                abort_unless(isset($data['received_amount']) && \App\Services\PosDeliveryAccount::assertReplay(
+                    (int) $companyId, (int) $txn->id, (int) $rider->id, (string) $data['received_amount']), 404);
+                return;
+            }
+            if ($txn->rider_settlement_id) throw (new \Illuminate\Database\Eloquent\ModelNotFoundException)->setModel(PosTransaction::class, [$txnId]);
 
             if (isset($data['received_amount'])) {
                 $revision = app(\App\Services\RiderBillPreviewService::class)->assignmentRevision($txn, $rider);

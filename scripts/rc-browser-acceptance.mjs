@@ -1,3 +1,17 @@
+import {pilotFiscalControlWorkflow} from './lib/pilot-fiscal-control-browser.mjs';
+import { prospectivePolicyWorkflow } from './lib/prospective-policy-browser.mjs';
+import { platformExpenseWorkflow } from './lib/platform-expense-browser.mjs';
+import { praBoundedReadWorkflow } from './lib/pra-bounded-read-browser.mjs';
+import { diBoundedReadWorkflow } from './lib/di-bounded-read-browser.mjs';
+import { aiUsageWorkflow } from './lib/ai-usage-browser.mjs';
+import { privateProfileWorkflow } from './lib/private-profile-browser.mjs';
+import { initializeSyntheticPixels } from './lib/synthetic-pixel-capture.mjs';
+import { madadgarReadWorkflow } from './lib/madadgar-read-browser.mjs';
+import { greetingTutorialWorkflow } from './lib/greeting-tutorial-browser.mjs';
+import { diInventoryWorkflow } from './lib/di-inventory-browser.mjs';
+import { reviewedDeviceProofWorkflow } from './lib/reviewed-device-proof-browser.mjs';
+import { deliveryCreditWorkflow } from './lib/delivery-credit-browser.mjs';
+import { cashierPolicyWorkflow } from './lib/cashier-policy-browser.mjs';
 import { hospitalWorkflow } from './lib/hospital-browser.mjs';
 import { schoolFeeWorkflow } from './lib/school-fee-browser.mjs';
 import { fbrDiBulkWorkflow } from './lib/fbr-di-bulk-browser.mjs';
@@ -1499,6 +1513,16 @@ async function deliveryContactSearchWorkflow(page,t,v) {
 }
 
 async function workflow(page,t,v,diagnostics) {
+  if(t.madadgarReadCases)return madadgarReadWorkflow(page,t,v,{baseUrl,login,loopback,saveEvidenceScreenshot,pass});
+  if(t.aiUsageCases)return aiUsageWorkflow(page,t,v,{baseUrl,login,loopback,dismiss,waitForOperationalSurface,saveEvidenceScreenshot,pass});
+  if(t.praReadCases)return praBoundedReadWorkflow(page,t,v,{baseUrl,login,loopback,saveEvidenceScreenshot,pass,dismiss,waitForOperationalSurface});
+  if(t.policyCases)return prospectivePolicyWorkflow(page,t,v,{baseUrl,saveEvidenceScreenshot,pass,login,loopback,dismiss,waitForOperationalSurface});
+  if(t.pilotFiscalCases)return pilotFiscalControlWorkflow(page,t,v,{baseUrl,login,loopback,saveEvidenceScreenshot,pass});
+  if(t.expenseCases)return platformExpenseWorkflow(page,t,v,{baseUrl,login,loopback,saveEvidenceScreenshot,pass});
+  if(t.diReadCases)return diBoundedReadWorkflow(page,t,v,{baseUrl,login,loopback,saveEvidenceScreenshot,pass});
+  if(t.privateProfileCases)return privateProfileWorkflow(page,t,v,{baseUrl,saveEvidenceScreenshot,pass});
+  if(t.greetingCases)return greetingTutorialWorkflow(page,t,v,{baseUrl,saveEvidenceScreenshot,pass});
+  if(t.diInventoryCases)return diInventoryWorkflow(page,t,v,{baseUrl,saveEvidenceScreenshot,pass});
   if(t.restoreSessionBoundary)return restoreSessionBoundaryWorkflow(page,t,v,{baseUrl,login,saveEvidenceScreenshot,pass});
   if(t.securityOnboarding)return securityOnboardingWorkflow(page,t,v,{baseUrl,login,saveEvidenceScreenshot,pass,loopback});
   if(t.taxIntegrations)return taxIntegrationsWorkflow(page,t,v,{baseUrl,waitForOperationalSurface,dismiss,saveEvidenceScreenshot,pass});
@@ -1640,6 +1664,9 @@ async function workflow(page,t,v,diagnostics) {
     return;
   }
   if(t.b02Deal)return b02DealWorkflow(page,t,v,{baseUrl,waitForOperationalSurface,dismiss,saveEvidenceScreenshot,pass});
+  if(t.deliveryCredit)return deliveryCreditWorkflow(page,t,v,{baseUrl,login,dismiss,waitForOperationalSurface,saveEvidenceScreenshot,pass,loopback});
+  if(t.reviewedDeviceProof)return reviewedDeviceProofWorkflow(page,t,v,{baseUrl,login,waitForOperationalSurface,saveEvidenceScreenshot,pass,loopback});
+  if(t.cashierPolicy)return cashierPolicyWorkflow(page,t,v,{baseUrl,login,dismiss,waitForOperationalSurface,saveEvidenceScreenshot,pass,loopback});
   if(t.staffDiscount)return staffDiscountWorkflow(page,t,v,{baseUrl,login,dismiss,waitForOperationalSurface,saveEvidenceScreenshot,pass,loopback});
   if(t.hospitalCollection)return hospitalWorkflow(page,t,v,{baseUrl,saveEvidenceScreenshot,pass});
   if(t.schoolFee)return schoolFeeWorkflow(page,t,v,{baseUrl,saveEvidenceScreenshot,pass});
@@ -2401,7 +2428,20 @@ async function customerBulkNavigation(page,t,v) {
  pass(t.name+'/'+v.width+': dashboard card totals match their detail; Sales, Tax and Day Close share the dashboard reporting layout');
 }
 async function one(browser,label,v,t) {
+  if(t.madadgarReadCases)t={...t,login:t.madadgarReadCases[v.width].login};
+  if(t.aiUsageCases)t={...t,login:t.aiUsageCases[v.width].admin};
+  if(t.praReadCases)t={...t,login:t.praReadCases[v.width].login};
+  if(t.policyCases)t={...t,login:t.policyCases[v.width].login};
+  if(t.pilotFiscalCases)t={...t,login:t.pilotFiscalCases[v.width].login};
+  if(t.expenseCases)t={...t,login:t.expenseCases[v.width].login};
+  if(t.diReadCases)t={...t,login:t.diReadCases[v.width].login};
+  if(t.privateProfileCases)t={...t,login:t.privateProfileCases[v.width].login};
+  if(t.greetingCases)t={...t,login:t.greetingCases[v.width].login};
+  if(t.diInventoryCases)t={...t,login:t.diInventoryCases[v.width].login};
   if(t.taxIntegrations)t={...t,login:t.taxIntegrations[v.width].login};
+  if(t.reviewedDeviceProof)t={...t,login:t.reviewedDeviceProof[v.width].login};
+  if(t.cashierPolicy)t={...t,login:t.cashierPolicy[v.width].cashier};
+  if(t.deliveryCredit)t={...t,login:t.deliveryCredit[v.width].login};
   if(t.staffDiscount)t={...t,login:t.staffDiscount[v.width].cashier};
   if(t.fbrDiBulk)t={...t,login:t.fbrDiBulk[v.width].login};
   if(t.billingSelection)t={...t,login:t.billingSelection[v.width].login};
@@ -2426,6 +2466,7 @@ async function one(browser,label,v,t) {
   }
 }
 const {browser}=await launchLocalBrowser();
+initializeSyntheticPixels({flag:process.env.RC_SYNTHETIC_PIXEL_EVIDENCE,fixturePath,baseUrl,browser,sourceSha:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim()});
 try { if(!requested.length) { const fiscal=cases.find(t=>t.name==='fiscal'), mobile=views.find(([,v])=>v.width===390); if(fiscal&&mobile) { await one(browser,'mobile-fiscal-preflight',mobile[1],fiscal); if(failures)throw new Error('FBR mobile fiscal preflight failed; pointer-access acceptance remains required'); } } for(const [label,v]of views)for(const t of cases){await one(browser,label,v,t);if((t.b01Account||t.mixedFulfillment||t.hotelSettingsWorkflow||t.tableOrderWorkflow||t.hotelWorkflow||t.deliveryContactSearch||t.b03AutoKot)&&failures)throw new Error("Settings/table-order/Hotel/B03 preflight failed; required browser acceptance remains failed");} for(const [label,v]of views)if(!requested.length||requestedIsolation)await healthIsolation(browser,label,v,fixture.isolation); if(!requested.length&&!di.length)throw new Error('DI pending role fixture missing'); for(const [label,v]of views)for(const t of di)if(!requested.length||requested.includes(t.name))await one(browser,label,v,t); } finally {await browser.close();}
 if(failures){console.error(`RC BROWSER ACCEPTANCE FAIL: ${failures} assertion(s) failed.`);process.exit(1);}
 if(videoDirectory) {

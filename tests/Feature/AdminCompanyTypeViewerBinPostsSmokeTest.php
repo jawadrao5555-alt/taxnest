@@ -196,7 +196,7 @@ class AdminCompanyTypeViewerBinPostsSmokeTest extends TestCase
 
         $response = $this->actingAsAdmin()
             ->from("/admin/companies/{$id}")
-            ->post("/admin/companies/{$id}/change-type", ['product_type' => 'pos']);
+            ->post("/admin/companies/{$id}/change-type", ['product_type' => 'pos', 'target_category' => 'other_service', 'target_package' => 'trial']);
 
         $response->assertRedirect("/admin/companies/{$id}");
         $response->assertSessionHas('success');
@@ -787,4 +787,54 @@ class AdminCompanyTypeViewerBinPostsSmokeTest extends TestCase
         $this->assertNotNull(DB::table('companies')->where('id', $binId)->value('deleted_at'));
         $this->assertSame(1, DB::table('users')->count());
     }
+    public function test_local_collection_bin_restore_preserves_snapshots_and_purge_removes_only_target_rows(): void
+    {
+        foreach (\App\Services\LocalCollectionLifecycle::TABLES as $table) {
+            Schema::create($table, function (Blueprint $t) {
+                $t->id(); $t->unsignedBigInteger('company_id'); $t->text('snapshot');
+            });
+        }
+        $id = $this->makeCompany(['product_type' => 'fbrpos', 'name' => 'Synthetic School']);
+        $other = $this->makeCompany(['product_type' => 'fbrpos', 'name' => 'Synthetic Hospital']);
+        foreach (\App\Services\LocalCollectionLifecycle::TABLES as $table) {
+            DB::table($table)->insert([['company_id' => $id, 'snapshot' => 'original: receipt=1 cash=500'],
+                ['company_id' => $other, 'snapshot' => 'other tenant']]);
+        }
+        $this->actingAsAdmin()->post("/admin/companies/{$id}/delete")->assertRedirect();
+        $this->assertNotNull(DB::table('companies')->where('id', $id)->value('deleted_at'));
+        $this->actingAsAdmin()->delete("/admin/bin/{$id}/destroy")->assertSessionHas('error');
+        $this->assertSame(1, DB::table('companies')->where('id', $id)->count());
+        foreach (\App\Services\LocalCollectionLifecycle::TABLES as $table) {
+            $this->assertSame('original: receipt=1 cash=500', DB::table($table)->where('company_id', $id)->value('snapshot'));
+        }
+        $this->actingAsAdmin()->post("/admin/bin/{$id}/restore")->assertRedirect();
+        foreach (\App\Services\LocalCollectionLifecycle::TABLES as $table) {
+            $this->assertSame('original: receipt=1 cash=500', DB::table($table)->where('company_id', $id)->value('snapshot'));
+        }
+        $this->actingAsAdmin()->post("/admin/companies/{$id}/delete")->assertRedirect();
+        DB::table('companies')->where('id', $id)->update(['deleted_at' => now()->subDays(8)]);
+        $this->actingAsAdmin()->delete("/admin/bin/{$id}/destroy")->assertSessionHas('success');
+        foreach (\App\Services\LocalCollectionLifecycle::TABLES as $table) {
+            $this->assertSame(0, DB::table($table)->where('company_id', $id)->count(), $table);
+            $this->assertSame('other tenant', DB::table($table)->where('company_id', $other)->value('snapshot'), $table);
+        }
+        $evidence = DB::table('company_deletion_request_events')->where('company_id', $id)
+            ->where('event', 'database_purge_committed')->first();
+        $this->assertNotNull($evidence);
+        $this->assertSame(1, json_decode($evidence->metadata, true)['local_collection_rows_purged']['school_fee_receipts']);
+    }
+
+    public function test_local_purge_rollback_leaves_all_ledger_rows_intact(): void
+    {
+        Schema::create('hospital_payments', function (Blueprint $t) { $t->id(); $t->unsignedBigInteger('company_id'); });
+        DB::table('hospital_payments')->insert(['company_id' => 999]);
+        try {
+            DB::transaction(function () {
+                app(\App\Services\LocalCollectionLifecycle::class)->purge(999);
+                throw new \RuntimeException('Synthetic rollback');
+            });
+        } catch (\RuntimeException $e) { $this->assertSame('Synthetic rollback', $e->getMessage()); }
+        $this->assertSame(1, DB::table('hospital_payments')->where('company_id', 999)->count());
+    }
+
 }

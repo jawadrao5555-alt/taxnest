@@ -26,7 +26,10 @@ class SendTrialReminders extends Command
     {
         $subs = Subscription::where('active', true)
             ->whereNotNull('trial_ends_at')
-            ->whereHas('pricingPlan', fn ($q) => $q->where('is_trial', true))
+            ->where(function ($q) {
+                $q->whereHas('pricingPlan', fn ($p) => $p->where('is_trial', true));
+                if (\App\Services\ProspectiveSubscriptionPolicy::available()) $q->orWhereNotNull('lifecycle_snapshot');
+            })
             ->whereHas('company', fn ($q) => $q->where('is_internal_account', false))
             ->with('company')
             ->get();
@@ -37,6 +40,12 @@ class SendTrialReminders extends Command
             $company = $sub->company;
             if (!$company) {
                 continue;
+            }
+
+            // A confirmed future paid term needs no payment demand during its remaining trial.
+            if ($sub->hasLifecycleSnapshot()) {
+                $view = \App\Services\ProspectiveSubscriptionPolicy::display($sub);
+                if (!$view || $view['phase'] !== 'trial' || !empty($view['paid_starts_at'])) continue;
             }
 
             $status = SubscriptionAccessService::trialStatus($company);
@@ -141,6 +150,11 @@ class SendTrialReminders extends Command
             ->get();
 
         foreach ($paidSubs as $sub) {
+            // Catalogue is_trial=false is not proof of a paid prospective term.
+            if ($sub->hasLifecycleSnapshot()) {
+                $view = \App\Services\ProspectiveSubscriptionPolicy::display($sub);
+                if (!$view || $view['phase'] !== 'paid') continue;
+            }
             $company = $sub->company;
             $email = $company ? $this->recipientEmail($company) : null;
             if (!$email) {

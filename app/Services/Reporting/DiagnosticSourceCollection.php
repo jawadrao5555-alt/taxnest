@@ -43,6 +43,20 @@ final class DiagnosticSourceCollection
 
                 return $result['status'];
             }
+            if ($source === FbrRetainedRefundEventEvidence::SOURCE) {
+                $result = array_replace($result, FbrRetainedRefundEventEvidence::observation($companyId,
+                    $from->copy()->setTimezone(config('app.timezone'))->format('Y-m-d H:i:s'),
+                    $from->copy()->endOfDay()->setTimezone(config('app.timezone'))->format('Y-m-d H:i:s')));
+                DB::table('diagnostic_source_observations')->insertOrIgnore($identity+$result);
+                return $result['status'];
+            }
+            if (in_array($source, RetainedPaymentEvidence::SOURCES, true)) {
+                $result = array_replace($result, RetainedPaymentEvidence::observation($source,$companyId,
+                    $from->copy()->setTimezone(config('app.timezone'))->format('Y-m-d H:i:s'),
+                    $from->copy()->endOfDay()->setTimezone(config('app.timezone'))->format('Y-m-d H:i:s')));
+                DB::table('diagnostic_source_observations')->insertOrIgnore($identity+$result);
+                return $result['status'];
+            }
             $required = array_merge(['id', $stamp, $source === 'di.fiscal' ? 'invoice_id' : 'company_id'], array_keys($fixed), $safeColumns);
             $available = Schema::hasTable($table);
             foreach ($required as $field) {
@@ -51,6 +65,7 @@ final class DiagnosticSourceCollection
             if ($source === 'di.fiscal') {
                 $available = $available && Schema::hasTable('invoices') && Schema::hasColumn('invoices', 'company_id');
             }
+            if ($source === 'di.stock_postings') $available = $available && DiRetainedStockEvidence::available();
             if ($available) {
                 $q = DB::table($table.' as e');
                 if ($source === 'di.fiscal') {
@@ -64,6 +79,11 @@ final class DiagnosticSourceCollection
                 $to = $from->copy()->endOfDay();
                 $q->whereBetween('e.'.$stamp, [$from->copy()->setTimezone(config('app.timezone'))->format('Y-m-d H:i:s'),
                     $to->setTimezone(config('app.timezone'))->format('Y-m-d H:i:s')]);
+                if ($source === 'di.stock_postings' && (clone $q)->whereNotIn('e.id', DiRetainedStockEvidence::validIds($companyId))->exists()) {
+                    $result['status'] = 'INCONSISTENT_RETAINED_LINKS';
+                    DB::table('diagnostic_source_observations')->insertOrIgnore($identity + $result);
+                    return $result['status'];
+                }
                 $row = $q->selectRaw('COUNT(*) as retained_rows, MIN(e.'.$stamp.') as first_source_at, MAX(e.'.$stamp.') as last_source_at')->first();
                 $result = array_replace($result, ['status' => (int) $row->retained_rows > 0 ? 'OBSERVED' : 'NO_RETAINED_EVENTS',
                     'retained_rows' => (int) $row->retained_rows, 'first_source_at' => $row->first_source_at, 'last_source_at' => $row->last_source_at]);

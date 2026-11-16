@@ -34,13 +34,13 @@ class ProfileController extends Controller
 
     public function update(ProfileUpdateRequest $request): RedirectResponse
     {
-        $request->user()->fill($request->validated());
-
-        if ($request->user()->isDirty('email')) {
-            $request->user()->email_verified_at = null;
-        }
-
-        $request->user()->save();
+        \Illuminate\Support\Facades\DB::transaction(function () use ($request) {
+            $actor = \App\Models\User::whereKey($request->user()->id)->lockForUpdate()->first();
+            abort_unless($actor && (int) $actor->company_id === (int) $request->user()->company_id, 403);
+            $actor->fill($request->validated());
+            if ($actor->isDirty('email')) $actor->email_verified_at = null;
+            $actor->save();
+        });
 
         return Redirect::route('profile.edit')->with('status', 'profile-updated');
     }
@@ -48,11 +48,12 @@ class ProfileController extends Controller
     public function updateCompany(Request $request): RedirectResponse
     {
         try {
-            if (! in_array($request->user()->role, ['company_admin', 'super_admin'])) {
+            $actor = $request->user()->fresh();
+            if (! $actor || (int) $actor->company_id !== (int) $request->user()->company_id || ! in_array($actor->role, ['company_admin', 'super_admin'], true)) {
                 return Redirect::route('profile.edit')->with('error', 'Only company admins can update business profile.');
             }
 
-            $company = Company::find($request->user()->company_id);
+            $company = Company::find($actor->company_id);
             if (! $company) {
                 return Redirect::route('profile.edit')->with('error', 'Company not found.');
             }
@@ -61,11 +62,11 @@ class ProfileController extends Controller
                 'name' => 'required|string|max:255',
                 'owner_name' => 'nullable|string|max:255',
                 'ntn' => 'nullable|string|max:50',
-                'cnic' => 'nullable|string|max:20',
+                'cnic' => \App\Support\ProfileFieldRules::cnic(),
                 'registration_no' => 'nullable|string|max:100',
                 'email' => 'nullable|email|max:255',
-                'phone' => 'nullable|string|max:50',
-                'mobile' => 'nullable|string|max:50',
+                'phone' => \App\Support\ProfileFieldRules::phone(),
+                'mobile' => \App\Support\ProfileFieldRules::phone(),
                 'business_activity' => 'nullable|string|max:255',
                 'address' => 'nullable|string|max:500',
                 'city' => 'nullable|string|max:100',

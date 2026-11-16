@@ -500,6 +500,32 @@ foreach ([1366, 390] as $width) {
     $bulkRiderCases[$width] = ['riderId' => $riderId, 'ids' => $ids];
 }
 
+// Independent synthetic delivery-credit tenants keep viewport recovery ledgers separate.
+$deliveryCreditCases = [];
+foreach ([1366, 390] as $width) {
+    $creditShop = $company('Synthetic Credit Shop '.$width, 'credit-shop-'.$width.'@rc-browser.invalid', 'RCCREDIT'.$width, 'pos', [
+        'business_category'=>'restaurant','pos_type'=>'restaurant','pos_setup_completed'=>true,
+        'feature_flags'=>array_merge(PosFeatureService::defaultsForCategory('restaurant'), ['delivery'=>true]),
+        'inventory_enabled'=>false,
+    ]);
+    $creditOwner = $user($creditShop, 'Synthetic Credit Owner '.$width, 'credit-owner-'.$width.'@rc-browser.invalid', 'company_admin', 'pos_admin');
+    $creditRiderUser = $user($creditShop, 'Synthetic Credit Rider '.$width, 'credit-rider-'.$width.'@rc-browser.invalid', 'staff', 'pos_rider');
+    $creditRider = \App\Models\PosRider::create(['company_id'=>$creditShop->id,'user_id'=>$creditRiderUser->id,'name'=>'Synthetic Credit Rider '.$width,'is_active'=>true]);
+    $creditIds=[];
+    foreach (['received','credit'] as $mode) {
+        $bill=DB::table('pos_transactions')->insertGetId([
+            'company_id'=>$creditShop->id,'created_by'=>$creditOwner->id,'invoice_number'=>'SYN-CREDIT-PRIVATE-'.$width.'-'.$mode,
+            'business_date'=>\App\Services\PosBusinessDay::current($creditShop->id),'status'=>'completed','invoice_mode'=>'local','pra_status'=>'local',
+            'customer_name'=>'Synthetic '.$mode.' customer '.$width,'customer_phone'=>'00000000000','payment_method'=>'cash','order_type'=>'delivery',
+            'subtotal'=>100,'tax_rate'=>0,'tax_amount'=>0,'total_amount'=>100,'rider_collection_amount'=>100,
+            'rider_id'=>$creditRider->id,'delivery_status'=>'dispatched','created_at'=>$now,'updated_at'=>$now,
+        ]);
+        DB::table('pos_transaction_items')->insert(['transaction_id'=>$bill,'item_name'=>'Synthetic private invoice item','quantity'=>1,'unit_price'=>100,'subtotal'=>100,'tax_amount'=>0,'created_at'=>$now,'updated_at'=>$now]);
+        $creditIds[$mode]=$bill;
+    }
+    $deliveryCreditCases[$width]=['login'=>$creditOwner->email,'riderLogin'=>$creditRiderUser->email,'ids'=>$creditIds];
+}
+
 $topSellingCompany = $company('Synthetic Top Selling', 'top-selling-company@rc-browser.invalid', 'RCTOPSELL001', 'pos', [
     'business_category' => 'restaurant', 'pos_type' => 'restaurant', 'restaurant_mode' => true,
     'feature_flags' => PosFeatureService::defaultsForCategory('restaurant'), 'pos_setup_completed' => true,
@@ -952,6 +978,29 @@ foreach([1366,390] as $width){
         'portal'=>['id'=>$portalRecord->id,'usin'=>$portalPayload['USIN'],'date'=>substr($portalPayload['DateTime'],0,10),
             'reference'=>'SYN-PORTAL-'.$width]];
 }
+$reviewedDeviceProofCases=[];
+foreach ([1366,390] as $proofWidth) {
+    $proofCompany=$company('Synthetic Device Review '.$proofWidth,'proof-company-'.$proofWidth.'@rc-browser.invalid','RCPROOF'.$proofWidth,'pos',['pra_reporting_enabled'=>false,'pos_setup_completed'=>true]);
+    DB::table('pos_agent_devices')->insert(['company_id'=>$proofCompany->id,'device_uid'=>'Synthetic-Browser-Device-'.$proofWidth,'created_at'=>now(),'updated_at'=>now()]);
+    $proofReviewer=AdminUser::create(['name'=>'Synthetic Proof Reviewer '.$proofWidth,'email'=>'proof-reviewer-'.$proofWidth.'@rc-browser.invalid','password'=>$password,'role'=>'super_admin']);
+    $proofSupport=AdminUser::create(['name'=>'Synthetic Proof Support '.$proofWidth,'email'=>'proof-support-'.$proofWidth.'@rc-browser.invalid','password'=>$password,'role'=>'support']);
+    $reviewedDeviceProofCases[$proofWidth]=['companyId'=>$proofCompany->id,'login'=>$proofReviewer->email,'support'=>$proofSupport->email];
+}
+$reviewedDeviceProofCases[1366]['foreignCompanyId']=$reviewedDeviceProofCases[390]['companyId'];
+$reviewedDeviceProofCases[390]['foreignCompanyId']=$reviewedDeviceProofCases[1366]['companyId'];
+$cashierPolicyCases=[];
+foreach ([1366,390] as $policyWidth) {
+    $policyCompany=$company('Synthetic Cashier Policy '.$policyWidth,'policy-company-'.$policyWidth.'@rc-browser.invalid','RCPOLICY'.$policyWidth,'pos',[
+        'pos_integration_mode'=>'pra','pra_reporting_enabled'=>false,'pos_setup_completed'=>true,'pos_tax_rate_cash'=>16,'pos_tax_rate_card'=>5]);
+    $policyPlan=\App\Models\PricingPlan::create(['name'=>'Synthetic cashier policy '.$policyWidth,'product_type'=>'pos','price'=>100,'invoice_limit'=>100]);
+    \App\Models\Subscription::create(['company_id'=>$policyCompany->id,'pricing_plan_id'=>$policyPlan->id,'active'=>true,'start_date'=>now()->subDay()->toDateString(),'end_date'=>now()->addDays(30)->toDateString()]);
+    $policyOwner=$user($policyCompany,'Synthetic Policy Owner','policy-owner-'.$policyWidth.'@rc-browser.invalid','company_admin','pos_admin');
+    $policyCashier=$user($policyCompany,'Synthetic Policy Cashier','policy-cashier-'.$policyWidth.'@rc-browser.invalid','user','pos_cashier');
+    $policyAdmin=$user($policyCompany,'Synthetic Policy Admin','policy-admin-'.$policyWidth.'@rc-browser.invalid','user','pos_admin');
+    $cashierPolicyCases[$policyWidth]=['owner'=>$policyOwner->email,'cashier'=>$policyCashier->email,'admin'=>$policyAdmin->email,'cashierId'=>$policyCashier->id];
+}
+$cashierPolicyCases[1366]['foreignId']=$cashierPolicyCases[390]['cashierId'];
+$cashierPolicyCases[390]['foreignId']=$cashierPolicyCases[1366]['cashierId'];
 $staffCases=[];
 foreach ([1366,390] as $staffWidth) {
     $staffCompany=$company('Synthetic Staff Approval '.$staffWidth,'staff-company-'.$staffWidth.'@rc-browser.invalid','RCSTAFF'.$staffWidth,'pos',[
@@ -1032,6 +1081,152 @@ foreach ([1366,390] as $securityWidth) {
         }
     }
 }
+// Usage metadata is generated by the accounting service only; never call a provider.
+$expenseCases=[];
+foreach([1366,390] as $width){
+ $reviewer=AdminUser::create(['name'=>'Synthetic Expense Owner '.$width,'email'=>'expense-owner-'.$width.'@rc-browser.invalid','password'=>$password,'role'=>'super_admin']);
+ $support=AdminUser::create(['name'=>'Synthetic Expense Support '.$width,'email'=>'expense-support-'.$width.'@rc-browser.invalid','password'=>$password,'role'=>'support']);
+ $expenseCases[$width]=['login'=>$reviewer->email,'support'=>$support->email];
+}
+$pilotFiscalCases=[];
+foreach([1366,390] as $fiscalWidth){
+ $fiscalAdmin=AdminUser::create(['name'=>'Synthetic Fiscal Reviewer '.$fiscalWidth,'email'=>'pilot-fiscal-admin-'.$fiscalWidth.'@rc-browser.invalid','password'=>$password,'role'=>'super_admin']);
+ $fiscalSupport=AdminUser::create(['name'=>'Synthetic Fiscal Support '.$fiscalWidth,'email'=>'pilot-fiscal-support-'.$fiscalWidth.'@rc-browser.invalid','password'=>$password,'role'=>'support']);
+ $pilotFiscalCases[$fiscalWidth]=['login'=>$fiscalAdmin->email,'support'=>$fiscalSupport->email,'companies'=>[]];
+ foreach(['education'=>'school','clinic'=>'hospital'] as $fiscalCategory=>$fiscalLabel){
+  $fiscalCompany=$company('Synthetic fiscal '.$fiscalLabel.' '.$fiscalWidth,'pilot-fiscal-'.$fiscalLabel.'-'.$fiscalWidth.'@rc-browser.invalid','RCPFC'.$fiscalLabel.$fiscalWidth,'fbrpos',['pos_type'=>$fiscalCategory,'business_category'=>$fiscalCategory,'pos_setup_completed'=>true,'fbr_pos_enabled'=>true,'fbr_reporting_enabled'=>false,'pra_reporting_enabled'=>false]);
+  $fiscalOwner=$user($fiscalCompany,'Synthetic fiscal tenant','pilot-fiscal-owner-'.$fiscalLabel.'-'.$fiscalWidth.'@rc-browser.invalid','company_admin','pos_admin');
+  $pilotFiscalCases[$fiscalWidth]['companies'][]=['id'=>$fiscalCompany->id,'category'=>$fiscalLabel,'owner'=>$fiscalOwner->email];
+ }
+}
+$aiUsageCases=[];
+foreach ([1366,390] as $width) {
+    $reviewer=AdminUser::create(['name'=>'Synthetic AI reviewer '.$width,'email'=>'ai-reviewer-'.$width.'@rc-browser.invalid','password'=>$password,'role'=>'super_admin']);
+    $support=AdminUser::create(['name'=>'Synthetic AI support '.$width,'email'=>'ai-support-'.$width.'@rc-browser.invalid','password'=>$password,'role'=>'support']);
+    $aiUsageCases[$width]=['admin'=>$reviewer->email,'support'=>$support->email,'panels'=>[]];
+    foreach (['pos','fbrpos'] as $product) {
+        $category=$product==='pos'?'retail':'education';
+        $c=$company('Synthetic AI usage '.$product.' '.$width,'ai-company-'.$product.'-'.$width.'@rc-browser.invalid','RCAI'.$product.$width,$product,['pos_type'=>$category,'business_category'=>$category,'pos_setup_completed'=>true,'fbr_pos_enabled'=>$product==='fbrpos','pra_reporting_enabled'=>false,'fbr_reporting_enabled'=>false]);
+        $owner=$user($c,'Synthetic usage owner','ai-owner-'.$product.'-'.$width.'@rc-browser.invalid','company_admin','pos_admin');
+        $cashier=$user($c,'Synthetic usage cashier','ai-cashier-'.$product.'-'.$width.'@rc-browser.invalid','employee','pos_cashier');
+        DB::table('madadgar_budget_policies')->insert(['company_id'=>$c->id,'model'=>'gpt-4o-mini','currency'=>'USD','input_per_million'=>'1.000000','output_per_million'=>'1.000000','monthly_budget'=>'0.001000','configured_by'=>$reviewer->id,'created_at'=>now(),'updated_at'=>now()]);
+        \App\Services\MadadgarUsage::local($c,'local',3);
+        $event=\App\Services\MadadgarUsage::begin($c,100,600);
+        \App\Services\MadadgarUsage::finish($event,10,['prompt_tokens'=>12,'completion_tokens'=>8]);
+        $uncertain=\App\Services\MadadgarUsage::begin($c,100,600);
+        \App\Services\MadadgarUsage::finish($uncertain,11,null,'provider_transport_error');
+        try { \App\Services\MadadgarUsage::begin($c,100,600); throw new RuntimeException('Synthetic cap did not block'); }
+        catch (RuntimeException $e) { if($e->getMessage()!=='Madadgar company AI budget unavailable')throw $e; }
+        $aiUsageCases[$width]['panels'][]=['companyId'=>$c->id,'companyName'=>$c->name,'login'=>$owner->email,'cashier'=>$cashier->email,'prefix'=>$product==='pos'?'/pos':'/fbr-pos'];
+    }
+}
+// Synthetic frozen-close and recipe evidence; never dispatches PRA or an AI provider.
+$praReadCases=[];
+foreach([1366,390] as $width){
+ $flags=PosFeatureService::defaultsForCategory('restaurant');foreach(['inventory','recipes','kitchen','kot'] as $flag)$flags[$flag]=true;
+ $c=$company('Synthetic PRA reads '.$width,'pra-read-'.$width.'@rc-browser.invalid','RCPRAREAD'.$width,'pos',['business_category'=>'restaurant','pos_type'=>'restaurant','restaurant_mode'=>true,'pos_setup_completed'=>true,'pra_reporting_enabled'=>false,'feature_flags'=>$flags]);
+ $o=$user($c,'Synthetic read owner','pra-read-owner-'.$width.'@rc-browser.invalid','company_admin','pos_admin');
+ $cashier=$user($c,'Synthetic read cashier','pra-read-cashier-'.$width.'@rc-browser.invalid','user','pos_cashier');
+ $branches=[];foreach(['A','B'] as $label)$branches[$label]=DB::table('branches')->insertGetId(['company_id'=>$c->id,'name'=>'Synthetic Recipe '.$label,'is_active'=>true,'is_head_office'=>$label==='A','created_at'=>$now,'updated_at'=>$now]);
+ $o->forceFill(['default_branch_id'=>$branches['A']])->save();$cashier->forceFill(['default_branch_id'=>$branches['A']])->save();
+ DB::table('branch_user')->insert(['user_id'=>$cashier->id,'branch_id'=>$branches['A'],'access_level'=>'full','created_at'=>$now,'updated_at'=>$now]);
+ $product=\App\Models\PosProduct::forceCreate(['company_id'=>$c->id,'name'=>'SYNTHETIC-PRIVATE-RECIPE-'.$width,'price'=>100,'is_active'=>true,'is_tax_exempt'=>false]);
+ $ingredient=DB::table('ingredients')->insertGetId(['company_id'=>$c->id,'name'=>'SYNTHETIC-PRIVATE-INGREDIENT','unit'=>'kg','base_unit'=>'kg','cost_per_unit'=>10,'current_stock'=>11,'min_stock_level'=>0,'is_active'=>true,'created_at'=>$now,'updated_at'=>$now]);
+ DB::table('product_recipes')->insert(['company_id'=>$c->id,'product_id'=>$product->id,'ingredient_id'=>$ingredient,'quantity_needed'=>2,'waste_percent'=>10,'is_active'=>true,'created_at'=>$now,'updated_at'=>$now]);
+ DB::table('ingredient_stocks')->insert(['company_id'=>$c->id,'ingredient_id'=>$ingredient,'branch_id'=>$branches['A'],'quantity'=>4.4,'created_at'=>$now,'updated_at'=>$now]);
+ DB::table('pos_day_close_reports')->insert(['company_id'=>$c->id,'branch_id'=>$branches['A'],'report_date'=>now(config('reporting_connector.timezone','Asia/Karachi'))->toDateString(),'report_number'=>'SYN-READ-'.$width,'cash_amount'=>123,'expected_cash'=>123,'counted_cash'=>120,'cash_variance'=>-3,'closed_by'=>$o->id,'created_at'=>$now,'updated_at'=>$now]);
+ $praReadCases[$width]=['login'=>$o->email,'cashier'=>$cashier->email,'company'=>$c->id,'campus'=>$branches['A'],'otherCampus'=>$branches['B'],'product'=>$product->id];
+}
+foreach([1366=>390,390=>1366] as $width=>$other){$praReadCases[$width]['foreignCompany']=$praReadCases[$other]['company'];$praReadCases[$width]['foreignCampus']=$praReadCases[$other]['campus'];}
+
+$diReadCases=[];
+foreach([1366,390] as $width){
+    $readCompany=$company('Synthetic DI read '.$width,'di-read-company-'.$width.'@rc-browser.invalid','RCDIREAD'.$width,'di');
+    $readOwner=$user($readCompany,'Synthetic DI read owner','di-read-owner-'.$width.'@rc-browser.invalid','company_admin');
+    $readCashier=$user($readCompany,'Synthetic DI read cashier','di-read-cashier-'.$width.'@rc-browser.invalid','user','pos_cashier');
+    foreach(['locked'=>$width===1366?321:654,'draft'=>999] as $status=>$total){
+        \App\Models\Invoice::withoutEvents(fn()=>\App\Models\Invoice::withoutGlobalScopes()->create(['company_id'=>$readCompany->id,'invoice_number'=>'SYN-READ-'.$width.'-'.$status,'buyer_name'=>'SYNTHETIC-PRIVATE-BUYER-'.$width,'buyer_ntn'=>'','buyer_address'=>'Synthetic address','status'=>$status,'total_amount'=>$total,'total_value_excluding_st'=>$total,'total_sales_tax'=>0,'document_type'=>'Sale Invoice','created_at'=>$now,'updated_at'=>$now]));
+    }
+    $diReadCases[$width]=['login'=>$readOwner->email,'cashier'=>$readCashier->email,'company'=>$readCompany->id,'total'=>$width===1366?'321.00':'654.00','foreignTotal'=>$width===1366?'654.00':'321.00'];
+}
+foreach([1366=>390,390=>1366] as $width=>$other)$diReadCases[$width]['foreignCompany']=$diReadCases[$other]['company'];
+$privateProfileCases = [];
+foreach ([1366, 390] as $width) {
+    $profileCompany = $company('Synthetic private profile '.$width, 'private-profile-'.$width.'@rc-browser.invalid', 'RCPROFILE'.$width, 'di');
+    $profileOwner = $user($profileCompany, 'Synthetic profile owner', 'private-profile-owner-'.$width.'@rc-browser.invalid', 'company_admin');
+    $privateProfileCases[$width] = ['login'=>$profileOwner->email, 'companyName'=>$profileCompany->name, 'companyId'=>$profileCompany->id];
+}
+$greetingCases = [];
+foreach ([1366, 390] as $width) {
+    $greetCompany = $company('Synthetic greeting workspace '.$width, 'greeting-'.$width.'@rc-browser.invalid', 'RCGREET'.$width, 'di');
+    $greetOwner = $user($greetCompany, 'Synthetic greeting owner', 'greeting-owner-'.$width.'@rc-browser.invalid', 'company_admin');
+    $greetingCases[$width] = ['login'=>$greetOwner->email];
+}
+// Keep synthetic media in existing disposable storage, never mutate committed public/videos.
+File::ensureDirectoryExists(storage_path('app/public/rc-browser-tutorials'));
+File::put(storage_path('app/public/rc-browser-tutorials/rc-onboarding-synthetic.mp4'), 'synthetic file placeholder; never played');
+File::put(storage_path('app/public/rc-browser-tutorials/rc-onboarding-synthetic.vtt'), "WEBVTT\n\n00:00.000 --> 00:01.000\nSynthetic caption fixture\n");
+\App\Models\TutorialVideo::create(['slug'=>'rc-onboarding-synthetic','product'=>'di','title'=>'Synthetic searchable guide','description'=>'Synthetic accessibility acceptance only','video_url'=>'/storage/rc-browser-tutorials/rc-onboarding-synthetic.mp4','category'=>'shuruat','is_published'=>true,'show_public'=>true,'controls_applied'=>true,'caption_path'=>'/storage/rc-browser-tutorials/rc-onboarding-synthetic.vtt','caption_language'=>'en','transcript'=>'Synthetic transcript only','release_version'=>'synthetic-build','reviewed_on'=>'2026-01-01']);
+// Synthetic state fixtures only: no fiscal transport is invoked or configured.
+$diInventoryCases=[];
+foreach ([1366,390] as $width) {
+    $stockCompany=$company('Synthetic DI stock '.$width,'di-stock-'.$width.'@rc-browser.invalid','RCDISTOCK'.$width,'di',['inventory_enabled'=>true]);
+    $stockOwner=$user($stockCompany,'Synthetic stock owner','di-stock-owner-'.$width.'@rc-browser.invalid','company_admin');
+    $stockProduct=\App\Models\Product::withoutGlobalScopes()->create(['company_id'=>$stockCompany->id,'name'=>'Synthetic DI KG stock '.$width,'hs_code'=>'33049900','uom'=>'KG','is_active'=>true,'default_price'=>100,'default_tax_rate'=>0]);
+    DB::table('inventory_stocks')->insert(['company_id'=>$stockCompany->id,'product_id'=>$stockProduct->id,'branch_id'=>null,'quantity'=>'100.0000','min_stock_level'=>0,'avg_purchase_price'=>0,'last_purchase_price'=>0,'created_at'=>$now,'updated_at'=>$now]);
+    $stockCases=[];
+    foreach (['posted'=>['50.0000','production'],'sandbox'=>['25.0000','sandbox'],'hold'=>['10.1234','production']] as $kind=>[$quantity,$environment]) {
+        $invoice=\App\Models\Invoice::withoutGlobalScopes()->create(['company_id'=>$stockCompany->id,'invoice_number'=>'SYN-DI-STOCK-'.$width.'-'.$kind,'buyer_name'=>'Synthetic stock buyer','buyer_ntn'=>'','buyer_address'=>'Synthetic address','total_amount'=>round((float)$quantity*100,2),'total_value_excluding_st'=>round((float)$quantity*100,2),'total_sales_tax'=>0,'status'=>'draft','document_type'=>'Sale Invoice','inventory_enabled_snapshot'=>true,'inventory_environment_snapshot'=>$environment]);
+        $invoice->items()->create(['hs_code'=>'33049900','description'=>'Synthetic stock line','quantity'=>$quantity,'price'=>100,'tax'=>0,'default_uom'=>'KG','inventory_snapshot'=>['version'=>1,'company_id'=>$stockCompany->id,'product_id'=>$stockProduct->id,'branch_id'=>null,'base_uom'=>'KG','base_quantity'=>$quantity,'source_invoice_item_id'=>null]]);
+        \App\Services\DiFiscalSubmissionState::accepted($invoice,'SYNTHETIC-NOT-REGULATOR-'.$width.'-'.$kind,$environment,'synthetic_browser_fixture');
+        if($kind==='hold') {
+            // Simulate an acknowledged fixture whose local projection has not completed.
+            $invoice->inventory_posting_state='reconciliation_hold';
+            $invoice->save();
+            $invoice->refresh()->load('items'); // Sign durable DB defaults, not an incompletely hydrated factory model.
+            $invoice->integrity_hash=\App\Services\IntegrityHashService::generate($invoice);
+            $invoice->save();
+        } else \App\Services\DiInvoiceInventory::saveAccepted($invoice);
+        $stockCases[$kind]=['id'=>$invoice->id,'reference'=>$invoice->internal_invoice_number??$invoice->invoice_number,'ack'=>$invoice->fbr_invoice_number];
+    }
+    $diInventoryCases[$width]=['login'=>$stockOwner->email,'product'=>$stockProduct->id,'invoices'=>$stockCases];
+}
+foreach([1366=>390,390=>1366] as $width=>$other) {
+    $diInventoryCases[$width]['foreignInvoice']=$diInventoryCases[$other]['invoices']['posted']['id'];
+    $diInventoryCases[$width]['foreignProduct']=$diInventoryCases[$other]['product'];
+}
+
+// Deterministic company-read acceptance. Provider mode is local; credentials untouched.
+\App\Models\SystemSetting::set('madadgar_enabled','1');
+\App\Models\SystemSetting::set('madadgar_mode','local');
+$madadgarReadCases=[];
+foreach ([1366,390] as $width) {
+    $readSchool=$company('Synthetic scoped school '.$width,'read-school-'.$width.'@rc-browser.invalid','RCREAD'.$width,'fbrpos',['business_category'=>'education','pos_type'=>'education','fbr_pos_enabled'=>true,'fbr_reporting_enabled'=>false,'fbr_pos_environment'=>'sandbox','pos_setup_completed'=>true,'feature_flags'=>PosFeatureService::defaultsForCategory('education')]);
+    \App\Models\Subscription::create(['company_id'=>$readSchool->id,'active'=>true,'override_type'=>'lifetime','start_date'=>$now,'end_date'=>now()->addYear()]);
+    $readOwner=$user($readSchool,'Synthetic scoped owner','read-owner-'.$width.'@rc-browser.invalid','company_admin','pos_admin');
+    $readCashier=$user($readSchool,'Synthetic scoped cashier','read-cashier-'.$width.'@rc-browser.invalid','user','pos_cashier');
+    $readCampuses=[];
+    foreach (['A'=>12345,'B'=>99999] as $label=>$amount) {
+        $branch=DB::table('branches')->insertGetId(['company_id'=>$readSchool->id,'name'=>'Synthetic Read Campus '.$label,'is_active'=>true,'is_head_office'=>$label==='A','created_at'=>$now,'updated_at'=>$now]);
+        $readCampuses[$label]=$branch;
+        DB::table('school_fee_receipts')->insert(['company_id'=>$readSchool->id,'branch_id'=>$branch,'collected_by'=>$readOwner->id,'request_key'=>(string)\Illuminate\Support\Str::uuid(),'student_reference'=>'SYNTHETIC-PRIVATE-READ-'.$label,'fee_head'=>'tuition','amount_paisa'=>$amount,'payment_method'=>'cash','collected_at'=>$now,'created_at'=>$now,'updated_at'=>$now]);
+    }
+    $readOwner->forceFill(['default_branch_id'=>$readCampuses['A']])->save();
+    $readCashier->forceFill(['default_branch_id'=>$readCampuses['A']])->save();
+    DB::table('branch_user')->insert(['user_id'=>$readCashier->id,'branch_id'=>$readCampuses['A'],'access_level'=>'full','created_at'=>$now,'updated_at'=>$now]);
+    $madadgarReadCases[$width]=['login'=>$readOwner->email,'cashier'=>$readCashier->email,'campus'=>$readCampuses['A'],'otherCampus'=>$readCampuses['B'],'company'=>$readSchool->id,'date'=>now()->toDateString()];
+}
+foreach([1366=>390,390=>1366] as $width=>$other)$madadgarReadCases[$width]['foreignCompany']=$madadgarReadCases[$other]['company'];
+
+$policyCases=[];
+foreach([1366,390] as $width){
+    $policyCompany=$company('Synthetic prospective policy '.$width,'policy-company-'.$width.'@rc-browser.invalid','RCPOLICY'.$width,'di',['is_internal_account'=>false,'onboarding_completed'=>true]);
+    $policyOwner=$user($policyCompany,'Synthetic policy owner','policy-owner-'.$width.'@rc-browser.invalid','company_admin');
+    $policyPlan=\App\Models\PricingPlan::create(['name'=>'Synthetic selected trial '.$width,'product_type'=>'di','price'=>1000,'invoice_limit'=>25,'is_trial'=>false,'is_public'=>true]);
+    $policySubscription=\App\Services\TrialSubscriptionService::ensureSelectedTrial($policyCompany->id,'di',$policyPlan->id);
+    $policyCases[$width]=['login'=>$policyOwner->email,'terms'=>\App\Services\ProspectiveSubscriptionPolicy::display($policySubscription),'plan'=>$policyPlan->name];
+}
+require __DIR__.'/lib/prospective-reminder-fixture.php';
 $billingSelectionCases = [];
 foreach ([1366,390] as $width) {
     $billingCompany = $company('Synthetic Billing Selection '.$width, 'billing-selection-'.$width.'@rc-browser.invalid', 'RCBILLSEL'.$width, 'di',
@@ -1044,6 +1239,20 @@ foreach ([1366,390] as $width) {
     $nextPlan = \App\Models\PricingPlan::create(['name' => 'Synthetic Selected '.$width, 'product_type' => 'di',
         'price' => 200, 'invoice_limit' => 50, 'is_trial' => false, 'is_public' => true]);
     $billingSelectionCases[$width] = ['login' => $billingOwner->email, 'planId' => $nextPlan->id, 'original' => $oldPlan->name];
+    $publicPlans=[];
+    foreach(['di','pos','fbrpos','erps'] as $signupProduct){
+        // POS/FBR deliberately expose only their canonical sellable packages.
+        // Do not invent a plan that the actual signup correctly refuses to offer.
+        $signupPlan=match($signupProduct){
+            'pos'=>\App\Services\PosPlanComparisonService::plans()->first(),
+            'fbrpos'=>\App\Services\FbrPosPlanComparisonService::plans()->first(),
+            default=>\App\Models\PricingPlan::create(['name'=>'Synthetic Signup '.$signupProduct.' '.$width,'product_type'=>$signupProduct,'price'=>1000,'price_yearly'=>12000,'invoice_limit'=>25,'is_trial'=>false,'is_public'=>true]),
+        };
+        if(!$signupPlan)$fail('canonical synthetic signup catalogue is empty for '.$signupProduct);
+        $publicPlans[$signupProduct]=['id'=>$signupPlan->id,'name'=>$signupPlan->name];
+    }
+    $billingSelectionCases[$width]['publicPlans']=$publicPlans;
+
 }
 \App\Models\GlobalHsMaster::updateOrCreate(['hs_code' => '99010000'], ['description' => 'Synthetic unreported packing fixture',
     'schedule_type' => 'standard', 'tax_rate' => 18, 'default_uom' => 'KG']);
@@ -1102,6 +1311,17 @@ $fixture = [
         ['name' => 'service-work-orders-denied', 'login' => $serviceDenied->email, 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/work-orders', '/pos/work-orders/report.csv'], 'denied' => true],
     ], $categoryJourneys, $optionalArchiveJourneys),
     'transactionalJourneys' => [
+        ['name'=>'madadgar-company-reads','manualOnly'=>true,'login'=>$madadgarReadCases[1366]['login'],'password'=>$password,'loginPath'=>'/fbr-pos/login','paths'=>[],'madadgarReadCases'=>$madadgarReadCases],
+        ['name'=>'prospective-billing-policy','manualOnly'=>true,'login'=>$policyCases[1366]['login'],'password'=>$password,'loginPath'=>'/login','paths'=>[],'policyCases'=>$policyCases],
+        ['name'=>'pilot-fiscal-controls','manualOnly'=>true,'login'=>$pilotFiscalCases[1366]['login'],'password'=>$password,'loginPath'=>'/admin/login','paths'=>[],'pilotFiscalCases'=>$pilotFiscalCases],
+        ['name'=>'platform-expense-records','manualOnly'=>true,'login'=>$expenseCases[1366]['login'],'password'=>$password,'loginPath'=>'/admin/login','paths'=>[],'expenseCases'=>$expenseCases],
+        ['name'=>'ai-usage-budget','manualOnly'=>true,'login'=>$aiUsageCases[1366]['admin'],'password'=>$password,'loginPath'=>'/admin/login','paths'=>[],'aiUsageCases'=>$aiUsageCases],
+        ['name'=>'pra-bounded-reads','manualOnly'=>true,'login'=>$praReadCases[1366]['login'],'password'=>$password,'loginPath'=>'/pos/login','paths'=>[],'praReadCases'=>$praReadCases],
+        ['name'=>'di-bounded-reads','manualOnly'=>true,'login'=>$diReadCases[1366]['login'],'password'=>$password,'loginPath'=>'/login','paths'=>[],'diReadCases'=>$diReadCases],
+        ['name'=>'private-profile-fields','manualOnly'=>true,'login'=>$privateProfileCases[1366]['login'],'password'=>$password,'loginPath'=>'/login','paths'=>[],'privateProfileCases'=>$privateProfileCases],
+        ['name'=>'opt-in-greetings-tutorials','manualOnly'=>true,'login'=>$greetingCases[1366]['login'],'password'=>$password,'loginPath'=>'/login','paths'=>[],'greetingCases'=>$greetingCases],
+        ['name'=>'di-inventory-projection','manualOnly'=>true,'login'=>$diInventoryCases[1366]['login'],'password'=>$password,'loginPath'=>'/login','paths'=>[],'diInventoryCases'=>$diInventoryCases],
+        ['name'=>'delivery-credit','login'=>$deliveryCreditCases[1366]['login'],'password'=>$password,'loginPath'=>'/pos/login','paths'=>['/pos/delivery-accounts'],'markers'=>['Synthetic credit customer'],'deliveryCredit'=>$deliveryCreditCases,'manualOnly'=>true],
         ['name'=>'hospital-collections','login'=>$hospitalCases[1366],'mobileLogin'=>$hospitalCases[390],'password'=>$password,'loginPath'=>'/fbr-pos/login',
             'paths'=>['/fbr-pos/hospital'],'markers'=>['Hospital'],'hospitalCollection'=>true,'manualOnly'=>true],
         ['name'=>'school-fees','login'=>$schoolUser->email,'mobileLogin'=>$schoolMobileUser->email,'password'=>$password,'loginPath'=>'/fbr-pos/login',
@@ -1114,6 +1334,8 @@ $fixture = [
         ['name'=>'billing-package-selection','login'=>$billingSelectionCases[1366]['login'],'password'=>$password,'loginPath'=>'/login',
             'paths'=>[], 'billingSelection'=>$billingSelectionCases],
         ['name'=>'kot-note-visibility','login'=>$kotNoteOwner->email,'password'=>$password,'loginPath'=>'/pos/login','paths'=>['/pos/invoice/create'],'markers'=>['Current Order'],'kotNoteVisibility'=>['orderId'=>$kotNoteOrder->id]],
+        ['name'=>'reviewed-device-proof','manualOnly'=>true,'login'=>$reviewedDeviceProofCases[1366]['login'],'password'=>$password,'loginPath'=>'/admin/login','paths'=>['/admin/companies'],'markers'=>[],'reviewedDeviceProof'=>$reviewedDeviceProofCases],
+        ['name'=>'cashier-online-payment-policy','manualOnly'=>true,'login'=>$cashierPolicyCases[1366]['cashier'],'password'=>$password,'loginPath'=>'/pos/login','paths'=>['/pos/invoice/create'],'markers'=>[],'cashierPolicy'=>$cashierPolicyCases],
         ['name'=>'staff-discount-approval','login'=>$staffCases[1366]['cashier'],'password'=>$password,'loginPath'=>'/pos/login','paths'=>['/pos/staff-discounts'],'markers'=>['Staff / family discount requests'],'staffDiscount'=>$staffCases],
         ...$surveyJourneys,
         ['name'=>'b01-company-account','login'=>$admin->email,'password'=>$password,'loginPath'=>'/admin/login',

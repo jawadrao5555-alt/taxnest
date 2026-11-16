@@ -12,8 +12,10 @@ class PosDeliveryAccountController extends Controller
     {
         $user = auth('pos')->user();
         abort_unless($user && ($user->role === 'company_admin' || $user->pos_role === 'pos_admin'), 403);
+        $companyId = (int) app('currentCompanyId');
+        PosDeliveryAccount::authorizeCollector($companyId, (int) $user->id);
         abort_unless(PosDeliveryAccount::ready(), 503);
-        return (int) app('currentCompanyId');
+        return $companyId;
     }
 
     public function index(Request $request)

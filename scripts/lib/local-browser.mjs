@@ -13,6 +13,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import pw from 'playwright-core';
+import { captureSyntheticPixels } from './synthetic-pixel-capture.mjs';
 
 const { chromium } = pw;
 const require = createRequire(import.meta.url);
@@ -545,6 +546,7 @@ export async function saveEvidenceScreenshot(page, name) {
     const file = path.join(dir, `${safe}.png`);
     await page.screenshot({ path: file, fullPage: true });
     writeFileSync(path.join(dir, `${safe}.txt`), `screenshot=${file}\ntime=${new Date().toISOString()}\n`);
+    await captureSyntheticPixels(page, String(name));
     return file;
 }
 

@@ -28,10 +28,12 @@ use Illuminate\Support\Facades\Schema;
 class AgentCommissionService
 {
     /** Called right after a payment proof flips to verified. Never breaks approval. */
-    public static function recordForProof(PaymentProof $proof): void
+    public static function recordForProof(PaymentProof $proof, bool $atomic = false): void
     {
         try {
+            if ($atomic && \Illuminate\Support\Facades\DB::transactionLevel() < 1) throw new \LogicException('Reviewed commission requires a transaction.');
             if (!Schema::hasTable('agent_commissions')) {
+                if ($atomic && Company::withTrashed()->find($proof->company_id)?->agent_id) throw new \LogicException('Agent commission schema unavailable.');
                 return;
             }
             if ($proof->isExtraBranch()) {
@@ -39,6 +41,7 @@ class AgentCommissionService
             }
             self::createEarnLine($proof);
         } catch (\Throwable $e) {
+            if ($atomic) throw $e;
             Log::warning('Agent commission record failed', [
                 'payment_proof_id' => $proof->id,
                 'error' => $e->getMessage(),

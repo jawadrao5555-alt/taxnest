@@ -345,7 +345,7 @@ class ConsultantService
      * signup; every recorded payment of that company earns the consultant
      * their profile's current rate. Duplicate-safe per subscription row.
      */
-    public static function recordCommissionForSubscription(Subscription $sub): ?ConsultantCommission
+    public static function recordCommissionForSubscription(Subscription $sub, bool $atomic = false): ?ConsultantCommission
     {
         try {
             $company = Company::find($sub->company_id);
@@ -390,10 +390,15 @@ class ConsultantService
                 'source' => 'subscription',
             ]);
 
-            ConsultantMailer::commissionRecorded($commission);
+            if ($atomic) {
+                DB::afterCommit(fn () => ConsultantMailer::commissionRecorded($commission));
+            } else {
+                ConsultantMailer::commissionRecorded($commission);
+            }
 
             return $commission;
         } catch (\Throwable $e) {
+            if ($atomic) throw $e;
             // A commission failure must NEVER block recording the payment itself
             // (e.g. deploy-before-migrate window where the table doesn't exist yet).
             \Log::warning('Consultant commission not recorded: ' . $e->getMessage(), [

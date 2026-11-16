@@ -9,6 +9,7 @@
  */
 
 return [
+    'nav_my_duty' => 'My duty',
 
     /* ─── Product ─── */
     // Nest ERPS is the PRODUCT; Healthcare is the vertical inside it. A second

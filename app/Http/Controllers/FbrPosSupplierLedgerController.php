@@ -630,6 +630,7 @@ class FbrPosSupplierLedgerController extends Controller
 
         try {
             $ret = DB::transaction(function () use ($request, $companyId, $branchId, $po, $supplier, $returnedOn, $batchTracking, $userId) {
+                \App\Services\ProspectiveQuotaGuard::lockCompanyForInvoiceWork($companyId);
                 // Serialise every return against one bill: the bill row is
                 // locked for the whole posting, so two concurrent forms cannot
                 // both pass the "remaining" check and together send back more

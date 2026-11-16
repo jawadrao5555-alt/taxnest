@@ -230,12 +230,14 @@ start_server() {
   assert_no_symlink "$SERVER_PID" 'PHP server PID target'
   rm -f "$SERVER_PID"
   browser_port_is_free || fail 'exact loopback browser port is already occupied'
+  # Healthcare registration is enabled only in this guarded disposable loopback server.
+  # Production remains closed by default; public signup tests must exercise its open pilot configuration.
   # Explicit exec makes the recorded PID the guarded Artisan process, not a
   # background shell-function wrapper. Its TERM handler stops the PHP child.
   (
     exec "$ROOT/scripts/rc-safe-run" --browser --runtime "$SAFE_RUNTIME" --mariadb-root "$LAB_ROOT" \
       --playwright-browsers-path "$PLAYWRIGHT_BROWSERS_PATH" --browser-tmpdir "$BROWSER_TMPDIR" -- \
-      env FEATURE_SMART_DI_IMPORT_SAFEGUARDS=1 FEATURE_SMART_DI_IMPORT_MAPPING=1 APP_URL="http://127.0.0.1:$BROWSER_PORT" \
+      env HEALTH_REGISTRATION_OPEN=1 FEATURE_SMART_DI_IMPORT_SAFEGUARDS=1 FEATURE_SMART_DI_IMPORT_MAPPING=1 APP_URL="http://127.0.0.1:$BROWSER_PORT" \
       REPORTING_OAUTH_REDIRECT_URIS="http://127.0.0.1:$BROWSER_PORT/admin/reporting/connections" \
       php artisan serve --host=127.0.0.1 --port="$BROWSER_PORT" --tries=1 --no-reload
   ) </dev/null >"$SERVER_LOG" 2>&1 & echo "$!" >"$SERVER_PID"
@@ -261,6 +263,7 @@ setup() {
   safe_browser php scripts/rc-di-browser-fixture.php
   ensure_fixture_storage_link
   safe_browser php tests/native/rc_admin_invoice_render.php
+  safe_browser php scripts/rc-synthetic-pixel-marker.php
   start_server
   assert_fixture
   write_state
@@ -274,7 +277,7 @@ resume() {
   assert_playwright_cache
   SOCKET="$LAB_ROOT/run/mariadb.sock"; assert_socket
   [[ -d "$LAB_ROOT/data/$DATABASE" ]] || fail 'resume requires existing isolated database data'
-  cd "$ROOT"; safe_browser php scripts/rc-browser-fixture-resume.php; safe_browser php scripts/rc-di-browser-fixture.php; ensure_fixture_storage_link; start_server
+  cd "$ROOT"; safe_browser php scripts/rc-browser-fixture-resume.php; safe_browser php scripts/rc-di-browser-fixture.php; ensure_fixture_storage_link; safe_browser php scripts/rc-synthetic-pixel-marker.php; start_server
   assert_fixture
   write_state
   BROWSER_TMPDIR_PERSIST=1
@@ -298,7 +301,7 @@ run() {
   if [[ -f "$ROOT/scripts/public-website-checks.mjs" ]]; then
     safe_browser env BASE_URL="http://127.0.0.1:$BROWSER_PORT" node scripts/public-website-checks.mjs
   fi
-  safe_browser env BASE_URL="http://127.0.0.1:$BROWSER_PORT" RC_BROWSER_FIXTURE="$FIXTURE" RC_TUTORIAL_RECORDING="${RC_TUTORIAL_RECORDING:-0}" node scripts/rc-browser-acceptance.mjs
+  safe_browser env BASE_URL="http://127.0.0.1:$BROWSER_PORT" RC_BROWSER_FIXTURE="$FIXTURE" RC_TUTORIAL_RECORDING="${RC_TUTORIAL_RECORDING:-0}" RC_SYNTHETIC_PIXEL_EVIDENCE="${RC_SYNTHETIC_PIXEL_EVIDENCE:-0}" node scripts/rc-browser-acceptance.mjs
   fi
 }
 serve() { resume; wait "$(cat "$SERVER_PID")"; }
@@ -312,6 +315,8 @@ stop() {
   # Never remove the runtime/TMPDIR while its PHP listener can still use it.
   for _ in $(seq 1 100); do browser_port_is_free && break; sleep 0.1; done
   browser_port_is_free || fail 'PHP listener did not stop; disposable state preserved'
+  assert_no_symlink "$ROOT/public/.rc-synthetic-proof.json" 'synthetic pixel marker'
+  rm -f "$ROOT/public/.rc-synthetic-proof.json"
   cleanup_browser_tmpdir
   rm -rf "$STATE_BASE"
   resolve_mariadbd

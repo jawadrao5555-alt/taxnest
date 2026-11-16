@@ -24,6 +24,12 @@
         try {
             $seCompany = \App\Models\Company::find($seCompanyId);
             if ($seCompany && !$seCompany->is_internal_account && ($seCompany->status ?? null) !== 'pending') {
+                // Frozen-policy notices use the shared read-only banner, including grace.
+                // Do not show the legacy Subscribe form over a confirmed future paid term.
+                $seProspective = \App\Services\ProspectiveSubscriptionPolicy::available()
+                    && \App\Models\Subscription::where('company_id',$seCompany->id)->where('active',true)->latest('id')->first()?->hasLifecycleSnapshot();
+                if (!$seProspective) {
+
                 // 1) Temporary/grace admin grant ending soon. FBR POS shops on a
                 //    TEMPORARY grant get a 7-din early warning (Task: free-access
                 //    expiry reminder, Aug 2026) so woh Business/Pro upgrade ka
@@ -49,6 +55,7 @@
                         $seUntil = $seSub && $seSub->trial_ends_at ? $seSub->trial_ends_at->format('Y-m-d') : null;
                         $sePopup = ['kind' => 'trial', 'until' => $seUntil, 'days_left' => (int) $seSt['days_left']];
                     }
+                }
                 }
             }
         } catch (\Throwable $seEx) {

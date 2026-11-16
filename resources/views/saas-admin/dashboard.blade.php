@@ -8,6 +8,9 @@
         <p class="tn-dashboard-note">Company operations, payment review, and system visibility in one workspace.</p>
     </div>
 
+    <section class="mb-6"><h2 class="font-semibold">School / Hospital local collections</h2><p class="text-sm">Visible latest FBR companies only; all-time retained local ledgers. Separate from retail/fiscal totals and TaxNest subscription revenue. Use Company Usage for company/campus/date filters.</p>
+    @foreach($fbrposCompaniesList as $collectionCompany)@if($collectionCompany->local_collections)<article class="border rounded p-3 my-2"><h3>{{ $collectionCompany->name }}</h3>@include('saas-admin.partials.local-collections',['local'=>$collectionCompany->local_collections])</article>@endif @endforeach
+    </section>
     {{-- Agent Health (Task 635): same rule as /admin/companies (Task 629) —
          silent-print shops whose Desktop Agent is offline > 2 hours. Shown only
          when there is a problem so the dashboard stays clean on good days. --}}
@@ -94,7 +97,7 @@
 <a data-dashboard-metric="fbrpos_transactions" aria-label="Open fbrpos transactions details" class="absolute z-10 inset-0 rounded-xl focus:ring-2 focus:ring-indigo-400 group-hover:ring-1 group-hover:ring-indigo-400" href="{{ route('saas.admin.dashboard.detail', 'fbrpos_transactions') }}"></a>
             <p class="text-[10px] text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">FBR POS Transactions</p>
             <p class="text-xl font-bold text-blue-400">{{ number_format($stats['fbrpos_transactions']) }}</p>
-            <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">PKR {{ number_format($stats['fbrpos_revenue'], 0) }} revenue</p>
+            <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">PKR {{ number_format($stats['fbrpos_revenue'], 0) }} retail ledger value (School/Hospital local payments excluded)</p>
         </div>
         <div class="relative group bg-gray-900 border border-gray-800 rounded-xl p-4">
 <a data-dashboard-metric="active_subscriptions" aria-label="Open active subscriptions details" class="absolute z-10 inset-0 rounded-xl focus:ring-2 focus:ring-indigo-400 group-hover:ring-1 group-hover:ring-indigo-400" href="{{ route('saas.admin.dashboard.detail', 'active_subscriptions') }}"></a>
@@ -249,8 +252,8 @@
                             <td class="px-4 py-3 text-gray-400 text-xs hidden sm:table-cell">{{ $company->ntn ?? '—' }}</td>
                             <td class="px-4 py-3 text-gray-400 text-xs hidden md:table-cell">{{ $company->owner_name ?? '—' }}</td>
                             <td class="px-4 py-3 text-center text-gray-300 hidden sm:table-cell">{{ $company->users_count }}</td>
-                            <td class="px-4 py-3 text-center text-gray-300 hidden md:table-cell">{{ number_format($company->fbrpos_transaction_count ?? 0) }}</td>
-                            <td class="px-4 py-3 text-right text-blue-400 text-xs hidden lg:table-cell">PKR {{ number_format($company->fbrpos_revenue ?? 0, 0) }}</td>
+                            <td class="px-4 py-3 text-center text-gray-300 hidden md:table-cell">{{ $company->local_collections ? 'Local ledger below' : number_format($company->fbrpos_transaction_count ?? 0) }}</td>
+                            <td class="px-4 py-3 text-right text-blue-400 text-xs hidden lg:table-cell">{{ $company->local_collections ? 'Retail archive only' : 'PKR '.number_format($company->fbrpos_revenue ?? 0, 0) }}</td>
                             <td class="px-4 py-3 text-center">
                                 <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium {{ $sc[$company->status] ?? 'bg-gray-800 text-gray-400' }}">{{ $company->status }}</span>
                             </td>

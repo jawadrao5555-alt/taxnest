@@ -54,9 +54,9 @@ class SubscriptionAccessService
         };
     }
 
-    public static function hasAccess(Company $company, bool $existingHospitalBill = false): array
+    public static function hasAccess(Company $company, bool $existingHospitalBill = false, ?Subscription $lockedSubscription = null): array
     {
-        $subscription = Subscription::where('company_id', $company->id)
+        $subscription = $lockedSubscription ?? Subscription::where('company_id', $company->id)
             ->where('active', true)
             ->orderByDesc('id')
             ->first();
@@ -69,6 +69,7 @@ class SubscriptionAccessService
         // Settling an existing hospital invoice consumes no new bill quota.
         // Expiry, missing subscriptions and other access restrictions still apply.
         $existingHospitalBill = $existingHospitalBill && $company->isHospitalCollectionPilot();
+        if ($subscription->hasLifecycleSnapshot() && !ProspectiveSubscriptionPolicy::snapshot($subscription)) return ['allowed'=>false,'reason'=>'Subscription policy evidence requires review.','override'=>null];
         $type = $subscription->override_type ?? 'none';
 
         // 1. Lifetime
@@ -134,6 +135,10 @@ class SubscriptionAccessService
         // 4. Normal subscription check
         if (!$subscription->active) {
             return ['allowed' => false, 'reason' => 'Your subscription is inactive. Contact admin.', 'override' => null];
+        }
+
+        if ($policy=ProspectiveSubscriptionPolicy::display($subscription)) {
+            return ['allowed'=>$policy['phase']!=='expired','reason'=>$policy['phase']==='expired'?'Your plan has expired. New billing is locked; history and receipts remain available.':'Prospective '.$policy['phase'].' access.','override'=>null];
         }
 
         if ($subscription->end_date && Carbon::parse($subscription->end_date)->isPast()) {
@@ -211,11 +216,17 @@ class SubscriptionAccessService
         }
 
         $daysLeft = null;
-        if ($subscription->trial_ends_at) {
+        $trialUntil = $subscription->trial_ends_at;
+        if ($subscription->hasLifecycleSnapshot()) {
+            $policyView = ProspectiveSubscriptionPolicy::display($subscription);
+            $trialUntil = ($policyView['phase'] ?? null) === 'trial'
+                ? Carbon::parse($policyView['trial_ends_at'])->setTimezone(config('app.timezone')) : null;
+        }
+        if ($trialUntil) {
             // Calendar-day diff (same formula as paidEndingReminder):
             // expiring later TODAY = 0 days left → banner says "ends today".
-            $daysLeft = $subscription->trial_ends_at->isFuture()
-                ? (int) now()->startOfDay()->diffInDays($subscription->trial_ends_at->copy()->startOfDay())
+            $daysLeft = $trialUntil->isFuture()
+                ? (int) now()->startOfDay()->diffInDays($trialUntil->copy()->startOfDay())
                 : 0;
         }
 

@@ -6,6 +6,7 @@ use App\Models\Company;
 use App\Models\PosDayCloseReport;
 use App\Models\PosRider;
 use App\Models\PosTransaction;
+use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
@@ -27,10 +28,15 @@ final class PosDeliveryAccount
         $due = self::cents($bill->rider_collection_amount ?? $bill->total_amount);
         if ($bill->status !== 'completed' || $bill->payment_method !== 'cash'
             || $bill->transaction_type === 'return' || $bill->rider_settlement_id
-            || (float) $bill->rider_partial_paid > 0 || $bill->invoice_mode === 'local'
-            || $due <= 0 || $cash > $due || (int) $bill->rider_id !== (int) $rider->id
+            || (float) $bill->rider_partial_paid > 0
+            || $due <= 0 || !in_array($cash, [0, $due], true) || (int) $bill->rider_id !== (int) $rider->id
             || (int) $bill->company_id !== (int) $rider->company_id) {
-            throw ValidationException::withMessages(['received_amount' => 'Check the bill and the cash received before completing the delivery.']);
+            throw ValidationException::withMessages(['received_amount' => 'Choose full amount received or full credit. Partial delivery payment is not supported.']);
+        }
+
+        if (DB::table('pos_delivery_accounts')->where('company_id', $bill->company_id)->where('transaction_id', $bill->id)->exists()
+            && self::assertReplay((int) $bill->company_id, (int) $bill->id, (int) $rider->id, $received)) {
+            return;
         }
 
         $credit = $due - $cash;
@@ -57,6 +63,28 @@ final class PosDeliveryAccount
         $bill->forceFill(['delivery_credit_amount' => $credit / 100])->save();
     }
 
+    /** Compare retries with the retained financial decision, even after bill cleanup. */
+    public static function assertReplay(int $companyId, int $transactionId, int $riderId, ?string $received): bool
+    {
+        if (!self::ready()) return false;
+        $prior = DB::table('pos_delivery_accounts')->where('company_id', $companyId)
+            ->where('transaction_id', $transactionId)->where('rider_id', $riderId)->first();
+        if (!$prior) {
+            abort_if($received !== null, 409, 'The original delivery did not record this payment.');
+            return false;
+        }
+        abort_unless($received !== null && self::cents($prior->received_amount) === self::cents($received),
+            409, 'This delivery already has a different payment decision.');
+        return true;
+    }
+
+    public static function authorizeCollector(int $companyId, int $userId): void
+    {
+        $user = User::find($userId);
+        abort_unless($user && (int) $user->company_id === $companyId
+            && ($user->role === 'company_admin' || $user->pos_role === 'pos_admin'), 403);
+    }
+
     public static function scopedAccounts(int $companyId)
     {
         return app(BranchContextService::class)->applyToQuery(
@@ -66,6 +94,7 @@ final class PosDeliveryAccount
 
     public static function collect(int $companyId, int $accountId, int $userId, string $requestId, string $amount): void
     {
+        self::authorizeCollector($companyId, $userId);
         $received = self::cents($amount);
         DB::transaction(function () use ($companyId, $accountId, $userId, $requestId, $received) {
             Company::whereKey($companyId)->lockForUpdate()->firstOrFail();
@@ -118,6 +147,8 @@ final class PosDeliveryAccount
             ->where('company_id', $original->company_id)
             ->where('transaction_id', $original->id)->lockForUpdate()->first();
         abort_unless($account, 409, 'The delivery credit record is missing.');
+        if (DB::table('pos_delivery_account_events')->where('account_id', $account->id)
+            ->where('kind', 'return')->where('return_transaction_id', $return->id)->exists()) return;
         $outstanding = self::cents($account->outstanding_amount);
         $offset = min($outstanding, self::cents($return->total_amount));
         if ($offset <= 0) {

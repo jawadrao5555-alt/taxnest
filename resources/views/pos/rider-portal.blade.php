@@ -66,11 +66,13 @@
                 @if(in_array($st, ['assigned', 'dispatched']))
                 <form method="POST" action="{{ route('pos.rider.delivered', $b->id) }}" class="shrink-0">
                     @csrf
-                    @if(\App\Services\PosDeliveryAccount::ready() && $b->invoice_mode !== 'local' && $b->payment_method === 'cash' && \App\Models\PosRider::collectionAmount($b) > 0)
+                    @if(\App\Services\PosDeliveryAccount::ready() && $b->payment_method === 'cash' && \App\Models\PosRider::collectionAmount($b) > 0)
                         <input type="hidden" name="assignment_revision" value="{{ $b->preview_assignment_revision }}">
-                        <label class="block text-xs mb-2">Cash received (balance goes to Udhaar Book)
-                            <input type="number" name="received_amount" min="0" max="{{ \App\Models\PosRider::collectionAmount($b) }}"
-                                   step="0.01" value="{{ \App\Models\PosRider::collectionAmount($b) }}" required class="block rounded w-28">
+                        <label class="block text-xs mb-2">Delivery payment
+                            <select name="received_amount" required class="block rounded w-44">
+                                <option value="{{ \App\Models\PosRider::collectionAmount($b) }}">Full amount received</option>
+                                <option value="0">Full credit / Udhaar</option>
+                            </select>
                         </label>
                     @endif
                     <button type="submit" class="px-3.5 py-2 rounded-lg bg-emerald-600 text-white text-xs font-semibold shadow-sm hover:bg-emerald-700 transition">{{ __('pos.delivered_check') }}</button>

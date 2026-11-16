@@ -219,6 +219,10 @@
                                             <p class="text-[11px] text-gray-500 pt-1">
                                                 Billing: {{ ucfirst($paCycleSel) }} — kept exactly as the shop requested and paid for.
                                             </p>
+                                            @if($validFrozenQuote && !in_array($reqCycleSel, \App\Services\SubscriptionAssignmentService::cyclesForPlan($proof->pricingPlan), true))
+                                                <input type="hidden" name="billing_cycle" value="{{ $reqCycleSel }}">
+                                                <p class="text-xs text-amber-300">Frozen quote: {{ \App\Models\Subscription::getCycleLabel($reqCycleSel) }}. Original terms retained.</p>
+                                            @endif
                                             <div>
                                                 <label class="block text-[11px] text-gray-400 mb-1">Amount verified in bank/receipt (PKR)</label>
                                                 <input type="number" name="verified_received_amount" value="{{ old('verified_received_amount', $proof->amount) }}" step="0.01" min="0.01" required class="w-full bg-gray-900 border border-gray-700 rounded-lg text-white text-xs px-2 py-2">
@@ -290,8 +294,16 @@
                                             // total bheja bhi hai — is liye mutawaqqa total aur shop ki likhi
                                             // raqam saath saath dikhti hai, aur slots isi qadam mein rakhe ya
                                             // kam kiye ja sakte hain.
+                                            $frozenQuote = $proof->distributor_quote_snapshot;
+                                            $validFrozenQuote = is_array($frozenQuote) && $proof->company && $proof->pricingPlan
+                                                && !\App\Services\DistributorDiscountService::validateSnapshot($frozenQuote, $proof->company, $proof->pricingPlan, $reqCycleSel) ? $frozenQuote : null;
+                                            $reviewPlan = $proof->pricingPlan;
+                                            if (is_array($validFrozenQuote['plan_snapshot'] ?? null)) {
+                                                $reviewPlan = new \App\Models\PricingPlan;
+                                                $reviewPlan->forceFill($validFrozenQuote['plan_snapshot']);
+                                            }
                                             $ebReview = \App\Services\BranchAddonService::renewalReview(
-                                                $proof->company, $proof->pricingPlan, $reqCycleSel, $proof->amount
+                                                $proof->company, $reviewPlan, $reqCycleSel, $proof->amount, $validFrozenQuote
                                             );
 
                                             // Har qabil-e-intikhab package ka base aur har slot-ginti ka
@@ -310,7 +322,7 @@
                                                         'base' => [],
                                                         'addon' => [],
                                                     ];
-                                                    foreach (['annual'] as $ebCycle) {
+                                                    foreach (\App\Services\SubscriptionAssignmentService::cyclesForPlan($ebPlan) as $ebCycle) {
                                                         $ebPriced = \App\Services\SubscriptionAssignmentService::computePrice($ebPlan, $ebCycle);
                                                         $ebMonths = \App\Services\BranchAddonService::monthsForCycle($ebPriced['cycle']);
                                                         $ebRow['base'][$ebCycle] = (float) $ebPriced['final_price'];
@@ -387,10 +399,13 @@
                                             </select>
                                             <select name="billing_cycle" x-model="cycle" required class="w-full bg-gray-900 border border-gray-700 rounded-lg text-white text-xs px-2 py-2">
                                                 <option value="annual">Annual</option>
-                                                @if(($proof->pricingPlan?->product_type ?? '') === 'di')
+                                                @if($proof->pricingPlan)
                                                     @foreach(\App\Services\SubscriptionAssignmentService::cyclesForPlan($proof->pricingPlan) as $cycleKey)
                                                         @if($cycleKey !== 'annual')<option value="{{ $cycleKey }}">{{ \App\Models\Subscription::getCycleLabel($cycleKey) }}</option>@endif
                                                     @endforeach
+                                                @endif
+                                                @if($validFrozenQuote && !in_array($reqCycleSel, \App\Services\SubscriptionAssignmentService::cyclesForPlan($proof->pricingPlan), true))
+                                                    <option value="{{ $reqCycleSel }}">{{ \App\Models\Subscription::getCycleLabel($reqCycleSel) }} (frozen quote)</option>
                                                 @endif
                                             </select>
                                             <div>

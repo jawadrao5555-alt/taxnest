@@ -35,7 +35,7 @@ class CompanyUsageStat extends Model
     }
 
     /** Batched, read-only snapshots for the visible companies, including real zeroes. */
-    public static function snapshotsForCompanies(Collection $companies): Collection
+    public static function snapshotsForCompanies(Collection $companies, array $localFilters = []): Collection
     {
         if ($companies->isEmpty()) {
             return collect();
@@ -79,7 +79,8 @@ class CompanyUsageStat extends Model
             }
         }
 
-        return $companies->map(function (Company $company) use ($hasSales, $sales, $counts, $lastActivity) {
+        $localReporter=app(\App\Services\Reporting\LocalCollectionReports::class);
+        return $companies->map(function (Company $company) use ($hasSales, $sales, $counts, $lastActivity, $localReporter, $localFilters) {
             $pra = $company->product_type === 'pos';
             $sale = $sales->get($company->id);
             $snapshot = new self([
@@ -93,6 +94,7 @@ class CompanyUsageStat extends Model
                     ? (int) ($values[$company->id] ?? 0) : null);
             }
             $snapshot->setRelation('company', $company);
+            $snapshot->setAttribute('local_collections', $company->isLocalCollectionPilot() ? $localReporter->read($company, $localFilters) : null);
 
             return $snapshot;
         });

@@ -11,6 +11,7 @@ for arg in "$@"; do
         --full) MODE=full ;;
         --upgrade) MODE=upgrade ;;
         --concurrency) MODE=concurrency ;;
+        --reviewed-callback) MODE=reviewed_callback ;;
         --di) MODE=di ;;
         --keep-running) KEEP=1 ;;
         *) printf 'rc-mariadb-migration-lab: unknown option %s\n' "$arg" >&2; exit 1 ;;
@@ -91,15 +92,62 @@ upgrade(){
     clean_php php "$ROOT/tests/native/rc_mariadb_schema.php"
     clean_php php artisan migrate --force --no-interaction | grep -q 'Nothing to migrate' || fail non-idempotent-upgrade-migration
 }
+reviewed_callback(){
+    export DB_DATABASE="$FULL_DB"
+    clean_php php "$ROOT/tests/native/rc_reviewed_device_proof.php" | tee "$EVIDENCE_DIR/reviewed-device-proof.log"
+    grep -Fqx "PASS: native reviewed proof exact collation scope default HOLD stale authority and concurrent append-only revocation" "$EVIDENCE_DIR/reviewed-device-proof.log" || fail reviewed-device-proof-missing-success-proof
+    grep -Fqx "PASS: native standalone duplicate reviewed callbacks preserve one fiscal identity and frozen environment refuses dispatch" "$EVIDENCE_DIR/reviewed-device-proof.log" || fail reviewed-device-proof-callback-missing-success-proof
+}
 concurrency(){
     export DB_DATABASE="$FULL_DB"
     clean_php php "$ROOT/tests/native/rc_mariadb_concurrency.php"
     clean_php php "$ROOT/tests/native/rc_notification_concurrency.php"
     clean_php php "$ROOT/tests/native/rc_staff_discount_concurrency.php"
     clean_php php "$ROOT/tests/native/rc_school_fee_concurrency.php" | tee "$EVIDENCE_DIR/school-fee-concurrency.log"
+    clean_php php "$ROOT/tests/native/rc_greetings_concurrency.php" | tee "$EVIDENCE_DIR/greetings-concurrency.log"
+    clean_php php "$ROOT/tests/native/rc_madadgar_budget.php" | tee "$EVIDENCE_DIR/madadgar-budget.log"
+    clean_php php "$ROOT/tests/native/rc_pilot_fiscal_control.php" | tee "$EVIDENCE_DIR/pilot-fiscal-control.log"
+    grep -Fqx "PASS: native School Hospital concurrent OFF and rejected ON remain disabled with exact audit current actor denial atomic rollback and unchanged acknowledgements foreign tenant no provider calls" "$EVIDENCE_DIR/pilot-fiscal-control.log" || fail pilot-fiscal-control-missing-proof
+    clean_php php "$ROOT/tests/native/rc_platform_expense_concurrency.php" | tee "$EVIDENCE_DIR/platform-expense-concurrency.log"
+    grep -Fqx "PASS: native platform expense duplicate request and reversal preserve one immutable original and offset with audit; changed data, current demotion and tenant guards denied; competing admin reversal bounded; no payment executed" "$EVIDENCE_DIR/platform-expense-concurrency.log" || fail platform-expense-missing-concurrency-proof
+    clean_php php "$ROOT/tests/native/rc_madadgar_escalation.php" | tee "$EVIDENCE_DIR/madadgar-escalation.log"
+    grep -Fqx "PASS: native escalation same-ID atomic retry, one confirmation, daily cap race, original reference recovered, no external sends" "$EVIDENCE_DIR/madadgar-escalation.log" || fail madadgar-escalation-missing-proof
+    grep -Fqx "PASS: native AI budget current-read concurrent cap unknown-cost retention and no provider calls" "$EVIDENCE_DIR/madadgar-budget.log" || fail madadgar-budget-missing-proof
+    clean_php php "$ROOT/tests/native/rc_delivery_credit_concurrency.php" | tee "$EVIDENCE_DIR/delivery-credit-concurrency.log"
     clean_php php "$ROOT/tests/native/rc_hospital_collection_concurrency.php" | tee "$EVIDENCE_DIR/hospital-collection-concurrency.log"
+    grep -Fqx "PASS synthetic greeting concurrent claim exactly one delivery" "$EVIDENCE_DIR/greetings-concurrency.log" || fail greeting-single-delivery-missing-proof
+    grep -Fqx "PASS synthetic greeting ambiguous HOLD no resend" "$EVIDENCE_DIR/greetings-concurrency.log" || fail greeting-unknown-hold-missing-proof
+    grep -Fqx "PASS: native retained delivery credit duplicate recovery is single and concurrent overcollection rejected" "$EVIDENCE_DIR/delivery-credit-concurrency.log" || fail delivery-credit-missing-proof
+    grep -Fqx "PASS: native hospital duplicate recovery, concurrent overpayment exclusion, immutable close and payment-close race" "$EVIDENCE_DIR/hospital-collection-concurrency.log" || fail hospital-core-missing-proof
+    grep -Fqx "PASS: native multi-service bank/card duplicate recovery, reference tamper rejection and immutable noncash closing" "$EVIDENCE_DIR/hospital-collection-concurrency.log" || fail hospital-multi-service-missing-proof
+    grep -Fqx "PASS: native School multi-head card duplicate recovery, concurrent bank overpayment exclusion, cash-only close and immutable partial-payment replay" "$EVIDENCE_DIR/school-fee-concurrency.log" || fail school-multi-head-missing-proof
+    reviewed_callback
+    clean_php php "$ROOT/tests/native/rc_cashier_online_policy.php" | tee "$EVIDENCE_DIR/cashier-online-policy.log"
+    grep -Fqx "PASS: native cashier policy schema default OFF owner-only settings current-session enforcement and tenant isolation" "$EVIDENCE_DIR/cashier-online-policy.log" || fail cashier-policy-missing-proof
+    clean_php php "$ROOT/tests/native/rc_local_collection_lifecycle.php" | tee "$EVIDENCE_DIR/local-collection-lifecycle.log"
+    grep -Fqx "PASS: native local School/Hospital bin and restore preserve exact snapshots; purge rollback restores all rows and audited purge removes target only" "$EVIDENCE_DIR/local-collection-lifecycle.log" || fail local-collection-lifecycle-missing-proof
     grep -Fqx "PASS: native school duplicate collection and close remain single; collect-close race serializes cash; post-close replay preserved and fresh payment rejected" "$EVIDENCE_DIR/school-fee-concurrency.log" || fail school-fee-concurrency-missing-success-proof
+    clean_php php "$ROOT/tests/native/rc_di_invoice_inventory.php" | tee "$EVIDENCE_DIR/di-invoice-inventory.log"
+    grep -Fqx "PASS: native DI retained stock diagnostic links exact scoped pagination forged tenant and branch rejected rollback preserved" "$EVIDENCE_DIR/di-invoice-inventory.log" || fail di-stock-diagnostics-missing-proof
+    grep -Fqx "PASS: native DI frozen inventory duplicate acceptance posts once concurrent overreturn refused exact four decimals and rollback preserved" "$EVIDENCE_DIR/di-invoice-inventory.log" || fail di-invoice-inventory-missing-proof
     clean_php php "$ROOT/tests/native/rc_di_billing_packing.php" | tee "$EVIDENCE_DIR/di-billing-packing.log"
+    clean_php php "$ROOT/tests/native/rc_prospective_policy_concurrency.php" | tee "$EVIDENCE_DIR/prospective-policy-concurrency.log"
+    grep -Fqx "PASS: native selected trial concurrent reviewed proof preserves exact72h and one paid term invoice receipt audit; partial rollback, retry, paid grace renewal, expired history reprint, current role and legacy retained; no payment executed" "$EVIDENCE_DIR/prospective-policy-concurrency.log" || fail prospective-policy-missing-native-proof
+    clean_php php "$ROOT/tests/native/rc_prospective_quota_retention.php" | tee "$EVIDENCE_DIR/prospective-quota-retention.log"
+    grep -Fqx "PASS: native prospective quota concurrent capture delete retry retains one paid slot; trial excluded renewal no reset changed source refused atomic rollback unknown aggregate hold legacy preserved" "$EVIDENCE_DIR/prospective-quota-retention.log" || fail prospective-quota-missing-native-proof
+    clean_php php "$ROOT/tests/native/rc_fbr_quota_retention.php" | tee "$EVIDENCE_DIR/fbr-quota-retention.log"
+    grep -Fqx "PASS: native FBR prospective concurrent capture delete retry retains paid quota; mixed day-close excludes trial renewal no reset changed source denied rollback and legacy preserved no fiscal calls" "$EVIDENCE_DIR/fbr-quota-retention.log" || fail fbr-quota-missing-native-proof
+    clean_php php "$ROOT/tests/native/rc_fbr_quota_admission.php" | tee "$EVIDENCE_DIR/fbr-quota-admission.log"
+    grep -Fqx "PASS: native FBR actual store old-snapshot distinct UUID last-slot race admits one; identical UUID race and full-quota replay return same bill without fiscal calls" "$EVIDENCE_DIR/fbr-quota-admission.log" || fail fbr-quota-missing-admission-proof
+    clean_php php "$ROOT/tests/native/rc_di_pra_quota_admission.php" | tee "$EVIDENCE_DIR/di-pra-quota-admission.log"
+    grep -Fqx "PASS: native DI PRA old-snapshot distinct bill last-slot admission permits one; DI same-claim retry unknown hold definite rejection and frozen production expiry preserved without provider calls" "$EVIDENCE_DIR/di-pra-quota-admission.log" || fail di-pra-quota-missing-admission-proof
+    clean_php php "$ROOT/tests/native/rc_local_pilot_quota_concurrency.php" | tee "$EVIDENCE_DIR/local-pilot-quota-concurrency.log"
+    grep -Fqx "PASS: native School Hospital paid last-slot serialized under old RR snapshot; same payment recovers same receipt changed data rejected cash unchanged no fiscal calls" "$EVIDENCE_DIR/local-pilot-quota-concurrency.log" || fail local-pilot-quota-missing-native-proof
+    grep -Fqx "PASS: native School Hospital old RR partial balance excludes overpayment; payment-close race and saved closing cash immutable on same-receipt retry and changed-data rejection" "$EVIDENCE_DIR/local-pilot-quota-concurrency.log" || fail local-pilot-quota-missing-close-proof
+    clean_php php "$ROOT/tests/native/rc_di_quota_stock_lock_order.php" | tee "$EVIDENCE_DIR/di-quota-stock-lock-order.log"
+    grep -Fqx "PASS: native DI quota reservation callback and receiving serialize company before invoice product; exact stock and duplicate ACK preserved including expired subscription without provider calls" "$EVIDENCE_DIR/di-quota-stock-lock-order.log" || fail di-quota-stock-lock-order-missing-proof
+    clean_php php "$ROOT/tests/native/rc_fbr_quota_stock_lock_order.php" | tee "$EVIDENCE_DIR/fbr-quota-stock-lock-order.log"
+    grep -Fqx "PASS: native FBR receiving overlaps actual last-slot sale with company-first locks exact stock movements and same UUID replay without fiscal calls" "$EVIDENCE_DIR/fbr-quota-stock-lock-order.log" || fail fbr-quota-stock-lock-order-missing-proof
     clean_php php "$ROOT/tests/native/rc_paid_renewal.php" | tee "$EVIDENCE_DIR/paid-renewal.log"
     clean_php php "$ROOT/tests/native/rc_trial_signup.php" | tee "$EVIDENCE_DIR/trial-signup.log"
     clean_php php "$ROOT/tests/native/rc_subscription_financial_adjustments.php" | tee "$EVIDENCE_DIR/subscription-financial-adjustments.log"
@@ -122,6 +170,8 @@ concurrency(){
     grep -Fqx "PASS: native password reset grant permits one concurrent completion and preserves other account" "$EVIDENCE_DIR/password-reset-grant.log" || fail password-reset-grant-missing-success-proof
     grep -Fqx "PASS: native reset rotates the company browser session generation atomically" "$EVIDENCE_DIR/password-reset-grant.log" || fail password-reset-session-generation-missing-success-proof
     grep -Fqx "PASS: native reset link claim preserves its original TIMESTAMP deadline" "$EVIDENCE_DIR/password-reset-grant.log" || fail password-reset-link-deadline-missing-success-proof
+    clean_php php "$ROOT/tests/native/rc_fbr_refund_diagnostic_evidence.php" | tee "$EVIDENCE_DIR/fbr-refund-diagnostic-evidence.log"
+    grep -Fqx "PASS: native FBR registered projected refund JSON integer binary identity exact tenant branch return-parent chain rejects forged aliases and missing links; IDs-only cursor includes late arrivals without provider calls" "$EVIDENCE_DIR/fbr-refund-diagnostic-evidence.log" || fail fbr-refund-diagnostic-missing-native-proof
     clean_php php "$ROOT/tests/native/rc_diagnostic_source_collection.php" | tee "$EVIDENCE_DIR/diagnostic-source-observations.log"
     grep -Fqx "PASS: native IMS links and print source read/collection retain exact tenant/product attribution and unchanged bill" "$EVIDENCE_DIR/diagnostic-source-observations.log" || fail diagnostic-ims-print-attribution-missing-success-proof
     grep -Fqx "PASS: native shared source excludes global and foreign rows; exhausted cursor retains window evidence and original rows" "$EVIDENCE_DIR/diagnostic-source-observations.log" || fail diagnostic-shared-source-attribution-missing-success-proof
@@ -179,6 +229,7 @@ case "$MODE" in
     full) full ;;
     upgrade) upgrade ;;
     concurrency) full; concurrency ;;
+    reviewed_callback) full; reviewed_callback ;;
     di) di ;;
 esac
 printf 'PASS: MariaDB RC lab mode=%s completed; raw evidence=%s\n' "$MODE" "$EVIDENCE_DIR"

@@ -2401,6 +2401,13 @@ class FbrService
         }
         $company = $transaction->company;
         $posEnv = $company->fbr_pos_environment ?? $company->fbr_environment ?? 'sandbox';
+        if (!$transaction->fbr_invoice_number && $transaction->fbr_status !== 'submitted' && ($company->fbr_connection_mode ?? null) === 'fiscal_device'
+            && Schema::hasColumn('fbr_pos_transactions','fbr_requested_environment_snapshot')
+            && (!$transaction->fbr_requested_environment_snapshot || $transaction->fbr_requested_environment_snapshot !== $posEnv)) {
+            $transaction->update(['fbr_status'=>'verification_pending']);
+            return ['status'=>'blocked','errors'=>['Original requested IMS environment is missing or changed; reconcile before dispatch.']];
+        }
+
         // Keep code backward-compatible during rolling deploys where the new
         // nullable evidence column may not have migrated yet.
         $logEnvironment = Schema::hasColumn('fbr_pos_logs', 'environment')

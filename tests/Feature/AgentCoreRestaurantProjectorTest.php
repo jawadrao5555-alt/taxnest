@@ -83,6 +83,22 @@ class AgentCoreRestaurantProjectorTest extends TestCase
         $this->assertDatabaseHas('restaurant_tables', ['id' => 70, 'status' => 'available']);
     }
 
+    public function test_optional_cashier_policy_blocks_queued_confirmation_without_closing_order(): void
+    {
+        (require database_path('migrations/2026_11_16_120000_create_pos_online_payment_policies_table.php'))->up();
+        DB::table('pos_online_payment_policies')->insert(['company_id' => 1, 'user_id' => 10, 'requires_approval' => true, 'updated_by' => 11]);
+        $this->projectCommand('open-policy', 'order.opened', 1, ['business_date' => '2026-10-06',
+            'lines' => [['item_type' => 'product', 'item_id' => 50, 'quantity' => 1]]]);
+        DB::table('restaurant_orders')->where('id', 100)->update(['online_payment_awaited_at' => now()]);
+        $blocked = $this->projectCommand('policy-blocked', 'order.settled', 2, [
+            'transaction_id' => 900, 'business_date' => '2026-10-06', 'online_payment_confirmed' => true,
+        ]);
+        $this->assertSame('rejected', $blocked->status);
+        $this->assertSame('online_payment_admin_approval_required', $blocked->result['code']);
+        $this->assertDatabaseHas('restaurant_orders', ['id' => 100, 'status' => 'held']);
+        $this->assertSame(0, DB::table('pos_transactions')->count());
+    }
+
     public function test_atomic_settlement_enforces_online_gate_branch_and_business_date(): void
     {
         $this->projectCommand('open', 'order.opened', 1, ['business_date' => '2026-10-06',
@@ -766,7 +782,7 @@ class AgentCoreRestaurantProjectorTest extends TestCase
             $t->json('printed_item_ids')->nullable(); $t->text('error')->nullable(); $t->unsignedTinyInteger('attempts')->default(0);
             $t->unsignedBigInteger('created_by')->nullable(); $t->timestamps();
         });
-        Schema::create('users', fn (Blueprint $t) => [$t->id(), $t->unsignedBigInteger('company_id'), $t->string('name'), $t->timestamps()]);
+        Schema::create('users', fn (Blueprint $t) => [$t->id(), $t->boolean('is_active')->default(true), $t->unsignedBigInteger('company_id'), $t->string('name'), $t->timestamps()]);
         Schema::create('agent_core_events', function (Blueprint $t): void {
             $t->id(); $t->unsignedBigInteger('company_id'); $t->string('device_uid'); $t->string('event_id'); $t->string('idempotency_key');
             $t->string('event_type'); $t->timestamp('occurred_at')->nullable(); $t->json('payload'); $t->string('content_hash');

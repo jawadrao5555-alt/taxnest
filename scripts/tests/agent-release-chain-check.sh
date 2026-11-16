@@ -216,6 +216,7 @@ sys.exit(0)
 PY
 
 if [ "$FAILS" -eq 0 ]; then
+  (cd "$ROOT" && node --test scripts/tests/followup-distribution.test.mjs) || exit 1
   echo "agent-release-chain-check: ALL PASS"
   exit 0
 fi

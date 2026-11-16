@@ -130,6 +130,9 @@
                                 <a href="{{ route('saas.admin.companies.show', $company->id) }}#company-access-actions" class="px-2 py-1 bg-emerald-600/20 text-emerald-400 text-xs rounded hover:bg-emerald-600/40 transition">Activate</a>
                                 @endif
                                 @endif
+                                @if(auth('admin')->user()?->fresh()?->isSuperAdmin())
+                                <a href="{{ route('saas.admin.device-proofs.index', $company->id) }}" class="px-2 py-1 bg-indigo-600/20 text-indigo-400 text-xs rounded">Device evidence</a>
+                                @endif
                                 <a href="{{ route('saas.admin.companies.show', $company->id) }}" class="px-2 py-1 bg-indigo-600/20 text-indigo-400 text-xs rounded hover:bg-indigo-600/40 transition">View</a>
                             </div>
                         </td>

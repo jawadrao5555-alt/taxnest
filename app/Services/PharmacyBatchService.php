@@ -111,6 +111,7 @@ class PharmacyBatchService
         PharmacyExpirySummaryService::forget($companyId);
 
         return DB::transaction(function () use ($companyId, $productId, $branchId, $quantity, $batchNumber, $expiry, $costPrice, $extra) {
+            \App\Services\ProspectiveQuotaGuard::lockCompanyForInvoiceWork($companyId);
             $batch = ProductBatch::where('company_id', $companyId)
                 ->where('product_id', $productId)
                 ->where('branch_id', $branchId)
@@ -454,6 +455,7 @@ class PharmacyBatchService
         PharmacyExpirySummaryService::forget((int) $batch->company_id);
 
         return DB::transaction(function () use ($batch, $action, $opts) {
+            \App\Services\ProspectiveQuotaGuard::lockCompanyForInvoiceWork((int) $batch->company_id);
             $batch = ProductBatch::lockForUpdate()->findOrFail($batch->id);
             $quantity = round((float) ($opts['quantity'] ?? $batch->quantity), self::Q);
             $quantity = min($quantity, (float) $batch->quantity);

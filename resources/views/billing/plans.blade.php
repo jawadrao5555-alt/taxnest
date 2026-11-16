@@ -5,6 +5,8 @@
                 <h2 class="font-bold text-xl text-gray-800 dark:text-gray-100 leading-tight">Billing & Plans</h2>
             </div>
 
+            @include('billing._policy-status', ['policySubscription' => $currentSubscription])
+
             @if(($pendingSelection ?? null) && ($pendingSelectionPlan ?? null))
             <section class="bg-white dark:bg-gray-900 border border-emerald-300 rounded-xl p-6 mb-6" aria-labelledby="selected-package-payment">
                 <h3 id="selected-package-payment" class="font-semibold text-lg">Selected: {{ $pendingSelectionPlan->name }}</h3>
@@ -254,10 +256,10 @@
                 months: { monthly: 1, quarterly: 3, semi_annual: 6, annual: 12 },
                 cycleLabels: { monthly: 'month', quarterly: '3 months', semi_annual: '6 months', annual: 'year' },
                 row(planId) { return (this.pricing[planId] || {})[this.cycle] || null; },
-                total(planId) { let r = this.row(planId); return r ? Math.round(r.final_price) : 0; },
-                perMonth(planId) { let r = this.row(planId); return r ? Math.round(r.monthly_effective) : 0; },
+                total(planId) { let r = this.row(planId); return r ? Number(r.final_price) : null; },
+                perMonth(planId) { let r = this.row(planId); return r ? Number(r.monthly_effective) : null; },
                 saving(planId) { let r = this.row(planId); return r ? Math.max(0, Math.round(r.total_before_discount - r.final_price)) : 0; },
-                fmt(n) { return Number(n).toLocaleString('en-US'); }
+                fmt(n) { return n === null ? 'Unavailable' : Number(n).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}); }
             }">
                 {{-- Only explicitly configured DI periods appear on each plan. --}}
                 <div class="flex justify-center mb-8">
@@ -303,7 +305,7 @@
                             @if($hasOffer)
                             <span class="inline-block mt-2 px-2 py-0.5 bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300 rounded-full text-[11px] font-bold">{{ $plan->sale_badge }}</span>
                             @endif
-                            <div class="mt-4">
+                            <div class="mt-4" x-show="row({{ $plan->id }})">
                                 <span class="text-3xl font-bold text-gray-900 dark:text-gray-100">PKR <span x-text="fmt(perMonth({{ $plan->id }}))"></span></span>
                                 <span class="text-gray-500 dark:text-gray-400 text-sm">/mo</span>
                                 <p class="text-xs text-gray-400 mt-1">

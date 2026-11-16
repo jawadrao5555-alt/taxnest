@@ -85,6 +85,7 @@ class FbrPosSchoolFeePilotTest extends TestCase
             $table->unique(['company_id', 'branch_key', 'report_date']);
         });
         (require database_path('migrations/2026_11_15_010000_extend_school_fee_collection_details.php'))->up();
+        (require database_path('migrations/2026_11_15_030000_extend_school_collection_ledger.php'))->up();
         $this->school = Company::withoutEvents(fn () => Company::create([
             'name' => 'Synthetic School', 'product_type' => 'fbrpos',
             'pos_type' => 'education', 'business_category' => 'education',
@@ -163,7 +164,22 @@ class FbrPosSchoolFeePilotTest extends TestCase
         $this->assertStringContainsString('SYN-001', $reprint);
         $this->assertStringContainsString('1,250.50', $reprint);
         $this->assertStringNotContainsString('fbr_invoice_number', $reprint);
-        $this->assertStringNotContainsString('<svg', $reprint);
+        // Icons are not fiscal evidence. Reject the actual retail fiscal receipt markers.
+        foreach (['alt="FBR QR Code"', 'class="fbr-number"', 'Tax Asaan', 'invoice.fbr.gov.pk', 'data-fiscal-qr', 'data-fbr-invoice-number'] as $marker) {
+            $this->assertStringNotContainsString($marker, $reprint);
+        }
+        $this->assertStringContainsString(__('pos.school_local_receipt'), $reprint);
+        $this->assertStringContainsString('FBR OFF', $reprint);
+        $this->assertFalse($this->school->fresh()->fbr_reporting_enabled);
+        // Even stray fiscal-shaped properties must never become a school identifier or QR.
+        $canary = clone $row;
+        $canary->fbr_invoice_number = 'SYNTHETIC-FISCAL-CANARY-DO-NOT-RENDER';
+        $canary->fbr_status = 'submitted';
+        $canary->qr_code = 'SYNTHETIC-FISCAL-QR-DO-NOT-RENDER';
+        $canaryHtml = view('fbr-pos.school-fees.receipt', ['company' => $this->school, 'receipt' => $canary])->render();
+        $this->assertStringNotContainsString($canary->fbr_invoice_number, $canaryHtml);
+        $this->assertStringNotContainsString($canary->qr_code, $canaryHtml);
+        $this->assertStringNotContainsString('tnMadadgar(', $reprint);
         Http::assertNothingSent();
     }
 
@@ -301,6 +317,7 @@ class FbrPosSchoolFeePilotTest extends TestCase
         app()->instance('request', $request);
         foreach ([$controller->dashboard(), $controller->index(), $controller->history($request), $controller->dayClose($request)] as $response) {
             $html = $response->getContent();
+            $this->assertStringContainsString('tnMadadgar(', $html);
             foreach (['products', 'stock', 'deals', 'loyalty', 'tax-reports', 'fail-queue', 'services', 'pharmacy', 'tables', 'kitchen'] as $retail) {
                 $this->assertDoesNotMatchRegularExpression('~href=["\'][^"\']*/fbr-pos/'.$retail.'(?:[/?#"\'])~i', $html);
             }
@@ -476,9 +493,9 @@ class FbrPosSchoolFeePilotTest extends TestCase
         Http::assertNothingSent();
     }
 
-    public function test_non_cash_unknown_fee_and_invalid_amounts_are_rejected(): void
+    public function test_unknown_method_fee_and_invalid_amounts_are_rejected(): void
     {
-        foreach ([['payment_method' => 'card'], ['fee_head' => 'canteen'], ['amount' => '0'], ['amount' => '-1'], ['amount' => '1.001'], ['amount' => '1e3']] as $invalid) {
+        foreach ([['payment_method' => 'crypto'], ['fee_head' => 'canteen'], ['amount' => '0'], ['amount' => '-1'], ['amount' => '1.001'], ['amount' => '1e3']] as $invalid) {
             try {
                 $this->collect($this->payload($invalid));
                 $this->fail('Invalid school fee payload was accepted: '.json_encode($invalid));
@@ -873,10 +890,10 @@ class FbrPosSchoolFeePilotTest extends TestCase
         $this->collect($this->payload());
         try { $this->closeSchoolDay(['counted_cash' => null]); $this->fail('Actual count required.'); }
         catch (ValidationException $e) { $this->assertArrayHasKey('counted_cash', $e->errors()); }
-        $closed = $this->closeSchoolDay(['counted_cash' => '1200.00'])->getData(true);
+        $closed = $this->closeSchoolDay(['variance_reason' => 'Synthetic cash shortage', 'counted_cash' => '1200.00'])->getData(true);
         $this->assertSame(120000, (int) $closed['counted_cash_paisa']);
         $this->assertSame(-5050, (int) $closed['variance_paisa']);
-        $this->assertSame($closed['report_id'], $this->closeSchoolDay(['counted_cash' => '1200'])->getData(true)['report_id']);
+        $this->assertSame($closed['report_id'], $this->closeSchoolDay(['variance_reason' => 'Synthetic cash shortage', 'counted_cash' => '1200'])->getData(true)['report_id']);
         try { $this->closeSchoolDay(['counted_cash' => '1250.50']); $this->fail('Changed count rejected.'); }
         catch (ValidationException $e) { $this->assertArrayHasKey('counted_cash', $e->errors()); }
         $this->assertSame(-5050, (int) DB::table('school_fee_day_closes')->value('variance_paisa'));
@@ -1008,13 +1025,13 @@ class FbrPosSchoolFeePilotTest extends TestCase
         $this->assertStringContainsString('data-paisa="125050"', $html);
         try { $this->closeSchoolDay(['unassigned' => '1', 'expected_branch_key' => $branchId]); $this->fail('Historical scope must be explicit.'); }
         catch (ValidationException $e) { $this->assertArrayHasKey('expected_branch_key', $e->errors()); }
-        $closed = $this->closeSchoolDay(['unassigned' => '1', 'expected_branch_key' => 0, 'counted_cash' => '1250.00'])->getData(true);
+        $closed = $this->closeSchoolDay(['unassigned' => '1', 'expected_branch_key' => 0, 'variance_reason' => 'Synthetic cash shortage', 'counted_cash' => '1250.00'])->getData(true);
         $snapshot = (array) DB::table('school_fee_day_closes')->first();
         $this->assertSame(0, (int) $snapshot['branch_key']);
         $this->assertSame(125050, (int) $snapshot['cash_amount_paisa']);
         $this->assertSame(-50, (int) $snapshot['variance_paisa']);
         $this->assertSame(1, (int) $snapshot['receipt_count']);
-        $this->assertSame($closed['report_id'], $this->closeSchoolDay(['unassigned' => '1', 'expected_branch_key' => 0, 'counted_cash' => '1250.00'])->getData(true)['report_id']);
+        $this->assertSame($closed['report_id'], $this->closeSchoolDay(['unassigned' => '1', 'expected_branch_key' => 0, 'variance_reason' => 'Synthetic cash shortage', 'counted_cash' => '1250.00'])->getData(true)['report_id']);
         $this->assertNull(DB::table('school_fee_receipts')->where('id', $oldId)->value('branch_id'));
         $this->assertSame((int) $branchId, (int) DB::table('school_fee_receipts')->where('id', $activeId)->value('branch_id'));
         $this->assertSame(0, DB::table('school_fee_day_closes')->where('branch_key', $branchId)->count());
@@ -1032,4 +1049,83 @@ class FbrPosSchoolFeePilotTest extends TestCase
         $this->assertSame($snapshot, (array) DB::table('school_fee_day_closes')->first());
     }
 
+
+    public function test_multihead_partial_recorded_payments_keep_immutable_receipts_and_cash_only_close(): void
+    {
+        $this->school->forceFill(['pos_cashier_dayclose' => true])->saveQuietly();
+        $payload = $this->payload(['student_name' => 'Synthetic Learner', 'amount' => '400', 'payment_method' => 'card',
+            'fee_lines' => [['fee_head'=>'tuition','amount'=>'1000'], ['fee_head'=>'exam','amount'=>'200']]]);
+        $first = $this->collect($payload)->getData(true)['receipt_id'];
+        $row = DB::table('school_fee_receipts')->find($first);
+        $this->assertSame(120000, (int) $row->payable_paisa);
+        $this->assertSame(80000, (int) $row->balance_paisa);
+        $this->assertSame($first, $this->collect($payload)->getData(true)['receipt_id']);
+        foreach (['payment_method'=>'bank', 'amount'=>'401', 'student_name'=>'Changed', 'account_id'=>$row->account_id] as $field=>$value) {
+            try { $this->collect(array_replace($payload, [$field=>$value])); $this->fail('Changed retry accepted'); }
+            catch (ValidationException $e) { $this->assertArrayHasKey('request_key', $e->errors()); }
+        }
+        $secondPayload = array_replace($payload, ['request_key'=>(string) Str::uuid(), 'account_id'=>$row->account_id, 'amount'=>'600', 'payment_method'=>'bank']);
+        $second = $this->collect($secondPayload)->getData(true)['receipt_id'];
+        $withoutAccount = $secondPayload; unset($withoutAccount['account_id']);
+        try { $this->collect($withoutAccount); $this->fail('Dropped account accepted'); }
+        catch (ValidationException $e) { $this->assertArrayHasKey('request_key', $e->errors()); }
+        try { $this->collect(array_replace($secondPayload, ['request_key'=>(string) Str::uuid(), 'amount'=>'201'])); $this->fail('Overpayment accepted'); }
+        catch (ValidationException $e) { $this->assertArrayHasKey('amount', $e->errors()); }
+        $thirdPayload = array_replace($secondPayload, ['request_key'=>(string) Str::uuid(), 'amount'=>'200', 'payment_method'=>'cash']);
+        $third = $this->collect($thirdPayload)->getData(true)['receipt_id'];
+        $this->assertSame(80000, (int) DB::table('school_fee_receipts')->find($first)->balance_paisa);
+        $this->assertSame(0, (int) DB::table('school_fee_receipts')->find($third)->balance_paisa);
+        $close = $this->closeSchoolDay(['expected_cash_paisa'=>20000,'expected_receipt_count'=>3,'counted_cash'=>'199','variance_reason'=>'Synthetic shortage','handover_to'=>'Synthetic Supervisor','handover_note'=>'Sealed envelope'])->getData(true);
+        $this->assertSame(20000, $close['cash_amount_paisa']); $this->assertSame(3, $close['receipt_count']);
+        $snapshot = (array) DB::table('school_fee_day_closes')->first();
+        $this->assertSame($second, $this->collect($secondPayload)->getData(true)['receipt_id']);
+        $this->assertSame($snapshot, (array) DB::table('school_fee_day_closes')->first());
+        $this->assertSame(3, DB::table('school_fee_receipts')->count());
+        Http::assertNothingSent();
+    }
+
+    public function test_student_lookup_is_campus_and_company_scoped_and_variance_needs_reason(): void
+    {
+        $this->school->forceFill(['pos_cashier_dayclose' => true])->saveQuietly();
+        $this->collect($this->payload(['student_reference'=>'SYN-LOOKUP','student_name'=>'Synthetic Learner']));
+        $id = DB::table('school_fee_accounts')->value('id');
+        $request = Request::create('/fbr-pos/school-fees', 'GET', ['student_search'=>'SYN-LOOKUP']);
+        $html = app(FbrPosSchoolFeeController::class)->index($request)->getContent();
+        $this->assertStringContainsString('Synthetic Learner', $html);
+        DB::table('school_fee_accounts')->where('id',$id)->update(['company_id'=>$this->school->id+99]);
+        $accounts = app(FbrPosSchoolFeeController::class)->index($request)->original->getData()['accounts'];
+        $this->assertCount(0,$accounts);
+        try { $this->closeSchoolDay(['counted_cash'=>'1']); $this->fail('Variance without reason accepted'); }
+        catch (ValidationException $e) { $this->assertArrayHasKey('variance_reason',$e->errors()); }
+    }
+
+    public function test_read_only_recovery_returns_settled_receipt_and_rejects_other_scope(): void
+    {
+        $payload = $this->payload(['payment_method'=>'bank']);
+        $id = $this->collect($payload)->getData(true)['receipt_id'];
+        $snapshot = (array) DB::table('school_fee_receipts')->find($id);
+        $request = Request::create('/fbr-pos/school-fees/recover','GET',['request_key'=>$payload['request_key'],'expected_branch_key'=>0]);
+        $response = app(FbrPosSchoolFeeController::class)->recover($request);
+        $this->assertSame($id, $response->getData(true)['receipt_id']);
+        $this->assertSame($snapshot,(array) DB::table('school_fee_receipts')->find($id));
+        DB::table('school_fee_receipts')->where('id',$id)->update(['branch_id'=>999]);
+        $this->expectHttpStatus(404, fn()=>app(FbrPosSchoolFeeController::class)->recover($request));
+        DB::table('school_fee_receipts')->where('id',$id)->update(['branch_id'=>null,'company_id'=>$this->school->id+1]);
+        $this->expectHttpStatus(404, fn()=>app(FbrPosSchoolFeeController::class)->recover($request));
+    }
+
+    public function test_legacy_archive_report_sums_only_authorized_stored_filtered_records(): void
+    {
+        $this->legacySchema();
+        app()->bind('currentBranchId', fn () => 17);
+        $id = $this->legacyInvoice(['created_at'=>'2026-10-02 10:00:00','total_amount'=>200,'tax_amount'=>20]);
+        $this->legacyInvoice(['created_at'=>'2026-09-02 10:00:00','total_amount'=>800,'tax_amount'=>80]);
+        $this->legacyInvoice(['created_at'=>'2026-10-02 10:00:00','total_amount'=>900,'company_id'=>$this->school->id+99]);
+        $request = Request::create('/fbr-pos/school-fees/legacy-retail','GET',['from'=>'2026-10-01','to'=>'2026-10-31']);
+        $data = app(FbrPosSchoolFeeController::class)->legacyIndex($request)->original->getData();
+        $this->assertSame(1,$data['archiveSummary']['count']);
+        $this->assertEquals(200,$data['archiveSummary']['total']);
+        $this->assertEquals(20,$data['archiveSummary']['tax']);
+        $this->assertEquals(200,DB::table('fbr_pos_transactions')->where('id',$id)->value('total_amount'));
+    }
 }

@@ -5,6 +5,7 @@ const os = require('os');
 const { startPrinting, stopPrinting, getPrintStatus, reportPrinters, nudgePrintPoll } = require('./printer');
 const { isCurrentHeartbeatRequest } = require('./heartbeat-guard');
 const { replayCallbacks } = require('./callback-retry-policy');
+const { describeResponse } = require('./ims-result');
 const { DiagnosticBuffer } = require('./diagnostic-buffer');
 const { parseFiscalResult } = require('./fiscal-result');
 const imsSoap = require('./ims-soap');
@@ -536,7 +537,8 @@ async function submitToPra(invoice, praEndpoint, praToken, praMode, praEnvironme
     });
 
     const data = praRes.data;
-    const diagnostics = { ...(isFiscalDevice ? callbackDiagnostics(data, praEnvironment) : {}), ...claimEvidence };
+    const diagnostics = { ...(isFiscalDevice ? callbackDiagnostics(data, invoice.requested_environment || praEnvironment) : {}), ...claimEvidence,
+      ...(isFbrPos && Number(praRes.status) >= 200 && Number(praRes.status) < 300 ? { ims_diagnostic: 'response_received', ims_response_fields: describeResponse(data) } : {}) };
     // Tolerant comparison — the local IMS Fiscal Device service may return Code as a NUMBER (100),
     // while the cloud API returns a string ('100'). A strict === would misreport success as failure.
     const fiscalResult = parseFiscalResult(data);
@@ -623,6 +625,7 @@ async function reportResult(txnId, success, praInvoiceNumber, response, error, o
     error,
     offline,
     agent_version: currentConfig?.appVersion || '1.0.0',
+    device_uid: currentConfig?.deviceUid || null,
     ...diagnostics,
   };
   try {

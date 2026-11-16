@@ -60,6 +60,13 @@
             </div>
         </div>
 
+        <div>
+            <x-input-label for="date_of_birth" :value="__('profile_fields.date_of_birth')" />
+            <x-text-input id="date_of_birth" name="date_of_birth" type="date" max="{{ now()->toDateString() }}" class="mt-1 block w-full" :value="old('date_of_birth', $user->date_of_birth?->format('Y-m-d'))" />
+            <x-input-error class="mt-2" :messages="$errors->get('date_of_birth')" />
+            <p class="text-sm text-gray-500">{{ __('profile_fields.no_message_consent') }}</p>
+        </div>
+
         <div class="flex items-center gap-4">
             <x-primary-button>{{ __('Save') }}</x-primary-button>
 

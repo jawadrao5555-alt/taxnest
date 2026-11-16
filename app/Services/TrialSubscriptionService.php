@@ -26,6 +26,23 @@ class TrialSubscriptionService
      * Attach the standard trial subscription to a company. Idempotent: if the
      * company already has an active subscription, nothing new is created.
      */
+    public static function ensureSelectedTrial(int $companyId, string $productType, int $planId): Subscription
+    {
+        return DB::transaction(function () use ($companyId,$productType,$planId) {
+            $company=Company::whereKey($companyId)->lockForUpdate()->firstOrFail();
+            $existing=Subscription::where('company_id',$companyId)->where('active',true)->lockForUpdate()->first();
+            if($existing)return $existing;
+            if (\App\Support\NestErps::canonicalProductType($company->product_type) !== \App\Support\NestErps::canonicalProductType($productType)) throw \Illuminate\Validation\ValidationException::withMessages(['product_type'=>'Select the matching product trial.']);
+            $plan=PricingPlan::whereKey($planId)->lockForUpdate()->firstOrFail();
+            $snapshot=ProspectiveSubscriptionPolicy::trial($company,$plan);
+            $trialStart=\Carbon\Carbon::parse($snapshot['trial_starts_at'])->setTimezone(config('app.timezone'));
+            $trialEnd=\Carbon\Carbon::parse($snapshot['trial_ends_at'])->setTimezone(config('app.timezone'));
+            return Subscription::create(['company_id'=>$companyId,'pricing_plan_id'=>$planId,'billing_cycle'=>'monthly',
+                'discount_percent'=>0,'final_price'=>0,'start_date'=>$trialStart,'end_date'=>$trialEnd,
+                'trial_ends_at'=>$trialEnd,'active'=>true,'purchase_snapshot'=>$snapshot['trial_purchase_snapshot'],'lifecycle_snapshot'=>$snapshot]);
+        });
+    }
+
     public static function ensureTrial(int $companyId, string $productType, int $days = 3): Subscription
     {
         return DB::transaction(function () use ($companyId, $productType, $days) {

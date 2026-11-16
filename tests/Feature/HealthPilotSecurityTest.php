@@ -202,6 +202,22 @@ class HealthPilotSecurityTest extends TestCase
         }
     }
 
+    public function test_dashboard_links_only_existing_authorized_modules_and_translates_duty(): void
+    {
+        foreach (['en', 'ur', 'rur'] as $locale) {
+            app()->setLocale($locale);
+            $response = $this->actingAs($this->myOwner, HealthPanel::GUARD)->get('/health/dashboard');
+            $response->assertOk()->assertDontSee('health.nav_my_duty');
+            foreach (['pharmacy', 'ipd', 'accounts', 'hr'] as $module) {
+                $this->assertMatchesRegularExpression('/data-health-module="'.$module.'".*?href="'.preg_quote(route('health.'.$module), '/').'"/s', $response->getContent());
+                $this->assertNotSame('health.nav_my_duty', trans('health.nav_my_duty', [], $locale));
+            }
+        }
+        $this->actingAs($this->myCashier, HealthPanel::GUARD)->get('/health/dashboard')
+            ->assertOk()->assertDontSee('href="'.route('health.accounts').'"', false)
+            ->assertDontSee('href="'.route('health.hr').'"', false);
+    }
+
     public function test_navigation_offers_nothing_the_hospital_cannot_use(): void
     {
         $this->mine->forceFill([

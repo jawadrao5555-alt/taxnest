@@ -47,6 +47,60 @@ use Tests\TestCase;
  */
 class PosOnlinePaymentAwaitedTest extends TestCase
 {
+    public function test_optional_cashier_approval_defaults_off_and_uses_current_database_policy(): void
+    {
+        (require database_path('migrations/2026_11_16_120000_create_pos_online_payment_policies_table.php'))->up();
+        $companyId = $this->makeShop();
+        $cashier = $this->makeCashier($companyId);
+        DB::table('users')->where('id', $cashier->id)->update(['role' => 'employee', 'pos_role' => 'pos_cashier']);
+        $cashier->refresh();
+        $this->assertFalse(\App\Services\PosOnlinePaymentPolicy::requiresApproval($cashier, $companyId));
+        DB::table('pos_online_payment_policies')->insert(['company_id' => $companyId, 'user_id' => $cashier->id, 'requires_approval' => true, 'updated_by' => $cashier->id]);
+        $this->assertTrue(\App\Services\PosOnlinePaymentPolicy::requiresApproval($cashier, $companyId));
+        $orderId = $this->makeOrder($companyId, ['online_payment_awaited_at' => now()]);
+        $this->actingAs($cashier, 'pos')->postJson("/pos/restaurant/orders/{$orderId}/pay", ['payment_method' => 'cash', 'online_payment_confirmed' => true])->assertForbidden();
+        $this->actingAs($cashier, 'pos')->postJson("/pos/restaurant/orders/{$orderId}/pay", ['payment_method' => 'qr_payment'])->assertForbidden();
+        $this->assertSame(0, DB::table('pos_transactions')->count());
+        $this->assertSame('held', DB::table('restaurant_orders')->find($orderId)->status);
+        // Same authenticated object: no logout/login is needed after the admin changes policy.
+        DB::table('pos_online_payment_policies')->update(['requires_approval' => false]);
+        $this->assertFalse(\App\Services\PosOnlinePaymentPolicy::requiresApproval($cashier, $companyId));
+        $this->assertTrue(\App\Services\PosOnlinePaymentPolicy::requiresApproval($cashier, $companyId + 100));
+        DB::table('users')->where('id', $cashier->id)->update(['is_active' => false]);
+        $this->assertTrue(\App\Services\PosOnlinePaymentPolicy::requiresApproval($cashier, $companyId));
+    }
+
+    public function test_only_company_admin_can_configure_cashier_policy_and_cannot_cross_company(): void
+    {
+        (require database_path('migrations/2026_11_16_120000_create_pos_online_payment_policies_table.php'))->up();
+        $companyId = $this->makeShop();
+        $cashier = $this->makeCashier($companyId);
+        DB::table('users')->where('id', $cashier->id)->update(['role' => 'employee', 'pos_role' => 'pos_cashier']);
+        $cashier->refresh();
+        $this->actingAs($cashier, 'pos')->putJson("/pos/team/online-payment-policy/{$cashier->id}", ['requires_approval' => true]);
+        $this->assertSame(0, DB::table('pos_online_payment_policies')->count());
+        DB::table('users')->where('id', $cashier->id)->update(['role' => 'company_admin', 'pos_role' => 'pos_admin']);
+        $admin = $cashier->fresh();
+        $target = $this->makeCashier($companyId);
+        DB::table('users')->where('id', $target->id)->update(['role' => 'employee', 'pos_role' => 'pos_cashier']);
+        $target->refresh();
+        $foreign = $this->makeCashier($this->makeShop());
+        DB::table('users')->where('id', $admin->id)->update(['role' => 'employee', 'pos_role' => 'pos_admin']);
+        $this->actingAs($admin->fresh(), 'pos')->putJson("/pos/team/online-payment-policy/{$target->id}", ['requires_approval' => true])->assertForbidden();
+        DB::table('users')->where('id', $admin->id)->update(['role' => 'company_admin']);
+        $this->actingAs($admin, 'pos')->putJson("/pos/team/online-payment-policy/{$target->id}", ['requires_approval' => true])->assertRedirect();
+        $this->assertTrue(\App\Services\PosOnlinePaymentPolicy::requiresApproval($target, $companyId));
+        $this->assertFalse(\App\Services\PosOnlinePaymentPolicy::requiresApproval($admin, $companyId));
+        foreach (['en', 'ur', 'rur'] as $locale) {
+            app()->setLocale($locale);
+            $html = view('pos.online-payment-policy', ['cashiers' => collect([$target]), 'enabled' => [$target->id]])->render();
+            $this->assertStringContainsString(e(__('online_payment_policy.title')), $html);
+            $this->assertStringNotContainsString('online_payment_policy.title', $html);
+            $this->assertStringNotContainsString('type="password"', $html);
+        }
+        $this->actingAs($admin, 'pos')->putJson("/pos/team/online-payment-policy/{$foreign->id}", ['requires_approval' => true])->assertNotFound();
+    }
+
     public function test_silent_proof_queue_preserves_selected_method_and_does_not_reuse_another_method(): void
     {
         Schema::table('companies', function (Blueprint $t) {

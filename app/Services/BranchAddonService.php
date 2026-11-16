@@ -236,7 +236,7 @@ class BranchAddonService
      * @param  float|string|null  $paid  Jo raqam shop ne proof par likhi.
      * @return array{applies:bool,slots:int,min_slots:int,branches:int,included:?int,cycle:string,base_price:float,addon_price:float,expected_total:float,paid:?float,short:bool,shortfall:float}
      */
-    public static function renewalReview(?Company $company, ?PricingPlan $plan, ?string $cycle, $paid = null): array
+    public static function renewalReview(?Company $company, ?PricingPlan $plan, ?string $cycle, $paid = null, ?array $validatedQuote = null): array
     {
         $slots = self::slots($company);
         // (Task 1441) "applies" tracks whether the add-on line is actually
@@ -251,7 +251,11 @@ class BranchAddonService
 
         if ($plan && self::supportsPlan($plan)) {
             // Wahi hisaab jo renewal par charge hota hai — dobara nahi banaya jata.
-            $priced = SubscriptionAssignmentService::computePrice($plan, $cycle, $applies ? $company : null);
+            $priced = $validatedQuote === null
+                ? SubscriptionAssignmentService::computePrice($plan, $cycle, $applies ? $company : null)
+                : ['cycle' => $validatedQuote['cycle'],
+                    'base_price' => (float) $validatedQuote['gross_package_price'] - (float) $validatedQuote['discount_amount'],
+                    'extra_branch_price' => (float) ($validatedQuote['undiscounted_addon_amount'] ?? 0)];
             $cycle = $priced['cycle'];
             $base = (float) $priced['base_price'];
             $addon = (float) $priced['extra_branch_price'];

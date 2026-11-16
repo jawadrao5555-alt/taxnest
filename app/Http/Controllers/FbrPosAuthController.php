@@ -148,7 +148,8 @@ class FbrPosAuthController extends Controller
         // so an unknown or missing name simply records nothing).
         $picked = \App\Services\RequestedPackageService::resolvePlan(request('plan'), 'fbrpos');
 
-        return view('fbr-pos.auth.register', ['pickedPlanName' => $picked?->name]);
+        return view('fbr-pos.auth.register', ['pickedPlanName' => $picked?->name,
+            'registrationPlans' => \App\Services\FbrPosPlanComparisonService::plans()]);
     }
 
     public function register(Request $request)
@@ -157,6 +158,7 @@ class FbrPosAuthController extends Controller
             'product_type' => 'nullable|string|in:fbrpos',
             'business_category' => 'nullable|string|same:pos_type',
             'requested_plan' => 'nullable|string|max:255',
+            'billing_cycle' => 'nullable|string|in:monthly,quarterly,semi_annual,annual',
             // Older forms send an ID; validate it within this product, never as an entitlement.
             'pricing_plan_id' => ['nullable', 'integer', \Illuminate\Validation\Rule::exists('pricing_plans', 'id')->where('product_type', 'fbrpos')->where('is_trial', 0)],
             'company_name' => 'required|string|max:255',
@@ -214,11 +216,12 @@ class FbrPosAuthController extends Controller
             }
             $selectedPlan ??= $legacyPlan;
         }
-        $requestedPackage = \App\Services\RequestedPackageService::companyAttributes($selectedPlan);
+        \App\Services\ProspectiveSubscriptionPolicy::requireSelection($selectedPlan);
+        $requestedPackage = \App\Services\RequestedPackageService::companyAttributes($selectedPlan, $request->input('billing_cycle'));
 
         // Company, owner, credential ledger and zero-price trial are one unit.
         // Never sign in or consume the referral session after a partial signup.
-        $user = \Illuminate\Support\Facades\DB::transaction(function () use ($request, $posType, $distributor, $storeSlipDefault, $requestedPackage) {
+        $user = \Illuminate\Support\Facades\DB::transaction(function () use ($request, $posType, $distributor, $storeSlipDefault, $requestedPackage, $selectedPlan) {
             $company = Company::create([
                 'name' => $request->company_name,
                 'ntn' => $request->company_ntn,
@@ -270,7 +273,8 @@ class FbrPosAuthController extends Controller
                 'ntn' => $request->company_ntn,
             ], $company->id, 'fbrpos');
 
-            $this->startTrial($company->id, 'fbrpos');
+            if (\App\Services\ProspectiveSubscriptionPolicy::available()) \App\Services\TrialSubscriptionService::ensureSelectedTrial($company->id,'fbrpos',$selectedPlan->id);
+            else $this->startTrial($company->id, 'fbrpos');
 
             return $user;
         });

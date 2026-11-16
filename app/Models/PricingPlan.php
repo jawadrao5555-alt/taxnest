@@ -66,19 +66,14 @@ class PricingPlan extends Model
      *
      * DI packages carry hand-set quarterly / half-year / annual rates so the
      * printed price is exactly what the owner approved instead of a formula
-     * result with paisa tails. Deliberately DI-only: PRA POS stores its price
-     * column as an ANNUAL rate, so letting it read these columns would change
-     * POS quotes.
+     * result with paisa tails. Explicit cycle columns apply across products. The legacy price column
+     * remains an annual amount for POS/ERP; no short period is derived from it.
      *
      * Returns null when this plan has no explicit rate for the cycle — the
      * caller then falls back to Subscription::calculateFinalPrice.
      */
     public function explicitCyclePrice(string $cycle): ?float
     {
-        if ($this->product_type !== 'di') {
-            return null;
-        }
-
         $column = match ($cycle) {
             'monthly'     => 'price_monthly',
             'quarterly'   => 'price_quarterly',

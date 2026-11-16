@@ -118,7 +118,7 @@ class AiInvoiceReaderService
         if ($plan && $plan->name === 'Premium') {
             return self::QUOTA_PREMIUM;
         }
-        if ($sub && $sub->isTrialActive()) {
+        if ($sub && $sub->isTrialActive() && (!$sub->hasLifecycleSnapshot())) {
             return self::QUOTA_TRIAL;
         }
 

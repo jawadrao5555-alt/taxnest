@@ -158,7 +158,9 @@ class DiInvoiceApiController extends Controller
         // ── Create invoice + items (mirrors InvoiceController::store) ───────
         try {
             $invoice = DB::transaction(function () use ($request, $company, $companyId, $selectedBranch, $documentType, $buyerRegType, $clientReference, $standardTaxRate) {
+                $request->merge(['items'=>\App\Services\DiInvoiceInventory::normalize($request->items,$company,$selectedBranch?->id,$documentType,null,$request->reference_invoice_number)]);
                 \App\Services\DiSellingPacking::validateReturns($request->input('items'), (int) $companyId);
+                \App\Services\DiInvoiceInventory::validateReturns($request->items,(int)$companyId);
                 $totals = \App\Services\DiInvoiceMath::totals($request->input('items'));
             $totalValueExcludingST = $totals['value'];
             $totalSalesTax = $totals['tax'];
@@ -170,6 +172,7 @@ class DiInvoiceApiController extends Controller
                 $invoice = Invoice::create([
                     'di_api_request_hash' => \App\Services\DiApiRequestIdentity::fingerprint($request->attributes->get('di_original_input', $request->all())),
                     'company_id' => $companyId,
+                    ...\App\Services\DiInvoiceInventory::eligibility($company),
                     'invoice_number' => $invoiceNumber,
                     'internal_invoice_number' => $invoiceNumber,
                     'buyer_name' => $request->input('buyer_name'),
@@ -206,6 +209,7 @@ class DiInvoiceApiController extends Controller
                     InvoiceItem::create([
                         'invoice_id' => $invoice->id,
                         ...(!empty($item['selling_snapshot']) ? ['selling_snapshot' => $item['selling_snapshot']] : []),
+                        ...(!empty($item['inventory_snapshot']) ? ['inventory_snapshot' => $item['inventory_snapshot']] : []),
                         'hs_code' => $item['hs_code'],
                         'schedule_type' => $scheduleType,
                         'pct_code' => $item['pct_code'] ?? ($hsResolved['pct_code'] ?? null),

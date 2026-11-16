@@ -1,0 +1,136 @@
+<?php
+
+namespace App\Services;
+
+use App\Models\Subscription;
+use Carbon\CarbonImmutable;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\ValidationException;
+
+/** Minimal immutable per-bill quota facts, never a recoverable invoice/support copy. */
+final class ProspectiveQuotaRetention
+{
+    public static function policy(int $companyId): ?array
+    {
+        // No prospective policy exists before its additive schema is present.
+        // Preserve legacy deletion/quota paths without querying absent tables.
+        if (! ProspectiveSubscriptionPolicy::available()) {
+            return null;
+        }
+        $sub = Subscription::where('company_id', $companyId)->where('active', true)->latest('id')->first();
+        if (! $sub || !$sub->hasLifecycleSnapshot()) {
+            return null;
+        }
+        $policy = ProspectiveSubscriptionPolicy::snapshot($sub);
+        if (! $policy || ! Schema::hasTable('prospective_pos_quota_retention')) {
+            self::hold();
+        }
+
+        return $policy;
+    }
+
+    private static function hold(): never
+    {
+        throw ValidationException::withMessages(['subscription' => 'Exact retained bill quota requires review; no allowance has been inferred from daily totals.']);
+    }
+
+    public static function monthStart(int $companyId): \Carbon\CarbonInterface
+    {
+        $start = now()->startOfMonth();
+        $s = self::policy($companyId);
+        if ($s && ! empty($s['first_paid_starts_at'])) {
+            $paid = CarbonImmutable::parse($s['first_paid_starts_at'])->setTimezone(config('app.timezone'));
+            if ($paid->greaterThan($start)) {
+                return $paid;
+            }
+        }
+
+        return $start;
+    }
+
+    public static function capture(Collection $bills, string $source, int $sourceId): void
+    {
+        if ($bills->isEmpty()) {
+            return;
+        }
+        if (DB::transactionLevel() < 1) {
+            throw new \LogicException('Quota retention requires the locked deletion transaction.');
+        }
+        foreach ($bills->groupBy('company_id') as $companyId => $rows) {
+            if (! self::policy((int) $companyId)) {
+                continue;
+            }
+            foreach ($rows as $bill) {
+                if (! $bill->created_at) {
+                    self::hold();
+                }
+                if (!Schema::hasColumn('prospective_pos_quota_retention','business_date')) self::hold();
+                // Match the existing day-close predicate while the original row exists.
+                $businessDate = $bill->business_date ?: $bill->created_at->toDateString();
+                if (!preg_match('/^\d{4}-\d{2}-\d{2}$/',(string)$businessDate)) self::hold();
+                $values = ['business_date'=>$businessDate, 'sold_at' => $bill->created_at->format('Y-m-d H:i:s'), 'quota_counted' => (int) ($bill->status === 'completed' && $bill->invoice_mode !== 'local' && ($bill->transaction_type ?? 'sale') !== 'return'),
+                    'aggregate_final' => (int) ! ($bill->invoice_mode === 'local' && $bill->pra_status === 'local'), 'source' => $source, 'source_id' => $sourceId];
+                $existing = DB::table('prospective_pos_quota_retention')->where('company_id', $companyId)->where('transaction_id', $bill->id)->lockForUpdate()->first();
+                if ($existing) {
+                    foreach ($values as $key => $value) {
+                        if ((string) $existing->$key !== (string) $value) {
+                            self::hold();
+                        }
+                    }
+
+                    continue;
+                }
+                DB::table('prospective_pos_quota_retention')->insert($values + ['company_id' => $companyId, 'transaction_id' => $bill->id, 'captured_at' => now()]);
+            }
+        }
+    }
+
+    public static function deletedCount(int $companyId, bool $currentRead = false, ?\Carbon\CarbonInterface $from = null): int
+    {
+        $s = self::policy($companyId);
+        if (! $s) {
+            throw new \LogicException('Legacy quota must use its existing retained aggregates.');
+        }
+        // A new-policy company cannot acquire unexplained older-style deletion totals.
+        foreach (['day-close' => 'pos_day_close_reports', 'archive-clear' => 'pos_local_series_resets'] as $source => $table) {
+            if (! Schema::hasTable($table)) {
+                self::hold();
+            }
+            $reports = DB::table($table)->where('company_id', $companyId)->where('deleted_final_count', '>', 0)->when($currentRead,fn($q)=>$q->lockForUpdate())->get();
+            foreach ($reports as $report) {
+                $q = DB::table('prospective_pos_quota_retention')->where('company_id', $companyId)->where('source', $source)->where('source_id', $report->id)->where('aggregate_final', true);
+                if ($source === 'day-close') {
+                    if (!Schema::hasColumn('prospective_pos_quota_retention','business_date')) self::hold();
+                    $month = CarbonImmutable::parse($report->report_date)->startOfMonth();
+                    $q->where('business_date','>=',$month->toDateString())->where('business_date','<',$month->addMonth()->toDateString());
+                }
+                if ($source === 'archive-clear') {
+                    $month = CarbonImmutable::parse($report->reset_date)->startOfMonth();
+                    $q->where('sold_at', '>=', $month)->where('sold_at', '<', $month->addMonth());
+                }
+                if (($currentRead ? $q->lockForUpdate()->get(['id'])->count() : $q->count()) !== (int) $report->deleted_final_count) {
+                    self::hold();
+                }
+            }
+        }
+        if (!Schema::hasTable('pos_bill_deletions')) self::hold();
+        if ($currentRead) {
+            $known = DB::table('prospective_pos_quota_retention')->where('company_id',$companyId)->orderBy('id')->lockForUpdate()->pluck('transaction_id')->all();
+            $audit = DB::table('pos_bill_deletions')->where('company_id',$companyId)->orderBy('id')->lockForUpdate()->pluck('transaction_id')->all();
+            if (array_diff($audit,$known)) self::hold();
+        } elseif (DB::table('pos_bill_deletions as d')->where('d.company_id',$companyId)->whereNotExists(fn($q)=>$q->selectRaw('1')->from('prospective_pos_quota_retention as q')->whereColumn('q.company_id','d.company_id')->whereColumn('q.transaction_id','d.transaction_id'))->exists()) self::hold();
+
+        // Anti-join prevents a capture followed by a rolled-back/unexecuted delete
+        // from counting both live and retained copies, even under synthetic repair.
+        $retained = DB::table('prospective_pos_quota_retention as q')->where('q.company_id', $companyId)->where('q.quota_counted', true)
+            ->whereBetween('q.sold_at', [$from ?? self::monthStart($companyId), now()->endOfMonth()]);
+        if ($currentRead) {
+            $live = DB::table('pos_transactions')->where('company_id',$companyId)->orderBy('id')->lockForUpdate()->pluck('id')->all();
+            return $retained->whereNotIn('q.transaction_id',$live)->orderBy('q.id')->lockForUpdate()->get(['q.id'])->count();
+        }
+        $retained->whereNotExists(fn ($q) => $q->selectRaw('1')->from('pos_transactions as p')->whereColumn('p.company_id', 'q.company_id')->whereColumn('p.id','q.transaction_id'));
+        return $currentRead ? $retained->orderBy('q.id')->lockForUpdate()->get(['q.id'])->count() : $retained->count();
+    }
+}

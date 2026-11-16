@@ -49,6 +49,7 @@ class User extends Authenticatable
         'name',
         'email',
         'phone',
+        'date_of_birth',
         'username',
         'password',
         'company_id',
@@ -396,6 +397,7 @@ class User extends Authenticatable
     }
 
     protected $hidden = [
+        'date_of_birth', // Private profile field, never implicit API/user export.
         'session_generation',
         'password',
         'remember_token',
@@ -408,6 +410,7 @@ class User extends Authenticatable
     {
         return [
             'email_verified_at' => 'datetime',
+            'date_of_birth' => 'date:Y-m-d',
             'password' => 'hashed',
             'is_active' => 'boolean',
             'dark_mode' => 'boolean',

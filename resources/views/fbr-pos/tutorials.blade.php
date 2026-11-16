@@ -9,6 +9,7 @@
         <a href="{{ route('fbrpos.dashboard') }}" class="text-sm font-semibold text-blue-600 dark:text-blue-400 hover:underline whitespace-nowrap">&larr; Dashboard</a>
     </div>
 
+    @include('tutorials._search')
     @forelse($groups as $key => $group)
     <div class="mb-8">
         <div class="flex items-center gap-2.5 mb-4">
@@ -18,7 +19,8 @@
         <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
             @foreach($group['videos'] as $v)
             <div class="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm overflow-hidden">
-                <video class="w-full bg-black tut-lazy" style="aspect-ratio: 16 / 9;" controls preload="none" playsinline data-src="{{ $v->video_url }}"></video>
+                <video class="w-full bg-black tut-lazy" style="aspect-ratio: 16 / 9;" controls preload="none" playsinline data-src="{{ $v->video_url }}" aria-label="{{ $v->title }}">@if($v->caption_path)<track kind="captions" src="{{ $v->caption_path }}" srclang="{{ $v->caption_language }}" label="{{ $v->caption_language }}">@endif</video>
+                @include('tutorials._metadata')
                 <div class="p-4">
                     <h3 class="text-sm font-bold text-gray-900 dark:text-white">{{ $v->title }}</h3>
                     @if($v->description)

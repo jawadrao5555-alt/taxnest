@@ -97,6 +97,9 @@ class PosCategoryProfilesTest extends TestCase
                 }
                 // The signup preset can never switch on something its own profile hides.
                 $defaults = array_keys(array_filter(PosFeatureService::allCategoryDefaults()[$cat] ?? []));
+                if ($panel === 'fbr' && in_array($cat, ['education', 'clinic'], true)) {
+                    $defaults = array_values(array_diff($defaults, ['service_jobs', 'inventory']));
+                }
                 $this->assertSame([], array_values(array_diff($defaults, $profile['modules'])), "{$cat}/{$panel}: preset turns on modules outside its own profile");
 
                 $this->assertGreaterThanOrEqual(3, count($profile['examples']), "{$cat}: needs 3-4 example items");

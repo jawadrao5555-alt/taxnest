@@ -56,6 +56,10 @@ class FbrPosTransaction extends Model
     protected static function booted()
     {
         static::creating(function (self $t) {
+            if ($t->company_id && \Schema::hasColumn('fbr_pos_transactions', 'fbr_requested_environment_snapshot')) {
+                $environment = Company::find($t->company_id)?->fbr_pos_environment;
+                $t->fbr_requested_environment_snapshot = $environment === 'production' ? 'production' : 'sandbox';
+            }
             if (\Schema::hasColumn('fbr_pos_transactions', 'fbr_receipt_profile_snapshot') && $t->company_id && $t->invoice_mode !== 'local') {
                 $company = \App\Models\Company::find($t->company_id);
                 if ($company) $t->fbr_receipt_profile_snapshot = $company->only(['name','address','ntn','fbr_sales_tax_registration_number','fbr_tax_office']);

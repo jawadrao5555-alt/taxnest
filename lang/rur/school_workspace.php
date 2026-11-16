@@ -1,0 +1,23 @@
+<?php
+return [
+    'exit_company' => 'Manage as Company se bahar',
+    'fiscal_off' => 'FBR OFF · Fiscal submission band hai.',
+    'workspace_menu' => 'School workspace aur settings',
+    'team_access' => 'Team aur campus access',
+    'profile_printing' => 'School profile aur receipt printing',
+    'billing' => 'Package aur billing',
+    'retail_archive' => 'Purana retail record (sirf parhna)',
+    'my_profile' => 'Meri profile',
+    'help' => 'Madad aur feedback',
+    'language' => 'Zaban',
+    'save_language' => 'Zaban save karein',
+    'workspace_only' => 'Yeh retail action School mode mein dastiyab nahi. School workspace istemal karein.',
+    'campus_start' => 'Abhi campus nahi bana. Purani receipts apni jagah mehfooz hain. Campus banayein aur collection se pehle staff access dein.',
+    'campus_access' => 'Staff campus access manage karein',
+    'school_plans' => 'School workspace packages',
+    'school_billing_note' => 'Package School fiscal submission enable nahi karta. Official route aur sandbox verification abhi zaroori hain.',
+    'package_choice' => 'Darkhwast karda package',
+    'trial_choice' => 'Mehdood trial shuru karein; paid package baad mein chunein',
+    'package_note' => 'Yeh sirf pasand record karta hai. Paid package ke liye alag approval aur payment chahiye; registration fiscal reporting enable nahi karti.',
+    'pilot_registration' => 'School / Education aur Hospital / Clinic sirf local collection hain. Official route aur sandbox verify hone tak FBR submission band rahegi.',
+];

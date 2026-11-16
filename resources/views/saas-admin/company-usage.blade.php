@@ -3,6 +3,8 @@
     <h1 class="text-2xl font-bold text-white mb-6">Company Usage Monitoring</h1>
     <p class="mb-4 text-sm text-gray-600 dark:text-gray-300">Billing, terminal and stock figures below cover PRA POS only; a dash means not applicable or unavailable. Staff activity comes from recorded logins and session heartbeats. Opening this page does not count as company activity.</p>
 
+    <form method="get" class="mb-4 grid sm:grid-cols-4 gap-2"><label>Company ID<input name="company_id" type="number" min="1" value="{{ request('company_id') }}"></label><label>Campus ID (0 = unassigned)<input name="branch_id" type="number" min="0" value="{{ request('branch_id') }}"></label><label>From calendar date<input name="date_from" type="date" value="{{ request('date_from') }}"></label><label>To calendar date<input name="date_to" type="date" value="{{ request('date_to') }}"></label><button>Filter local collections</button></form>
+    <p>Local filters below apply only to School/Hospital collections. PRA usage columns remain all-time.</p>
     <div class="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
         <div class="overflow-x-auto">
             <table class="w-full text-sm table-cards">
@@ -22,6 +24,7 @@
                     <tr class="hover:bg-gray-800/50 {{ $loop->even ? 'bg-gray-800/20' : '' }}">
                         <td class="px-4 py-3 text-white font-medium">
                             <a href="{{ route('saas.admin.companies.show', $stat->company_id) }}" class="hover:text-indigo-400 transition">{{ $stat->company->name ?? 'Unknown' }}</a>
+                            @if(auth('admin')->user()?->canManageSensitiveConfiguration())<a class="block text-xs text-indigo-400" href="{{ route('admin.company-ai-usage',$stat->company_id) }}">AI usage / budget</a>@endif
                             <span class="block text-xs text-gray-500">{{ \App\Support\ProductCatalog::label($stat->company->product_type) }}</span>
                         </td>
                         <td class="px-4 py-3 text-right text-gray-300 font-medium">{{ $stat->total_pos_transactions === null ? '—' : number_format($stat->total_pos_transactions) }}</td>
@@ -31,6 +34,7 @@
                         <td class="px-4 py-3 text-right text-gray-300">{{ $stat->inventory_items ?? '—' }}</td>
                         <td class="px-4 py-3 text-gray-500 dark:text-gray-400 text-xs">{{ $stat->last_activity_at?->diffForHumans() ?? '—' }}</td>
                     </tr>
+                    @if($stat->local_collections)<tr><td colspan="7" class="px-4 py-3">@include('saas-admin.partials.local-collections',['local'=>$stat->local_collections])</td></tr>@endif
                     @empty
                     <tr><td colspan="7" class="px-4 py-12 text-center text-gray-500 dark:text-gray-400">No usage data yet.</td></tr>
                     @endforelse

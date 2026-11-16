@@ -6,7 +6,7 @@ export default {
     darkMode: 'class',
     content: [
         './vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php',
-        './storage/framework/views/*.php',
+        // Compiled Blade caches are generated state, not exact-SHA build inputs.
         './resources/views/**/*.blade.php',
     ],
 

@@ -339,8 +339,11 @@ class FbrPosController extends Controller
         if (!$bill) {
             return response()->json(['success' => false, 'message' => __('pos.provisional_bill_not_found')], 404);
         }
+        $prospectiveQuota = \App\Services\ProspectiveSubscriptionPolicy::available()
+            && (\App\Services\PlanLimitService::getActiveSubscription($companyId)?->hasLifecycleSnapshot() ?? false);
         try {
-            \DB::transaction(function () use ($bill, $companyId) {
+            \DB::transaction(function () use ($bill, $companyId, $prospectiveQuota) {
+                if ($prospectiveQuota) Company::whereKey($companyId)->lockForUpdate()->firstOrFail();
                 $locked = \App\Models\FbrPosTransaction::where('company_id', $companyId)
                     ->where('id', $bill->id)
                     ->where('invoice_mode', 'local')
@@ -353,6 +356,7 @@ class FbrPosController extends Controller
                     ->firstOrFail();
                 $items = \App\Models\FbrPosTransactionItem::where('transaction_id', $locked->id)
                     ->lockForUpdate()->get();
+                \App\Services\FbrProspectiveQuotaRetention::capture(collect([$locked]), 'single-delete');
                 app(\App\Services\OptionalLocalBillArchive::class)->capture($locked, 'fbrpos', $items);
                 \App\Services\InventoryService::restoreFbrTransaction(
                     (int) $companyId,
@@ -1122,7 +1126,10 @@ class FbrPosController extends Controller
                 $localSummary['provisional']['rider_guarded'] = $this->lastWashGuarded;
             }
             if ($ids->isNotEmpty()) {
-                \DB::transaction(function () use ($ids, $companyId) {
+                $prospectiveQuota = \App\Services\ProspectiveSubscriptionPolicy::available()
+                    && (\App\Services\PlanLimitService::getActiveSubscription($companyId)?->hasLifecycleSnapshot() ?? false);
+                \DB::transaction(function () use ($ids, $companyId, $prospectiveQuota) {
+                    if ($prospectiveQuota) Company::whereKey($companyId)->lockForUpdate()->firstOrFail();
                     $deleteRows = FbrPosTransaction::where('company_id', $companyId)
                         ->whereIn('id', $ids)
                         ->where('invoice_mode', 'local')
@@ -1149,6 +1156,7 @@ class FbrPosController extends Controller
                             Auth::guard('fbrpos')->id()
                         );
                     }
+                    \App\Services\FbrProspectiveQuotaRetention::capture($deleteRows, 'day-close');
                     FbrPosTransactionItem::whereIn('transaction_id', $deleteRows->pluck('id'))->delete();
                     $this->lastWashDeleted = FbrPosTransaction::where('company_id', $companyId)
                         ->whereIn('id', $deleteRows->pluck('id'))
@@ -2163,8 +2171,33 @@ class FbrPosController extends Controller
             }
         }
 
+        $prospectiveQuota = \App\Services\ProspectiveSubscriptionPolicy::available()
+            && (\App\Services\PlanLimitService::getActiveSubscription($companyId)?->hasLifecycleSnapshot() ?? false);
         try {
-            $transaction = DB::transaction(function () use ($request, $companyId, $company, $invoiceMode, $initialFbrStatus, $offlineUuid, $offlineUuidColumnExists, $offlineQueuedAt, $offlineQueuedBy, $offlineBranchId, $draftId) {
+            $transaction = DB::transaction(function () use ($request, $companyId, $company, $invoiceMode, $initialFbrStatus, $offlineUuid, $offlineUuidColumnExists, $offlineQueuedAt, $offlineQueuedBy, $offlineBranchId, $draftId, $prospectiveQuota) {
+                // New-policy paid limits serialize with the company before any
+                // sale mutation. Recheck replay after waiting: it must not consume
+                // another slot or repeat fiscal dispatch when the first response was lost.
+                if ($prospectiveQuota) {
+                    Company::whereKey($companyId)->lockForUpdate()->firstOrFail();
+                    if ($offlineUuidColumnExists) {
+                        $winner = FbrPosTransaction::where('company_id', $companyId)
+                            ->where('offline_uuid', $offlineUuid)->lockForUpdate()->first();
+                        if ($winner) {
+                            $message = __('pos.invoice_already_synced', ['number' => $winner->invoice_number]);
+                            return $request->wantsJson() ? response()->json([
+                                'success'=>true, 'replayed'=>true, 'transaction_id'=>$winner->id,
+                                'invoice_number'=>$winner->invoice_number, 'total_amount'=>(float)$winner->total_amount,
+                                'payment_method'=>$winner->payment_method, 'fbr_invoice_number'=>$winner->fbr_invoice_number,
+                                'fbr_status'=>$winner->fbr_status, 'invoice_mode'=>$winner->invoice_mode,
+                                'change_due'=>(float)$winner->change_due, ...$winner->waBillPayload($company), 'message'=>$message,
+                            ]) : redirect()->route('fbrpos.show', $winner->id)->with('success', $message);
+                        }
+                    }
+                    $context = \App\Services\ProspectiveQuotaGuard::context($companyId);
+                    \App\Services\FbrProspectiveQuotaRetention::assertCapacity($companyId, $context);
+                }
+
                 // ── Task 1271: ATOMIC DRAFT CONSUME = THE CLAIM ──────────────
                 // Conditional DELETE first: DELETE has no affected-rows-on-
                 // unchanged-values gotcha, and the row lock serializes every
@@ -3146,6 +3179,10 @@ class FbrPosController extends Controller
 
                 return $transaction;
             });
+
+            if ($transaction instanceof \Symfony\Component\HttpFoundation\Response) {
+                return $transaction;
+            }
 
             // Task 1271: WhatsApp Bill extras (FBR twin of the PRA pay JSON extras).
             // Never throws — nulls when feature off / provisional / no routable phone.
@@ -8589,6 +8626,7 @@ class FbrPosController extends Controller
 
         $supplierId = null;
         $product = DB::transaction(function () use ($request, $createFbrData, $companyId, $inventoryAllowed, $existingSupplier, &$supplierId) {
+            \App\Services\ProspectiveQuotaGuard::lockCompanyForInvoiceWork($companyId);
             $product = Product::create($createFbrData);
             $supplier = $this->quickAddSupplierIfRequested($request, $companyId, $inventoryAllowed) ?? $existingSupplier;
             $supplierId = $supplier?->id;
@@ -8693,6 +8731,7 @@ class FbrPosController extends Controller
 
         $supplierId = null;
         $created = DB::transaction(function () use ($request, $filled, $companyId, $taxType, $taxRate, $isThird, $hasThirdCol, $inventoryAllowed, $existingSupplier, &$supplierId) {
+            \App\Services\ProspectiveQuotaGuard::lockCompanyForInvoiceWork($companyId);
             $supplier = $this->quickAddSupplierIfRequested($request, $companyId, $inventoryAllowed) ?? $existingSupplier;
             $supplierId = $supplier?->id;
 
@@ -8878,6 +8917,7 @@ class FbrPosController extends Controller
         // ONE transaction for the whole edit: field save + min-stock/opening
         // + stock adjustment commit together or not at all.
         DB::transaction(function () use ($request, $product, $updateFbrData, $editStockSupplier, $inventoryAllowedUpd) {
+            \App\Services\ProspectiveQuotaGuard::lockCompanyForInvoiceWork((int) $product->company_id);
             $product->update($updateFbrData);
 
             // Retail Core (Aug 2026): optional opening stock + low-stock threshold.
@@ -9005,6 +9045,7 @@ class FbrPosController extends Controller
         $reason = trim((string) ($request->qty_reason ?? ''));
         $note = 'Stock correction (product edit form)' . ($reason !== '' ? ' — ' . $reason : '');
         DB::transaction(function () use ($companyId, $product, $newQty, $note, $userId, $branchId) {
+            \App\Services\ProspectiveQuotaGuard::lockCompanyForInvoiceWork($companyId);
             $stock = \App\Services\BranchStockService::stockRow($companyId, (int) $product->id, $branchId);
             $delta = round($newQty - (float) $stock->quantity, 3);
             if (abs($delta) < 0.0005) {
@@ -9095,13 +9136,14 @@ class FbrPosController extends Controller
             return true;
         }
         $sub = \App\Services\PlanLimitService::getActiveSubscription($companyId);
+        if ($sub && $sub->hasLifecycleSnapshot() && !\App\Services\ProspectiveSubscriptionPolicy::snapshot($sub)) return false;
         if (!$sub || !$sub->entitlementPlan()) {
             return true;
         }
-        if ($sub->hasActiveOverride()) {
+        if ($sub->hasActiveOverride() && (!$sub->hasLifecycleSnapshot())) {
             return true;
         }
-        return (bool) $sub->entitlementPlan()->inventory_enabled || (bool) $sub->entitlementPlan()->is_trial;
+        return (bool) $sub->entitlementPlan()->inventory_enabled || ((bool) $sub->entitlementPlan()->is_trial && (!$sub->hasLifecycleSnapshot()));
     }
 
     /**
@@ -9156,6 +9198,7 @@ class FbrPosController extends Controller
         $branchId = $branchId ?? $this->panelStockBranchId($companyId);
 
         return DB::transaction(function () use ($companyId, $supplier, $lines, $branchId) {
+            \App\Services\ProspectiveQuotaGuard::lockCompanyForInvoiceWork($companyId);
             $total = 0;
             foreach ($lines as $l) {
                 $total += round((float) $l['quantity'] * (float) $l['unit_price'], 2);

@@ -29,14 +29,14 @@ class FbrPosSubmissionEvidenceService
         }
     }
 
-    public function recordDispatch(Company $company, FbrPosTransaction $transaction, ?string $agentVersion = null): void
+    public function recordDispatch(Company $company, FbrPosTransaction $transaction, ?string $agentVersion = null, ?string $deviceUid = null, ?string $claim = null): void
     {
         if (! $this->available()) {
             return;
         }
 
         try {
-            DB::transaction(function () use ($company, $transaction, $agentVersion) {
+            DB::transaction(function () use ($company, $transaction, $agentVersion, $deviceUid, $claim) {
                 $now = now();
                 $row = DB::table(self::TABLE)
                     ->where('transaction_id', $transaction->id)
@@ -47,7 +47,7 @@ class FbrPosSubmissionEvidenceService
                     'company_id' => (int) $company->id,
                     'channel' => 'local_fiscal_device',
                     'endpoint_class' => 'local_fbr_ims',
-                    'requested_environment' => $this->requestedEnvironment($company),
+                    'requested_environment' => $transaction->fbr_requested_environment_snapshot ?? $this->requestedEnvironment($company),
                     'local_environment_proof' => 'unknown',
                     'pos_id_fingerprint' => $this->fingerprint($posId),
                     'pos_id_mask' => $this->mask($posId),
@@ -56,7 +56,13 @@ class FbrPosSubmissionEvidenceService
                     'updated_at' => $now,
                 ];
 
+                if (Schema::hasColumn(self::TABLE, 'device_uid')) {
+                    $proof = $deviceUid && $posId ? app(ReviewedDeviceProof::class)->reviewedProof((int)$company->id, $deviceUid, $posId, $attrs['requested_environment']) : null;
+                    $attrs += ['device_uid'=>$deviceUid, 'submission_claim_hash'=>$claim ? hash('sha256',$claim) : null, 'reviewed_device_proof_id'=>$proof?->id];
+                    $attrs['local_environment_proof'] = $proof ? 'reviewed_device_evidence' : 'unknown';
+                }
                 if ($row) {
+                    $attrs['requested_environment'] = $row->requested_environment;
                     $attrs['dispatch_count'] = ((int) $row->dispatch_count) + 1;
                     DB::table(self::TABLE)->where('id', $row->id)->update($attrs);
 
@@ -103,7 +109,7 @@ class FbrPosSubmissionEvidenceService
                 'company_id' => (int) $company->id,
                 'channel' => 'local_fiscal_device',
                 'endpoint_class' => 'local_fbr_ims',
-                'requested_environment' => $this->requestedEnvironment($company),
+                'requested_environment' => $transaction->fbr_requested_environment_snapshot ?? $this->requestedEnvironment($company),
                 'local_environment_proof' => 'unknown',
                 'pos_id_fingerprint' => $this->fingerprint($posId),
                 'pos_id_mask' => $this->mask($posId),
@@ -120,6 +126,7 @@ class FbrPosSubmissionEvidenceService
 
             $existing = DB::table(self::TABLE)->where('transaction_id', $transaction->id)->first();
             if ($existing) {
+                unset($attrs['requested_environment'], $attrs['local_environment_proof']);
                 DB::table(self::TABLE)->where('id', $existing->id)->update($attrs);
 
                 return;

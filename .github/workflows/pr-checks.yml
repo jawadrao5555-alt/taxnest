@@ -20,6 +20,8 @@ jobs:
           mkdir -p "$evidence/logs"
           printf 'lane=%s\nphase=prebootstrap\n' "$GITHUB_JOB" >"$evidence/logs/prebootstrap.log"
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
       - uses: actions/setup-node@v4
         with:
           node-version: '22.23.2'
@@ -39,6 +41,8 @@ jobs:
           bash scripts/tests/approval-dispatch-check.sh
           bash scripts/tests/npm-lock-portability-test.sh
           bash scripts/tests/ci-sanitize-evidence-check.sh
+          node --test scripts/tests/synthetic-pixels-check.mjs
+          python3 scripts/tests/synthetic-pixels-check.py
           bash scripts/tests/rc-failure-observability-check.sh
       - name: Mandatory PR-check DAG contract
         run: bash scripts/tests/rc-ci-gates-check.sh
@@ -70,6 +74,8 @@ jobs:
           mkdir -p "$evidence/logs"
           printf 'lane=%s\nphase=prebootstrap\n' "$GITHUB_JOB" >"$evidence/logs/prebootstrap.log"
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
       - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.4'
@@ -104,6 +110,8 @@ jobs:
           mkdir -p "$evidence/logs"
           printf 'lane=%s\nphase=prebootstrap\n' "$GITHUB_JOB" >"$evidence/logs/prebootstrap.log"
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
       - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.4'
@@ -158,7 +166,7 @@ jobs:
       - name: Check DI billing compatibility and historical invoice rendering
         run: bash scripts/rc-safe-run -- vendor/bin/phpunit tests/Feature/AdminPlanCycleRatesTest.php tests/Feature/AdminPlanStorePostTest.php tests/Feature/AdminPagesSmokeTest.php tests/Feature/PaymentProofInstantAccessTest.php tests/Feature/InvoicePdfDecimalQuantityTest.php tests/Feature/FbrLogTenantIsolationTest.php tests/Feature/RequestedPackageSignupTest.php tests/Feature/InvoiceBulkSubmitTest.php
       - name: Run full suite in clean loopback-only environment
-        run: bash scripts/rc-safe-run -- vendor/bin/phpunit
+        run: bash scripts/rc-safe-run -- bash scripts/rc-phpunit-opcache
       - name: Sanitize CI evidence
         id: sanitize_evidence
         if: always()
@@ -197,6 +205,7 @@ jobs:
           apt-get install -y --no-install-recommends bash ca-certificates git sudo
       - uses: actions/checkout@v7
         with:
+          ref: ${{ github.event.pull_request.head.sha }}
           set-safe-directory: false
       - name: Install isolated MariaDB-container build prerequisites
         run: bash scripts/ci-mariadb-provision.sh install
@@ -218,6 +227,18 @@ jobs:
         env:
           RC_MARIADB_PORT: '33116'
         run: bash scripts/rc-safe-run -- bash scripts/rc-mariadb-migration-lab.sh --all
+      - name: Independently verify native upgrade preservation
+        if: always()
+        env:
+          RC_MARIADB_PORT: '33116'
+          RC_MARIADB_RUN_ID: upgrade_${{ github.run_id }}_${{ github.run_attempt }}
+        run: bash scripts/rc-safe-run -- bash scripts/rc-mariadb-migration-lab.sh --upgrade
+      - name: Independently verify native reviewed callback race
+        if: always()
+        env:
+          RC_MARIADB_PORT: '33116'
+          RC_MARIADB_RUN_ID: callback_${{ github.run_id }}_${{ github.run_attempt }}
+        run: bash scripts/rc-safe-run -- bash scripts/rc-mariadb-migration-lab.sh --reviewed-callback
       - name: Run required MariaDB-only supplemental probes
         env:
           RC_MARIADB_PORT: '33116'
@@ -246,6 +267,7 @@ jobs:
       options: --user root
     env:
       RC_MARIADB_VERSION: '10.6.23'
+      RC_SYNTHETIC_PIXEL_EVIDENCE: '1'
     steps:
       - name: Bootstrap pinned MariaDB container before checkout
         shell: bash
@@ -260,6 +282,7 @@ jobs:
           apt-get install -y --no-install-recommends bash ca-certificates git sudo
       - uses: actions/checkout@v7
         with:
+          ref: ${{ github.event.pull_request.head.sha }}
           set-safe-directory: false
       - name: Install isolated MariaDB-container build prerequisites
         run: bash scripts/ci-mariadb-provision.sh install
@@ -281,13 +304,18 @@ jobs:
         run: |
           composer install --no-interaction --prefer-dist --no-progress --no-ansi --no-scripts
           bash scripts/npm-bootstrap-pinned.sh ci --ignore-scripts --no-audit --no-fund
+          # Browser acceptance must render this checkout's classes, not an
+          # older committed Vite bundle. Keep the responsive assertions strict.
+          npm run build
+          node scripts/tests/landing-asset-contract.mjs
+          node --test scripts/tests/source-only-tailwind.test.mjs
           RC_BROWSER_STATE_ROOT=/tmp/taxnest-rc-browser-${{ github.run_id }}-${{ github.job }} \
             bash scripts/rc-playwright-install.sh
           node scripts/tests/local-browser-discovery-check.mjs
       - name: Check online POS recovery with real service-worker navigation
         env:
           RC_BROWSER_STATE_ROOT: /tmp/taxnest-rc-browser-${{ github.run_id }}-${{ github.job }}
-        run: bash scripts/rc-safe-run -- env PLAYWRIGHT_BROWSERS_PATH="$RC_BROWSER_STATE_ROOT/playwright-cache" node --test scripts/tests/sale-online-recovery-browser.test.mjs
+        run: bash scripts/rc-safe-run -- env PLAYWRIGHT_BROWSERS_PATH="$RC_BROWSER_STATE_ROOT/playwright-cache" node --test scripts/tests/sale-online-recovery-browser.test.mjs scripts/tests/sw-private-navigation.test.mjs scripts/tests/fbr-signup-button.test.mjs scripts/tests/platform-expense-pattern.test.mjs scripts/tests/tutorial-fixture-storage.test.mjs scripts/tests/madadgar-pending-identity-test.mjs scripts/tests/ai-usage-theme-browser.test.mjs scripts/tests/scrolled-pixel-browser.test.mjs scripts/tests/pilot-fiscal-fixture-identity.test.mjs
       - name: Verify DI billing periods and Smart Packing at desktop and 390px
         env:
           RC_MARIADB_PORT: '33117'
@@ -302,7 +330,7 @@ jobs:
           RC_MARIADB_PORT: '33117'
           RC_BROWSER_PORT: '5911'
           RC_BROWSER_STATE_ROOT: /tmp/taxnest-rc-browser-${{ github.run_id }}-${{ github.job }}
-        run: RC_BROWSER_ONLY=school-fees,hospital-collections bash scripts/rc-browser-fixture.sh run
+        run: RC_BROWSER_ONLY=pilot-fiscal-controls,prospective-billing-policy,platform-expense-records,pra-bounded-reads,di-bounded-reads,ai-usage-budget,private-profile-fields,madadgar-company-reads,di-inventory-projection,opt-in-greetings-tutorials,school-fees,hospital-collections,cashier-online-payment-policy,delivery-credit,reviewed-device-proof bash scripts/rc-browser-fixture.sh run
       - name: Verify Tax Integrations at desktop and 390px mobile
         env:
           RC_MARIADB_PORT: '33117'
@@ -355,6 +383,10 @@ jobs:
           cp "$RC_BROWSER_STATE_ROOT/safe-runtime/browser-state/tutorial-videos/"*.webm "$RUNNER_TEMP/tutorial-preview/"
           cp "$RC_BROWSER_STATE_ROOT/safe-runtime/browser-state/tutorial-videos/recording-manifest.json" "$RUNNER_TEMP/tutorial-preview/"
           echo "preview_dir=$(realpath "$RUNNER_TEMP/tutorial-preview")" >> "$GITHUB_OUTPUT"
+      - name: Verify dedicated Hospital ERP demo role access at desktop and 390px
+        env:
+          RC_BROWSER_STATE_ROOT: /tmp/taxnest-rc-browser-${{ github.run_id }}-${{ github.job }}
+        run: bash scripts/check-erp-demo-browser.sh "$RC_BROWSER_STATE_ROOT/playwright-cache"
       - name: Check real table controls and receipt typography components
         env:
           RC_BROWSER_STATE_ROOT: /tmp/taxnest-rc-browser-${{ github.run_id }}-${{ github.job }}
@@ -375,6 +407,21 @@ jobs:
           RC_BROWSER_PORT: '5911'
           RC_BROWSER_STATE_ROOT: /tmp/taxnest-rc-browser-${{ github.run_id }}-${{ github.job }}
         run: bash scripts/rc-browser-fixture.sh stop
+      - name: Verify guarded synthetic screenshot pixels
+        id: synthetic_pixels
+        if: always()
+        run: |
+          mkdir -p "$RUNNER_TEMP/taxnest-synthetic-pixels"
+          python3 scripts/lib/verify-synthetic-pixels.py "$RUNNER_TEMP/taxnest-synthetic-pixels/$GITHUB_JOB"
+          test -f "$RUNNER_TEMP/taxnest-synthetic-pixels/$GITHUB_JOB/VERIFIED_SYNTHETIC_PIXELS"
+      - name: Upload verified synthetic screenshots for visual review
+        if: always() && steps.synthetic_pixels.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: synthetic-visual-review-${{ github.run_id }}
+          path: ${{ runner.temp }}/taxnest-synthetic-pixels/${{ github.job }}
+          if-no-files-found: error
+          retention-days: 14
       - name: Sanitize CI evidence
         id: sanitize_evidence
         if: always()
@@ -411,6 +458,8 @@ jobs:
           mkdir -p "$evidence/logs"
           printf 'lane=%s\nphase=prebootstrap\n' "$GITHUB_JOB" >"$evidence/logs/prebootstrap.log"
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
       - uses: actions/setup-node@v4
         with:
           node-version: '22.23.2'
@@ -522,6 +571,8 @@ jobs:
           mkdir -p "$evidence/logs"
           printf 'lane=%s\nphase=prebootstrap\n' "$GITHUB_JOB" >"$evidence/logs/prebootstrap.log"
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
       - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.4'

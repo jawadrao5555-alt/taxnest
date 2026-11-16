@@ -16,9 +16,9 @@ const buildActiveBytes=fs.readFileSync(buildActive), buildProposalBytes=fs.readF
 if(!buildActiveBytes.equals(buildProposalBytes))throw Error('active and proposed Build PRA Agent workflows must be byte-identical');
 const expected=['workflow-safety','dependency-audit-build','fullphpunit','native-mariadb-di','browserdesktopmobile','jsagentrealtime','manifest-provenance'];
 const mandatoryCommands={
-  'workflow-safety':['rc-ci-gates-check.sh','npm-lock-portability-test.sh','ci-sanitize-evidence-check.sh','rc-failure-observability-check.sh'],
+  'workflow-safety':['rc-ci-gates-check.sh','npm-lock-portability-test.sh','ci-sanitize-evidence-check.sh','rc-failure-observability-check.sh','synthetic-pixels-check.mjs','synthetic-pixels-check.py'],
   'dependency-audit-build':['rc-recertify.sh --all-locks'],
-  fullphpunit:['rc-safe-run -- vendor/bin/phpunit','rc-safe-run -- python3 scripts/tests/elaan-native-sql-check.py'],
+  fullphpunit:['rc-safe-run -- bash scripts/rc-phpunit-opcache','rc-safe-run -- python3 scripts/tests/elaan-native-sql-check.py'],
   'native-mariadb-di':['ci-mariadb-provision.sh install','ci-mariadb-provision.sh verify','rc-mariadb-migration-lab.sh --all','rc-safe-run -- python3 scripts/tests/elaan-native-sql-check.py --mariadb'],
   browserdesktopmobile:['ci-mariadb-provision.sh install','ci-mariadb-provision.sh verify','rc-browser-fixture.sh run','rc-playwright-install.sh','local-browser-discovery-check.mjs'],
   jsagentrealtime:['rc-safe-run -- node --test'],
@@ -33,11 +33,33 @@ function contract(doc,label){
   for(const n of expected)if(!validateRun.includes(`needs.${n}.result`)||!validateRun.includes('success'))throw Error(`${label}: validate does not require ${n} success`);
   for(const [name,needles] of Object.entries(mandatoryCommands)){
     const steps=jobs[name].steps||[];
+    const exactCheckout=steps.find(s=>s.uses==='actions/checkout@v7');
+    if(exactCheckout?.with?.ref!=='${{ github.event.pull_request.head.sha }}')throw Error(`${label}: ${name} must test exact PR head, not inferred merge commit`);
+
     const text=steps.map(s=>s.run||'').join('\n');
     for(const needle of needles)if(!text.includes(needle))throw Error(`${label}: ${name} lacks mandatory command: ${needle}`);
     const artifacts=steps.filter(s=>s.uses==='actions/upload-artifact@v4');
-    const artifact=artifacts[0];
-    for(const extra of artifacts.slice(1)) {
+    const artifact=artifacts.find(s=>s.name==='Upload sanitized CI evidence');
+    for(const extra of artifacts.filter(s=>s!==artifact)) {
+      if(extra.name==='Upload verified synthetic screenshots for visual review') {
+        const gates=steps.filter(s=>s.id==='synthetic_pixels');
+        const gate=gates[0];
+        const commands=[
+          'mkdir -p "$RUNNER_TEMP/taxnest-synthetic-pixels"',
+          'python3 scripts/lib/verify-synthetic-pixels.py "$RUNNER_TEMP/taxnest-synthetic-pixels/$GITHUB_JOB"',
+          'test -f "$RUNNER_TEMP/taxnest-synthetic-pixels/$GITHUB_JOB/VERIFIED_SYNTHETIC_PIXELS"'
+        ];
+        if(name!=='browserdesktopmobile'||jobs[name].env?.RC_SYNTHETIC_PIXEL_EVIDENCE!=='1'
+          ||gates.length!==1||gate.if!=='always()'||gate['continue-on-error']
+          ||JSON.stringify(String(gate.run||'').trim().split('\n'))!==JSON.stringify(commands)
+          ||steps.indexOf(gate)>=steps.indexOf(extra)
+          ||extra.if!=="always() && steps.synthetic_pixels.outcome == 'success'"
+          ||extra.with?.name!=='synthetic-visual-review-${{ github.run_id }}'
+          ||extra.with?.path!=='${{ runner.temp }}/taxnest-synthetic-pixels/${{ github.job }}'
+          ||extra.with?.['if-no-files-found']!=='error'||extra.with?.['retention-days']!==14
+          ||extra['continue-on-error'])throw Error(`${label}: invalid guarded synthetic pixel artifact`);
+        continue;
+      }
       const paths=String(extra.with?.path||'').trim().split('\n');
       const allowed=['${{ steps.browser-preflight.outputs.preview_dir }}/*.webm','${{ steps.browser-preflight.outputs.preview_dir }}/recording-manifest.json'];
       const preflight=steps.find(s=>s.id==='browser-preflight');
@@ -55,8 +77,27 @@ function contract(doc,label){
     if(!sanitize||sanitize.if!=='always()'||!String(sanitize.run||'').includes('ci-sanitize-evidence.sh'))throw Error(`${label}: ${name} lacks the sanitizer collector`);
     if(text.includes('npm ci')&&!text.includes('npm-bootstrap-pinned.sh'))throw Error(`${label}: ${name} invokes npm ci without the pinned helper`);
   }
+  if((jobs.browserdesktopmobile.steps||[]).filter(s=>s.name==='Upload verified synthetic screenshots for visual review').length!==1)throw Error(`${label}: one guarded synthetic pixel upload required`);
+  const fullSteps=(jobs.fullphpunit.steps||[]).filter(s=>s.name==='Run full suite in clean loopback-only environment');
+  if(fullSteps.length!==1 || fullSteps[0].if || fullSteps[0]['continue-on-error']
+    || fullSteps[0].run!=='bash scripts/rc-safe-run -- bash scripts/rc-phpunit-opcache')throw Error(`${label}: full suite must run without filters in the bounded verified runtime`);
   const native=jobs['native-mariadb-di'];
   const browser=jobs.browserdesktopmobile;
+  const erp=(browser.steps||[]).find(s=>s.name==='Verify dedicated Hospital ERP demo role access at desktop and 390px');
+  if(!erp || erp.if || erp['continue-on-error'] || erp.run!=='bash scripts/check-erp-demo-browser.sh "$RC_BROWSER_STATE_ROOT/playwright-cache"'
+    || erp.env?.RC_BROWSER_STATE_ROOT!=='/tmp/taxnest-rc-browser-${{ github.run_id }}-${{ github.job }}')throw Error(`${label}: dedicated ERP role acceptance must remain mandatory and isolated`);
+
+  for (const [mode, prefix] of [['upgrade', 'upgrade_'], ['reviewed-callback', 'callback_']]) {
+    const steps=native.steps||[];
+    const index=steps.findIndex(s=>String(s.run||'').endsWith(`rc-mariadb-migration-lab.sh --${mode}`));
+    const step=steps[index];
+    const allIndex=steps.findIndex(s=>String(s.run||'').endsWith('rc-mariadb-migration-lab.sh --all'));
+    if(!step || step.if!=='always()' || step['continue-on-error'] || index<=allIndex
+      || step.env?.RC_MARIADB_RUN_ID!==prefix+'${{ github.run_id }}_${{ github.run_attempt }}') {
+      throw Error(`${label}: native ${mode} must run independently, mandatorily, after --all with its own disposable run ID`);
+    }
+  }
+
   for(const [name,job] of [['native-mariadb-di',native],['browserdesktopmobile',browser]]){
     const image=job.container?.image||'';
     if(!/^mariadb:10\.6\.23-jammy@sha256:[0-9a-f]{64}$/.test(image))throw Error(`${label}: ${name} must pin MariaDB 10.6.23 jammy by digest`);
@@ -82,6 +123,70 @@ const activeDoc=yaml.load(activeBytes.toString('utf8'));
 const proposalDoc=yaml.load(proposalBytes.toString('utf8'));
 const activeContract=contract(activeDoc,'active');
 const proposalContract=contract(proposalDoc,'proposed');
+for (const mode of ['upgrade','reviewed-callback']) {
+  for (const change of ['remove','optional','conditional','shared-root']) {
+    const mutated=structuredClone(activeDoc);
+    const steps=mutated.jobs['native-mariadb-di'].steps;
+    const index=steps.findIndex(s=>String(s.run||'').endsWith(`rc-mariadb-migration-lab.sh --${mode}`));
+    if(change==='remove')steps.splice(index,1);
+    if(change==='optional')steps[index]['continue-on-error']=true;
+    if(change==='conditional')steps[index].if='success()';
+    if(change==='shared-root')delete steps[index].env.RC_MARIADB_RUN_ID;
+    let rejected=false;
+    try { contract(mutated, `negative-${mode}-${change}`); } catch { rejected=true; }
+    if(!rejected)throw Error(`Validator accepted unsafe native ${mode} ${change}`);
+  }
+}
+for(const change of ['remove-upload','condition','path','name','missing-file','optional-verifier','missing-verifier','weaken-verifier','disabled-capture','extra-upload']) {
+ const mutated=structuredClone(activeDoc), job=mutated.jobs.browserdesktopmobile, steps=job.steps;
+ const upload=steps.find(s=>s.name==='Upload verified synthetic screenshots for visual review'), gate=steps.find(s=>s.id==='synthetic_pixels');
+ if(change==='remove-upload')steps.splice(steps.indexOf(upload),1);
+ if(change==='condition')upload.if='always()';
+ if(change==='path')upload.with.path='${{ github.workspace }}/.local';
+ if(change==='name')upload.with.name='arbitrary';
+ if(change==='missing-file')upload.with['if-no-files-found']='warn';
+ if(change==='optional-verifier')gate['continue-on-error']=true;
+ if(change==='missing-verifier')steps.splice(steps.indexOf(gate),1);
+ if(change==='weaken-verifier')gate.run='true';
+ if(change==='disabled-capture')delete job.env.RC_SYNTHETIC_PIXEL_EVIDENCE;
+ if(change==='extra-upload')steps.push({uses:'actions/upload-artifact@v4',with:{path:'.local'}});
+ let rejected=false;try{contract(mutated,`negative-pixels-${change}`);}catch{rejected=true;}
+ if(!rejected)throw Error(`Validator accepted unsafe synthetic pixel ${change}`);
+}
+for(const change of ['remove','optional','conditional','different-command','different-cache']) {
+ const mutated=structuredClone(activeDoc),steps=mutated.jobs.browserdesktopmobile.steps;
+ const index=steps.findIndex(s=>s.name==='Verify dedicated Hospital ERP demo role access at desktop and 390px');
+ if(change==='remove')steps.splice(index,1);
+ if(change==='optional')steps[index]['continue-on-error']=true;
+ if(change==='conditional')steps[index].if='success()';
+ if(change==='different-command')steps[index].run='true';
+ if(change==='different-cache')steps[index].env.RC_BROWSER_STATE_ROOT='/tmp/arbitrary';
+ let rejected=false;try{contract(mutated,`negative-erp-${change}`);}catch{rejected=true;}
+ if(!rejected)throw Error(`Validator accepted unsafe ERP role lane ${change}`);
+}
+for(const name of Object.keys(mandatoryCommands)) {
+ const mutated=structuredClone(activeDoc),checkout=mutated.jobs[name].steps.find(s=>s.uses==='actions/checkout@v7');
+ delete checkout.with.ref;
+ let rejected=false;try{contract(mutated,`negative-exact-head-${name}`);}catch{rejected=true;}
+ if(!rejected)throw Error(`Validator accepted inferred checkout in ${name}`);
+}
+for(const change of ['remove','optional','conditional','filter','bypass-runtime']) {
+ const mutated=structuredClone(activeDoc), steps=mutated.jobs.fullphpunit.steps;
+ const index=steps.findIndex(s=>s.name==='Run full suite in clean loopback-only environment');
+ if(change==='remove')steps.splice(index,1);
+ if(change==='optional')steps[index]['continue-on-error']=true;
+ if(change==='conditional')steps[index].if='success()';
+ if(change==='filter')steps[index].run+=' --filter OneTest';
+ if(change==='bypass-runtime')steps[index].run='bash scripts/rc-safe-run -- vendor/bin/phpunit';
+ let rejected=false;try{contract(mutated,`negative-full-${change}`);}catch{rejected=true;}
+ if(!rejected)throw Error(`Validator accepted incomplete full suite ${change}`);
+}
+console.log('PASS: five full-suite omission/filter/runtime mutations rejected');
+console.log('PASS: seven non-exact-head checkout mutations rejected');
+console.log('PASS: five negative isolated ERP role gate mutations rejected');
+console.log('PASS: ten negative synthetic pixel gate mutations rejected');
+console.log('PASS: eight negative native preservation/callback gate mutations rejected');
+
 if(JSON.stringify(activeContract)!==JSON.stringify(proposalContract))throw Error('active and proposed PR workflows must have equivalent mandatory DAG/container contracts');
 const sha256=b=>crypto.createHash('sha256').update(b).digest('hex');
 console.log(`PASS: active/proposed workflows have equivalent runnable fail-closed contracts; active_sha256=${sha256(activeBytes)} proposed_sha256=${sha256(proposalBytes)} build_agent_sha256=${sha256(buildActiveBytes)}`);

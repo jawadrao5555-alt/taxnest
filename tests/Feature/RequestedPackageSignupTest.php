@@ -427,29 +427,33 @@ class RequestedPackageSignupTest extends TestCase
 
     // ── The signup pages carry the pick into the form ─────────────────
 
-    public function test_signup_pages_carry_the_pick_into_hidden_fields(): void
+    public function test_signup_pages_carry_the_pick_and_fbr_exposes_an_explicit_package_choice(): void
     {
         $this->get('/register?plan=Business&cycle=quarterly')
             ->assertOk()
-            ->assertSee('name="requested_plan" value="Business"', false)
+            ->assertSee('name="requested_plan" required', false)
+            ->assertSee('value="Business" selected', false)
             ->assertSee('name="requested_billing_cycle" value="quarterly"', false);
 
         $this->get('/fbr-pos/register?plan=Business')
             ->assertOk()
-            ->assertSee('name="requested_plan" value="Business"', false);
+            ->assertSee('name="requested_plan"', false)
+            ->assertSee('value="Business" selected', false)
+            ->assertSee('signup-package-choice', false);
 
         // A retired FBR package must not survive the trip into the form.
         $this->get('/fbr-pos/register?plan=Pro')
             ->assertOk()
-            ->assertDontSee('name="requested_plan"', false);
+            ->assertDontSee('value="Pro"', false)
+            ->assertSee('name="requested_plan"', false);
 
-        // Nothing picked → no hidden fields at all.
-        $this->get('/register')->assertOk()->assertDontSee('name="requested_plan"', false);
-        $this->get('/fbr-pos/register')->assertOk()->assertDontSee('name="requested_plan"', false);
+        // Nothing picked still requires an explicit compatible package; no selection is invented.
+        $this->get('/register')->assertOk()->assertSee('name="requested_plan" required', false)->assertSee(__('billing_policy.choose_plan'));
+        $this->get('/fbr-pos/register')->assertOk()->assertSee('name="requested_plan"', false)->assertSee(__('billing_policy.choose_plan'));
 
         // A trial / wrong-product name in the link is not echoed back either.
-        $this->get('/register?plan=DI+Trial')->assertOk()->assertDontSee('name="requested_plan"', false);
-        $this->get('/fbr-pos/register?plan=Starter')->assertOk()->assertDontSee('name="requested_plan"', false);
+        $this->get('/register?plan=DI+Trial')->assertOk()->assertSee('name="requested_plan" required', false)->assertDontSee('value="DI Trial"', false);
+        $this->get('/fbr-pos/register?plan=Starter')->assertOk()->assertDontSee('value="Starter"', false)->assertSee('name="requested_plan"', false);
     }
 
     public function test_pos_signup_page_carries_only_allow_listed_addons_into_the_form(): void
@@ -547,42 +551,14 @@ class RequestedPackageSignupTest extends TestCase
         $this->assertSame(12, (int) $sub->start_date->diffInMonths($sub->end_date));
     }
 
-    public function test_an_fbr_package_without_a_monthly_rate_falls_back_to_the_year(): void
+    public function test_missing_or_unactivated_short_request_requires_review_without_annual_fallback(): void
     {
-        // Retired monthly columns never affect the annual FBR POS charge.
-        $plan = $this->plan('Business', 'fbrpos');
-        $company = $this->pendingCompany('fbrpos', $plan, 'monthly');
-
-        $sub = SubscriptionAssignmentService::assignRequestedPlanOnApproval($company);
-
-        $this->assertSame('annual', $sub->billing_cycle);
-        $this->assertSame(3000.0, (float) $sub->final_price);
-    }
-
-    /** Even a populated retired monthly column must never be charged. */
-    public function test_an_fbr_package_is_charged_annually_when_the_row_prices_monthly(): void
-    {
-        $plan = $this->plan('Business', 'fbrpos');
-        $plan->update(['price_monthly' => 2599, 'price_quarterly' => 7349]);
-        $company = $this->pendingCompany('fbrpos', $plan->fresh(), 'monthly');
-
-        $sub = SubscriptionAssignmentService::assignRequestedPlanOnApproval($company);
-
-        $this->assertSame('annual', $sub->billing_cycle);
-        $this->assertSame(3000.0, (float) $sub->final_price);
-        $this->assertSame(12, (int) $sub->start_date->diffInMonths($sub->end_date));
-    }
-
-    public function test_pra_pos_approval_is_unchanged(): void
-    {
-        $plan = $this->plan('Starter', 'pos');
-        $company = $this->pendingCompany('pos', $plan, 'monthly');
-
-        $sub = SubscriptionAssignmentService::assignRequestedPlanOnApproval($company);
-
-        $this->assertSame('annual', $sub->billing_cycle, 'PRA POS approval must still be a full year');
-        $this->assertSame(30000.0, (float) $sub->final_price);
-        $this->assertSame(12, (int) $sub->start_date->diffInMonths($sub->end_date));
+        foreach (['fbrpos','pos'] as $type) {
+            $plan=$this->plan($type === 'pos' ? 'Starter' : 'Business',$type);
+            $plan->update(['price_monthly'=>2599]);
+            $company=$this->pendingCompany($type,$plan->fresh(),'monthly');
+            $this->assertNull(SubscriptionAssignmentService::assignRequestedPlanOnApproval($company));
+        }
     }
 
     public function test_retired_pos_plan_cannot_be_requested_or_assigned_through_a_service_bypass(): void

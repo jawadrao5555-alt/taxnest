@@ -762,6 +762,7 @@ class FbrPosStockController extends Controller
         }
 
         $po = DB::transaction(function () use ($request, $companyId, $supplier, $branchId, $costing, $paidNow, $ledgerReady) {
+            \App\Services\ProspectiveQuotaGuard::lockCompanyForInvoiceWork($companyId);
             $hasCol = fn (string $table, string $col) => \Illuminate\Support\Facades\Schema::hasColumn($table, $col);
 
             $poData = [
@@ -954,6 +955,7 @@ class FbrPosStockController extends Controller
         $branchId = $resolved['branch'];
 
         DB::transaction(function () use ($po, $companyId, $branchId) {
+            \App\Services\ProspectiveQuotaGuard::lockCompanyForInvoiceWork($companyId);
             // Row lock + re-check — double-submit must not reverse stock twice.
             $locked = PurchaseOrder::lockForUpdate()->find($po->id);
             if (!$locked || $locked->status !== PurchaseOrder::STATUS_RECEIVED) {
@@ -1190,6 +1192,7 @@ class FbrPosStockController extends Controller
                     $reason = trim((string) ($request->qty_reason ?? ''));
                     $note = 'Stock correction (quick edit)' . ($reason !== '' ? ' — ' . $reason : '');
                     DB::transaction(function () use ($companyId, $product, $newQty, $note, $stockBranchId, &$changedAny) {
+                        \App\Services\ProspectiveQuotaGuard::lockCompanyForInvoiceWork($companyId);
                         $stock = BranchStockService::stockRow($companyId, (int) $product->id, $stockBranchId);
                         $delta = round($newQty - (float) $stock->quantity, 3);
                         if (abs($delta) < 0.0005) {
@@ -1293,6 +1296,7 @@ class FbrPosStockController extends Controller
 
         try {
             $result = DB::transaction(function () use ($companyId, $product, $from, $to, $qty, $request) {
+                \App\Services\ProspectiveQuotaGuard::lockCompanyForInvoiceWork($companyId);
                 $source = BranchStockService::stockRow($companyId, (int) $product->id, $from);
 
                 // A transfer can only move goods that exist — unlike a sale

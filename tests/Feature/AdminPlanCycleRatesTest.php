@@ -8,6 +8,17 @@ use Tests\TestCase;
 /** Admin plan surfaces expose configured DI periods and annual-only POS rates. */
 class AdminPlanCycleRatesTest extends TestCase
 {
+    public function test_shared_card_shows_only_explicit_activated_periods(): void
+    {
+        config(['billing.shared_configured_cycles' => true]);
+        $plan = new PricingPlan(['name'=>'Starter','product_type'=>'fbrpos','price'=>14999,
+            'price_quarterly'=>4299,'price_semi_annual'=>8199,'invoice_limit'=>800]);
+        $html=$this->renderCard($plan);
+        $this->assertStringContainsString('4,299.00',$html);
+        $this->assertStringContainsString('8,199.00',$html);
+        $this->assertSame(['quarterly','semi_annual','annual'], \App\Services\SubscriptionAssignmentService::cyclesForPlan($plan));
+    }
+
     public function test_a_di_card_shows_its_configured_period_rates(): void
     {
         $plan = new PricingPlan([

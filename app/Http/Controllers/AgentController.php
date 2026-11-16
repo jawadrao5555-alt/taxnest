@@ -892,6 +892,12 @@ class AgentController extends Controller
         $invoices = [];
         foreach ($pending as $txn) {
             try {
+                // Never infer a historical queued bill's environment from mutable company settings.
+                if (\Illuminate\Support\Facades\Schema::hasColumn('fbr_pos_transactions','fbr_requested_environment_snapshot')
+                    && (!$txn->fbr_requested_environment_snapshot || $txn->fbr_requested_environment_snapshot !== ($company->fbr_pos_environment ?? 'sandbox'))) {
+                    $txn->update(['fbr_status'=>'verification_pending']);
+                    continue;
+                }
                 $txn->loadMissing(['items', 'company']);
                 $payload = $fbrService->buildFbrPosPayload($txn);
                 if ($txn->fbr_device_uid_snapshot && $txn->fbr_device_uid_snapshot !== $deviceUid) continue;
@@ -900,13 +906,14 @@ class AgentController extends Controller
                 app(FbrPosSubmissionEvidenceService::class)->recordDispatch(
                     $company,
                     $txn,
-                    $request->input('version')
+                    $request->input('version'), $deviceUid, $claim
                 );
                 $invoices[] = [
                     'transaction_id' => $txn->id,
                     'invoice_number' => $txn->invoice_number,
                     'payload' => $payload,
                     'submission_claim' => $claim,
+                    'requested_environment' => $txn->fbr_requested_environment_snapshot ?? ($company->fbr_pos_environment ?? 'sandbox'),
                     'created_at' => $txn->created_at?->toIso8601String(),
                 ];
             } catch (\Throwable $e) {
@@ -1171,6 +1178,8 @@ class AgentController extends Controller
     private function fbrSubmitResult(Request $request, Company $company)
     {
         return DB::transaction(function () use ($request, $company) {
+        // Serialize reviewed proof revocation with acknowledgement authority.
+        Company::whereKey($company->id)->lockForUpdate()->firstOrFail();
         $txnId = $request->input('transaction_id');
 
         $txn = FbrPosTransaction::where('id', $txnId)
@@ -1206,18 +1215,37 @@ class AgentController extends Controller
             && $returnedFiscalNumber !== null
             && hash_equals($returnedFiscalNumber, $fbrInvoiceNumber);
         $evidence = app(FbrPosSubmissionEvidenceService::class);
+        $numberOnly = false;
+        $reportedClaim = $request->input('submission_claim');
+        $deviceUid = $this->requestDeviceUid($request);
+        if (!$treatAsSuccess && $code === null && $reportedClaim && $deviceUid
+            && $txn->fbr_status === 'pending' && $txn->fbr_submission_hash
+            && $txn->fbr_agent_claimed_at && \Illuminate\Support\Carbon::parse($txn->fbr_agent_claimed_at)->gt(now()->subMinutes(3))
+            && hash_equals((string)$txn->fbr_submission_hash,(string)$reportedClaim)
+            && $txn->fbr_requested_environment_snapshot === 'production'
+            && \Illuminate\Support\Facades\Schema::hasColumn(FbrPosSubmissionEvidenceService::TABLE,'reviewed_device_proof_id')) {
+            $dispatch = DB::table(FbrPosSubmissionEvidenceService::TABLE)->where('company_id',$company->id)->where('transaction_id',$txn->id)->first();
+            $proof = app(\App\Services\ReviewedDeviceProof::class)->reviewedProof((int)$company->id,$deviceUid,(string)$txn->fbr_pos_id_snapshot,'production');
+            $number = \App\Services\ImsNumberOnlyAcknowledgement::number($response,(string)$txn->fbr_pos_id_snapshot,$request->input('ims_diagnostic'),(array)$request->input('ims_response_fields',[]));
+            $numberOnly = $dispatch && $proof && (int)$dispatch->reviewed_device_proof_id === (int)$proof->id
+                && $dispatch->device_uid === $deviceUid && $dispatch->requested_environment === 'production'
+                && hash_equals((string)$dispatch->submission_claim_hash,hash('sha256',(string)$reportedClaim))
+                && $number && hash_equals($number,$fbrInvoiceNumber);
+            $treatAsSuccess = (bool)$numberOnly;
+        }
+
 
         // Idempotent callback: once an explicit Code-100 result stamped this
         // row, a late/stale callback must not replace its fiscal number or
         // demote it. The agent receives an ack and drops the queued callback.
         $storedNumber = trim((string) ($txn->fbr_invoice_number ?? ''));
         if ($storedNumber !== '') {
-            $storedWasAccepted = (string) $txn->fbr_response_code === '100';
+            $storedWasAccepted = in_array((string)$txn->fbr_response_code, ['100','NUMBER_ONLY_REVIEWED'], true);
             $evidence->recordResult(
                 $company,
                 $txn,
                 $storedWasAccepted ? ($txn->fbr_response ?? $response) : $response,
-                $storedWasAccepted ? '100' : $code,
+                $storedWasAccepted ? ($txn->fbr_response_code === '100' ? '100' : null) : $code,
                 $storedNumber,
                 $storedWasAccepted ? 'local_accepted' : 'verification_pending',
                 $request->input('agent_version')
@@ -1235,6 +1263,10 @@ class AgentController extends Controller
         if ($reportedClaim !== null && !hash_equals((string) ($txn->fbr_submission_hash ?? ''), (string) $reportedClaim)) {
             return response()->json(['error' => 'stale_submission_claim'], 409);
         }
+        if ($reportedClaim && \Illuminate\Support\Facades\Schema::hasColumn(FbrPosSubmissionEvidenceService::TABLE,'device_uid')) {
+            $bound = DB::table(FbrPosSubmissionEvidenceService::TABLE)->where('company_id',$company->id)->where('transaction_id',$txn->id)->first();
+            if ($bound?->device_uid && $bound->device_uid !== $deviceUid) return response()->json(['error'=>'wrong_dispatch_device'],409);
+        }
         if ($txn->fbr_status === 'verification_pending' && !$treatAsSuccess) {
             return response()->json(['ok' => true, 'verification_pending' => true]);
         }
@@ -1247,7 +1279,7 @@ class AgentController extends Controller
             $txn->update(array_merge([
                 'fbr_status' => 'submitted',
                 'fbr_invoice_number' => $fbrInvoiceNumber,
-                'fbr_response_code' => '100',
+                'fbr_response_code' => $numberOnly ? 'NUMBER_ONLY_REVIEWED' : '100',
                 'fbr_response' => $safeResponse,
                 'fbr_submission_hash' => null,
             ], \App\Services\FbrService::fbrErrorPatch(null)));
@@ -1256,7 +1288,7 @@ class AgentController extends Controller
                 $company,
                 $txn,
                 $response,
-                '100',
+                $numberOnly ? null : '100',
                 $fbrInvoiceNumber,
                 'local_accepted',
                 $request->input('agent_version')

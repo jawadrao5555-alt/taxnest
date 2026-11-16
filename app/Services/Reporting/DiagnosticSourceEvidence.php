@@ -10,7 +10,7 @@ use Illuminate\Validation\ValidationException;
 /** Registered, SELECT-only source metadata. Never returns stored payloads or unrestricted columns. */
 final class DiagnosticSourceEvidence
 {
-    public const REGISTRY_VERSION = 10;
+    public const REGISTRY_VERSION = 15;
 
     public const FIELD_CONTRACT_VERSION = 1;
 
@@ -25,9 +25,19 @@ final class DiagnosticSourceEvidence
         'pos.di' => ['pos', 'pos_di_sandbox_submissions', 'created_at'],
         'pos.orders' => ['pos', 'restaurant_orders', 'created_at'],
         'di.fiscal' => ['di', 'fbr_logs', 'created_at'],
+        'di.stock_postings' => ['di', 'di_invoice_inventory_postings', 'created_at'],
+        'di.payment_events' => ['di', 'customer_ledgers', 'created_at'],
+        'fbrpos.projected_refund_events' => ['fbrpos', 'agent_core_events', 'created_at'],
+        'fbrpos.payment_allocations' => ['fbrpos', 'fbr_khata_settlements', 'created_at'],
         'di.sales' => ['di', 'invoices', 'created_at'],
         'fbrpos.fiscal' => ['fbrpos', 'fbr_pos_logs', 'created_at'],
         'fbrpos.sales' => ['fbrpos', 'fbr_pos_transactions', 'created_at'],
+        'fbrpos.school.accounts' => ['fbrpos', 'school_fee_accounts', 'created_at'],
+        'fbrpos.school.receipts' => ['fbrpos', 'school_fee_receipts', 'collected_at'],
+        'fbrpos.school.closings' => ['fbrpos', 'school_fee_day_closes', 'closed_at'],
+        'fbrpos.hospital.invoices' => ['fbrpos', 'hospital_invoices', 'created_at'],
+        'fbrpos.hospital.payments' => ['fbrpos', 'hospital_payments', 'collected_at'],
+        'fbrpos.hospital.closings' => ['fbrpos', 'hospital_day_closes', 'closed_at'],
         'fbrpos.callbacks' => ['fbrpos', 'fbr_pos_callback_diagnostics', 'callback_received_at'],
         'fbrpos.print_receipts' => ['fbrpos', 'pos_print_evidence', 'received_at', ['product_type' => 'fbrpos']],
         'health.audit' => ['erps', 'health_audit_events', 'occurred_at'],
@@ -59,13 +69,10 @@ final class DiagnosticSourceEvidence
         'health.support_cases' => ['erps', 'support_cases', 'updated_at'],
         'health.live_ops' => ['erps', 'live_ops_autonomous_requests', 'updated_at', [], null,
             ['status', 'operation', 'fix_commit', 'pull_request', 'deployment_sha']],
-        // No current table retains tenant-bound backup evidence. Register the
-        // gap explicitly so callers receive UNAVAILABLE instead of a false
-        // healthy/empty result or globally attributed infrastructure state.
-        'pos.backup_evidence' => ['pos', null, null, [], 'NO_TENANT_BOUND_RETAINED_SOURCE'],
-        'di.backup_evidence' => ['di', null, null, [], 'NO_TENANT_BOUND_RETAINED_SOURCE'],
-        'fbrpos.backup_evidence' => ['fbrpos', null, null, [], 'NO_TENANT_BOUND_RETAINED_SOURCE'],
-        'health.backup_evidence' => ['erps', null, null, [], 'NO_TENANT_BOUND_RETAINED_SOURCE'],
+        'pos.backup_evidence' => ['pos', 'tenant_backup_evidence', 'event_at', [], null, ['source_id', 'event_id', 'reported_status', 'provenance', 'received_at', 'reported_retained_until', 'evidence_expires_at']],
+        'di.backup_evidence' => ['di', 'tenant_backup_evidence', 'event_at', [], null, ['source_id', 'event_id', 'reported_status', 'provenance', 'received_at', 'reported_retained_until', 'evidence_expires_at']],
+        'fbrpos.backup_evidence' => ['fbrpos', 'tenant_backup_evidence', 'event_at', [], null, ['source_id', 'event_id', 'reported_status', 'provenance', 'received_at', 'reported_retained_until', 'evidence_expires_at']],
+        'health.backup_evidence' => ['erps', 'tenant_backup_evidence', 'event_at', [], null, ['source_id', 'event_id', 'reported_status', 'provenance', 'received_at', 'reported_retained_until', 'evidence_expires_at']],
         'di.import_batches' => ['di', 'invoice_import_batches', 'created_at'],
         'di.audit_exports' => ['di', 'audit_packs', 'created_at'],
         'health.prescriptions' => ['erps', 'health_prescriptions', 'created_at'],
@@ -121,6 +128,11 @@ final class DiagnosticSourceEvidence
         if (\App\Support\NestErps::canonicalProductType($company->product_type) !== $product) {
             throw ValidationException::withMessages(['source' => 'This source does not apply to the selected product.']);
         }
+        if (str_starts_with($v['source'],'fbrpos.school.') || str_starts_with($v['source'],'fbrpos.hospital.')) {
+            $localCompany=\App\Models\Company::withoutGlobalScopes()->findOrFail($company->id);
+            $matchesCategory=str_starts_with($v['source'],'fbrpos.school.') ? $localCompany->isSchoolFeePilot() : $localCompany->isHospitalCollectionPilot();
+            if (!$matchesCategory) throw ValidationException::withMessages(['source'=>'Local ledger source does not apply to this company category.']);
+        }
         $meta = ['company' => ['id' => (int) $company->id, 'name' => $company->name, 'product' => $company->product_type],
             'branch' => $branchId === null ? null : ['id' => $branchId, 'scope' => 'exact'],
             'period' => ['from' => $from->toDateString(), 'to' => $to->toDateString(), 'basis' => 'stored_server_calendar', 'timezone' => $tz],
@@ -145,12 +157,29 @@ final class DiagnosticSourceEvidence
                 'Rows contain IDs/timestamps and only source-specific allow-listed operational identifiers. Regulatory payloads, patient data, customer details and credentials are excluded.',
                 'Branch filtering is applied only through an exact retained branch key; sources without one return BRANCH_SCOPE_UNAVAILABLE.',
                 'Pages use immutable IDs, not a database snapshot; re-read for late arrivals. DI logs whose source invoice was deleted cannot be attributed.']];
+        if ($v['source'] === FbrRetainedRefundEventEvidence::SOURCE) {
+            return FbrRetainedRefundEventEvidence::source((int)$company->id, $branchId,
+                $from->copy()->setTimezone(config('app.timezone'))->format('Y-m-d H:i:s'), $to->copy()->setTimezone(config('app.timezone'))->format('Y-m-d H:i:s'),
+                (int)($v['after_id']??0), (int)($v['limit']??25), $meta);
+        }
+        if (in_array($v['source'], RetainedPaymentEvidence::SOURCES, true)) {
+            return RetainedPaymentEvidence::source($v['source'], (int)$company->id, $branchId,
+                $from->copy()->setTimezone(config('app.timezone'))->format('Y-m-d H:i:s'), $to->copy()->setTimezone(config('app.timezone'))->format('Y-m-d H:i:s'),
+                (int)($v['after_id']??0), (int)($v['limit']??25), $meta);
+        }
         if ($v['source'] === 'pos.offline_samples') {
             $meta['related_operation'] = ['name' => 'get_pra_operations_evidence', 'stream' => 'agent_collection',
                 'purpose' => 'Retained device sequence gaps, source/receipt clock-or-upload difference, stale streams, pending/dropped/reset counts and storage status.'];
         }
         if (str_ends_with($v['source'], '.live_ops')) {
             $meta['release_evidence_note'] = 'Stored status and identifiers only; they do not prove tests passed, deployment occurred, live verification succeeded or the company is healthy.';
+        }
+        if (str_ends_with($v['source'], '.backup_evidence')) {
+            $meta['backup_evidence'] = ['provenance' => 'authenticated_producer_report',
+                'backup_verified' => false, 'restore_verified' => false, 'rpo_rto_verified' => false,
+                'retention_basis' => 'Producer-reported artifact retention; evidence expiry is not proof of artifact survival or deletion.',
+                'completeness' => 'Missing producers, events, backup bytes and restore outcomes remain unknown.'];
+            if (!Schema::hasTable('tenant_backup_evidence')) $unavailableReason = 'NO_TENANT_BOUND_RETAINED_SOURCE';
         }
         if ($unavailableReason !== null) {
             return $meta + ['status' => 'UNAVAILABLE', 'availability_reason' => $unavailableReason,
@@ -176,6 +205,8 @@ final class DiagnosticSourceEvidence
                     $q->where('e.id', $branchId);
                 } elseif ($v['source'] === 'di.fiscal' && Schema::hasColumn('invoices', 'branch_id')) {
                     $q->where('i.branch_id', $branchId);
+                } elseif (in_array($table,['school_fee_day_closes','hospital_day_closes'],true) && Schema::hasColumn($table,'branch_key')) {
+                    $q->where('e.branch_key',$branchId);
                 } elseif (Schema::hasColumn($table, 'branch_id')) {
                     $q->where('e.branch_id', $branchId);
                 } else {
@@ -188,6 +219,14 @@ final class DiagnosticSourceEvidence
             }
             $q->whereBetween('e.'.$stamp, [$from->copy()->setTimezone(config('app.timezone'))->format('Y-m-d H:i:s'),
                 $to->copy()->setTimezone(config('app.timezone'))->format('Y-m-d H:i:s')]);
+            if ($v['source'] === 'di.stock_postings') {
+                if (!DiRetainedStockEvidence::available()) {
+                    return $meta + ['status'=>'UNAVAILABLE','observed'=>null,'rows'=>[], 'pagination'=>['has_more'=>false,'next_after_id'=>null]];
+                }
+                if ((clone $q)->whereNotIn('e.id', DiRetainedStockEvidence::validIds((int)$company->id))->exists()) {
+                    return $meta + ['status'=>'INCONSISTENT_RETAINED_LINKS','observed'=>null,'rows'=>[], 'pagination'=>['has_more'=>false,'next_after_id'=>null]];
+                }
+            }
             $limit = (int) ($v['limit'] ?? 25);
             $extent = (clone $q)->selectRaw('COUNT(*) AS retained_rows, MIN(e.'.$stamp.') AS first_at, MAX(e.'.$stamp.') AS last_at')->first();
             $select = array_merge(['e.id', 'e.'.$stamp.' as event_at'], array_map(fn ($column) => 'e.'.$column, $safeColumns));

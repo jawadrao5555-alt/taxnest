@@ -33,7 +33,7 @@
                 @endforeach
             </select>
             @endif
-            <button class="bg-blue-600 text-white rounded-lg px-4 py-2 text-sm font-semibold hover:bg-blue-700">{{ __('pos.create_account') }}</button>
+            <button type="submit" class="bg-blue-600 text-white rounded-lg px-4 py-2 text-sm font-semibold hover:bg-blue-700">{{ __('pos.create_account') }}</button>
         </form>
         @if(!($quota['allowed'] ?? true))
         <p class="mt-2 text-xs text-amber-600">{{ $quota['reason'] ?? '' }}</p>
@@ -119,7 +119,7 @@
                             </select>
                             @endif
                             <div class="flex gap-2">
-                                <button class="bg-blue-600 text-white rounded-lg px-4 py-2 text-sm font-semibold hover:bg-blue-700">{{ __('pos.save_changes') }}</button>
+                                <button type="submit" class="bg-blue-600 text-white rounded-lg px-4 py-2 text-sm font-semibold hover:bg-blue-700">{{ __('pos.save_changes') }}</button>
                                 <button type="button" @click="editId = null" class="text-gray-500 hover:underline text-sm">{{ __('pos.cancel') }}</button>
                             </div>
                         </form>

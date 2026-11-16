@@ -370,6 +370,70 @@ class FbrPosSubmissionEvidenceTest extends TestCase
         $this->assertNotNull(session('error'));
     }
 
+    public function test_reviewed_number_only_is_bound_to_original_claim_device_environment_and_exact_shape(): void
+    {
+        (require database_path('migrations/2026_11_17_060000_bind_standalone_dispatch_evidence.php'))->up();
+        $proofMigration = glob(database_path('migrations/*create_reviewed_device_proofs*'))[0];
+        (require $proofMigration)->up();
+        Schema::table('fbr_pos_transactions',function(Blueprint $t){$t->string('fbr_pos_id_snapshot')->nullable();$t->timestamp('fbr_agent_claimed_at')->nullable();});
+        foreach (['accepted','no-proof','revoked','foreign-number','extra-field','no-transport','wrong-device','missing-claim','stale','sandbox'] as $case) {
+            DB::table('reviewed_device_proofs')->delete();
+            $proofId=DB::table('reviewed_device_proofs')->insertGetId(['company_id'=>$this->companyId,'device_uid'=>'LAB-PC','pos_id'=>'654321','environment'=>'production','action'=>'approve','actor_id'=>1,'evidence_reference'=>'SYNTHETIC-REVIEW','evidence_sha256'=>str_repeat('a',64),'review_note'=>'Synthetic only','created_at'=>now()]);
+            $claim=bin2hex(random_bytes(32));
+            $bill=$this->bill(['fbr_submission_hash'=>$claim,'fbr_pos_id_snapshot'=>'654321','fbr_requested_environment_snapshot'=>$case==='sandbox'?'sandbox':'production','fbr_agent_claimed_at'=>$case==='stale'?now()->subMinutes(4):now()]);
+            app(FbrPosSubmissionEvidenceService::class)->recordDispatch($this->company(),$bill,'1.0','LAB-PC',$claim);
+            if($case==='no-proof') DB::table('reviewed_device_proofs')->delete();
+            if($case==='revoked') DB::table('reviewed_device_proofs')->insert(['company_id'=>$this->companyId,'device_uid'=>'LAB-PC','pos_id'=>'654321','environment'=>'production','action'=>'revoke','actor_id'=>1,'evidence_reference'=>'SYNTHETIC-REVOKE','evidence_sha256'=>str_repeat('b',64),'review_note'=>'Revoked','revokes_id'=>$proofId,'created_at'=>now()]);
+            $number=$case==='foreign-number'?'123456ABC20260001':'654321ABC20260001';
+            $response=['FBRInvoiceNumber'=>$number];if($case==='extra-field')$response['Message']='ok';
+            $body=['success'=>false,'outcome_unknown'=>true,'submission_claim'=>$claim,'device_uid'=>$case==='wrong-device'?'OTHER-PC':'LAB-PC','pra_invoice_number'=>$number,'response'=>$response,'ims_diagnostic'=>$case==='no-transport'?null:'response_received','ims_response_fields'=>['FBRInvoiceNumber:string']];
+            if($case==='missing-claim')unset($body['submission_claim']);
+            $this->submit($bill,$body);
+            $bill->refresh();
+            $this->assertSame($case==='accepted'?'submitted':($case==='wrong-device'?'pending':'verification_pending'),$bill->fbr_status,$case);
+            $this->assertSame($case==='accepted'?$number:null,$bill->fbr_invoice_number,$case);
+            if($case==='accepted') {
+                $this->assertSame('NUMBER_ONLY_REVIEWED',$bill->fbr_response_code);
+                $this->submit($bill,$body);
+                $row=DB::table(FbrPosSubmissionEvidenceService::TABLE)->where('transaction_id',$bill->id)->first();
+                $this->assertNull($row->response_code);$this->assertSame('unknown',$row->central_verification_state);
+            }
+        }
+    }
+
+    public function test_missing_or_switched_original_environment_holds_before_poll_dispatch(): void
+    {
+        (require database_path('migrations/2026_11_17_060000_bind_standalone_dispatch_evidence.php'))->up();
+        $created=FbrPosTransaction::forceCreate(['company_id'=>$this->companyId,'invoice_number'=>'NEW-FROZEN','invoice_mode'=>'local','fbr_status'=>'local']);
+        $this->assertSame('production',$created->fbr_requested_environment_snapshot);
+        DB::table('companies')->where('id',$this->companyId)->update(['fbr_pos_environment'=>'sandbox']);
+        $this->assertSame('production',$created->fresh()->fbr_requested_environment_snapshot);
+        DB::table('companies')->where('id',$this->companyId)->update(['fbr_pos_environment'=>'production']);
+        foreach ([null,'sandbox'] as $environment) {
+            $bill=$this->bill(['fbr_requested_environment_snapshot'=>$environment]);
+            $request=Request::create('/api/agent/pending-invoices','GET',['device_uid'=>'LAB-PC']);
+            $method=new \ReflectionMethod(AgentController::class,'fbrPendingInvoices');
+            $data=$method->invoke(new AgentController,$this->company(),$request)->getData(true);
+            $this->assertSame(0,$data['count']);
+            $this->assertSame('verification_pending',$bill->fresh()->fbr_status);
+            $this->assertNull($bill->fresh()->fbr_submission_hash);
+        }
+        $bill=$this->bill(['fbr_requested_environment_snapshot'=>'sandbox']);
+        $result=app(\App\Services\FbrService::class)->submitFbrPosTransaction($bill);
+        $this->assertSame('blocked',$result['status']);
+        $this->assertSame('verification_pending',$bill->fresh()->fbr_status);
+    }
+
+    public function test_dispatch_and_callback_do_not_rewrite_original_requested_environment(): void
+    {
+        $bill=$this->bill();$service=app(FbrPosSubmissionEvidenceService::class);
+        $service->recordDispatch($this->company(),$bill);
+        DB::table('companies')->where('id',$this->companyId)->update(['fbr_pos_environment'=>'sandbox']);
+        $service->recordDispatch($this->company(),$bill);
+        $service->recordResult($this->company(),$bill,null,null,null,'verification_pending');
+        $this->assertSame('production',DB::table(FbrPosSubmissionEvidenceService::TABLE)->where('transaction_id',$bill->id)->value('requested_environment'));
+    }
+
     private function submit(FbrPosTransaction $bill, array $body): array
     {
         $request = Request::create('/api/agent/submit-result', 'POST', $body + [

@@ -2,44 +2,85 @@
 @section('content')
 <h1>{{ __('pos.school_nav_collect') }}</h1>
 <p class="muted">{{ __('pos.school_fee_desk') }}</p>
-<p class="muted">{{ __('pos.school_pilot_scope') }}</p>
+<p class="muted">{{ __('school_ledger.pilot_scope') }}</p>
 <div class="notice">{{ __('pos.fbr_missing_school_route') }} {{ __('pos.school_separate_ledger') }}</div>
 <section class="card">
-    <h2>{{ __('pos.school_collect_cash') }}</h2>
+    <h2>{{ __('school_ledger.record_payment') }}</h2>
     @if($collectionClosed)<div role="alert" class="notice">{{ __('pos.school_closed_collection') }}</div>@endif
     @if($errors->any())<div role="alert" class="error"><ul>@foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul></div>@endif
     <div id="school-recovery-notice" class="notice" role="alert" hidden></div>
+    <button type="button" id="school-recover-payment" hidden>{{ __('school_ledger.recover') }}</button>
     <form method="post" action="/fbr-pos/school-fees" id="school-collection" data-closed="{{ $collectionClosed ? '1' : '0' }}">
         @csrf
         <input type="hidden" name="request_key" value="{{ old('request_key', $requestKey) }}">
-        <input type="hidden" name="payment_method" value="cash">
+        <input type="hidden" name="account_id" id="school-account-id" value="">
         <input type="hidden" name="expected_branch_key" value="{{ $schoolCampusId ?? 0 }}">
         <div class="grid">
-            <div><label for="student_reference">{{ __('pos.school_student_reference') }}</label><input id="student_reference" name="student_reference" value="{{ old('student_reference') }}" maxlength="100" required autocomplete="off"><div class="muted">{{ __('pos.school_reference_hint') }}</div></div>
+            <div><label for="student_name">{{ __('school_ledger.student_name') }}</label><input id="student_name" name="student_name" maxlength="100" value="{{ old('student_name') }}"></div>
+            <div><label for="payment_method">{{ __('pos.school_payment') }}</label><select id="payment_method" name="payment_method"><option value="cash">{{ __('pos.school_cash') }}</option><option value="card">{{ __('school_ledger.card') }}</option><option value="bank">{{ __('school_ledger.bank') }}</option></select></div>
+            <div><label for="student_reference">{{ __('pos.school_student_reference') }}</label><input id="student_reference" list="school-student-references" name="student_reference" value="{{ old('student_reference') }}" maxlength="100" required autocomplete="off"><datalist id="school-student-references">@foreach($studentReferences as $reference)<option value="{{ $reference }}">@endforeach</datalist><div class="muted">{{ __('pos.school_reference_hint') }} {{ __('school_ledger.legacy_lookup') }}</div></div>
             <div><label for="fee_head">{{ __('pos.school_fee_head') }}</label><select id="fee_head" name="fee_head" required>@foreach($feeHeads as $head)<option value="{{ $head['code'] }}" @selected(old('fee_head', 'tuition') === $head['code'])>{{ $head['label'] }}</option>@endforeach</select></div>
             <div><label for="fee_period">{{ __('school.period') }}</label><input type="month" id="fee_period" name="fee_period" value="{{ old('fee_period', now()->format('Y-m')) }}" required><div class="muted">{{ __('school.default_month') }}</div></div>
             <div><label for="amount">{{ __('pos.school_amount') }} (PKR)</label><input id="amount" name="amount" type="number" min="0.01" max="99999999.99" step="0.01" value="{{ old('amount') }}" required inputmode="decimal"></div>
         </div>
-        <label class="cash-confirm"><input type="checkbox" name="cash_confirmed" value="1" required @disabled($collectionClosed)> <span>{{ __('pos.school_confirm_cash') }}</span></label>
-        <div class="actions"><button type="submit" @disabled($collectionClosed)>{{ __('pos.school_collect_cash') }}</button><span class="muted">{{ __('pos.school_cash_only') }}</span></div>
+        <fieldset id="school-multi-lines"><legend>{{ __('school_ledger.lines') }}</legend>
+<label><input style="width:auto" type="checkbox" id="school-multi-mode"> {{ __('school_ledger.itemized') }}</label>
+<div id="school-line-editor" hidden><div id="school-lines"></div><button id="school-add-line" type="button">{{ __('school_ledger.add_head') }}</button><p id="school-payable"></p></div>
+<p class="muted">{{ __('school_ledger.scope') }}</p></fieldset>
+<label class="cash-confirm"><input type="checkbox" name="cash_confirmed" value="1" required @disabled($collectionClosed)> <span>{{ __('school_ledger.confirm_received') }}</span></label>
+        <div class="actions"><button type="submit" @disabled($collectionClosed)>{{ __('school_ledger.record_payment') }}</button><span class="muted">{{ __('school_ledger.record_only') }}</span></div>
     </form>
 </section>
-<section class="card"><h2>{{ __('pos.school_receipt_history') }}</h2><div class="scroll">
-<table><thead><tr><th>{{ __('pos.school_receipt') }}</th><th>{{ __('pos.school_student_reference') }}</th><th>{{ __('pos.school_fee_head') }}</th><th>PKR</th><th>{{ __('pos.school_collected_at') }}</th></tr></thead><tbody>
+<section class="card"><h2>{{ __('school_ledger.lookup') }}</h2>
+<form method="get"><label for="student-search">{{ __('school_ledger.lookup') }}</label><input id="student-search" name="student_search" maxlength="100" value="{{ request('student_search') }}"><button>{{ __('pos.school_view_report') }}</button></form>
+<div class="scroll"><table><thead><tr><th>{{ __('pos.school_student_reference') }}</th><th>{{ __('school.period') }}</th><th>{{ __('school_ledger.payable') }}</th><th>{{ __('school_ledger.paid') }}</th><th>{{ __('school_ledger.balance') }}</th><th></th></tr></thead><tbody>
+@foreach($accounts as $account)<tr><td>{{ $account->student_reference }} {{ $account->student_name }}</td><td>{{ $account->fee_period }}</td><td>{{ number_format($account->payable_paisa/100,2) }}</td><td>{{ number_format($account->paid_paisa/100,2) }}</td><td>{{ number_format(($account->payable_paisa-$account->paid_paisa)/100,2) }}</td><td>@if($account->paid_paisa < $account->payable_paisa)<button type="button" class="school-pay-balance" data-account="{{ json_encode($account) }}">{{ __('school_ledger.pay_balance') }}</button>@endif</td></tr>@endforeach
+</tbody></table></div></section>
+<section class="card" id="school-receipt-history"><h2>{{ __('pos.school_receipt_history') }}</h2><div class="scroll">
+<table><thead><tr><th>{{ __('pos.school_receipt') }}</th><th>{{ __('pos.school_student_reference') }}</th><th>{{ __('pos.school_fee_head') }}</th><th>PKR</th><th>{{ __('pos.school_collected_at') }}</th><th>{{ __('school.period') }}</th><th>{{ __('school.campus') }}</th><th>{{ __('school.cashier') }}</th></tr></thead><tbody>
 @forelse($receipts as $receipt)
-<tr><td><a href="/fbr-pos/school-fees/{{ $receipt->id }}/receipt">SF-{{ $receipt->id }}</a></td><td>{{ $receipt->student_reference }}</td><td>{{ $receipt->fee_head_label ?? __('pos.school_head_'.$receipt->fee_head) }}</td><td>{{ number_format($receipt->amount_paisa / 100, 2) }}</td><td>{{ $receipt->collected_at }}</td></tr>
-@empty<tr><td colspan="5">{{ __('pos.school_no_receipts') }}</td></tr>@endforelse
+<tr><td><a href="/fbr-pos/school-fees/{{ $receipt->id }}/receipt">SF-{{ $receipt->id }}</a></td><td>{{ $receipt->student_reference }}</td><td>{{ $receipt->fee_head_label ?? __('pos.school_head_'.$receipt->fee_head) }}</td><td>{{ number_format($receipt->amount_paisa / 100, 2) }}</td><td>{{ $receipt->collected_at }}</td><td>{{ $receipt->fee_period }}</td><td>{{ $receipt->campus_name }}</td><td>{{ $receipt->cashier_name }}</td></tr>
+@empty<tr><td colspan="8">{{ __('pos.school_no_receipts') }}</td></tr>@endforelse
 </tbody></table></div>{{ $receipts->links() }}</section>
 <script>
 (() => {
     const form = document.getElementById('school-collection');
-    const button = form.querySelector('button');
+    const button = form.querySelector('button[type="submit"]');
     const confirmation = form.querySelector('[name="cash_confirmed"]');
     const key = form.querySelector('[name="request_key"]');
     const notice = document.getElementById('school-recovery-notice');
     const storageKey = @json('taxnest.school.pending.'.$company->id.'.'.($schoolCampusId ?? 0).'.'.auth('fbrpos')->id());
-    const recoveryMessage = @json(__('pos.school_pending_recovery'));
+    const recoveryMessage = @json(__('school_ledger.pending_recovery'));
     const storageMessage = @json(__('pos.school_pending_storage_unavailable'));
+    const heads = @json($feeHeads->values());
+    const multi = document.getElementById('school-multi-mode');
+    const editor = document.getElementById('school-line-editor');
+    const lines = document.getElementById('school-lines');
+    let loadedAccount = false;
+    const addLine = (head = heads[0]?.code, amount = '') => {
+        const row = document.createElement('div'); row.className = 'grid school-line';
+        const select = document.createElement('select'); select.className = 'school-line-head';
+        heads.forEach(h => { const option = new Option(h.label, h.code); option.selected = h.code === head; select.add(option); });
+        if (![...select.options].some(o => o.value === head)) select.add(new Option(head, head, true, true));
+        const input = document.createElement('input'); input.type = 'number'; input.min = '0.01'; input.max = '99999999.99'; input.step = '0.01'; input.className = 'school-line-amount'; input.value = amount;
+        const remove = document.createElement('button'); remove.type = 'button'; remove.textContent = @json(__('school_ledger.remove')); remove.onclick = () => { if (!loadedAccount) row.remove(); };
+        row.append(select, input, remove); lines.append(row);
+    };
+    multi.onchange = () => { editor.hidden = !multi.checked; if (multi.checked && !lines.children.length) addLine(document.getElementById('fee_head').value, document.getElementById('amount').value); };
+    document.getElementById('school-add-line').onclick = () => { if (!loadedAccount && lines.children.length < 20) addLine(); };
+    document.querySelectorAll('.school-pay-balance').forEach(b => b.onclick = () => {
+        if (pending) { show(recoveryMessage); return; }
+        const a = JSON.parse(b.dataset.account); loadedAccount = true;
+        document.getElementById('school-account-id').value = a.id;
+        document.getElementById('student_reference').value = a.student_reference;
+        document.getElementById('student_name').value = a.student_name || '';
+        document.getElementById('fee_period').value = a.fee_period;
+        document.getElementById('amount').value = ((a.payable_paisa-a.paid_paisa)/100).toFixed(2);
+        multi.checked = true; multi.disabled = true; editor.hidden = false; lines.replaceChildren();
+        JSON.parse(a.fee_lines).forEach(l => addLine(l.fee_head, (l.amount_paisa/100).toFixed(2)));
+        document.getElementById('school-payable').textContent = @json(__('school_ledger.balance')) + ': PKR ' + ((a.payable_paisa-a.paid_paisa)/100).toFixed(2);
+        form.scrollIntoView({behavior:'smooth'});
+    });
     let pending = null;
     let storageReady = true;
     let submitting = false;
@@ -58,6 +99,19 @@
         button.disabled = blocked || submitting;
         confirmation.disabled = blocked;
     };
+    const recover = document.getElementById('school-recover-payment');
+    recover.hidden = !pending;
+    recover.onclick = async () => {
+        recover.disabled = true;
+        try {
+            const query = new URLSearchParams({ request_key: key.value, expected_branch_key: form.querySelector('[name="expected_branch_key"]').value });
+            const response = await fetch('/fbr-pos/school-fees/recover?' + query, {credentials:'same-origin', headers:{Accept:'application/json'}});
+            const result = await response.json();
+            if (response.ok && /^\/fbr-pos\/school-fees\/\d+\/receipt$/.test(result.receipt_url)) { window.location.assign(result.receipt_url); return; }
+            show(@json(__('school_ledger.not_recovered')));
+        } catch (_) { show(recoveryMessage); }
+        finally { recover.disabled = false; }
+    };
     updateControls();
     window.addEventListener('pageshow', updateControls);
     form.addEventListener('submit', async event => {
@@ -69,15 +123,21 @@
             sessionStorage.setItem(storageKey, key.value);
             if (sessionStorage.getItem(storageKey) !== key.value) throw new Error('Recovery key not saved');
             pending = key.value;
+            recover.hidden = false;
         } catch (_) { storageReady = false; show(storageMessage); updateControls(); return; }
         submitting = true;
         updateControls();
         const abort = new AbortController();
         const timeout = setTimeout(() => abort.abort(), 30000);
         try {
+            const payload = new FormData(form);
+            if (multi.checked) [...lines.children].forEach((row, i) => {
+                payload.append(`fee_lines[${i}][fee_head]`, row.querySelector('select').value);
+                payload.append(`fee_lines[${i}][amount]`, row.querySelector('input').value);
+            });
             const response = await fetch(form.action, {
                 method: 'POST', credentials: 'same-origin', headers: { Accept: 'application/json' },
-                body: new FormData(form), signal: abort.signal,
+                body: payload, signal: abort.signal,
             });
             const result = await response.json();
             if (response.ok && result.success && /^\/fbr-pos\/school-fees\/\d+\/receipt$/.test(result.receipt_url)) {

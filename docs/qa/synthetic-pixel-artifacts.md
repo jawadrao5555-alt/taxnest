@@ -1,0 +1,17 @@
+# Guarded synthetic visual review artifacts
+
+The browser CI job may export `synthetic-visual-review-<run>` separately from the existing text-only evidence artifact. The default evidence sanitizer remains unchanged and still rejects binary evidence.
+
+This lane is opt-in (`RC_SYNTHETIC_PIXEL_EVIDENCE=1`) only in the disposable browser job. Setup/resume creates a fresh nonce and final fixture digest after all synthetic seeding, checking the exact disposable database and Unix socket. Its ignored public marker is removed by fixture stop. Capture binds to that fixture, the newly launched browser object, exact loopback origin (including frames), and fixed 1366×900 / 390×844 viewports. No production session or storage state is imported. Only names in `scripts/lib/synthetic-pixel-policy.json` can enter this lane.
+
+Captures mask editable fields, code blocks, explicit secret elements, canvas and frames. Rendered synthetic receipts and fiscal OFF labels remain visible, with a synthetic-data watermark. Each record is signed with a local random private key, outside the export directory. The independent export gate checks the signature, source commit, hashes, filename pairs, regular files (no symlinks/hardlinks), size limits, PNG CRCs/dimensions/decompression limits, and rejects metadata, unknown chunks and trailing payloads. Export contains only verified PNGs, a manifest and success marker, never the key, fixture, credentials or raw browser data.
+
+Run `node --test scripts/tests/synthetic-pixels-check.mjs` and `python3 scripts/tests/synthetic-pixels-check.py` for negative guards. CI uploads only after `verify-synthetic-pixels.py` succeeds. A failed browser job may still provide verified partial screenshots; the manifest explicitly does not assert all journeys passed. Every export starts `NOT_VISUALLY_REVIEWED`. Retrieve and inspect the actual pixels before reporting visual acceptance. This implementation alone is not evidence of a completed browser run or a visual pass.
+
+## Dedicated ERP demo identity
+
+A second, explicit `hospital-erp-demo` identity is supported only for `taxnest_erp_demo`, fixture `/tmp/taxnest-erp-demo-<UID>-<alphanumeric>/safe-runtime/browser-state/fixture.json`, and its exactly paired `/tmp/taxnest-rc-mariadb-erp-demo-<UID>-<same alphanumeric>/run/mariadb.sock`. The dedicated fresh ERP bootstrap/router must verify the actual database/socket and emit `fixture_kind`, `database`, nonce and final fixture digest. It is not a standard browser fixture and cannot capture standalone names. Its only names are `erp-demo-<owner|reception|doctor|cashier|pharmacy|lab|nursing|accounts|auditor|hr>-<1366|390>`. Signed records and exported manifests retain fixture kind. Wrong database, kind, path or paired socket is rejected; all existing masking, loopback, signature and PNG gates remain mandatory.
+
+## Scrolled detail proof
+
+Receipt and closing pages now produce additional explicitly named `*-receipt-details-*` and `*-totals-details-*` views, including the receipt recovered after a lost response. These scroll to deterministic stored-field selectors, assert every required field/print control fits fully inside the fixed viewport above the watermark, capture through the same mask/signature gate, and restore the original scroll. They do not change data, unmask fields, resize viewports or claim full physical-print verification. Missing/clipped detail fails the browser journey rather than silently exporting an incomplete proof.

@@ -27,9 +27,11 @@ class FranchiseCommissionService
     }
 
     /** A verified package receipt is the only automatic earning event. */
-    public static function recordForProof(PaymentProof $proof): void
+    public static function recordForProof(PaymentProof $proof, bool $atomic = false): void
     {
         try {
+            if ($atomic && \Illuminate\Support\Facades\DB::transactionLevel() < 1) throw new \LogicException('Reviewed commission requires a transaction.');
+            if ($atomic && $proof->franchise_id_at_verification && !Schema::hasTable('franchise_commissions')) throw new \LogicException('Franchise commission schema unavailable.');
             if (!Schema::hasTable('franchise_commissions')
                 || $proof->status !== 'verified' || $proof->kind() !== 'subscription'
                 || (float) $proof->amount <= 0) {
@@ -55,6 +57,7 @@ class FranchiseCommissionService
                 'earned_at' => $proof->verified_at ?? now(),
             ]);
         } catch (\Throwable $e) {
+            if ($atomic) throw $e;
             // Never undo an already verified customer payment for accounting UI.
             Log::warning('Franchise commission record failed', [
                 'payment_proof_id' => $proof->id, 'error' => $e->getMessage(),

@@ -26,6 +26,8 @@
             Dashboard
         </a>
 
+        <x-di-madadgar-read-link />
+
         @if(auth()->user()->role !== 'super_admin' || auth()->user()->company_id)
         <div class="pt-4 pb-1 px-4 cursor-pointer select-none" @click="toggle('business')">
             <p class="text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-300 flex items-center justify-between">

@@ -127,6 +127,13 @@ if ($refused->getStatusCode() !== 302 || auth('admin')->check()
     throw new RuntimeException('Native stale external-session or remember-cookie boundary failed.');
 }
 auth('admin')->login($admin->fresh());
+$loginAudit = \App\Models\SecurityLog::where('action', 'login')->latest('id')->firstOrFail();
+if ($loginAudit->user_id !== null || ($loginAudit->metadata['guard'] ?? null) !== 'admin'
+    || ($loginAudit->metadata['actor_type'] ?? null) !== 'saas_admin'
+    || (int) ($loginAudit->metadata['actor_id'] ?? 0) !== (int) $admin->id) {
+    throw new RuntimeException('Native administrator login audit crossed company-user identity namespace.');
+}
+
 $accepted = $boundary->handle($request, fn () => response('FRESH'));
 if ($accepted->getStatusCode() !== 200 || $accepted->getContent() !== 'FRESH') {
     throw new RuntimeException('Native fresh-login restore boundary failed.');

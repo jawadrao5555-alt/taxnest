@@ -50,6 +50,8 @@ class PosRiderPortalDeliveredInvariantTest extends TestCase
             $table->id();
             $table->unsignedBigInteger('company_id')->nullable();
             $table->string('name')->nullable();
+            $table->string('role')->nullable();
+            $table->string('pos_role')->nullable();
             $table->timestamps();
         });
 
@@ -169,6 +171,46 @@ class PosRiderPortalDeliveredInvariantTest extends TestCase
 
     public function test_delivery_cash_recovery_and_credit_first_return(): void
     {
+        $this->deliveryAccountsSchema();
+
+        [$riderId, $userId] = $this->makeRiderWithUser();
+        $billId = $this->makeBill($riderId, ['total_amount' => 1000, 'customer_name' => 'Demo Customer', 'branch_id' => 4]);
+        $bill = \App\Models\PosTransaction::findOrFail($billId);
+        $rider = \App\Models\PosRider::findOrFail($riderId);
+        $revision = app(\App\Services\RiderBillPreviewService::class)->assignmentRevision($bill, $rider);
+        $this->markDelivered($userId, $billId, ['received_amount' => '0.00', 'assignment_revision' => $revision]);
+
+        $bill->refresh();
+        $this->assertSame('delivered', $bill->delivery_status);
+        $this->assertSame(0.0, \App\Models\PosRider::remainingAmount($bill));
+        $account = DB::table('pos_delivery_accounts')->where('transaction_id', $billId)->first();
+        $this->assertSame(1000.0, (float) $account->outstanding_amount);
+
+        DB::table('users')->where('id', $userId)->update(['role' => 'company_admin']);
+        $requestId = (string) \Illuminate\Support\Str::uuid();
+        $today = \App\Services\PosBusinessDay::current(self::COMPANY);
+        for ($i = 0; $i < 2; $i++) {
+            \App\Services\PosDeliveryAccount::collect(self::COMPANY, $account->id, $userId, $requestId, '150.00');
+        }
+        $this->assertSame(150.0, \App\Services\PosDeliveryAccount::recoveries(self::COMPANY, $today, 4));
+        $this->assertSame(0.0, \App\Services\PosDeliveryAccount::recoveries(self::COMPANY, $today, 5));
+        $this->assertSame(0.0, \App\Services\PosDeliveryAccount::recoveries(self::COMPANY + 1, $today, 4));
+
+        $return = \App\Models\PosTransaction::findOrFail($this->makeBill(null, ['total_amount' => 900]));
+        DB::transaction(fn () => \App\Services\PosDeliveryAccount::offsetReturn($bill, $return, $userId));
+        DB::transaction(fn () => \App\Services\PosDeliveryAccount::offsetReturn($bill, $return, $userId));
+
+        $this->assertSame(0.0, (float) DB::table('pos_delivery_accounts')->where('id', $account->id)->value('outstanding_amount'));
+        $this->assertSame(850.0, (float) $return->delivery_credit_amount);
+        $this->assertSame(50.0, \App\Support\PosPaymentBuckets::split(collect([$return]))['cash']);
+
+        DB::table('pos_transactions')->where('id', $billId)->delete();
+        $this->assertDatabaseHas('pos_delivery_accounts', ['transaction_id' => $billId]);
+        $this->assertDatabaseCount('pos_delivery_account_events', 2);
+    }
+
+    private function deliveryAccountsSchema(): void
+    {
         Schema::table('pos_transactions', function (Blueprint $table) {
             $table->string('customer_name')->nullable();
             $table->unsignedBigInteger('branch_id')->nullable();
@@ -180,39 +222,80 @@ class PosRiderPortalDeliveredInvariantTest extends TestCase
         });
         $migration = require database_path('migrations/2026_11_06_000001_create_pos_delivery_accounts.php');
         $migration->up();
+    }
 
+    public function test_partial_delivery_payment_is_rejected_without_any_financial_write(): void
+    {
+        $this->deliveryAccountsSchema();
         [$riderId, $userId] = $this->makeRiderWithUser();
-        $billId = $this->makeBill($riderId, ['total_amount' => 1000, 'customer_name' => 'Demo Customer', 'branch_id' => 4]);
-        $bill = \App\Models\PosTransaction::findOrFail($billId);
-        $rider = \App\Models\PosRider::findOrFail($riderId);
-        $revision = app(\App\Services\RiderBillPreviewService::class)->assignmentRevision($bill, $rider);
-        $this->markDelivered($userId, $billId, ['received_amount' => '600.00', 'assignment_revision' => $revision]);
-
-        $bill->refresh();
-        $this->assertSame('delivered', $bill->delivery_status);
-        $this->assertSame(600.0, \App\Models\PosRider::remainingAmount($bill));
-        $account = DB::table('pos_delivery_accounts')->where('transaction_id', $billId)->first();
-        $this->assertSame(400.0, (float) $account->outstanding_amount);
-
-        $requestId = (string) \Illuminate\Support\Str::uuid();
-        $today = \App\Services\PosBusinessDay::current(self::COMPANY);
-        for ($i = 0; $i < 2; $i++) {
-            \App\Services\PosDeliveryAccount::collect(self::COMPANY, $account->id, $userId, $requestId, '150.00');
+        $id = $this->makeBill($riderId, ['customer_name' => 'Synthetic Customer']);
+        $bill = \App\Models\PosTransaction::findOrFail($id);
+        $revision = app(\App\Services\RiderBillPreviewService::class)->assignmentRevision($bill, \App\Models\PosRider::find($riderId));
+        try {
+            $this->markDelivered($userId, $id, ['received_amount' => '100', 'assignment_revision' => $revision]);
+            $this->fail('Partial rider payment must not create credit.');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            $this->assertStringContainsString('full amount', $e->errors()['received_amount'][0]);
         }
-        $this->assertSame(150.0, \App\Services\PosDeliveryAccount::recoveries(self::COMPANY, $today, 4));
-        $this->assertSame(0.0, \App\Services\PosDeliveryAccount::recoveries(self::COMPANY, $today, 5));
-        $this->assertSame(0.0, \App\Services\PosDeliveryAccount::recoveries(self::COMPANY + 1, $today, 4));
+        $this->assertDatabaseCount('pos_delivery_accounts', 0);
+        $this->assertSame('dispatched', $bill->fresh()->delivery_status);
+        $this->assertSame(500.0, \App\Models\PosRider::remainingAmount($bill->fresh()));
+    }
 
-        $return = \App\Models\PosTransaction::findOrFail($this->makeBill(null, ['total_amount' => 300]));
-        DB::transaction(fn () => \App\Services\PosDeliveryAccount::offsetReturn($bill, $return, $userId));
+    public function test_full_received_retry_is_idempotent_and_changed_decision_is_rejected(): void
+    {
+        $this->deliveryAccountsSchema();
+        [$riderId, $userId] = $this->makeRiderWithUser();
+        $id = $this->makeBill($riderId, ['customer_name' => 'Synthetic Customer']);
+        $bill = \App\Models\PosTransaction::findOrFail($id);
+        $revision = app(\App\Services\RiderBillPreviewService::class)->assignmentRevision($bill, \App\Models\PosRider::find($riderId));
+        $data = ['received_amount' => '500.00', 'assignment_revision' => $revision];
+        $this->markDelivered($userId, $id, $data);
+        $this->markDelivered($userId, $id, $data);
+        $this->assertDatabaseCount('pos_delivery_accounts', 1);
+        $this->assertSame(500.0, \App\Models\PosRider::remainingAmount($bill->fresh()));
+        try {
+            $this->markDelivered($userId, $id, array_replace($data, ['received_amount' => '0']));
+            $this->fail('Changed financial replay must conflict.');
+        } catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) {
+            $this->assertSame(409, $e->getStatusCode());
+        }
+        $this->assertDatabaseHas('pos_delivery_accounts', ['transaction_id' => $id, 'received_amount' => 500, 'credit_amount' => 0]);
+    }
 
-        $this->assertSame(0.0, (float) DB::table('pos_delivery_accounts')->where('id', $account->id)->value('outstanding_amount'));
-        $this->assertSame(250.0, (float) $return->delivery_credit_amount);
-        $this->assertSame(50.0, \App\Support\PosPaymentBuckets::split(collect([$return]))['cash']);
-
-        DB::table('pos_transactions')->where('id', $billId)->delete();
-        $this->assertDatabaseHas('pos_delivery_accounts', ['transaction_id' => $billId]);
-        $this->assertDatabaseCount('pos_delivery_account_events', 2);
+    public function test_local_credit_survives_bill_cleanup_and_only_same_company_owner_collects(): void
+    {
+        $this->deliveryAccountsSchema();
+        [$riderId, $userId] = $this->makeRiderWithUser();
+        $id = $this->makeBill($riderId, ['invoice_mode' => 'local', 'customer_name' => 'Retained Customer']);
+        $bill = \App\Models\PosTransaction::findOrFail($id);
+        $revision = app(\App\Services\RiderBillPreviewService::class)->assignmentRevision($bill, \App\Models\PosRider::find($riderId));
+        $this->markDelivered($userId, $id, ['received_amount' => '0', 'assignment_revision' => $revision]);
+        $account = DB::table('pos_delivery_accounts')->first();
+        $this->assertSame(0.0, \App\Models\PosRider::remainingAmount($bill->fresh()));
+        DB::table('pos_transactions')->where('id', $id)->delete();
+        $requestId = (string) \Illuminate\Support\Str::uuid();
+        foreach ([null, 'company_admin'] as $role) {
+            DB::table('users')->where('id', $userId)->update(['role' => $role, 'company_id' => $role ? self::COMPANY + 1 : self::COMPANY]);
+            try {
+                \App\Services\PosDeliveryAccount::collect(self::COMPANY, $account->id, $userId, $requestId, '500');
+                $this->fail('Rider or other-company admin must not collect.');
+            } catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) {
+                $this->assertSame(403, $e->getStatusCode());
+            }
+        }
+        DB::table('users')->where('id', $userId)->update(['role' => 'company_admin', 'company_id' => self::COMPANY]);
+        \App\Services\PosDeliveryAccount::collect(self::COMPANY, $account->id, $userId, $requestId, '500');
+        \App\Services\PosDeliveryAccount::collect(self::COMPANY, $account->id, $userId, $requestId, '500');
+        $saved = DB::table('pos_delivery_accounts')->first();
+        $this->assertSame(0.0, (float) $saved->outstanding_amount);
+        $this->assertSame('Retained Customer', $saved->customer_name);
+        $this->assertSame($riderId, (int) $saved->rider_id);
+        $this->assertSame(500.0, (float) $saved->credit_amount);
+        $this->assertDatabaseCount('pos_delivery_account_events', 1);
+        $html = \Illuminate\Support\Facades\Blade::render(str_replace(['<x-pos-layout>', '</x-pos-layout>'], '', file_get_contents(resource_path('views/pos/delivery-accounts.blade.php'))), ['errors' => new \Illuminate\Support\ViewErrorBag, 'accounts' => new \Illuminate\Pagination\LengthAwarePaginator([$saved], 1, 25), 'events' => collect()]);
+        $this->assertStringNotContainsString($bill->invoice_number, $html);
+        $this->assertStringContainsString('Retained Customer', $html);
     }
 
     /** Attempt that MUST 404 (bill unreachable for this rider). */

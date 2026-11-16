@@ -31,6 +31,9 @@
         {{-- Only the cards this person can actually open. --}}
         @php
             $cards = [];
+            if ($isOwner && \Illuminate\Support\Facades\Route::has('health.package-checkout')) {
+                $cards[] = ['url' => route('health.package-checkout'), 'title' => __('greetings.package_review'), 'desc' => __('greetings.package_review_note'), 'meta' => ''];
+            }
             if ($isOwner) {
                 $cards[] = [
                     'url' => route('health.settings.modules'),
@@ -95,6 +98,7 @@
         </div>
 
         @if($isOwner)
+            @include('billing._policy-status', ['policySubscription' => $company?->subscriptions()->where('active', true)->orderByDesc('id')->first()])
             @include('billing._subscription-history')
         @endif
     </div>

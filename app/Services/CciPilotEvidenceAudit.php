@@ -25,37 +25,39 @@ final class CciPilotEvidenceAudit {
   }
   $totals=['gross'=>0,'discount'=>0,'vat'=>0,'net'=>0];$footerMismatch=0;
   foreach($invoices as $footer){foreach($totals as $field=>$_) $totals[$field]+=$footer[$field];if($footer['gross']-$footer['discount']+$footer['vat']!==$footer['net']) $footerMismatch++;}
-  $unmatched=0;$changed=0;$seen=[];$missingMrp=0;$pendingHs=0;$missingConversion=0;$missingBuyer=0;$salesCount=0;$partition=[];$gateHold=0;$gateRows=0;$pendingVat=0;
+  $unmatched=0;$changed=0;$seen=[];$missingMrp=0;$pendingHs=0;$missingConversion=0;$missingBuyer=0;$salesCount=0;$partition=[];$gateHold=0;$gateRows=0;$pendingVat=0;$requests=[];
   foreach(['TAXNEST SALES LINES','EXCLUDED PACKAGING','DAMAGE RETURNS REVIEW'] as $sheet) {
    $table=$this->table($grids,$sheet,['CCI Invoice No','Actual Supply Date','CCI SKU','Original Cases Qty','CCI Gross Rs','CCI Line Net Rs','Source row']);
    $partition[$sheet]=count($table);
-   foreach($table as $e) {
+   foreach($table as $index=>$e) {
     $key=$e['CCI Invoice No'].'|'.$e['CCI SKU'].'|'.$e['Source row'];
     if(!isset($lines[$key]) || isset($seen[$key])) {$unmatched++;continue;} $seen[$key]=true;$d=$lines[$key];
     if($d['invoice_date']!==$e['Actual Supply Date'] || abs((float)$d['quantity']-(float)$e['Original Cases Qty'])>0.0000001
      || InvoiceImportMoney::cents($d['source_gross'])!==InvoiceImportMoney::cents($e['CCI Gross Rs'])
      || InvoiceImportMoney::cents($d['source_reported_net'])!==InvoiceImportMoney::cents($e['CCI Line Net Rs'])) $changed++;
     if($sheet==='TAXNEST SALES LINES') {
-     $salesCount++;if(!is_numeric($e['Printed Retail Price']??null) || (float)$e['Printed Retail Price']<=0) $missingMrp++;
-     if(strtoupper(trim((string)($e['HS and Tax Verified']??'')))!=='VERIFIED') $pendingHs++;
-     if(!is_numeric($e['Litres per Case (if known)']??null) || (float)$e['Litres per Case (if known)']<=0) $missingConversion++;
-     if(!in_array(strtoupper(trim((string)($e['Buyer Status']??''))),['REGISTERED VERIFIED','UNREGISTERED VERIFIED'],true)) $missingBuyer++;
+     $salesCount++;$missing=[];
+     if(!is_numeric($e['Printed Retail Price']??null) || (float)$e['Printed Retail Price']<=0) {$missingMrp++;$missing[]='Printed Retail Price';}
+     if(strtoupper(trim((string)($e['HS and Tax Verified']??'')))!=='VERIFIED') {$pendingHs++;$missing[]='HS and Tax Verified';}
+     if(!is_numeric($e['Litres per Case (if known)']??null) || (float)$e['Litres per Case (if known)']<=0) {$missingConversion++;$missing[]='Litres per Case (if known)';}
+     if(!in_array(strtoupper(trim((string)($e['Buyer Status']??''))),['REGISTERED VERIFIED','UNREGISTERED VERIFIED'],true)) {$missingBuyer++;$missing[]='Buyer Status';}
+     if($missing) $requests[]=['sheet'=>$sheet,'evidence_row'=>$index+2,'source_row'=>(int)$e['Source row'],'required_fields'=>$missing];
     }
    }
   }
-  foreach($this->table($grids,'TAXNEST INVOICE GATE',['CCI Invoice No','Buyer Registration','MRP Confirmed','HS/Tax Confirmed','Source VAT Reviewed','Ready for TaxNest']) as $gate) {
+  foreach($this->table($grids,'TAXNEST INVOICE GATE',['CCI Invoice No','Buyer Registration','MRP Confirmed','HS/Tax Confirmed','Source VAT Reviewed','Ready for TaxNest']) as $index=>$gate) {
    $gateRows++;if(str_starts_with(strtoupper((string)$gate['Ready for TaxNest']),'HOLD')) $gateHold++;
-   if(strtoupper(trim((string)$gate['Source VAT Reviewed']))!=='VERIFIED') $pendingVat++;
+   if(strtoupper(trim((string)$gate['Source VAT Reviewed']))!=='VERIFIED') {$pendingVat++;$requests[]=['sheet'=>'TAXNEST INVOICE GATE','evidence_row'=>$index+2,'required_fields'=>['Source VAT Reviewed']];}
   }
   $skuRows=$this->table($grids,'SKU MASTER',['CCI Product Code','HS/Tax Approval']);$skuPending=0;
-  foreach($skuRows as $sku) if(strtoupper(trim((string)$sku['HS/Tax Approval']))!=='VERIFIED') $skuPending++;
+  foreach($skuRows as $index=>$sku) if(strtoupper(trim((string)$sku['HS/Tax Approval']))!=='VERIFIED') {$skuPending++;$requests[]=['sheet'=>'SKU MASTER','evidence_row'=>$index+2,'required_fields'=>['HS/Tax Approval']];}
   return ['status'=>'HOLD','authorization'=>'Evidence inventory only; verified company mappings and reviewed batch approval remain mandatory.',
    'source_invoices'=>count($invoices),'source_lines'=>count($rows),'source_skus'=>count($skus),'source_outlets'=>count($buyers),'supply_dates'=>array_keys($dates),
    'staging_partition_counts'=>$partition,'source_negative_quantity_lines'=>$negativeQuantity,'footer_totals_cents'=>$totals,'footer_mismatch_count'=>$footerMismatch,
    'covered_source_lines'=>count($seen),'uncovered_source_lines'=>count($lines)-count($seen),'unmatched_or_duplicate_evidence_lines'=>$unmatched,'changed_source_values'=>$changed,
    'beverage_sales_lines'=>$salesCount,'sales_lines_missing_printed_mrp'=>$missingMrp,'sales_lines_without_verified_hs_tax'=>$pendingHs,
    'sales_lines_missing_case_conversion'=>$missingConversion,'sales_lines_without_verified_buyer'=>$missingBuyer,'source_lines_without_item_vat_amount'=>$lineVatMissing,
-   'sku_mapping_rows'=>count($skuRows),'sku_mappings_without_verified_hs_tax'=>$skuPending,'invoice_gate_rows'=>$gateRows,'invoice_gate_hold_count'=>$gateHold,'invoice_gates_without_verified_vat'=>$pendingVat];
+   'sku_mapping_rows'=>count($skuRows),'sku_mappings_without_verified_hs_tax'=>$skuPending,'invoice_gate_rows'=>$gateRows,'invoice_gate_hold_count'=>$gateHold,'invoice_gates_without_verified_vat'=>$pendingVat,'evidence_requests'=>$requests];
  }
  private function table(array $grids,string $name,array $required): array {
   if(empty($grids[$name])) throw new \InvalidArgumentException('Missing evidence sheet: '.$name);

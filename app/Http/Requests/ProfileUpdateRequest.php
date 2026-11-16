@@ -2,9 +2,9 @@
 
 namespace App\Http\Requests;
 
-use App\Models\User;
+use App\Support\IdentityScope;
+use App\Support\ProfileFieldRules;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 
 class ProfileUpdateRequest extends FormRequest
 {
@@ -23,14 +23,15 @@ class ProfileUpdateRequest extends FormRequest
                 'lowercase',
                 'email',
                 'max:255',
-                Rule::unique(User::class)->ignore($this->user()->id),
+                IdentityScope::uniqueEmail(IdentityScope::ofUser($this->user()->fresh()), $this->user()->id),
             ],
-            'phone' => ['nullable', 'string', 'max:30'],
+            'phone' => [...ProfileFieldRules::phone(), IdentityScope::uniquePhone(IdentityScope::ofUser($this->user()->fresh()), $this->user()->id)],
+            'date_of_birth' => ['sometimes', 'nullable', 'date_format:Y-m-d', 'before_or_equal:today'],
             'username' => [
                 'nullable',
                 'string',
                 'max:100',
-                Rule::unique(User::class)->ignore($this->user()->id),
+                IdentityScope::uniqueUsername(IdentityScope::ofUser($this->user()->fresh()), $this->user()->id),
             ],
         ];
     }

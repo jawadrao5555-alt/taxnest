@@ -907,7 +907,7 @@ pre, code { max-width: 100%; overflow-x: auto; word-break: break-word; }
         background: #16191b !important;
         color: #edf2f1;
     }
-    .tn-premium-shell [x-data^="tnMadadgar("] {
+    .tn-premium-shell [x-data^="tnMadadgar("][data-madadgar-placement="floating"] {
         bottom: calc(4.25rem + env(safe-area-inset-bottom, 0px)) !important;
         left: .6rem !important;
         right: .6rem !important;

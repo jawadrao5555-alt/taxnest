@@ -8,7 +8,7 @@ class IntegrityHashService
 {
     public static function generate(Invoice $invoice): string
     {
-        return self::generateVersion($invoice, 4);
+        return self::generateVersion($invoice, $invoice->inventory_enabled_snapshot === true ? 5 : 4);
     }
 
     private static function generateVersion(Invoice $invoice, int $version): string
@@ -29,6 +29,7 @@ class IntegrityHashService
                 'price' => self::amount($item->price, $version >= 4 ? 6 : 4),
                 'tax' => self::amount($item->tax),
                 ...($version >= 4 ? ['selling_snapshot' => $item->selling_snapshot] : []),
+                ...($version >= 5 ? ['inventory_snapshot' => $item->inventory_snapshot] : []),
                 ...($version >= 3 ? [
                     'default_uom' => (string) $item->default_uom,
                     'sale_type' => (string) $item->sale_type,
@@ -47,6 +48,7 @@ class IntegrityHashService
 
         return hash('sha256', json_encode([
             'version' => $version,
+            ...($version >= 5 ? ['inventory_enabled_snapshot'=>$invoice->inventory_enabled_snapshot,'inventory_environment_snapshot'=>$invoice->inventory_environment_snapshot] : []),
             'company_id' => (int) $invoice->company_id,
             'branch_id' => $invoice->branch_id ? (int) $invoice->branch_id : null,
             'invoice_number' => (string) $invoice->invoice_number,
@@ -81,7 +83,8 @@ class IntegrityHashService
     {
         if (!$invoice->integrity_hash) return 'missing';
         $invoice->load('items');
-        foreach ([4 => 'verified_current', 3 => 'verified_legacy_v3', 2 => 'verified_legacy_v2'] as $version => $status) {
+        foreach ([5 => 'verified_current', 4 => 'verified_current', 3 => 'verified_legacy_v3', 2 => 'verified_legacy_v2'] as $version => $status) {
+            if ($invoice->inventory_enabled_snapshot === true && $version < 5) continue;
             if (hash_equals((string) $invoice->integrity_hash, self::generateVersion($invoice, $version))) return $status;
         }
         return 'failed';

@@ -1,0 +1,23 @@
+<?php
+return [
+    'exit_company' => 'Exit Manage as Company',
+    'fiscal_off' => 'FBR OFF · Fiscal submission blocked.',
+    'workspace_menu' => 'School workspace and settings',
+    'team_access' => 'Team and campus access',
+    'profile_printing' => 'School profile and receipt printing',
+    'billing' => 'Package and billing',
+    'retail_archive' => 'Old retail archive (read-only)',
+    'my_profile' => 'My profile',
+    'help' => 'Help and feedback',
+    'language' => 'Language',
+    'save_language' => 'Save language',
+    'workspace_only' => 'This retail action is not available in School mode. Use the School workspace.',
+    'campus_start' => 'No campus configured yet. Existing receipts remain in their original scope. Create a campus, then assign staff access before collecting there.',
+    'campus_access' => 'Manage staff campus access',
+    'school_plans' => 'School workspace plans',
+    'school_billing_note' => 'Packages do not enable school fiscal submission. Official route confirmation and sandbox verification are still required.',
+    'package_choice' => 'Requested package',
+    'trial_choice' => 'Start with the bounded trial; choose a paid package later',
+    'package_note' => 'This records your preference only. A paid package needs separate approval and payment; registration does not enable fiscal reporting.',
+    'pilot_registration' => 'School / Education and Hospital / Clinic use local administrative collections only. FBR submission stays blocked until the official reporting route and sandbox are verified.',
+];

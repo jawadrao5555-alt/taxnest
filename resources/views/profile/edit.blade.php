@@ -1,4 +1,7 @@
 <x-app-layout>
+    @if(auth()->user()?->role === 'company_admin')
+    <div class="max-w-7xl mx-auto p-4"><a href="{{ route('greetings.index') }}">{{ __('greetings.link') }}</a></div>
+    @endif
     <div class="py-8">
         <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
             <div class="mb-2">
@@ -35,6 +38,24 @@
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email <span class="text-red-500">*</span></label>
                             <input type="email" name="email" value="{{ old('email', $user->email) }}" required class="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
                             @error('email') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <x-input-label for="profile-phone" :value="__('Phone')" />
+                            <x-text-input id="profile-phone" name="phone" type="text" class="mt-1 block w-full" :value="old('phone', $user->phone)" />
+                            <x-input-error class="mt-2" :messages="$errors->get('phone')" />
+                        </div>
+                        <div>
+                            <x-input-label for="profile-username" :value="__('Username')" />
+                            <x-text-input id="profile-username" name="username" type="text" class="mt-1 block w-full" :value="old('username', $user->username)" />
+                            <x-input-error class="mt-2" :messages="$errors->get('username')" />
+                        </div>
+                        <div>
+                            <x-input-label for="date_of_birth" :value="__('profile_fields.date_of_birth')" />
+                            <x-text-input id="date_of_birth" name="date_of_birth" type="date" max="{{ now()->toDateString() }}" class="mt-1 block w-full" :value="old('date_of_birth', $user->date_of_birth?->format('Y-m-d'))" aria-describedby="profile-birth-privacy" />
+                            <x-input-error class="mt-2" :messages="$errors->get('date_of_birth')" />
+                            <p id="profile-birth-privacy" class="text-sm text-gray-500">{{ __('profile_fields.no_message_consent') }}</p>
                         </div>
                     </div>
                     <div class="flex justify-end">

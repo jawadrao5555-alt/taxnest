@@ -42,6 +42,19 @@
                                 </span>
                                 <div class="min-w-0">
                                     <p class="font-medium text-gray-900 dark:text-gray-100">{{ $v->title }}</p>
+@if($canManageRelease)
+<details><summary>Accessibility and version metadata</summary>
+<form method="POST" action="{{ route('admin.tutorial-videos.metadata', $v->id) }}" class="space-y-2">@csrf
+<label class="block">Local VTT caption path<input name="caption_path" value="{{ $v->caption_path }}" placeholder="/videos/example.vtt"></label>
+<label class="block">Caption language<select name="caption_language"><option value="">Not supplied</option>@foreach(['en','ur'] as $language)<option value="{{ $language }}" @selected($v->caption_language===$language)>{{ $language }}</option>@endforeach</select></label>
+<label class="block">Transcript<textarea name="transcript" maxlength="20000">{{ $v->transcript }}</textarea></label>
+<label class="block">Release version<input name="release_version" value="{{ $v->release_version }}" maxlength="80"></label>
+<label class="block">Reviewed on<input type="date" name="reviewed_on" value="{{ $v->reviewed_on }}"></label>
+<input type="hidden" name="superseded" value="0"><label class="block"><input type="checkbox" name="superseded" value="1" @checked($v->superseded)> Superseded: exclude from current tutorials</label>
+<button>Save metadata without changing publication permissions</button>
+</form></details>
+@endif
+
                                     <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                                         <a href="{{ $v->video_url }}" target="_blank" class="hover:underline">{{ $v->slug }}</a>
                                         @if($v->duration_seconds) · {{ gmdate($v->duration_seconds >= 3600 ? 'G:i:s' : 'i:s', $v->duration_seconds) }} min @endif

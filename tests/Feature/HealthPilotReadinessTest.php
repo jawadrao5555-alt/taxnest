@@ -89,6 +89,18 @@ class HealthPilotReadinessTest extends TestCase
 
     /* ─────────────────────── 1. No ungated door ───────────────────────────── */
 
+    public function test_package_checkout_capability_is_owner_only_even_with_delegated_permission(): void
+    {
+        $company = $this->company();
+        $owner = $this->owner($company);
+        $this->assertTrue(HealthAccessService::can($owner, 'billing.manage', $company));
+        $owner->forceFill(['role' => 'staff', 'health_role' => 'health_admin', 'health_permissions' => json_encode(['billing.manage'])]);
+        $this->assertFalse(HealthAccessService::can($owner, 'billing.manage', $company));
+        foreach (['health/package-checkout', 'health/package-payment-proof'] as $path) {
+            $this->assertSame('billing.manage', HealthAccessService::capabilityForPath($path));
+        }
+    }
+
     public function test_every_signed_in_healthcare_route_resolves_to_a_capability(): void
     {
         $ungated = [];

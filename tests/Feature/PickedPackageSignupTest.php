@@ -150,6 +150,7 @@ class PickedPackageSignupTest extends TestCase
 
         $response->assertOk();
         $this->assertNull($response->viewData('pickedPlanName'));
+        $response->assertSee(':disabled="Boolean(packageName) &amp;&amp;', false);
         $response->assertDontSee(__('pos.auth_picked_package'), false);
     }
 

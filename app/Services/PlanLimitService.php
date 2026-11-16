@@ -33,7 +33,7 @@ class PlanLimitService
 
         $plan = $subscription->entitlementPlan();
 
-        return !$plan || (bool) $plan->is_trial;
+        return (!$subscription->hasLifecycleSnapshot()) && (!$plan || (bool) $plan->is_trial);
     }
 
     /**
@@ -86,7 +86,7 @@ class PlanLimitService
     /** Counted invoices inside the CURRENT calendar month (same basis as POS). */
     public static function monthlyInvoiceCount(int $companyId): int
     {
-        return self::countedInvoices($companyId, now()->startOfMonth(), now()->endOfMonth());
+        return self::countedInvoices($companyId, ProspectiveQuotaRetention::monthStart($companyId), now()->endOfMonth());
     }
 
     /** Human date the monthly quota rolls over on. */
@@ -179,7 +179,7 @@ class PlanLimitService
                 ->where(function ($q) {
                     $q->whereNull('invoice_mode')->orWhere('invoice_mode', '!=', 'local');
                 })
-                ->whereBetween('created_at', [now()->startOfMonth(), now()->endOfMonth()]);
+                ->whereBetween('created_at', [ProspectiveQuotaRetention::monthStart($companyId), now()->endOfMonth()]);
             // Returns/credit notes (Task 570) never consume bill quota — they
             // reverse a sale that already paid for its slot.
             if (\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'transaction_type')) {
@@ -188,6 +188,9 @@ class PlanLimitService
                 });
             }
             $live = $liveQuery->count();
+            if (ProspectiveQuotaRetention::policy($companyId)) {
+                return $live + ProspectiveQuotaRetention::deletedCount($companyId);
+            }
 
             // Reporting-OFF finals hard-deleted by the day-close DELETE policy would
             // otherwise vanish from this count (quota bypass) — add back the counts
@@ -298,18 +301,19 @@ class PlanLimitService
             if ($company?->isHospitalCollectionPilot()) {
                 return \Illuminate\Support\Facades\DB::table('hospital_invoices')
                     ->where('company_id', $companyId)
-                    ->whereBetween('created_at', [now()->startOfMonth(), now()->endOfMonth()])->count();
+                    ->whereBetween('created_at', [ProspectiveQuotaRetention::monthStart($companyId), now()->endOfMonth()])->count();
             }
             if ($company?->isSchoolFeePilot()) {
                 return \Illuminate\Support\Facades\DB::table('school_fee_receipts')
                     ->where('company_id', $companyId)
-                    ->whereBetween('created_at', [now()->startOfMonth(), now()->endOfMonth()])->count();
+                    ->whereBetween('created_at', [ProspectiveQuotaRetention::monthStart($companyId), now()->endOfMonth()])->count();
             }
-            return \App\Models\FbrPosTransaction::where('company_id', $companyId)
+            $live = \App\Models\FbrPosTransaction::where('company_id', $companyId)
                 ->where('status', 'completed')
                 ->where('transaction_type', 'sale')
-                ->whereBetween('created_at', [now()->startOfMonth(), now()->endOfMonth()])
+                ->whereBetween('created_at', [ProspectiveQuotaRetention::monthStart($companyId), now()->endOfMonth()])
                 ->count();
+            return $live + FbrProspectiveQuotaRetention::deletedCount($companyId);
         };
 
         // Admin override wins (interpreted as bills/month, same as PRA POS).

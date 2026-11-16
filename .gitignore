@@ -60,3 +60,6 @@ backup.sql
 
 # Agent packaging date is generated for each actual build.
 /pra-agent/build-info.json
+
+# Ephemeral loopback synthetic browser attestation, never production content.
+/public/.rc-synthetic-proof.json

@@ -9,6 +9,8 @@ declare(strict_types=1);
  * fiscal metadata behavior are checked separately, never mistaken for loss.
  */
 
+require_once __DIR__.'/lib/upgrade_decimal.php';
+
 $mode = $argv[1] ?? '';
 $database = getenv('DB_DATABASE') ?: '';
 $socket = getenv('DB_SOCKET') ?: '';
@@ -58,19 +60,22 @@ function snapshotTable(PDO $pdo, string $table, string $where, array $bindings, 
     $statement = $pdo->prepare('SELECT '.implode(',', array_map('qi', $wantedColumns)).' FROM '.qi($table).' WHERE '.$where.' ORDER BY id');
     $statement->execute($bindings);
     $rows = $statement->fetchAll(PDO::FETCH_ASSOC);
-    // Widening DECIMAL changes PDO's trailing-zero representation, not its value.
-    // Compare exactly as decimal text for these three deliberately widened fields;
-    // do not round, cast through float, omit fields or normalize other evidence.
-    if ($table === 'invoice_items') {
-        foreach ($rows as &$row) {
-            foreach (['quantity', 'price', 'mrp'] as $field) {
-                if (isset($row[$field]) && str_contains((string) $row[$field], '.')) {
-                    $row[$field] = rtrim(rtrim((string) $row[$field], '0'), '.');
-                }
+    // Only documented widened decimal fields may differ in trailing zeroes.
+    // Every other byte, field, row identity and row count remains invariant.
+    $decimalFields = match ($table) {
+        'invoice_items' => ['quantity', 'price', 'mrp'],
+        'inventory_stocks' => ['quantity'],
+        'inventory_movements' => ['quantity', 'balance_after'],
+        default => [],
+    };
+    foreach ($rows as &$row) {
+        foreach ($decimalFields as $field) {
+            if (isset($row[$field])) {
+                $row[$field] = rcUpgradeDecimal((string) $row[$field]);
             }
         }
-        unset($row);
     }
+    unset($row);
     return ['columns' => $wantedColumns, 'rows' => $rows];
 }
 
@@ -105,7 +110,27 @@ function persist(string $path, array $value): string
     return hash('sha256', $json);
 }
 
+function inventoryDecimalSchema(PDO $pdo): array
+{
+    $result = [];
+    foreach (['inventory_stocks' => ['quantity'], 'inventory_movements' => ['quantity', 'balance_after']] as $table => $fields) {
+        foreach ($fields as $field) {
+            $q = $pdo->prepare('SELECT data_type,numeric_precision,numeric_scale,is_nullable,column_default FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name=? AND column_name=?');
+            $q->execute([$table, $field]);
+            $result[$table.'.'.$field] = $q->fetch(PDO::FETCH_ASSOC);
+        }
+    }
+    return $result;
+}
+
 if ($mode === 'seed') {
+    $schema = inventoryDecimalSchema($pdo);
+    persist($evidenceDir.'/upgrade-decimal-schema-before.json', $schema);
+    foreach ($schema as $field => $column) {
+        if (!$column || $column['data_type'] !== 'decimal' || (int) $column['numeric_precision'] !== 15 || (int) $column['numeric_scale'] !== 2) {
+            failUpgrade("unexpected baseline decimal schema for {$field}");
+        }
+    }
     $companyIds = [];
     $branchIds = [];
     $productIds = [];
@@ -224,6 +249,14 @@ $afterComparable['subscriptions'] = $afterSubscriptions;
 if ($beforeComparable !== $afterComparable) {
     persist($evidenceDir.'/upgrade-after-mismatch.json', $after);
     failUpgrade('data-bearing upgrade changed a preservation invariant');
+}
+// Value preservation alone is insufficient: prove the intended storage precision.
+$schema = inventoryDecimalSchema($pdo);
+persist($evidenceDir.'/upgrade-decimal-schema-after.json', $schema);
+foreach ($schema as $field => $column) {
+    if (!$column || $column['data_type'] !== 'decimal' || (int) $column['numeric_precision'] !== 18 || (int) $column['numeric_scale'] !== 4) {
+        failUpgrade("incorrect widened decimal schema for {$field}");
+    }
 }
 $legacy = $pdo->query("SELECT p.name,s.active,s.start_date,s.end_date FROM subscriptions s JOIN companies c ON c.id=s.company_id JOIN pricing_plans p ON p.id=s.pricing_plan_id WHERE c.ntn='RC-UPGRADE-A'")->fetch(PDO::FETCH_ASSOC);
 if (($legacy['name'] ?? null) !== 'Kaarobar' || (int) ($legacy['active'] ?? 0) !== 1 || ($legacy['start_date'] ?? null) !== '2026-09-01' || ($legacy['end_date'] ?? null) !== '2026-12-01') {

@@ -3483,6 +3483,8 @@ class PosController extends Controller
             }
         }
 
+        \App\Services\PosOnlinePaymentPolicy::assertAllowed(auth('pos')->user(), (int) $companyId, $request->input('payment_method'), $request->boolean('online_payment_confirmed'));
+
         // Normalize 'card' alias → 'debit_card' (front-end Universal POS sends 'card';
         // PosTaxRule + PRA mapping use 'debit_card'). Without this, downstream tax
         // lookup/PRA payment-mode mapping miss the rule and fall back to defaults.
@@ -3881,6 +3883,12 @@ class PosController extends Controller
         DB::beginTransaction();
         try {
             $lockedPromotionCompany = Company::whereKey($companyId)->lockForUpdate()->firstOrFail();
+            $quotaContext = \App\Services\ProspectiveQuotaGuard::context((int)$companyId, false);
+            if ($quotaContext && $offlineUuidColumnExists) {
+                $saved = PosTransaction::withoutGlobalScope('hide_archived')->where('company_id',$companyId)->where('offline_uuid',$offlineUuid)->lockForUpdate()->first();
+                if ($saved) { DB::commit(); return $this->offlineReplayResponse($request, $saved); }
+            }
+            if ($quotaContext && !$saveAsProvisional) \App\Services\ProspectiveQuotaGuard::assertPra((int)$companyId,$quotaContext);
             \App\Services\PosStaffDiscount::claim($staffApproval, (int) $companyId);
             \App\Services\PosStaffDiscount::assertOrderAvailable((int) $companyId, (int) $settleOrderIdIn, $staffApproval['row']->id ?? null);
             if (!$agentCoreInventorySale && !$request->filled('offline_queued_at')) \App\Services\PosPromotions::assertRowsCurrent($companyItems, $lockedPromotionCompany);
@@ -4419,6 +4427,8 @@ class PosController extends Controller
                 ->with('error', __('pos.return_bill_immutable'));
         }
 
+        \App\Services\PosOnlinePaymentPolicy::assertAllowed(auth('pos')->user(), (int) $companyId, $request->input('payment_method'), $transaction->payment_method === 'qr_payment');
+
         // Snapshot the OLD line items before they are replaced, so the edit can
         // reconcile inventory (restore old qty, deduct new qty) when the owner
         // opted into restock-on-void. Captured now — items are deleted below.
@@ -4798,6 +4808,7 @@ class PosController extends Controller
 
         DB::beginTransaction();
         try {
+            \App\Services\ProspectiveQuotaGuard::context((int)$companyId, false);
             // Re-read under a row lock: a raced / replayed DELETE must not
             // restock twice or bank a second quota ledger row for one bill.
             // (sqlite ignores FOR UPDATE — MySQL is where the race lives.)
@@ -4890,6 +4901,7 @@ class PosController extends Controller
      */
     private function recordBillDeletionForQuota(PosTransaction $transaction, int $companyId): void
     {
+        \App\Services\ProspectiveQuotaRetention::capture(collect([$transaction]), 'single-delete', (int)$transaction->id);
         if ($transaction->status !== 'completed'
             || $transaction->invoice_mode === 'local'
             || ($transaction->transaction_type ?? 'sale') === 'return') {
@@ -4952,6 +4964,7 @@ class PosController extends Controller
     {
         try {
             DB::transaction(function () use ($transaction, $companyId, $newPraStatus) {
+                $quotaContext = \App\Services\ProspectiveQuotaGuard::context((int)$companyId, false);
                 $locked = PosTransaction::withoutGlobalScope('hide_archived')
                     ->where('company_id', $companyId)
                     ->where('id', $transaction->id)
@@ -4962,6 +4975,7 @@ class PosController extends Controller
                     throw new \RuntimeException('NOT_PROVISIONAL');
                 }
 
+                if ($quotaContext) \App\Services\ProspectiveQuotaGuard::assertPra((int)$companyId,$quotaContext);
                 $locked->update([
                     // Serial split (owner rule Jul 2026): the L-series number changes
                     // to a real POS fiscal serial ONLY when the bill actually goes to
@@ -5945,6 +5959,7 @@ class PosController extends Controller
 
         $company = Company::find($companyId);
         return DB::transaction(function () use ($companyId, $company, $id) {
+            \App\Services\ProspectiveQuotaGuard::lockCompanyForWrite((int)$companyId);
             $tx = PosTransaction::where('company_id', $companyId)->where('id', $id)
                 ->lockForUpdate()->first();
             if (!$tx) {
@@ -5996,6 +6011,7 @@ class PosController extends Controller
         $newNumber = null;
         $newTotal  = null;
         DB::transaction(function () use ($companyId, $company, $id, $method, $reportingOn, &$newNumber, &$newTotal) {
+                $quotaContext = \App\Services\ProspectiveQuotaGuard::context((int)$companyId, false);
                 // Race-safe: lock the row and re-verify it is still a genuine provisional.
                 // The F10 modal fires promote on Enter, so double-Enter is a real
                 // double-promote path — the lock + re-check closes it.
@@ -6029,6 +6045,7 @@ class PosController extends Controller
                     throw new \RuntimeException('MONTH_CLOSED');
                 }
 
+                if ($quotaContext) \App\Services\ProspectiveQuotaGuard::assertPra((int)$companyId,$quotaContext);
                 $payMethod = $method ?? $tx->payment_method;
 
                 // Recompute tax from the STORED bill for the chosen method — mirrors
@@ -9309,7 +9326,7 @@ class PosController extends Controller
             $deleted = PosTransaction::withoutGlobalScope('hide_archived')->whereIn('id', $ids)->delete();
 
             $thisMonth = $rows->filter($inThisMonth);
-            \App\Models\PosLocalSeriesReset::create([
+            $quotaReset = \App\Models\PosLocalSeriesReset::create([
                 'company_id' => $companyId,
                 'reset_date' => now()->toDateString(),
                 'deleted_final_count' => $thisMonth->reject($isProvisional)->count(),
@@ -9319,6 +9336,7 @@ class PosController extends Controller
                 'to_date' => $dates->last(),
                 'performed_by' => $user->id,
             ]);
+            \App\Services\ProspectiveQuotaRetention::capture($rows, 'archive-clear', (int)$quotaReset->id);
         });
 
         $next = $this->previewNextLocalNumber($companyId);
@@ -11608,6 +11626,7 @@ class PosController extends Controller
             && $newStockQty !== null && (int) $newStockQty !== (int) ($oldStockQty ?? PHP_INT_MIN)
         ) {
             \DB::transaction(function () use ($companyId, $product, $newStockQty, $stockBranchId, &$data) {
+            \App\Services\ProspectiveQuotaGuard::lockCompanyForWrite((int)$companyId);
                 $branchId = \App\Services\BranchStockService::writeBranchId($companyId, $stockBranchId);
                 $stockRow = \App\Models\InventoryStock::firstOrCreate(
                     ['company_id' => $companyId, 'product_id' => $product->id, 'branch_id' => $branchId],
@@ -11654,6 +11673,7 @@ class PosController extends Controller
         }
 
         \DB::transaction(function () use ($product, $data, $companyId, $preparedRecipeRows) {
+            \App\Services\ProspectiveQuotaGuard::lockCompanyForWrite((int)$companyId);
             $product->update($data);
             if ($preparedRecipeRows !== null) {
                 \App\Services\ProductRecipeEditor::sync(
@@ -16729,6 +16749,7 @@ class PosController extends Controller
                         }
                     }
                     \App\Services\PosFinancialHistory::captureDeleted($deleteRows, (int) $report->id, 'day-close');
+                    \App\Services\ProspectiveQuotaRetention::capture($deleteRows, 'day-close', (int)$report->id);
                     foreach ($deleteRows as $archiveRow) {
                         app(\App\Services\OptionalLocalBillArchive::class)->capture($archiveRow, 'pos');
                     }

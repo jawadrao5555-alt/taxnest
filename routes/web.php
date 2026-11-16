@@ -127,6 +127,9 @@ Route::get('/share/invoice/{uuid}', [ShareController::class, 'show']);
 Route::get('/share/invoice/{uuid}/pdf', [ShareController::class, 'pdf'])->name('share.invoice.pdf');
 
 // Meta WhatsApp Cloud API status webhook (per-company; public + CSRF-exempt).
+Route::post('/api/diagnostics/backup-evidence/{source}', [\App\Http\Controllers\Diagnostics\BackupEvidenceController::class, 'store'])
+    ->whereUuid('source')->middleware('throttle:60,1')->withoutMiddleware($statelessMachine);
+
 Route::get('/webhooks/whatsapp/{company}', [\App\Http\Controllers\WhatsAppWebhookController::class, 'verify'])->whereNumber('company')->withoutMiddleware($statelessMachine);
 Route::post('/webhooks/whatsapp/{company}', [\App\Http\Controllers\WhatsAppWebhookController::class, 'receive'])->whereNumber('company')->withoutMiddleware($statelessMachine);
 
@@ -398,6 +401,7 @@ Route::middleware(['pos.auth'])->prefix('pos/local-bills')->group(function () {
 Route::middleware('web')->post('/branch/switch', [BranchSwitchController::class, 'switch'])->name('branch.switch');
 
 Route::middleware(['auth', 'company', 'rate_limit_company', 'company.approval'])->group(function () {
+    Route::match(['get','post'], '/madadgar/di-read', [\App\Http\Controllers\DiMadadgarReadController::class, 'show'])->name('di.madadgar.read')->middleware('throttle:20,1');
     Route::post('/survey/{id}/respond', [\App\Http\Controllers\PosSurveyController::class, 'respond'])->defaults('survey_guard', 'web')->name('di.survey.respond');
     Route::post('/survey/{id}/dismiss', [\App\Http\Controllers\PosSurveyController::class, 'dismiss'])->defaults('survey_guard', 'web')->name('di.survey.dismiss');
 
@@ -427,6 +431,8 @@ Route::middleware(['auth', 'company', 'rate_limit_company', 'company.approval'])
     Route::post('/notifications/{id}/dismiss', [DashboardController::class, 'dismissNotification'])->name('notifications.dismiss');
     Route::post('/notifications/dismiss-all', [DashboardController::class, 'dismissAllNotifications'])->name('notifications.dismiss-all');
 
+    Route::get('/billing/checkout', [\App\Http\Controllers\PackageCheckoutController::class, 'index'])->name('billing.package-checkout');
+    Route::post('/billing/checkout', [\App\Http\Controllers\PackageCheckoutController::class, 'select'])->name('billing.package-checkout.select');
     Route::get('/billing/plans', [BillingController::class, 'plans'])->name('billing.plans');
     Route::get('/billing/documents/invoices/{invoice}', [\App\Http\Controllers\SubscriptionDocumentController::class, 'companyInvoice'])->whereNumber('invoice')->name('billing.documents.invoice');
     Route::get('/billing/documents/receipts/{payment}', [\App\Http\Controllers\SubscriptionDocumentController::class, 'companyReceipt'])->whereNumber('payment')->name('billing.documents.receipt');
@@ -475,6 +481,7 @@ Route::middleware(['auth', 'company', 'rate_limit_company', 'company.approval'])
         Route::post('/invoice/{invoice}/validate', [InvoiceController::class, 'validateInvoice']);
         Route::post('/invoice/{invoice}/validate-fbr', [InvoiceController::class, 'validateFbrPayload']);
         Route::post('/invoice/{invoice}/confirm-fbr', [InvoiceController::class, 'confirmFbrStatus']);
+        Route::post('/invoice/{invoice}/retry-inventory', [\App\Http\Controllers\InvoiceInventoryController::class, 'retry'])->name('invoice.retry-inventory');
         Route::post('/invoice/{invoice}/update-fbr-number', [InvoiceController::class, 'updateFbrNumber']);
         Route::post('/invoice/{invoice}/duplicate', [InvoiceController::class, 'duplicate'])->name('invoice.duplicate');
         Route::delete('/invoice/{invoice}', [InvoiceController::class, 'destroy'])->name('invoice.destroy');
@@ -834,6 +841,7 @@ Route::post('/api/pos-app/fcm-token/clear', [\App\Http\Controllers\PosAppPushCon
     ->middleware('throttle:30,1')->withoutMiddleware($statelessMachine)->name('pos.app.fcm-clear');
 
 Route::middleware(['pos.auth'])->prefix('pos/madadgar')->group(function () {
+    Route::get('/usage', [\App\Http\Controllers\MadadgarUsageController::class, 'show'])->name('pos.madadgar.usage');
     Route::get('/history', [\App\Http\Controllers\MadadgarController::class, 'history'])->name('pos.madadgar.history');
     Route::post('/message', [\App\Http\Controllers\MadadgarController::class, 'message'])->name('pos.madadgar.message')->middleware('throttle:20,1');
     Route::post('/escalate', [\App\Http\Controllers\MadadgarController::class, 'escalate'])->name('pos.madadgar.escalate')->middleware('throttle:10,1');
@@ -855,6 +863,7 @@ Route::post('/api/fbr-pos-app/fcm-token/clear', [\App\Http\Controllers\PosAppPus
 // Madadgar for the FBR panel — fbrpos.auth ONLY, NO company.approval (pending
 // companies may chat), ALL roles. Same throttles as the PRA group.
 Route::middleware(['fbrpos.auth'])->prefix('fbr-pos/madadgar')->group(function () {
+    Route::get('/usage', [\App\Http\Controllers\MadadgarUsageController::class, 'show'])->name('fbrpos.madadgar.usage');
     Route::get('/history', [\App\Http\Controllers\MadadgarController::class, 'history'])->name('fbrpos.madadgar.history');
     Route::post('/message', [\App\Http\Controllers\MadadgarController::class, 'message'])->name('fbrpos.madadgar.message')->middleware('throttle:20,1');
     Route::post('/escalate', [\App\Http\Controllers\MadadgarController::class, 'escalate'])->name('fbrpos.madadgar.escalate')->middleware('throttle:10,1');
@@ -951,6 +960,8 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     Route::post('/suggestions', [\App\Http\Controllers\FeatureSuggestionController::class, 'store'])->name('pos.suggestions.store')->middleware('throttle:10,1');
     Route::post('/payment-proof', [\App\Http\Controllers\PaymentProofController::class, 'store'])
         ->name('pos.payment-proof.store')->middleware('throttle:6,1');
+    Route::get('/billing/checkout', [\App\Http\Controllers\PackageCheckoutController::class, 'index'])->name('pos.package-checkout');
+    Route::post('/billing/checkout', [\App\Http\Controllers\PackageCheckoutController::class, 'select'])->name('pos.package-checkout.select');
     Route::post('/settings/theme', [PosController::class, 'updateTheme'])->name('pos.settings.theme');
     // Dark mode (owner video, 25 Aug 2026): per-USER preference, like the
     // language pick above — the Ctrl+K palette used to flip the class in the
@@ -1391,6 +1402,8 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
             Route::post('/inventory/stock-in/{id}/cancel', [PosStockInController::class, 'cancel'])->whereNumber('id')->name('pos.inventory.stock-in.cancel');
         });
         Route::get('/team', [PosController::class, 'posTeam'])->name('pos.team');
+        Route::get('/team/online-payment-policy', [\App\Http\Controllers\PosOnlinePaymentPolicyController::class, 'index'])->name('pos.team.online-payment-policy');
+        Route::put('/team/online-payment-policy/{id}', [\App\Http\Controllers\PosOnlinePaymentPolicyController::class, 'update'])->whereNumber('id')->name('pos.team.online-payment-policy.update');
         Route::post('/team/cashier', [PosController::class, 'storeCashier'])->name('pos.team.store-cashier');
         Route::put('/team/cashier/{id}', [PosController::class, 'updateCashier'])->name('pos.team.update-cashier');
         Route::post('/team/cashier/{id}/toggle', [PosController::class, 'toggleCashier'])->name('pos.team.toggle-cashier');
@@ -1617,6 +1630,15 @@ Route::post('/admin/login', [AdminAuthController::class, 'login']);
 Route::post('/admin/logout', [AdminAuthController::class, 'logout'])->name('admin.logout');
 
 Route::prefix('admin')->middleware(['admin.auth'])->group(function () {
+    Route::get('/companies/{companyId}/pilot-fiscal-control', [\App\Http\Controllers\SaasAdmin\PilotFiscalControlController::class, 'show'])->whereNumber('companyId')->name('saas.admin.pilot-fiscal-control');
+    Route::post('/companies/{companyId}/pilot-fiscal-control', [\App\Http\Controllers\SaasAdmin\PilotFiscalControlController::class, 'update'])->whereNumber('companyId')->name('saas.admin.pilot-fiscal-control.update');
+    Route::get('/platform-expenses', [\App\Http\Controllers\SaasAdmin\PlatformExpenseController::class, 'index'])->name('saas.admin.platform-expenses');
+    Route::post('/platform-expenses', [\App\Http\Controllers\SaasAdmin\PlatformExpenseController::class, 'store'])->name('saas.admin.platform-expenses.store');
+    Route::post('/platform-expenses/{id}/reverse', [\App\Http\Controllers\SaasAdmin\PlatformExpenseController::class, 'reverse'])->whereNumber('id')->name('saas.admin.platform-expenses.reverse');
+    Route::get('/companies/{companyId}/device-proofs', [\App\Http\Controllers\SaasAdmin\ReviewedDeviceProofController::class, 'index'])->whereNumber('companyId')->name('saas.admin.device-proofs.index');
+    Route::post('/companies/{companyId}/device-proofs', [\App\Http\Controllers\SaasAdmin\ReviewedDeviceProofController::class, 'store'])->whereNumber('companyId')->name('saas.admin.device-proofs.store');
+    Route::post('/companies/{companyId}/device-proofs/{id}/revoke', [\App\Http\Controllers\SaasAdmin\ReviewedDeviceProofController::class, 'revoke'])->whereNumber(['companyId','id'])->name('saas.admin.device-proofs.revoke');
+
     Route::get('/companies/{companyId}/local-bill-records', [\App\Http\Controllers\SaasAdmin\AdminLocalBillRecordController::class, 'index'])->whereNumber('companyId')->name('saas.admin.local-bill-records');
     Route::put('/companies/{companyId}/local-bill-records', [\App\Http\Controllers\SaasAdmin\AdminLocalBillRecordController::class, 'update'])->whereNumber('companyId')->name('saas.admin.local-bill-records.update');
     Route::get('/companies/{companyId}/local-bill-records/{id}/download', [\App\Http\Controllers\SaasAdmin\AdminLocalBillRecordController::class, 'download'])->whereNumber(['companyId', 'id'])->middleware('throttle:20,1')->name('saas.admin.local-bill-records.download');
@@ -1712,6 +1734,7 @@ Route::prefix('admin')->middleware(['admin.auth'])->group(function () {
     Route::post('/tutorial-videos/{id}/toggle-published', [\App\Http\Controllers\TutorialVideoAdminController::class, 'togglePublished'])->name('admin.tutorial-videos.toggle-published');
     Route::post('/tutorial-videos/{id}/toggle-public', [\App\Http\Controllers\TutorialVideoAdminController::class, 'togglePublic'])->name('admin.tutorial-videos.toggle-public');
     Route::post('/tutorial-videos/{id}/gate', [\App\Http\Controllers\TutorialVideoAdminController::class, 'setGate'])->name('admin.tutorial-videos.gate');
+    Route::post('/tutorial-videos/{id}/metadata', [\App\Http\Controllers\TutorialVideoAdminController::class, 'metadata'])->name('admin.tutorial-videos.metadata');
     Route::post('/tutorial-videos/{id}/role', [\App\Http\Controllers\TutorialVideoAdminController::class, 'setRole'])->name('admin.tutorial-videos.role');
 
     // POS Feature Suggestions review (owner request 20 Jul 2026)
@@ -1730,6 +1753,8 @@ Route::prefix('admin')->middleware(['admin.auth'])->group(function () {
     Route::delete('/surveys/{id}', [\App\Http\Controllers\PosSurveyController::class, 'adminDestroy'])->name('admin.surveys.destroy');
 
     // Madadgar AI bot — chat logs + settings (owner request 22 Jul 2026)
+    Route::get('/companies/{companyId}/ai-usage', [\App\Http\Controllers\MadadgarUsageController::class, 'show'])->name('admin.company-ai-usage');
+    Route::post('/companies/{companyId}/ai-usage', [\App\Http\Controllers\MadadgarUsageController::class, 'configure'])->name('admin.company-ai-budget');
     Route::get('/madadgar-chats', [\App\Http\Controllers\MadadgarController::class, 'adminChats'])->name('admin.madadgar-chats');
     Route::post('/madadgar-settings', [\App\Http\Controllers\MadadgarController::class, 'adminSettings'])->name('admin.madadgar-settings');
 
@@ -1790,8 +1815,8 @@ Route::prefix('admin')->middleware(['admin.auth'])->group(function () {
     Route::post('/groups/{id}/detach/{companyId}', [AdminGroupController::class, 'detach'])->name('saas.admin.groups.detach');
 
     Route::get('/companies', [AdminCompanyController::class, 'index'])->name('saas.admin.companies');
-    Route::get('/companies/create', [AdminCompanyController::class, 'create'])->name('saas.admin.companies.create');
-    Route::post('/companies', [AdminCompanyController::class, 'store'])->name('saas.admin.companies.store');
+    Route::get('/companies/create', [\App\Http\Controllers\SaasAdmin\AdminCompanyCreationController::class, 'create'])->name('saas.admin.companies.create');
+    Route::post('/companies', [\App\Http\Controllers\SaasAdmin\AdminCompanyCreationController::class, 'store'])->name('saas.admin.companies.store');
     Route::get('/companies/{id}', [AdminCompanyController::class, 'show'])->name('saas.admin.companies.show');
     Route::get('/companies/{id}/edit', [AdminCompanyController::class, 'edit'])->name('saas.admin.companies.edit');
     Route::put('/companies/{id}', [AdminCompanyController::class, 'update'])->name('saas.admin.companies.update');
@@ -1804,8 +1829,9 @@ Route::prefix('admin')->middleware(['admin.auth'])->group(function () {
     // transfer paid for outside the panel).
     Route::post('/companies/{id}/ai-pages', [AdminCompanyController::class, 'grantAiPages'])->name('saas.admin.companies.aiPages');
     Route::post('/companies/{id}/delete', [AdminCompanyController::class, 'softDelete'])->name('saas.admin.companies.delete');
-    Route::post('/companies/{id}/change-type', [AdminCompanyController::class, 'changeProductType'])->name('saas.admin.companies.changeType');
-    Route::post('/companies/{id}/clone-product', [AdminCompanyController::class, 'cloneToProduct'])->name('saas.admin.companies.cloneProduct');
+    Route::get('/companies/{id}/product-review', [\App\Http\Controllers\SaasAdmin\AdminProductTransitionController::class, 'productReview'])->name('saas.admin.companies.productReview');
+    Route::post('/companies/{id}/change-type', [\App\Http\Controllers\SaasAdmin\AdminProductTransitionController::class, 'changeProductType'])->name('saas.admin.companies.changeType');
+    Route::post('/companies/{id}/clone-product', [\App\Http\Controllers\SaasAdmin\AdminProductTransitionController::class, 'cloneToProduct'])->name('saas.admin.companies.cloneProduct');
     Route::post('/companies/{id}/reveal-access-code', [AdminCompanyController::class, 'revealFbrAccessCode'])->name('saas.admin.companies.revealAccessCode');
     Route::post('/companies/{id}/reset-password', [AdminCompanyController::class, 'resetAdminPassword'])->name('saas.admin.companies.resetPassword');
 
@@ -1981,6 +2007,9 @@ Route::post('/health/logout', [HealthAuthController::class, 'logout'])->name('he
 Route::post('/health/guest-language', [HealthController::class, 'guestLanguage'])->name('health.guest-language');
 
 Route::prefix('health')->middleware(['health.auth', 'company.approval'])->group(function () {
+    Route::get('/package-checkout', [\App\Http\Controllers\PackageCheckoutController::class, 'index'])->name('health.package-checkout');
+    Route::post('/package-checkout', [\App\Http\Controllers\PackageCheckoutController::class, 'select'])->name('health.package-checkout.select');
+    Route::post('/package-payment-proof', [\App\Http\Controllers\PaymentProofController::class, 'store'])->name('health.payment-proof.store')->middleware('throttle:6,1');
     Route::post('/survey/{id}/respond', [\App\Http\Controllers\PosSurveyController::class, 'respond'])->defaults('survey_guard', 'health')->name('health.survey.respond');
     Route::post('/survey/{id}/dismiss', [\App\Http\Controllers\PosSurveyController::class, 'dismiss'])->defaults('survey_guard', 'health')->name('health.survey.dismiss');
     Route::get('/', fn () => redirect()->route('health.dashboard'));
@@ -2586,7 +2615,7 @@ Route::prefix('health')->middleware(['health.auth', 'company.approval'])->group(
         ->name('health.my.earnings');
 });
 
-Route::prefix('fbr-pos')->middleware(['fbrpos.auth', 'company.approval'])->group(function () {
+Route::prefix('fbr-pos')->middleware(['fbrpos.auth', 'company.approval', \App\Http\Middleware\SchoolWorkspace::class])->group(function () {
     Route::post('/survey/{id}/respond', [\App\Http\Controllers\PosSurveyController::class, 'respond'])->defaults('survey_guard', 'fbrpos')->name('fbrpos.survey.respond');
     Route::post('/survey/{id}/dismiss', [\App\Http\Controllers\PosSurveyController::class, 'dismiss'])->defaults('survey_guard', 'fbrpos')->name('fbrpos.survey.dismiss');
     // Same shared users.dark_mode preference as PRA POS. This is deliberately
@@ -2599,6 +2628,8 @@ Route::prefix('fbr-pos')->middleware(['fbrpos.auth', 'company.approval'])->group
     Route::post('/whats-new/seen', [\App\Http\Controllers\AppUpdateController::class, 'markSeen'])->name('fbrpos.whats-new.seen');
     Route::post('/payment-proof', [\App\Http\Controllers\PaymentProofController::class, 'store'])
         ->name('fbrpos.payment-proof.store')->middleware('throttle:6,1');
+    Route::get('/billing/checkout', [\App\Http\Controllers\PackageCheckoutController::class, 'index'])->name('fbrpos.package-checkout');
+    Route::post('/billing/checkout', [\App\Http\Controllers\PackageCheckoutController::class, 'select'])->name('fbrpos.package-checkout.select');
     // Feature suggestion box (Task 1275) — admin/manager-only (in-controller
     // gate), 10/day cap; rows land product='fbrpos' in the shared admin view.
     Route::get('/suggestions', [\App\Http\Controllers\FeatureSuggestionController::class, 'fbrIndex'])->name('fbrpos.suggestions');
@@ -2613,9 +2644,19 @@ Route::prefix('fbr-pos')->middleware(['fbrpos.auth', 'company.approval'])->group
     Route::get('/hospital/day-close', [\App\Http\Controllers\FbrPosHospitalController::class, 'dayClose'])->name('fbrpos.hospital.day-close');
     Route::post('/hospital/day-close', [\App\Http\Controllers\FbrPosHospitalController::class, 'close'])->name('fbrpos.hospital.close');
     Route::post('/hospital/campus', [\App\Http\Controllers\FbrPosHospitalController::class, 'switchCampus'])->name('fbrpos.hospital.campus');
+    Route::get('/hospital/settings', [\App\Http\Controllers\HospitalWorkspaceSettingsController::class, 'index'])->name('fbrpos.hospital.settings');
+    Route::post('/hospital/settings/services', [\App\Http\Controllers\HospitalWorkspaceSettingsController::class, 'saveService'])->name('fbrpos.hospital.settings.services');
+    Route::post('/hospital/settings/campus', [\App\Http\Controllers\HospitalWorkspaceSettingsController::class, 'addCampus'])->name('fbrpos.hospital.settings.campus');
+    Route::get('/hospital/printing', [\App\Http\Controllers\HospitalReceiptSettingsController::class, 'index'])->name('fbrpos.hospital.printing');
+    Route::post('/hospital/printing', [\App\Http\Controllers\HospitalReceiptSettingsController::class, 'update'])->name('fbrpos.hospital.printing.update');
+    Route::get('/hospital/printing/preview', [\App\Http\Controllers\HospitalReceiptSettingsController::class, 'preview'])->name('fbrpos.hospital.printing.preview');
     Route::get('/hospital/invoices/{id}', [\App\Http\Controllers\FbrPosHospitalController::class, 'invoice'])->whereNumber('id')->name('fbrpos.hospital.invoice');
     Route::post('/hospital/invoices/{id}/payments', [\App\Http\Controllers\FbrPosHospitalController::class, 'payment'])->whereNumber('id')->name('fbrpos.hospital.payment');
     Route::get('/hospital/receipts/{id}', [\App\Http\Controllers\FbrPosHospitalController::class, 'receipt'])->whereNumber('id')->name('fbrpos.hospital.receipt');
+    Route::get('/school-fees/printing', [\App\Http\Controllers\SchoolReceiptSettingsController::class, 'index'])->name('fbrpos.school-fees.printing');
+    Route::post('/school-fees/printing', [\App\Http\Controllers\SchoolReceiptSettingsController::class, 'update'])->name('fbrpos.school-fees.printing.update');
+    Route::get('/school-fees/printing/preview', [\App\Http\Controllers\SchoolReceiptSettingsController::class, 'preview'])->name('fbrpos.school-fees.printing.preview');
+    Route::get('/school-fees/recover', [\App\Http\Controllers\FbrPosSchoolFeeController::class, 'recover'])->name('fbrpos.school-fees.recover');
     Route::get('/school-fees/settings', [\App\Http\Controllers\FbrPosSchoolFeeController::class, 'settings'])->name('fbrpos.school-fees.settings');
     Route::post('/school-fees/settings/fee-head', [\App\Http\Controllers\FbrPosSchoolFeeController::class, 'saveFeeHead'])->name('fbrpos.school-fees.fee-head');
     Route::post('/school-fees/settings/campus', [\App\Http\Controllers\FbrPosSchoolFeeController::class, 'addCampus'])->name('fbrpos.school-fees.add-campus');
@@ -2752,7 +2793,7 @@ Route::prefix('fbr-pos')->middleware(['fbrpos.auth', 'company.approval'])->group
     Route::get('/reports/export-csv', [FbrPosController::class, 'exportReportCsv'])->name('fbrpos.reports.export-csv');
 
     // 👥 Team management (FBR twin of /pos/team) — admin-only in controller.
-    Route::get('/team', [FbrPosController::class, 'fbrTeam'])->name('fbrpos.team');
+    Route::get('/team', [\App\Http\Controllers\PilotTeamController::class, 'index'])->name('fbrpos.team');
     Route::post('/team', [FbrPosController::class, 'fbrStoreTeamMember'])->name('fbrpos.team.store');
     Route::put('/team/{id}', [FbrPosController::class, 'fbrUpdateTeamMember'])->name('fbrpos.team.update');
     Route::post('/team/{id}/toggle', [FbrPosController::class, 'fbrToggleTeamMember'])->name('fbrpos.team.toggle');
@@ -3193,4 +3234,11 @@ Route::middleware(['admin.auth', 'throttle:60,1'])->group(function () {
     Route::post('/admin/reporting/oauth/authorize', [\App\Http\Controllers\Reporting\OAuthController::class, 'approve']);
     Route::get('/admin/reporting/connections', [\App\Http\Controllers\Reporting\OAuthController::class, 'connections']);
     Route::post('/admin/reporting/connections/{id}/revoke', [\App\Http\Controllers\Reporting\OAuthController::class, 'revoke'])->whereUuid('id');
+});
+
+Route::middleware('auth')->prefix('profile/greetings')->name('greetings.')->group(function () {
+    Route::get('/', [\App\Http\Controllers\GreetingPreferencesController::class, 'index'])->name('index');
+    Route::post('/', [\App\Http\Controllers\GreetingPreferencesController::class, 'save'])->name('save');
+    Route::post('/recipient', [\App\Http\Controllers\GreetingPreferencesController::class, 'recipient'])->name('recipient');
+    Route::post('/preview', [\App\Http\Controllers\GreetingPreferencesController::class, 'preview'])->name('preview');
 });

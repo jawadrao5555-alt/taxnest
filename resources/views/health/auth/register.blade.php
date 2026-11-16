@@ -49,9 +49,12 @@
 
             <form method="POST" action="{{ url('/health/register') }}" class="space-y-5">
                 @csrf
-                @if($pickedPlanName)
-                    <input type="hidden" name="requested_plan" value="{{ request('plan') }}">
-                @endif
+<label for="required-signup-package" class="block text-sm font-semibold">{{ __('billing_policy.plan') }}</label>
+                <select id="required-signup-package" name="requested_plan" required class="w-full rounded-xl border-gray-300">
+                    <option value="">{{ __('billing_policy.choose_plan') }}</option>
+                    @foreach(($registrationPlans ?? collect()) as $signupPlan)<option value="{{ $signupPlan->name }}" @selected(old('requested_plan', $pickedPlanName ?? '') === $signupPlan->name)>{{ $signupPlan->name }}</option>@endforeach
+                </select>
+                @include('billing._signup-policy')
 
                 <div>
                     <label class="block text-xs font-bold uppercase tracking-wide text-gray-600 mb-2">{{ __('health.org_type') }}</label>

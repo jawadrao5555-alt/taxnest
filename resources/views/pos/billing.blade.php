@@ -10,6 +10,8 @@
                 <p class="text-gray-500 dark:text-gray-400 mt-2">Annual billing — pick a plan, start selling</p>
             </div>
 
+            @include('billing._policy-status', ['policySubscription' => $currentSubscription])
+
             @if($currentSubscription && $currentSubscription->entitlementPlan())
             <div class="bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-700 rounded-xl p-4 mb-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                 <div class="flex items-center gap-3">
@@ -58,10 +60,6 @@
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
                 @foreach($plans as $plan)
                 @php
-                    $yearlyTotal = round($plan->sale_price);
-                    $perMonth = round($plan->sale_price / 12);
-                    $hasOffer = $plan->sale_percent > 0;
-                    $compareYearly = $hasOffer ? round($plan->price) : 0;
                     $isCurrent = $currentSubscription && $currentSubscription->pricing_plan_id === $plan->id;
                     $isPopular = $plan->name === 'Business';
                 @endphp
@@ -77,16 +75,7 @@
                         @endif
                         <h3 class="text-lg font-bold text-gray-900 dark:text-gray-100">{{ $plan->name }}</h3>
 
-                        <div class="mt-4 mb-1">
-                            @if($hasOffer)
-                            <div class="mb-1.5"><span class="inline-block px-2 py-0.5 bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300 rounded-full text-[11px] font-bold">{{ $plan->sale_badge }}</span></div>
-                            <span class="text-base text-gray-400 line-through mr-1">PKR {{ number_format($compareYearly) }}</span>
-                            @endif
-                            <span class="text-3xl font-black text-gray-900 dark:text-gray-100">PKR {{ number_format($yearlyTotal) }}</span>
-                            <span class="text-gray-400 text-sm">/year</span>
-                        </div>
-                        <p class="text-xs text-gray-400">PKR {{ number_format($perMonth) }}/mo effective</p>
-                        @if($hasOffer)<p class="text-xs text-purple-600 font-medium mt-0.5">Save PKR {{ number_format($compareYearly - $yearlyTotal) }}</p>@endif
+                        @include('billing._configured-cycle-quote', ['plan' => $plan, 'company' => $company, 'quoteCheckoutRoute' => 'pos.package-checkout'])
 
                         @php
                             $prevPlan = $loop->index > 0 ? ($plans[$loop->index - 1] ?? null) : null;
@@ -342,7 +331,7 @@
                     </span>
                     <span class="flex items-center gap-1.5">
                         <svg class="w-4 h-4 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
-                        3-day free trial
+                        {{ __('billing_policy.heading') }}
                     </span>
                 </div>
             </div>

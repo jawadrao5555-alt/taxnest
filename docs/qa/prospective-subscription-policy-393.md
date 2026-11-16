@@ -1,0 +1,47 @@
+# Prospective selected-package contract
+
+Owner chose this new-registration policy on 15 November2026. It supersedes the old desired-versus-preserved ambiguity **only for new public registrations after the additive lifecycle migration**. Existing subscriptions, trials, caps, grants and purchased snapshots are never backfilled. Direct legacy/admin trial assignment retains its existing rules. Before migration, the compatibility path remains legacy and must not be represented as v1 rollout complete.
+
+The server requires an explicit same-product sellable non-trial package on new DI/PRA/FBR/Healthcare public signup. Missing/foreign/retired/conflicting selections are rejected; no package or price is guessed. Healthcare's existing closed-by-default registration gate is unchanged. A nullable immutable `lifecycle_snapshot` records `selected_trial_v1`, UTC timestamps and the frozen selected package. The migration is forward-only to retain contractual evidence.
+
+The trial lasts exactly72 hours. Only bill-count allowance is unlimited; user/branch/product/department/AI limits and feature flags remain those of the selected snapshot. Historical trial-evaluates-everything bypasses are explicitly excluded for v1. Add-on purchase and fiscal verification are not granted by trial status. School/Hospital fiscal guards remain unchanged.
+
+Verified full payment during the trial confirms a paid row whose term starts at the original trial end. Its effective feature reader continues using the original trial snapshot until then, including when the paid quote has a different tier or revised features. Late activation starts at verification time, not a past trial date. Same-package early renewal retains remaining paid time; renewal in/after grace starts at verification time. Prior purchased entitlement periods are frozen so future renewal features do not activate early. All timestamps are UTC in the contract; legacy date columns are rendered/stored in the application's existing timezone.
+
+Grace exists only after a confirmed paid expiry and ends exactly7 days later. The authoritative access gate blocks new billable operations at the exclusive grace end. Existing scoped history and receipt PDF/reprint routes remain read-only and accessible. Explicit existing company suspension, grants and other authorization gates remain separate. No expired trial receives paid grace automatically.
+
+Actual approval still uses the existing proof/company transaction and idempotent documents; no alternate money ledger or external charge is added. Partial verification cannot activate a v1 term. Original legacy partial-payment evidence behavior is preserved for legacy contracts. Repeated proof approval produces one paid row, invoice and receipt. New module tests cover early/late/boundary/renewal states, unchanged old caps, feature limits, required package choices across four public panels and forward-only migration preservation. Native concurrency, desktop/mobile and exact integrated-head CI are separate required evidence, not implied by these focused tests.
+
+## First paid allowance and retained PRA counts
+
+The frozen first paid start excludes unlimited-trial consumption from the first paid calendar-month allowance. Subsequent early renewals retain that same boundary; they do not reset the current month's count. DI retains its existing `COALESCE(submitted_at, created_at)` definition, so a draft typed during trial but submitted after paid activation consumes paid allowance. FBR/School/Hospital retain their existing creation-time definitions.
+
+New-policy PRA deletions retain only company/bill identity, original timestamp, quota eligibility, and exact deletion-source identity. No invoice number, customer, lines or amount is copied. Single delete, archive clear and day close write this evidence atomically with deletion, with a unique original-bill identity. Live/retained anti-join prevents double counting. The existing legacy daily aggregates are not split or backfilled. An unexplained aggregate or missing required schema holds quota for review instead of inventing either consumed or free allowance. Historical null-policy companies keep the old calculation unchanged. Tombstones survive rollback and company bin/restore, and follow the existing audited, authorized company purge transaction.
+
+Day-close source validation uses a separately frozen original `business_date` (or the existing created-date fallback while the original bill still exists), bounded to the report month. It does not substitute `sold_at` or count earlier backlog against the report's month. Bill quota itself retains the existing creation-time basis. The cross-month test includes older backlog, an April bill, a May 1 after-midnight bill belonging to April 30, and a May business-day bill. Existing tombstones without this newly added fact are not backfilled or inferred; an unexplained day-close total remains a review hold.
+
+## Atomic prospective admission
+
+New-policy PRA checkout, restaurant settlement and provisional promotion recheck capacity with current locking reads after the tenant lock, in the same transaction as the final bill. Existing UUID recovery precedes the new charge. The original-created timestamp meaning is preserved: a trial-created PRA provisional promoted later is the same original bill, not a second paid-period bill. DI retains its distinct submitted-time definition.
+
+DI canonical reservation serializes prospective company capacity before the invoice claim. Current reads include accepted production rows and production submitting/unknown-result claims. The existing durable fiscal claim is the reservation; there is no separate commercial ledger to drift. Unknown results retain capacity, definite rejection releases it, sandbox/demo never consume production bill allowance, and an expired retry cannot relabel production evidence as sandbox. Existing acknowledged/in-flight identity cannot reserve twice. No network call occurs under the new lock.
+
+School/Hospital admission also reloads current policy/count rows under the tenant lock. Receipt recovery precedes access/cap checks. Local account balances, partial-payment sums and closing snapshots use current locking reads, including when a caller has an outer repeatable-read transaction. Hospital partial settlement creates no new bill slot. Required native two-process old-snapshot probes remain separate from SQLite focused tests.
+
+### Prospective write lock order
+
+Prospective quota admission, DI acknowledgement/local inventory repair, and stock receiving acquire the company row before invoice, product, stock, or movement rows. This also prevents the implicit company foreign-key shared lock on a movement/posting INSERT from reversing the company-first quota order. The helper is ordering-only: expired access never prevents recording an already accepted fiscal acknowledgement or receiving stock. Legacy SQL-NULL policy rows retain their prior behavior. Outer stock mutation callers must acquire the same company lock before subordinate locks; a nested service lock cannot repair an already reversed order.
+
+Focused local verification: 43 tests / 209 assertions passed, including expired-access accepted acknowledgement and receiving without any HTTP request. Native overlap acceptance is a separate required hosted probe, not inferred from SQLite results.
+
+### Prospective reminders, without new delivery authority
+
+The existing trial email selector now recognizes frozen selected-package trials instead of mistaking their paid catalogue carrier for a paid subscription. Existing recipient resolution, two-day window, notification deduplication and mail settings are unchanged. Confirmed early payment suppresses a redundant payment demand during the remaining trial. No new grace emails, channels or provider settings are introduced.
+
+Read-only in-app notices derive trial, confirmed future paid start, paid end and grace end from validated frozen policy timestamps. Grace repeats on later page visits (the shared banner's existing daily dismissal key remains); after grace the access/lock flow owns the message. School/Hospital and Healthcare notices use their explicit panel guard. Legacy SQL-NULL reminders remain unchanged; malformed policy never invents dates. Early-paid trial days use frozen trial end even when the replacement paid row has no legacy trial_ends_at.
+
+This is bounded #301 workstream 3 reminder integration, not acceptance of all original 47 requirements. Synthetic mail/notification tests do not prove actual email delivery; final-head CI and rendered desktop/mobile review remain separate.
+
+### Bounded reminder browser acceptance
+
+The existing mandatory `prospective-billing-policy` browser journey additionally logs into six disposable School tenants (three frozen phases at desktop/mobile widths). Actual dashboard language forms select English, Urdu and Roman Urdu; assertions require exact translated text/deadline, Urdu direction, bounded text, legible leading, unobstructed notice and explicit scrolled synthetic screenshot names. Trial and confirmed fixtures use real frozen policy construction; grace fixtures use historical synthetic approval time. No email command, collection, live payment or fiscal endpoint is invoked. This does not certify screen-reader support or physical devices. Executable browser checks still require hosted execution and subsequent pixel review.

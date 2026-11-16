@@ -73,16 +73,38 @@
                     </div>
                     @endif
 
-                    <form method="POST" action="/fbr-pos/register" class="px-6 pb-6 pt-4 space-y-4" x-data="{ posType: '{{ old('pos_type', 'retail') }}' }">
+                    @php
+                        $signupCycleQuotes = [];
+                        foreach (($registrationPlans ?? collect()) as $signupPlan) {
+                            foreach (\App\Services\SubscriptionAssignmentService::cyclesForPlan($signupPlan) as $signupCycle) {
+                                $signupCycleQuotes[$signupPlan->name][$signupCycle] = \App\Services\SubscriptionAssignmentService::computePrice($signupPlan, $signupCycle)['final_price'];
+                            }
+                        }
+                    @endphp
+                    <form method="POST" action="/fbr-pos/register" class="px-6 pb-6 pt-4 space-y-4" x-data="{ posType: @js(old('pos_type', 'retail')), packageName: @js(old('requested_plan', $pickedPlanName ?? '')), billingCycle: @js(old('billing_cycle', request('billing_cycle', 'annual'))), cycleQuotes: @js($signupCycleQuotes) }">
                         @csrf
 
-                        {{-- Task 1484: carries the clicked package into the signup so
-                             approval activates exactly that one. Only ever holds a
-                             package the server already matched, and register()
-                             re-checks it anyway. --}}
-                        @if(!empty($pickedPlanName))
-                        <input type="hidden" name="requested_plan" value="{{ $pickedPlanName }}">
-                        @endif
+                        <div x-show="packageName" x-cloak>@include('billing._signup-policy')</div>
+                        <div id="signup-package-choice">
+                            <label for="requested-plan" class="block text-sm font-semibold">{{ __('school_workspace.package_choice') }}</label>
+                            <select id="requested-plan" name="requested_plan" required x-model="packageName" @change="billingCycle = 'annual'" class="w-full rounded-xl border-gray-300">
+                                <option value="">{{ __('billing_policy.choose_plan') }}</option>
+                                @foreach(($registrationPlans ?? collect()) as $registrationPlan)
+                                <option value="{{ $registrationPlan->name }}" @selected(old('requested_plan', $pickedPlanName ?? '') === $registrationPlan->name)>{{ $registrationPlan->name }}</option>
+                                @endforeach
+                            </select>
+                            <p class="text-xs text-gray-500 mt-1">{{ __('school_workspace.package_note') }}</p>
+                        </div>
+                        <div x-show="packageName" x-cloak>
+                            <label for="signup-billing-cycle" class="block text-sm font-semibold">Billing period</label>
+                            <select id="signup-billing-cycle" name="billing_cycle" x-model="billingCycle" class="w-full rounded-xl border-gray-300">
+                                <template x-for="(total, key) in (cycleQuotes[packageName] || {})" :key="key">
+                                    <option :value="key" x-text="key.replace('_', ' ') + ' · PKR ' + Number(total).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})"></option>
+                                </template>
+                            </select>
+                            <p>Payable package total: <span x-text="(cycleQuotes[packageName] || {})[billingCycle] === undefined ? 'Unavailable' : 'PKR ' + Number(cycleQuotes[packageName][billingCycle]).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})"></span></p>
+                        </div>
+                        <p class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm" x-show="['education','clinic','hospital'].includes(posType)" x-cloak>{{ __('school_workspace.pilot_registration') }}</p>
 
                         <div class="pt-1 pb-2">
                             <p class="text-xs font-semibold text-blue-600/60 uppercase tracking-wider">{{ __('pos.auth_select_business_type') }}</p>
@@ -168,7 +190,7 @@
                             <input id="password_confirmation" type="password" name="password_confirmation" required autocomplete="new-password" placeholder="{{ __('pos.auth_ph_reenter') }}" class="w-full rounded-xl text-sm text-gray-900 placeholder-gray-400 transition" style="background: rgba(255,255,255,0.7); border: 1px solid rgba(59,130,246,0.2); padding: 11px 14px; outline: none;" onfocus="this.style.borderColor='rgba(59,130,246,0.5)'; this.style.boxShadow='0 0 0 3px rgba(59,130,246,0.15)';" onblur="this.style.borderColor='rgba(59,130,246,0.2)'; this.style.boxShadow='none';">
                         </div>
 
-                        <button type="submit" class="w-full py-3 rounded-xl text-sm font-bold text-white transition-all duration-200" style="background: linear-gradient(135deg, #2563eb, #3b82f6); box-shadow: 0 4px 20px rgba(37, 99, 235, 0.4);" onmouseover="this.style.boxShadow='0 6px 28px rgba(37, 99, 235, 0.55)'; this.style.transform='translateY(-1px)';" onmouseout="this.style.boxShadow='0 4px 20px rgba(37, 99, 235, 0.4)'; this.style.transform='translateY(0)';">
+                        <button :disabled="Boolean(packageName) &amp;&amp; (cycleQuotes[packageName] || {})[billingCycle] === undefined" type="submit" class="w-full py-3 rounded-xl text-sm font-bold text-white transition-all duration-200" style="background: linear-gradient(135deg, #2563eb, #3b82f6); box-shadow: 0 4px 20px rgba(37, 99, 235, 0.4);" onmouseover="this.style.boxShadow='0 6px 28px rgba(37, 99, 235, 0.55)'; this.style.transform='translateY(-1px)';" onmouseout="this.style.boxShadow='0 4px 20px rgba(37, 99, 235, 0.4)'; this.style.transform='translateY(0)';">
                             {{ __('pos.auth_create_account') }}
                         </button>
 

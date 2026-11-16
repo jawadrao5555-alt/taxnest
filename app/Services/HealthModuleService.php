@@ -243,6 +243,7 @@ class HealthModuleService
                 return self::PLAN_FALLBACK_MODULES;
             }
 
+            if ($subscription->hasLifecycleSnapshot() && !ProspectiveSubscriptionPolicy::snapshot($subscription)) return [];
             $plan = $subscription->entitlementPlan();
 
             if (!$plan) {
@@ -250,7 +251,7 @@ class HealthModuleService
             }
 
             // A trial evaluates the whole product.
-            if ((bool) ($plan->is_trial ?? false)) {
+            if ((bool) ($plan->is_trial ?? false) && (!$subscription->hasLifecycleSnapshot())) {
                 return self::MODULES;
             }
 

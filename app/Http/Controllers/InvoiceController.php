@@ -209,6 +209,15 @@ class InvoiceController extends Controller
         $items = [];
         foreach ($source->items as $item) {
             $snapshot = $item->selling_snapshot;
+            if (!$snapshot && $item->inventory_snapshot) {
+                $posting = DB::table('di_invoice_inventory_postings')->where('company_id',$companyId)->where('invoice_item_id',$item->id)->where('direction','sale')->first();
+                if (!$posting) continue;
+                $returned = DB::table('di_invoice_inventory_postings')->where('source_posting_id',$posting->id)->sum('base_quantity');
+                $remaining = \Brick\Math\BigDecimal::of($posting->base_quantity)->minus((string)$returned);
+                if (!$remaining->isPositive()) continue;
+                $items[] = $item->only(['hs_code','pct_code','description','default_uom','price','mrp','tax_rate','schedule_type','sro_schedule_no','serial_no']) + ['product_id'=>$posting->product_id,'source_invoice_item_id'=>$item->id,'quantity'=>(string)$remaining,'selling_packing_id'=>'','price_includes_tax'=>false,'packings'=>[],'tax'=>0];
+                continue;
+            }
             if (!$snapshot) continue;
             $used = InvoiceItem::where('selling_snapshot->source_invoice_item_id', (int) $item->id)
                 ->whereHas('invoice', fn ($q) => $q->where('company_id', $companyId)->where('document_type', 'Credit Note'))->sum('quantity');
@@ -371,10 +380,13 @@ class InvoiceController extends Controller
         if (in_array($documentType, ['Credit Note', 'Debit Note']) && empty($request->reference_invoice_number)) {
             return back()->with('error', 'Reference invoice number is required for Credit/Debit Notes.')->withInput();
         }
+        $request->merge(['items' => \App\Services\DiInvoiceInventory::normalize($request->items, $company, $request->branch_id ? (int)$request->branch_id : null, $documentType, null, $request->reference_invoice_number)]);
 
         DB::beginTransaction();
         try {
+            \App\Services\ProspectiveQuotaGuard::lockCompanyForInvoiceWork((int)$companyId);
             \App\Services\DiSellingPacking::validateReturns($request->items, (int) $companyId, isset($invoice) ? (int) $invoice->id : null);
+            \App\Services\DiInvoiceInventory::validateReturns($request->items,(int)$companyId,isset($invoice)?(int)$invoice->id:null);
             $totals = \App\Services\DiInvoiceMath::totals($request->items);
             $totalValueExcludingST = $totals['value'];
             $totalSalesTax = $totals['tax'];
@@ -391,6 +403,7 @@ class InvoiceController extends Controller
 
             $invoice = Invoice::create([
                 'company_id' => $companyId,
+                ...\App\Services\DiInvoiceInventory::eligibility($company),
                 'invoice_number' => $invoiceNumber,
                 'internal_invoice_number' => $invoiceNumber,
                 'buyer_name' => $request->buyer_name,
@@ -430,6 +443,7 @@ class InvoiceController extends Controller
                 InvoiceItem::create([
                     'invoice_id' => $invoice->id,
                     ...(!empty($item['selling_snapshot']) ? ['selling_snapshot' => $item['selling_snapshot']] : []),
+                    ...(!empty($item['inventory_snapshot']) ? ['inventory_snapshot' => $item['inventory_snapshot']] : []),
                     'hs_code' => $item['hs_code'],
                     'schedule_type' => $scheduleType,
                     'pct_code' => $item['pct_code'] ?? ($hsResolved['pct_code'] ?? null),
@@ -659,6 +673,7 @@ class InvoiceController extends Controller
         if (in_array($documentType, ['Credit Note', 'Debit Note']) && empty($request->reference_invoice_number)) {
             return back()->with('error', 'Reference invoice number is required for Credit/Debit Notes.')->withInput();
         }
+        $request->merge(['items' => \App\Services\DiInvoiceInventory::normalize($request->items, $company, $request->branch_id ? (int)$request->branch_id : null, $documentType, $invoice, $request->reference_invoice_number)]);
 
         $oldData = [
             'buyer_name' => $invoice->buyer_name,
@@ -668,6 +683,7 @@ class InvoiceController extends Controller
 
         DB::beginTransaction();
         try {
+            \App\Services\ProspectiveQuotaGuard::lockCompanyForInvoiceWork((int)$companyId);
             // An FBR submit can claim the record after the edit form renders.
             // Re-check under the same row lock used for the item replacement.
             $lockedInvoice = Invoice::where('id', $invoice->id)->lockForUpdate()->firstOrFail();
@@ -675,8 +691,10 @@ class InvoiceController extends Controller
                 throw new \RuntimeException('Invoice is no longer editable because fiscal submission has started.');
             }
             $invoice = $lockedInvoice;
+            \App\Services\DiInvoiceInventory::releaseForEdit($invoice);
 
             \App\Services\DiSellingPacking::validateReturns($request->items, (int) $companyId, isset($invoice) ? (int) $invoice->id : null);
+            \App\Services\DiInvoiceInventory::validateReturns($request->items,(int)$companyId,isset($invoice)?(int)$invoice->id:null);
             $totals = \App\Services\DiInvoiceMath::totals($request->items);
             $totalValueExcludingST = $totals['value'];
             $totalSalesTax = $totals['tax'];
@@ -739,6 +757,7 @@ class InvoiceController extends Controller
                 InvoiceItem::create([
                     'invoice_id' => $invoice->id,
                     ...(!empty($item['selling_snapshot']) ? ['selling_snapshot' => $item['selling_snapshot']] : []),
+                    ...(!empty($item['inventory_snapshot']) ? ['inventory_snapshot' => $item['inventory_snapshot']] : []),
                     'hs_code' => $item['hs_code'],
                     'schedule_type' => $scheduleType,
                     'pct_code' => $item['pct_code'] ?? ($hsResolved['pct_code'] ?? null),
@@ -1132,6 +1151,7 @@ class InvoiceController extends Controller
 
             $claimed = DiFiscalSubmissionState::reserve($invoice->id, 'direct_mis', $fbrEnvironment);
             $locked = $claimed && DB::transaction(function () use ($claimed, $request) {
+                \App\Services\ProspectiveQuotaGuard::lockCompanyForInvoiceWork((int)$claimed->company_id);
                 $lockedInvoice = Invoice::whereKey($claimed->id)->lockForUpdate()->first();
                 if (!$lockedInvoice || !$lockedInvoice->is_fbr_processing) {
                     return false;
@@ -1336,6 +1356,7 @@ class InvoiceController extends Controller
         }
 
         $dispatched = \DB::transaction(function () use ($invoice) {
+            \App\Services\ProspectiveQuotaGuard::lockCompanyForInvoiceWork((int)$invoice->company_id);
             $locked = Invoice::where('id', $invoice->id)->lockForUpdate()->first();
             if (!in_array($locked->status, ['draft', 'failed']) || $locked->is_fbr_processing) {
                 return false;
@@ -1586,6 +1607,7 @@ class InvoiceController extends Controller
             ]);
             $fbrInvoiceNumber = trim((string) $request->input('fbr_invoice_number'));
             $confirmed = DB::transaction(function () use ($invoice, $fbrInvoiceNumber, $request, $user) {
+                \App\Services\ProspectiveQuotaGuard::lockCompanyForInvoiceWork((int)$invoice->company_id);
                 $locked = Invoice::withoutGlobalScopes()->whereKey($invoice->id)->lockForUpdate()->first();
                 if (!$locked || $locked->status !== 'pending_verification') {
                     return null;
@@ -1606,7 +1628,7 @@ class InvoiceController extends Controller
                     'totalValues' => $locked->total_amount,
                 ]);
                 $locked->integrity_hash = IntegrityHashService::generate($locked);
-                $locked->save();
+                \App\Services\DiInvoiceInventory::saveAccepted($locked);
                 $this->createLedgerEntry($locked);
                 \App\Models\OverrideLog::create([
                     'invoice_id' => $locked->id,
@@ -1644,6 +1666,7 @@ class InvoiceController extends Controller
         if ($action === 'reject') {
             $request->validate(['verification_reason' => 'required|string|min:10|max:500']);
             $rejected = DB::transaction(function () use ($invoice) {
+                \App\Services\ProspectiveQuotaGuard::lockCompanyForInvoiceWork((int)$invoice->company_id);
                 $locked = Invoice::withoutGlobalScopes()->whereKey($invoice->id)->lockForUpdate()->first();
                 if (!$locked || $locked->status !== 'pending_verification') {
                     return null;
@@ -1718,6 +1741,7 @@ class InvoiceController extends Controller
         try {
             $overrideEvidence = null;
             $invoice = DB::transaction(function () use ($invoice, $newNumber, $user, $request, &$overrideEvidence) {
+                \App\Services\ProspectiveQuotaGuard::lockCompanyForInvoiceWork((int)$invoice->company_id);
                 $locked = Invoice::withoutGlobalScopes()->whereKey($invoice->id)->lockForUpdate()->firstOrFail();
                 $isPending = $locked->status === 'pending_verification';
                 $isLockedCorrection = $user->role === 'super_admin' && $locked->status === 'locked';
@@ -1738,7 +1762,7 @@ class InvoiceController extends Controller
                     'totalValues' => $locked->total_amount,
                 ]);
                 $locked->integrity_hash = IntegrityHashService::generate($locked);
-                $locked->save();
+                \App\Services\DiInvoiceInventory::saveAccepted($locked);
                 $this->createLedgerEntry($locked);
                 $overrideEvidence = [
                     'old_reference_sha256' => hash('sha256', (string) $oldNumber),
@@ -2405,11 +2429,15 @@ class InvoiceController extends Controller
 
         DB::beginTransaction();
         try {
+            \App\Services\ProspectiveQuotaGuard::lockCompanyForInvoiceWork((int)$companyId);
             \App\Services\DiSellingPacking::validateReturns($invoice->items->map(fn ($item) => $item->toArray())->all(), (int) $companyId);
+            $inventoryLines = \App\Services\DiInvoiceInventory::normalize($invoice->items->map(fn($i)=>$i->toArray()+['product_id'=>$i->inventory_snapshot['product_id']??null,'source_invoice_item_id'=>$i->inventory_snapshot['source_invoice_item_id']??null])->all(), $invoice->company, $invoice->branch_id, $invoice->document_type, null, $invoice->reference_invoice_number);
+            \App\Services\DiInvoiceInventory::validateReturns($inventoryLines,(int)$companyId);
             $newInvoiceNumber = InvoiceNumberingService::generateNextNumber($companyId);
 
             $newInvoice = Invoice::create([
                 'company_id' => $invoice->company_id,
+                ...\App\Services\DiInvoiceInventory::eligibility($invoice->company),
                 'invoice_number' => $newInvoiceNumber,
                 'internal_invoice_number' => $newInvoiceNumber,
                 'buyer_name' => $invoice->buyer_name,
@@ -2444,9 +2472,10 @@ class InvoiceController extends Controller
                 'fbr_submission_hash' => null,
             ]);
 
-            foreach ($invoice->items as $item) {
+            foreach ($invoice->items as $index => $item) {
                 InvoiceItem::create([
                     'invoice_id' => $newInvoice->id,
+                    ...(!empty($inventoryLines[$index]['inventory_snapshot']) ? ['inventory_snapshot'=>$inventoryLines[$index]['inventory_snapshot']] : []),
                     ...($item->selling_snapshot ? ['selling_snapshot' => $item->selling_snapshot] : []),
                     'hs_code' => $item->hs_code,
                     'description' => $item->description,
@@ -2502,6 +2531,7 @@ class InvoiceController extends Controller
 
         DB::beginTransaction();
         try {
+            \App\Services\ProspectiveQuotaGuard::lockCompanyForInvoiceWork((int)$companyId);
             $lockedInvoice = Invoice::where('id', $invoice->id)->lockForUpdate()->firstOrFail();
             if (!in_array($lockedInvoice->status, ['draft', 'failed'], true) || $lockedInvoice->is_fbr_processing) {
                 throw new \RuntimeException('Invoice cannot be deleted after fiscal submission has started.');
@@ -2515,6 +2545,7 @@ class InvoiceController extends Controller
                 'user' => auth()->user()->name,
             ]);
 
+            \App\Services\DiInvoiceInventory::releaseForEdit($invoice);
             $invoice->items()->delete();
             $invoice->deliveries()->delete();
             $invoice->delete();
@@ -2622,10 +2653,11 @@ class InvoiceController extends Controller
                         ];
                     }
                     $invoice = DB::transaction(function () use ($invoice, $fbrNum, $environment, $successLog) {
+                        \App\Services\ProspectiveQuotaGuard::lockCompanyForInvoiceWork((int)$invoice->company_id);
                         $locked = Invoice::withoutGlobalScopes()->whereKey($invoice->id)->lockForUpdate()->firstOrFail();
                         DiFiscalSubmissionState::accepted($locked, $fbrNum, $environment, 'recovered_authoritative_fbr_log');
                         $locked->fbr_submission_date = $successLog->created_at;
-                        $locked->save();
+                        \App\Services\DiInvoiceInventory::saveAccepted($locked);
                         $this->createLedgerEntry($locked);
                         AuditLogService::log('invoice_fbr_success_recovered', 'Invoice', $locked->id, null, [
                             'environment' => $environment,
@@ -2729,6 +2761,7 @@ class InvoiceController extends Controller
             // this point, but can never leave a locked invoice without ledger
             // and required audit evidence.
             $invoice = DB::transaction(function () use ($invoice, $fbrNum, $environment, $response, $executionMs) {
+                \App\Services\ProspectiveQuotaGuard::lockCompanyForInvoiceWork((int)$invoice->company_id);
                 $locked = Invoice::withoutGlobalScopes()->whereKey($invoice->id)->lockForUpdate()->firstOrFail();
                 DiFiscalSubmissionState::accepted(
                     $locked,
@@ -2743,7 +2776,7 @@ class InvoiceController extends Controller
                     'invoiceDate' => $locked->invoice_date ?? $locked->created_at->format('Y-m-d'),
                     'totalValues' => $locked->total_amount,
                 ]);
-                $locked->save();
+                \App\Services\DiInvoiceInventory::saveAccepted($locked);
                 $this->createLedgerEntry($locked);
                 AuditLogService::log('invoice_fbr_success', 'Invoice', $locked->id, null, [
                     'fbr_invoice_number' => $fbrNum,

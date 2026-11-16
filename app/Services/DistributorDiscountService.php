@@ -70,7 +70,13 @@ class DistributorDiscountService
     {
         if (($s['version'] ?? null) !== self::VERSION) return 'Unsupported distributor quote version.';
         if ((int)($s['company_id'] ?? 0) !== $company->id || (int)($s['plan_id'] ?? 0) !== $plan->id) return 'Distributor quote does not belong to this company/package.';
-        if (($s['product_type'] ?? null) !== ($plan->product_type ?? 'di') || ($s['cycle'] ?? null) !== $cycle || !in_array($cycle, SubscriptionAssignmentService::cyclesForPlan($plan), true)) return 'Distributor quote product or billing cycle is inconsistent.';
+        $quotedPlan = $plan;
+        if (is_array($s['plan_snapshot'] ?? null)) {
+            $quotedPlan = new PricingPlan;
+            $quotedPlan->forceFill($s['plan_snapshot']);
+            if ((int) $quotedPlan->id !== (int) $plan->id || $quotedPlan->product_type !== $plan->product_type) return 'Frozen plan identity is inconsistent.';
+        }
+        if (($s['product_type'] ?? null) !== ($plan->product_type ?? 'di') || ($s['cycle'] ?? null) !== $cycle || !in_array($cycle, SubscriptionAssignmentService::cyclesForPlan($quotedPlan, true), true)) return 'Distributor quote product or billing cycle is inconsistent.';
         if ($cycle !== 'annual' && ((float) ($s['discount_percent'] ?? 0) !== 0.0 || (float) ($s['discount_amount'] ?? 0) !== 0.0)) return 'Distributor discounts apply only to annual purchases.';
         $snapshotAgent = ($s['agent_id'] ?? null) === null ? null : (int)$s['agent_id'];
         $companyAgent = $company->agent_id === null ? null : (int)$company->agent_id;

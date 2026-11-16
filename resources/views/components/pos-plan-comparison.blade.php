@@ -54,3 +54,14 @@
     :surface="$surface"
     :show-heading="$showHeading"
 />
+
+@if($surface === 'landing' && config('billing.shared_configured_cycles', false))
+<section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 my-6" aria-label="Configured billing periods">
+    @foreach($pcmpPlans as $plan)
+    <article class="rounded-xl border p-4 bg-white text-gray-900">
+        <h3 class="font-bold">{{ $plan->name }}</h3>
+        @include('billing._configured-cycle-quote', ['plan' => $plan, 'company' => null, 'signupRoute' => 'pos.register'])
+    </article>
+    @endforeach
+</section>
+@endif

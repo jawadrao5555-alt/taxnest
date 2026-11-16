@@ -152,7 +152,7 @@ class DiFeatureService
         }
 
         // Active-trial companies evaluate everything (owner rule, POS parity).
-        if ($subscription->isTrialActive()) {
+        if ($subscription->isTrialActive() && (!$subscription->hasLifecycleSnapshot())) {
             return true;
         }
 

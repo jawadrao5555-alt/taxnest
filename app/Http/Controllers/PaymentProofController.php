@@ -52,6 +52,8 @@ class PaymentProofController extends Controller
             return $this->storeAiPagesRequest($request, $company);
         }
 
+        $originGuard = $this->originGuard();
+        abort_unless(in_array((string) auth($originGuard)->user()?->role, ['company_admin', 'super_admin'], true), 403);
         $productType = $this->resolveProductType($company);
         // Owner, 23 Aug 2026: every product line is sold by the YEAR only, so
         // a stale form or a hand-crafted POST can no longer buy a short cycle.
@@ -71,7 +73,7 @@ class PaymentProofController extends Controller
         // The selected package must be a real, non-trial plan for THIS account's
         // product line — a company can never request a plan from another panel.
         $plan = \App\Models\PricingPlan::find($validated['pricing_plan_id']);
-        if (!$plan || $plan->is_trial || ($plan->product_type ?? 'di') !== $productType) {
+        if (!$plan || $plan->is_trial || \App\Services\PlanCompanyCompatibility::productKey($plan->product_type) !== \App\Services\PlanCompanyCompatibility::productKey($productType)) {
             return back()
                 ->withErrors(['pricing_plan_id' => 'Please select a valid package for your account.'])
                 ->withInput()
@@ -84,6 +86,10 @@ class PaymentProofController extends Controller
                 ->withErrors(['pricing_plan_id' => \App\Services\PlanSellabilityService::pickCurrentMessage($plan)])
                 ->withInput()
                 ->with('payment_proof', 'error');
+        }
+
+        if (!\App\Services\PendingSubscriptionSelection::quote($company, $plan, $validated['billing_cycle'])) {
+            \App\Services\SubscriptionAssignmentService::cycleForPlan($plan, $validated['billing_cycle']);
         }
 
         // Private (non-public) disk: receipts are downloadable by admins only.
@@ -107,7 +113,7 @@ class PaymentProofController extends Controller
             // Store the cycle the APPROVAL will actually assign (computePrice
             // always annual since 23 Aug 2026) so the proof row
             // and the resulting subscription can never disagree.
-            'billing_cycle' => \App\Services\SubscriptionAssignmentService::computePrice($plan, $validated['billing_cycle'])['cycle'],
+            'billing_cycle' => $snapshot['cycle'],
             // Preserve what the shop says it transferred for the admin's bank
             // reconciliation. The expected quote remains server-owned inside
             // the immutable snapshot and is never derived from this input.
@@ -747,40 +753,20 @@ class PaymentProofController extends Controller
      * Resolve the acting company across the three isolated guards, mirroring
      * the trial-lock-modal resolution (CompanyIsolation binds 'n').
      */
-    private function resolveCompanyId(): ?int
+    private function originGuard(): string
     {
-        if (app()->bound('n') && app('n')) {
-            return (int) app('n');
-        }
-        // Order mirrors the lock-modal's submitAction resolution (pos → fbrpos → web)
-        // so the company a proof is attached to always matches the panel it was
-        // submitted from, even in the rare dual-guard login case.
-        foreach (['pos', 'fbrpos', 'web'] as $guard) {
-            if (auth($guard)->check()) {
-                $cid = (int) (auth($guard)->user()->company_id ?? 0);
-                return $cid ?: null;
-            }
-        }
-        return null;
+        $name = (string) request()->route()?->getName();
+        return str_starts_with($name, 'health.') ? 'health' : (str_starts_with($name, 'fbrpos.') ? 'fbrpos' : (str_starts_with($name, 'pos.') ? 'pos' : 'web'));
     }
 
-    /**
-     * Map the acting panel/company to its pricing product line so a company can
-     * only request (and be shown) plans from its own panel.
-     *  - pos guard    → 'pos'
-     *  - fbrpos guard → 'fbrpos'
-     *  - web guard    → 'di'
-     */
+    private function resolveCompanyId(): ?int
+    {
+        return auth($this->originGuard())->user()?->company_id;
+    }
+
     private function resolveProductType(?\App\Models\Company $company): string
     {
-        if (auth('pos')->check()) {
-            // Mirror the trial-lock modal: standalone-mode POS companies are a
-            // separate (annual-only) product line, never 'pos'.
-            return (($company?->pos_integration_mode ?? 'pra') === 'standalone') ? 'standalone' : 'pos';
-        }
-        if (auth('fbrpos')->check()) {
-            return 'fbrpos';
-        }
-        return 'di';
+        if ($this->originGuard() === 'pos') return (($company?->pos_integration_mode ?? 'pra') === 'standalone') ? 'standalone' : 'pos';
+        return $company?->product_type ?? 'di';
     }
 }

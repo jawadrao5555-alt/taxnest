@@ -85,7 +85,9 @@ class TrialPurchaseEvidenceTest extends TestCase
             $company = Company::where('name', $input['company_name'])->sole();
             $this->assertSame($paid->id, (int) $company->requested_plan_id);
             $sub = Subscription::where('company_id', $company->id)->sole();
-            $this->assertSame($trial->id, (int) $sub->pricing_plan_id);
+            $this->assertSame($paid->id, (int) $sub->pricing_plan_id);
+            $this->assertSame('selected_trial_v1', $sub->lifecycle_snapshot['version']);
+            $this->assertSame(-1, $sub->entitlementPlan()->invoice_limit);
             $this->assertSame(0.0, (float) $sub->final_price);
             $this->assertNotNull($sub->trial_ends_at);
             $this->assertNotNull($sub->purchase_snapshot);

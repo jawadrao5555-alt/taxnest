@@ -1261,6 +1261,8 @@ class RestaurantPosController extends Controller
         // rides the answer on the retry; any caller that skips the question —
         // a stale tab, the table board, a crafted POST — is refused here, so
         // an unpaid table can never be closed by accident.
+        \App\Services\PosOnlinePaymentPolicy::assertAllowed(auth('pos')->user(), (int) $companyId, $request->input('payment_method'), $request->boolean('online_payment_confirmed'));
+
         if ($order->awaitingOnlinePayment() && !$request->boolean('online_payment_confirmed')) {
             $onlineQuote = RestaurantOrderPaymentCalculator::calculate($order, $company, 'qr_payment');
             return response()->json([
@@ -1417,6 +1419,7 @@ class RestaurantPosController extends Controller
                     'message' => 'This order was already settled or cancelled on another terminal — refresh the table board.',
                 ], 409);
             }
+            if (!$request->boolean('save_as_provisional')) \App\Services\ProspectiveQuotaGuard::assertPra((int)$companyId);
             // ONLINE-PAYMENT GATE, RE-CHECKED UNDER THE LOCK. The pre-txn check
             // above read a STALE row: another terminal (or the table board) can
             // stamp "paisay online aa rahay hain" in the window between that read
@@ -1807,12 +1810,14 @@ class RestaurantPosController extends Controller
         $existingTxn = PosTransaction::withoutGlobalScope('hide_archived')
             ->where('company_id', $companyId)
             ->where('offline_uuid', $payUuid)
+            ->when(DB::transactionLevel() > 0, fn ($q) => $q->lockForUpdate())
             ->first();
         if (!$existingTxn) {
             return null;
         }
         $originalOrder = RestaurantOrder::where('company_id', $companyId)
             ->where('pos_transaction_id', $existingTxn->id)
+            ->when(DB::transactionLevel() > 0, fn ($q) => $q->lockForUpdate())
             ->first();
         // Ghost tidy (best-effort, never blocks the replay): the retry's re-hold
         // may have minted a duplicate 'held' order — cancel it and free its table

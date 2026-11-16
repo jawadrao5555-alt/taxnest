@@ -21,6 +21,8 @@
 </form>
 @elseif(isset($schoolCampuses) && $schoolCampuses->count() === 1)
 <p class="muted">{{ __('pos.school_campus') }}: {{ $schoolCampuses->first()->name }}</p>
+@else
+<p class="muted">{{ __('pos.school_campus') }}: {{ __('school.no_campus') }}</p>
 @endif
 <nav class="actions no-print" aria-label="{{ __('pos.school_navigation') }}"><a href="/fbr-pos/school-fees">{{ __('pos.school_nav_collect') }}</a><a href="/fbr-pos/transactions">{{ __('pos.school_nav_receipts') }}</a>@if(\App\Services\PosAccessService::dayCloseAllowed(Auth::guard('fbrpos')->user(), $company))<a href="/fbr-pos/day-close">{{ __('pos.school_nav_close') }}</a>@endif</nav>
 @if($schoolCanConfigure ?? false)<p class="no-print"><a href="/fbr-pos/school-fees/settings">{{ __('school.settings') }}</a></p>@endif
@@ -29,8 +31,9 @@
 @if($schoolCanConfigure ?? false)
 <a href="/fbr-pos/team">{{ __('school_workspace.team_access') }}</a><a href="/fbr-pos/school-fees/settings">{{ __('school.settings') }}</a><a href="/fbr-pos/school-fees/printing">{{ __('school_workspace.profile_printing') }}</a><a href="/fbr-pos/billing">{{ __('school_workspace.billing') }}</a><a href="/fbr-pos/school-fees/legacy-retail">{{ __('school_workspace.retail_archive') }}</a>
 @endif
-<a href="/fbr-pos/my-profile">{{ __('school_workspace.my_profile') }}</a><a href="/fbr-pos/suggestions">{{ __('school_workspace.help') }}</a>
+<a href="/fbr-pos/my-profile">{{ __('school_workspace.my_profile') }}</a><a href="#school-help-guide">{{ __('school_workspace.help') }}</a>
 </nav><form method="post" action="/fbr-pos/set-language">@csrf<label for="school-language">{{ __('school_workspace.language') }}</label><select id="school-language" name="language"><option value="en" @selected(app()->getLocale()==='en')>English</option><option value="rur" @selected(app()->getLocale()==='rur')>Roman Urdu</option><option value="ur" @selected(app()->getLocale()==='ur')>اردو</option></select><button type="submit">{{ __('school_workspace.save_language') }}</button></form></details>
+<details class="no-print" id="school-help-guide"><summary>{{ __('school_workspace.help') }}</summary><p>{{ __('school_audit.guide') }}</p><a href="/product-guide#school-standalone">{{ __('school_workspace.help') }}</a><p>{{ __('school_ledger.pending_recovery') }}</p><p>{{ __('school_ledger.record_only') }}</p><a href="/fbr-pos/suggestions">{{ __('school_audit.support') }}</a></details>
 <x-prospective-policy-reminder guard="fbrpos" />
 @if(isset($slot))<section class="school-shared-page">{{ $slot }}</section>@else @yield('content') @endif
 <script>

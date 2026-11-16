@@ -87,6 +87,7 @@ class FbrPosSchoolFeePilotTest extends TestCase
         (require database_path('migrations/2026_11_15_010000_extend_school_fee_collection_details.php'))->up();
         (require database_path('migrations/2026_11_15_030000_extend_school_collection_ledger.php'))->up();
         (require database_path('migrations/2027_01_01_000000_add_pilot_fiscal_route_snapshots.php'))->up();
+        (require database_path('migrations/2026_11_16_130000_add_school_rates_and_payment_references.php'))->up();
         $this->school = Company::withoutEvents(fn () => Company::create([
             'name' => 'Synthetic School', 'product_type' => 'fbrpos',
             'pos_type' => 'education', 'business_category' => 'education',
@@ -244,9 +245,9 @@ class FbrPosSchoolFeePilotTest extends TestCase
             $this->assertMatchesRegularExpression('/id="school-today-cash"[^>]*data-paisa="'.$paisa.'"/', $html);
             $this->assertMatchesRegularExpression('/id="school-today-status"[^>]*>\s*'.$status.'\s*</', $html);
         };
-        $assertDashboard(0, 0, 'Open');
+        $assertDashboard(0, 0, 'No day close recorded yet');
         $this->collect($this->payload());
-        $assertDashboard(1, 125050, 'Open');
+        $assertDashboard(1, 125050, 'No day close recorded yet');
         $this->school->forceFill(['pos_cashier_dayclose' => true])->saveQuietly();
         $this->closeSchoolDay();
         $assertDashboard(1, 125050, 'Closed');
@@ -1054,7 +1055,7 @@ class FbrPosSchoolFeePilotTest extends TestCase
     public function test_multihead_partial_recorded_payments_keep_immutable_receipts_and_cash_only_close(): void
     {
         $this->school->forceFill(['pos_cashier_dayclose' => true])->saveQuietly();
-        $payload = $this->payload(['student_name' => 'Synthetic Learner', 'amount' => '400', 'payment_method' => 'card',
+        $payload = $this->payload(['student_name' => 'Synthetic Learner', 'amount' => '400', 'payment_method' => 'card', 'payment_reference' => 'SYN-CARD-001',
             'fee_lines' => [['fee_head'=>'tuition','amount'=>'1000'], ['fee_head'=>'exam','amount'=>'200']]]);
         $first = $this->collect($payload)->getData(true)['receipt_id'];
         $row = DB::table('school_fee_receipts')->find($first);
@@ -1102,7 +1103,7 @@ class FbrPosSchoolFeePilotTest extends TestCase
 
     public function test_read_only_recovery_returns_settled_receipt_and_rejects_other_scope(): void
     {
-        $payload = $this->payload(['payment_method'=>'bank']);
+        $payload = $this->payload(['payment_method'=>'bank', 'payment_reference'=>'SYN-BANK-001']);
         $id = $this->collect($payload)->getData(true)['receipt_id'];
         $snapshot = (array) DB::table('school_fee_receipts')->find($id);
         $request = Request::create('/fbr-pos/school-fees/recover','GET',['request_key'=>$payload['request_key'],'expected_branch_key'=>0]);
@@ -1147,4 +1148,86 @@ class FbrPosSchoolFeePilotTest extends TestCase
         Http::assertNothingSent();
     }
 
+
+    public function test_non_cash_reference_is_required_and_immutable_but_legacy_retry_is_recoverable(): void
+    {
+        foreach (['bank', 'card'] as $method) {
+            $payload = $this->payload(['payment_method' => $method]);
+            try { $this->collect($payload); $this->fail('New noncash payment without reference accepted.'); }
+            catch (ValidationException $e) { $this->assertArrayHasKey('payment_reference', $e->errors()); }
+            $this->assertSame(0, DB::table('school_fee_receipts')->where('request_key', $payload['request_key'])->count());
+            $payload['payment_reference'] = 'SYN-'.strtoupper($method);
+            $id = $this->collect($payload)->getData(true)['receipt_id'];
+            $before = (array) DB::table('school_fee_receipts')->find($id);
+            $route = json_decode($before['fiscal_route_snapshot'], true, 512, JSON_THROW_ON_ERROR);
+            $this->assertSame('off', $route['route']);
+            $this->assertSame($this->school->id, $route['company_id']);
+            $this->assertFalse($route['eligible']);
+            $account = (array) DB::table('school_fee_accounts')->find($before['account_id']);
+            $this->assertSame($id, $this->collect($payload)->getData(true)['receipt_id']);
+            try { $this->collect(array_replace($payload, ['payment_reference' => 'CHANGED'])); $this->fail('Changed reference accepted.'); }
+            catch (ValidationException $e) { $this->assertArrayHasKey('request_key', $e->errors()); }
+            $this->assertSame($before, (array) DB::table('school_fee_receipts')->find($id));
+            $this->assertSame($account, (array) DB::table('school_fee_accounts')->find($before['account_id']));
+            $this->assertStringContainsString($payload['payment_reference'], app(FbrPosSchoolFeeController::class)->receipt($id)->getContent());
+            // Simulate a pre-migration reference-less receipt, not a new payment.
+            DB::table('school_fee_receipts')->where('id', $id)->update(['payment_reference'=>null]);
+            unset($payload['payment_reference']);
+            $this->assertSame($id, $this->collect($payload)->getData(true)['receipt_id']);
+        }
+        $this->assertSame(2, DB::table('school_fee_receipts')->count());
+        Http::assertNothingSent();
+    }
+
+    public function test_default_fee_rate_is_future_only_and_additive_migration_preserves_history(): void
+    {
+        $id = $this->collect($this->payload())->getData(true)['receipt_id'];
+        $before = (array) DB::table('school_fee_receipts')->find($id);
+        $account = (array) DB::table('school_fee_accounts')->first();
+        $this->cashier->role = 'company_admin'; $this->cashier->pos_role = 'pos_admin';
+        $this->actingAs($this->cashier, 'fbrpos');
+        $this->schoolSettingsPost('saveFeeHead', ['code'=>'tuition','label'=>'Tuition','active'=>1,'default_amount'=>'2500.75']);
+        $this->assertSame(250075, (int) DB::table('school_fee_heads')->value('default_amount_paisa'));
+        $this->schoolSettingsPost('saveFeeHead', ['code'=>'tuition','label'=>'Tuition revised','active'=>1]);
+        $this->assertSame(250075, (int) DB::table('school_fee_heads')->value('default_amount_paisa'));
+        $migration = require database_path('migrations/2026_11_16_130000_add_school_rates_and_payment_references.php');
+        $migration->down(); $migration->up();
+        $this->assertSame($before, (array) DB::table('school_fee_receipts')->find($id));
+        $this->assertSame($account, (array) DB::table('school_fee_accounts')->first());
+        $this->assertStringContainsString('default_amount_paisa', app(FbrPosSchoolFeeController::class)->index()->getContent());
+    }
+
+    public function test_school_dashboard_separates_total_cash_non_cash_and_all_date_outstanding(): void
+    {
+        $this->collect($this->payload(['amount'=>'100']));
+        $this->collect($this->payload(['amount'=>'40','payment_method'=>'bank','payment_reference'=>'SYN-BANK', 'fee_lines'=>[['fee_head'=>'tuition','amount'=>'200']]]));
+        $data = app(FbrPosSchoolFeeController::class)->dashboard()->original->getData();
+        $this->assertSame(14000, $data['totalAmountPaisa']);
+        $this->assertSame(10000, $data['cashAmountPaisa']);
+        $this->assertSame(4000, $data['bankAmountPaisa']);
+        $this->assertSame(0, $data['cardAmountPaisa']);
+        $this->assertSame(16000, $data['outstandingPaisa']);
+        DB::table('school_fee_accounts')->where('paid_paisa',4000)->update(['company_id'=>999]);
+        $this->assertSame(0, app(FbrPosSchoolFeeController::class)->dashboard()->original->getData()['outstandingPaisa']);
+    }
+
+    public function test_school_history_filters_match_itemized_head_and_student_accounts_are_paginated(): void
+    {
+        $id = $this->collect($this->payload(['payment_method'=>'bank','payment_reference'=>'SYN-FILTER','fee_lines'=>[['fee_head'=>'tuition','amount'=>'1250'],['fee_head'=>'exam','amount'=>'0.50']]]))->getData(true)['receipt_id'];
+        $this->collect($this->payload());
+        $request = Request::create('/fbr-pos/transactions', 'GET', ['from'=>today()->toDateString(),'to'=>today()->toDateString(),'fee_head'=>'exam','payment_method'=>'bank','cashier'=>'Synthetic']);
+        app()->instance('request', $request);
+        $data = app(FbrPosSchoolFeeController::class)->history($request)->original->getData();
+        $this->assertSame([$id], $data['receipts']->pluck('id')->all());
+        for ($i=0; $i<31; $i++) $this->collect($this->payload(['student_reference'=>'SYN-PAGE-'.$i]));
+        $request = Request::create('/fbr-pos/school-fees', 'GET', ['student_search'=>'SYN-PAGE']);
+        app()->instance('request', $request);
+        $data = app(FbrPosSchoolFeeController::class)->index($request)->original->getData();
+        $this->assertSame(31,$data['accounts']->total());
+        $this->assertCount(30,$data['accounts']);
+        $request = Request::create('/fbr-pos/school-fees', 'GET', ['student_search'=>'SYN-PAGE','accounts_page'=>2]);
+        app()->instance('request', $request);
+        $this->assertCount(1,app(FbrPosSchoolFeeController::class)->index($request)->original->getData()['accounts']);
+        Http::assertNothingSent();
+    }
 }

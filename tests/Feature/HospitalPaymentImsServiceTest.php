@@ -27,7 +27,7 @@ class HospitalPaymentImsServiceTest extends TestCase
         $result=HospitalPaymentImsService::queueFinalizedReceipt($company->id,$payment);
         $this->assertTrue($result['queued']);$this->assertFalse($result['existing']);
         $mirror=DB::table('fbr_pos_transactions')->find($result['transaction_id']);
-        $this->assertSame('8000.00',(string)$mirror->total_amount);
+        $this->assertSame('8000.00', number_format((float) $mirror->total_amount, 2, '.', ''));
         $this->assertSame(1,DB::table('fbr_pos_transaction_items')->where('transaction_id',$mirror->id)->count());
         DB::table('fbr_pos_transactions')->where('id',$mirror->id)->update(['fbr_status'=>'submitted','fbr_invoice_number'=>'203480SYN000001','fbr_response_code'=>'100']);
         HospitalPaymentImsService::reconcileReceipt($company->id,$payment);

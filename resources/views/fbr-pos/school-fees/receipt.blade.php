@@ -26,9 +26,10 @@
 @if($schoolFbrQr)<br><img src="{{ $schoolFbrQr }}" alt="FBR fiscal QR" style="width:34mm;height:34mm;margin:8px auto;display:block">@endif</div>
 @elseif(in_array(($receipt->fbr_status ?? null),['pending','offline','verification_pending'],true))
 <div class="notice" id="school-fbr-pending">FBR IMS: {{ str_replace('_',' ',ucfirst($receipt->fbr_status)) }}</div>
-@else
+@elseif(!in_array(($receipt->fbr_status ?? null), ['failed', 'config_error'], true) && (json_decode($receipt->fiscal_route_snapshot ?? 'null', true)['route'] ?? null) !== 'ims')
 <div class="notice">{{ __('pos.school_local_receipt') }}</div>
 @endif
+@include('fbr-pos.partials.collection-ims-retry', ['imsReceipt' => $receipt, 'imsRetryRoute' => 'fbrpos.school-fees.ims-retry'])
 <dl><dt>{{ __('pos.school_student_reference') }}</dt><dd>{{ $receipt->student_reference }}@if($receipt->student_name ?? null)<br>{{ $receipt->student_name }}@endif</dd><dt>{{ __('pos.school_collected_at') }}</dt><dd>{{ $receipt->collected_at }}</dd><dt>{{ __('pos.school_payment') }}</dt><dd id="school-receipt-method">{{ __('school_print.'.$method) }}</dd>
 <dt>{{ __('school_audit.reference') }}</dt><dd id="school-payment-reference">{{ $receipt->payment_reference ?? __('school.not_recorded') }}</dd>
 <dt>{{ __('school.period') }}</dt><dd id="school-receipt-period">{{ $receipt->fee_period ?? __('school.not_recorded') }}</dd><dt>{{ __('school.campus') }}</dt><dd id="school-receipt-campus">{{ $receipt->campus_name ?? __('school.not_recorded') }}</dd><dt>{{ __('school.cashier') }}</dt><dd id="school-receipt-cashier">{{ $receipt->cashier_name ?? __('school.not_recorded') }}</dd></dl>

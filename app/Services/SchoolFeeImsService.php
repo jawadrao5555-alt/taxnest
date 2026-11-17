@@ -42,6 +42,10 @@ final class SchoolFeeImsService
                 return ['queued' => false, 'reason' => 'local_only'];
             }
 
+            if (!CollectionFbrSubmission::matchesRoute($company, $snapshot)) {
+                return ['queued' => false, 'reason' => 'original_route_changed'];
+            }
+
             abort_unless((int) $receipt->amount_paisa > 0 && $receipt->collected_at !== null, 422);
 
             $existing = $receipt->fbr_pos_transaction_id
@@ -107,6 +111,8 @@ final class SchoolFeeImsService
                 'fbr_error_message' => null,
                 'updated_at' => now(),
             ]);
+
+            CollectionFbrSubmission::dispatch($mirror);
 
             return ['queued' => true, 'transaction_id' => $mirror->id, 'existing' => false];
         }, 3);

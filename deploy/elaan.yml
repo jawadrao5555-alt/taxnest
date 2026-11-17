@@ -1,6 +1,7 @@
-title: "TaxNest updates ka poora record"
-audience: all
+title: "School aur Hospital mein wohi FBR Settings"
+audience: fbr_pos
 type: improvement
 points:
-  - "TaxNest admin team ab purani aur nayi updates ko issue number ya naam se dhoond sakti hai."
-  - "Har update ki tafseel aur us ke live hone ki tasdeeq alag nazar aati hai."
+  - "School aur Hospital ki Settings mein FBR Integration Settings kholein. Yahan baqi FBR POS categories wala poora setup milega."
+  - "FBR ON/OFF, Submission Mode, POS configuration, Test Connection aur Desktop Agent ki settings aik hi jagah hain."
+  - "Pehle se saved settings mehfooz hain. Purani receipts apne asal submission mode aur POS ID ke sath rahengi."

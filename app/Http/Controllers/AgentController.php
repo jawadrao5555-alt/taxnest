@@ -901,6 +901,9 @@ class AgentController extends Controller
                     continue;
                 }
                 $txn->loadMissing(['items', 'company']);
+                if ($company->isLocalCollectionPilot() && !\App\Services\CollectionFbrSubmission::canSubmit($txn)) {
+                    continue;
+                }
                 $payload = $fbrService->buildFbrPosPayload($txn);
                 if ($txn->fbr_device_uid_snapshot && $txn->fbr_device_uid_snapshot !== $deviceUid) continue;
                 $claim = \App\Services\FbrPosAgentClaim::acquire($txn, $this->requestDeviceUid($request));

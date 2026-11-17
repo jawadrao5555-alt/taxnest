@@ -2646,6 +2646,10 @@ Route::prefix('fbr-pos')->middleware(['fbrpos.auth', 'company.approval', \App\Ht
     Route::post('/hospital/day-close', [\App\Http\Controllers\FbrPosHospitalController::class, 'close'])->name('fbrpos.hospital.close');
     Route::post('/hospital/campus', [\App\Http\Controllers\FbrPosHospitalController::class, 'switchCampus'])->name('fbrpos.hospital.campus');
     Route::get('/hospital/settings', [\App\Http\Controllers\HospitalWorkspaceSettingsController::class, 'index'])->name('fbrpos.hospital.settings');
+    Route::post('/hospital/settings/ims', [\App\Http\Controllers\CollectionImsController::class, 'save'])->name('fbrpos.hospital.ims-settings');
+    Route::post('/hospital/settings/ims/reporting', [\App\Http\Controllers\CollectionImsController::class, 'toggle'])->name('fbrpos.hospital.ims-toggle');
+    Route::post('/hospital/settings/ims/diagnostics', [\App\Http\Controllers\CollectionImsController::class, 'diagnostics'])->name('fbrpos.hospital.ims-diagnostics');
+    Route::post('/hospital/receipts/{id}/retry-ims', [\App\Http\Controllers\CollectionImsController::class, 'retry'])->whereNumber('id')->name('fbrpos.hospital.ims-retry');
     Route::post('/hospital/settings/services', [\App\Http\Controllers\HospitalWorkspaceSettingsController::class, 'saveService'])->name('fbrpos.hospital.settings.services');
     Route::post('/hospital/settings/campus', [\App\Http\Controllers\HospitalWorkspaceSettingsController::class, 'addCampus'])->name('fbrpos.hospital.settings.campus');
     Route::get('/hospital/printing', [\App\Http\Controllers\HospitalReceiptSettingsController::class, 'index'])->name('fbrpos.hospital.printing');
@@ -2661,7 +2665,10 @@ Route::prefix('fbr-pos')->middleware(['fbrpos.auth', 'company.approval', \App\Ht
     Route::get('/school-fees/settings', [\App\Http\Controllers\FbrPosSchoolFeeController::class, 'settings'])->name('fbrpos.school-fees.settings');
     Route::post('/school-fees/settings/fee-head', [\App\Http\Controllers\FbrPosSchoolFeeController::class, 'saveFeeHead'])->name('fbrpos.school-fees.fee-head');
     Route::post('/school-fees/settings/campus', [\App\Http\Controllers\FbrPosSchoolFeeController::class, 'addCampus'])->name('fbrpos.school-fees.add-campus');
-    Route::post('/school-fees/settings/ims', [\App\Http\Controllers\FbrPosSchoolFeeController::class, 'saveImsSettings'])->name('fbrpos.school-fees.ims-settings');
+    Route::post('/school-fees/settings/ims', [\App\Http\Controllers\CollectionImsController::class, 'save'])->name('fbrpos.school-fees.ims-settings');
+    Route::post('/school-fees/settings/ims/reporting', [\App\Http\Controllers\CollectionImsController::class, 'toggle'])->name('fbrpos.school-fees.ims-toggle');
+    Route::post('/school-fees/settings/ims/diagnostics', [\App\Http\Controllers\CollectionImsController::class, 'diagnostics'])->name('fbrpos.school-fees.ims-diagnostics');
+    Route::post('/school-fees/{id}/receipt/retry-ims', [\App\Http\Controllers\CollectionImsController::class, 'retry'])->whereNumber('id')->name('fbrpos.school-fees.ims-retry');
     Route::get('/school-fees/student-ledger', [\App\Http\Controllers\FbrPosSchoolFeeController::class, 'studentLedger'])->name('fbrpos.school-fees.student-ledger');
     Route::get('/school-fees/outstanding', [\App\Http\Controllers\FbrPosSchoolFeeController::class, 'outstanding'])->name('fbrpos.school-fees.outstanding');
     Route::get('/school-fees/reports', [\App\Http\Controllers\SchoolFeeReportController::class, 'index'])->name('fbrpos.school-fees.reports');

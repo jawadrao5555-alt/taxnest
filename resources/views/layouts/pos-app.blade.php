@@ -305,13 +305,13 @@
              Inter has display=swap so text renders in the system font meanwhile. --}}
         <link href="https://fonts.bunny.net/css?family=inter:300,400,500,600,700,800,900&display=swap" rel="stylesheet" media="print" onload="this.media='all'" />
         <noscript><link href="https://fonts.bunny.net/css?family=inter:300,400,500,600,700,800,900&display=swap" rel="stylesheet" /></noscript>
+        {{-- Keep the deferred chart dependency before the Alpine/Vite entry:
+             dashboard components can render as soon as Alpine starts. --}}
+        <script defer src="/vendor/chart.umd.min.js?v=4.4.0"></script>
         @vite(['resources/css/app.css', 'resources/js/app.js'])
         <link rel="stylesheet" href="{{ asset('css/taxnest-ui.css?v=1.1') }}">
         <script src="{{ asset('js/nestpos-local-core.js') }}?v=10" defer></script>
         @include('partials.alpine-runtime-loader')
-        {{-- Self-hosted Chart.js (perf, Jul 2026): third-party CDN cost an extra
-             DNS+TLS connection on every fresh load; .htaccess caches /vendor 30d. --}}
-        <script defer src="/vendor/chart.umd.min.js?v=4.4.0"></script>
         <script>document.documentElement.style.colorScheme=document.documentElement.classList.contains('dark')?'dark':'light';</script>
         <style>
             *, *::before, *::after { font-family: 'Inter', system-ui, -apple-system, sans-serif; }

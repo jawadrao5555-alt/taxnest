@@ -7381,5 +7381,7 @@ Once reported, the bill will be locked — no more edit or delete. Continue?',
     'sale_staff_check_before_payment' => 'Check owner approval before payment.',
     'sale_delivery_clear_selection' => 'Clear selection',
     'sale_delivery_select_all_shown' => 'Select all shown',
+    'fbr_agent_connection_online' => 'Desktop Agent is online. Check the receipt for the FBR result after submission.',
+    'fbr_agent_connection_offline' => 'Desktop Agent is offline. Open the Desktop Agent page and connect this counter.',
 ];
 

@@ -1,5 +1,19 @@
 // Synthetic owner-only shared workspace proof. No live company/user is used.
 export async function collectionSharedWorkspaceChecks(page, kind, v, {baseUrl, saveEvidenceScreenshot}, campusLabel=null) {
+  const hub = kind === 'school' ? '/fbr-pos/school-fees/settings' : '/fbr-pos/hospital/settings';
+  await page.goto(baseUrl + hub, { waitUntil: 'domcontentloaded' });
+  await page.getByRole('link', { name: 'FBR Integration Settings', exact: true }).click();
+  await page.waitForURL('**/fbr-pos/settings');
+  for (const label of ['Submission Mode', 'FBR POS Configuration', 'FBR Integration Settings']) {
+    await page.getByRole('heading', { name: label, exact: true }).waitFor();
+  }
+  for (const name of ['fbr_pos_id', 'fbr_pos_environment', 'fbr_access_code', 'fbr_pos_token']) {
+    await page.locator('[name="' + name + '"]').first().waitFor({ state: 'attached' });
+  }
+  await page.getByRole('button', { name: 'Test Connection', exact: true }).waitFor();
+  if (await page.locator('form[action*="/settings/ims"]').count()) throw new Error('Duplicated collection IMS form remains');
+  if (await page.evaluate(() => document.documentElement.scrollWidth) > v.width + 2) throw new Error(kind + ' FBR settings overflow');
+  await saveEvidenceScreenshot(page, kind + '-shared-fbr-settings-' + v.width);
   for(const path of ['/fbr-pos/team','/fbr-pos/my-profile','/fbr-pos/billing','/fbr-pos/suggestions']) {
     const response=await page.goto(baseUrl+path,{waitUntil:'domcontentloaded'});
     if(!response?.ok() || new URL(page.url()).pathname!==path) throw new Error(kind+' shared workspace did not open its exact path: '+path);

@@ -3,6 +3,8 @@
 <h1>{{ __('hospital_workspace.settings') }}</h1>
 <p class="notice">{{ __('hospital.scope') }}</p>
 @if($errors->any())<p role="alert" class="error">{{ $errors->first() }}</p>@endif
+@if(session('status'))<p role="status" class="notice">{{ session('status') }}</p>@endif
+@include('fbr-pos.partials.collection-fbr-settings-link')
 <section class="card"><h2>{{ __('hospital_workspace.profile_printing') }}</h2>
 <div class="actions">
 <a href="/fbr-pos/hospital/printing">{{ __('hospital_workspace.profile_printing') }}</a>

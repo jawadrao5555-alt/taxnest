@@ -7366,5 +7366,7 @@ return [
     'sale_staff_check_before_payment' => 'ادائیگی سے پہلے مالک کی منظوری چیک کریں۔',
     'sale_delivery_clear_selection' => 'انتخاب ختم کریں',
     'sale_delivery_select_all_shown' => 'تمام دکھائی گئی ڈیلیوریاں منتخب کریں',
+    'fbr_agent_connection_online' => 'ڈیسک ٹاپ ایجنٹ آن لائن ہے۔ جمع کرانے کے بعد رسید پر ایف بی آر کا نتیجہ دیکھیں۔',
+    'fbr_agent_connection_offline' => 'ڈیسک ٹاپ ایجنٹ آف لائن ہے۔ ڈیسک ٹاپ ایجنٹ کا صفحہ کھول کر اس کاؤنٹر کو منسلک کریں۔',
 ];
 

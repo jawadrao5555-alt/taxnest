@@ -37,10 +37,10 @@ class SchoolWorkspaceBoundaryTest extends TestCase
             'store', 'api/toggle-universal', 'api/toggle-auto-kot',
             'settings/inventory-toggle', 'settings/kot-reprint-toggle',
             'settings/restock-toggle', 'settings/quick-type',
-            'settings', 'receipt-settings', 'printer-settings', 'business-profile',
+            'receipt-settings', 'printer-settings', 'business-profile',
             'transactions/19/retry-fbr', 'transactions/19/update-and-retry',
             'fail-queue/retry-all', 'fail-queue/19/reconcile',
-            'api/toggle-fbr-reporting', 'integration/decision', 'test-connection',
+
             'products', 'purchases', 'deals', 'delivery', 'wholesale',
         ]);
     }
@@ -74,7 +74,7 @@ class SchoolWorkspaceBoundaryTest extends TestCase
 
     public function test_school_shared_settings_redirect_to_school_workspace(): void
     {
-        foreach (['settings', 'customize', 'business-profile', 'receipt-settings', 'printer-settings', 'branches'] as $path) {
+        foreach (['customize', 'business-profile', 'receipt-settings', 'printer-settings', 'branches'] as $path) {
             $r = (new SchoolWorkspace)->handle(Request::create('/fbr-pos/'.$path), fn () => response('retail settings'));
             $this->assertStringEndsWith('/fbr-pos/school-fees/settings', $r->headers->get('Location'));
             $this->assertStringContainsString('no-store', $r->headers->get('Cache-Control'));
@@ -83,7 +83,7 @@ class SchoolWorkspaceBoundaryTest extends TestCase
 
     public function test_school_supported_routes_are_available_and_not_cached(): void
     {
-        foreach (['school-fees', 'school-fees/settings', 'school-fees/reports.csv', 'school-fees/reports.pdf', 'agent', 'agent/download', 'school-fees/legacy-retail/19', 'team', 'team/10', 'billing', 'my-profile', 'api/boot-check'] as $path) {
+        foreach (['settings', 'settings/identities', 'test-connection', 'desktop/agent-pairing', 'school-fees', 'school-fees/settings', 'school-fees/reports.csv', 'school-fees/reports.pdf', 'agent', 'agent/download', 'school-fees/legacy-retail/19', 'team', 'team/10', 'billing', 'my-profile', 'api/boot-check'] as $path) {
             $r = (new SchoolWorkspace)->handle(Request::create('/fbr-pos/'.$path), fn () => response('supported'));
             $this->assertSame('supported', $r->getContent());
             $this->assertStringContainsString('no-store', $r->headers->get('Cache-Control'));

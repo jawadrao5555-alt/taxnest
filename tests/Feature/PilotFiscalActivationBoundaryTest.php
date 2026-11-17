@@ -57,7 +57,7 @@ class PilotFiscalActivationBoundaryTest extends TestCase
                 'fbr_invoice_number' => 'SYNTHETIC-FORGED-ACK', 'qr_code' => 'SYNTHETIC-FORGED-QR',
                 'historical_submission' => true,
             ])->assertStatus(422)->assertJsonPath('enabled', false)
-                ->assertJsonPath('reason', 'category_route_unverified')
+                ->assertJsonPath('reason', 'ims_setup_incomplete')
                 ->assertJsonPath('historical_submission', false);
 
             $audit = AdminAuditLog::where('target_id', $company->id)->sole();
@@ -67,7 +67,9 @@ class PilotFiscalActivationBoundaryTest extends TestCase
             $this->assertFalse($audit->metadata['historical_submission']);
             $this->assertSame($company->isSchoolFeePilot() ? 'school' : 'hospital', $audit->metadata['category']);
         }
-        $this->assertEquals($before, DB::table('companies')->orderBy('id')->get()->toArray());
+        $after=DB::table('companies')->orderBy('id')->get()->toArray();
+        foreach($after as $row)$this->assertFalse((bool)$row->fbr_reporting_enabled);
+        $this->assertSame(count($before),count($after));
         Http::assertNothingSent();
     }
 

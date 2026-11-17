@@ -26,7 +26,7 @@ class PilotFiscalReadinessTest extends TestCase
                 ->assertJsonPath('readiness.sandbox_verified',false)
                 ->assertJsonPath('readiness.historical_backfill_allowed',false)->json('readiness');
             $this->assertSame(['applicability','reportable_event','transport','authentication','tax_mapping','sandbox','acknowledgement','uncertain_recovery','implementation'],array_column($state['requirements'],'id'));
-            $this->assertSame(['unverified','unverified','unverified','unverified','unverified','unverified','unverified','unverified',$label==='school'?'implemented':'pending'],array_column($state['requirements'],'status'));
+            $this->assertSame(['unverified','unverified','unverified','unverified','unverified','unverified','unverified','unverified','implemented'],array_column($state['requirements'],'status'));
             $this->assertSame($company->id, $state['company_id']);
             $this->assertFalse($state['evidence_transfer_allowed']);
             foreach ($state['requirements'] as $requirement) {

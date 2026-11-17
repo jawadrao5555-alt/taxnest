@@ -194,7 +194,8 @@ async function hospitalWorkspaceChecks(page,v,{baseUrl,saveEvidenceScreenshot}) 
     await saveEvidenceScreenshot(page,'hospital-workspace-'+path.split('/').pop()+'-'+v.width);
   }
   for(const language of ['ur','rur','en']) {
-    await page.locator('#hospital-workspace-menu summary').click();
+    await page.goto(baseUrl+'/fbr-pos/hospital/settings',{waitUntil:'domcontentloaded'});
+    if(await page.locator('#hospital-workspace-menu').count()) throw new Error('Duplicate Hospital owner settings menu is visible');
     await page.locator('#hospital-language').selectOption(language);
     const languageForm=page.locator('#hospital-language').locator('..');
     await Promise.all([page.waitForNavigation({waitUntil:'domcontentloaded'}),languageForm.locator('button').click()]);

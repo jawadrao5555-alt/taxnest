@@ -1,13 +1,17 @@
 <x-fbr-pos-layout>
 @php
     $teamCompany = Auth::guard('fbrpos')->user()?->company;
-    $unassignedLabel = $teamCompany?->isLocalCollectionPilot() ? __('collection_audit.unassigned_campus') : __('pos.main_branch');
+    $unassignedLabel = match (true) {
+        $teamCompany?->isHospitalCollectionPilot() => __('hospital_workspace.no_branch'),
+        $teamCompany?->isSchoolFeePilot() => __('collection_audit.unassigned_campus'),
+        default => __('pos.main_branch'),
+    };
 @endphp
 <div class="max-w-6xl mx-auto">
     @include('fbr-pos.partials.back-link')
     <div class="flex items-center justify-between mb-6">
         <div>
-            <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ __('pos.team_management') }}</h1>
+            <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ $teamCompany?->isHospitalCollectionPilot() ? __('hospital_workspace.team') : __('pos.team_management') }}</h1>
             <p class="text-sm text-gray-500 mt-1">{{ __('pos.team_management_sub') }}</p>
         </div>
     </div>

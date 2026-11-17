@@ -31,16 +31,17 @@ input:focus-visible,select:focus-visible,button:focus-visible,a:focus-visible{ou
 <main>
 <header class="hospital-topbar"><div><p class="muted">{{ __('hospital.title') }}</p><h1>{{ $company->name }}</h1></div><div class="hospital-topbar-tools no-print">
 @if(isset($hospitalCampuses)&&$hospitalCampuses->count()>1)<form class="campus-switcher" action="/fbr-pos/hospital/campus" method="post">@csrf<label class="sr-only" for="hospital-campus">{{ __('hospital.campus') }}</label><select id="hospital-campus" name="branch_id" onchange="this.form.requestSubmit()">@foreach($hospitalCampuses as $campus)<option value="{{ $campus->id }}" @selected((int)$hospitalCampusId===(int)$campus->id)>{{ $campus->name }}</option>@endforeach</select><noscript><button>{{ __('hospital.campus') }}</button></noscript></form>
-@elseif(isset($hospitalCampuses)&&$hospitalCampuses->count()===1)<span class="muted">{{ $hospitalCampuses->first()->name }}</span>@else<span class="muted">No campus configured</span>@endif
+@elseif(isset($hospitalCampuses)&&$hospitalCampuses->count()===1)<span class="muted">{{ $hospitalCampuses->first()->name }}</span>@else<span class="muted">{{ __('hospital_workspace.no_branch') }}</span>@endif
 @php($hospitalImsOn = $company->fbr_reporting_enabled && $company->fbrPosIntegrationConfigured())
 <span @class(['fiscal-badge','on'=>$hospitalImsOn]) id="hospital-fiscal-status" role="status">{{ $hospitalImsOn ? 'FBR IMS ON' : 'Fiscal OFF' }}</span>
 @if(is_array(session('impersonation')))<form method="post" action="{{ route('saas.admin.impersonation.stop') }}">@csrf<button>{{ __('hospital_workspace.exit_company') }}</button></form>@else<form method="post" action="/fbr-pos/logout">@csrf<button>{{ __('pos.logout') }}</button></form>@endif
 </div></header>
 @if(!empty($hospitalUnassigned))<p class="notice">{{ __('hospital.unassigned_notice') }}</p>@endif
+@unless($hospitalIsOwner ?? false)
 <details class="no-print" id="hospital-workspace-menu"><summary>{{ __('hospital_workspace.menu') }}</summary><nav class="actions">
-@if($hospitalIsOwner ?? false)<a href="/fbr-pos/team">{{ __('hospital_workspace.team') }}</a><a href="/fbr-pos/hospital/settings">{{ __('hospital_workspace.campuses') }}</a><a href="/fbr-pos/hospital/printing">{{ __('hospital_workspace.profile_printing') }}</a><a href="/fbr-pos/billing">{{ __('hospital_workspace.billing') }}</a>@endif
 <a href="/fbr-pos/my-profile">{{ __('hospital_workspace.my_profile') }}</a><a href="/product-guide#hospital-standalone">{{ __('hospital_workspace.help') }}</a>
 </nav><form method="post" action="/fbr-pos/set-language">@csrf<label for="hospital-language">{{ __('hospital_workspace.language') }}</label><select id="hospital-language" name="language"><option value="en" @selected(app()->getLocale()==='en')>English</option><option value="rur" @selected(app()->getLocale()==='rur')>Roman Urdu</option><option value="ur" @selected(app()->getLocale()==='ur')>اردو</option></select><button>{{ __('hospital_workspace.save_language') }}</button></form></details>
+@endunless
 <x-prospective-policy-reminder guard="fbrpos" />
 @if(isset($slot))<section class="hospital-shared-page">{{ $slot }}</section>@else @yield('content') @endif
 <script>window.addEventListener('pageshow',function(event){if(event.persisted)window.location.reload();});</script>

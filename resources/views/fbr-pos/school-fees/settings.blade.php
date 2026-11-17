@@ -10,7 +10,11 @@
 <section class="card"><h2>My profile & password</h2><p>Signed-in user's personal profile and password.</p><a class="button" href="/fbr-pos/my-profile">Open profile</a></section>
 <section class="card"><h2>Billing & package</h2><p>Subscription, package and billing history.</p><a class="button" href="/fbr-pos/billing">Open billing</a></section>
 <section class="card"><h2>Help & support</h2><p>School POS guide and product support.</p><a class="button" href="/product-guide#school-standalone">School POS guide</a> <a href="/fbr-pos/suggestions">Contact support</a></section>
-<section class="card"><h2>Reports</h2><p>Collections, payment methods and IMS results with PDF/CSV exports.</p><a class="button" href="{{ route('fbrpos.school-fees.reports') }}">Open reports</a></section>
+<section class="card" id="school-records"><h2>{{ __('school_workspace.retail_archive') }}</h2><a class="button" href="/fbr-pos/school-fees/legacy-retail">{{ __('pos.school_legacy_title') }}</a></section>
+<section class="card" id="school-preferences">
+<h2>{{ __('school_workspace.language') }}</h2>
+<form method="post" action="/fbr-pos/set-language">@csrf<label for="school-language">{{ __('school_workspace.language') }}</label><select id="school-language" name="language"><option value="en" @selected(app()->getLocale()==='en')>English</option><option value="rur" @selected(app()->getLocale()==='rur')>Roman Urdu</option><option value="ur" @selected(app()->getLocale()==='ur')>اردو</option></select><button type="submit">{{ __('school_workspace.save_language') }}</button></form>
+</section>
 </div>
 <section class="card" id="school-ims-settings"><h2>FBR IMS integration</h2>
 <p>Finalized School payment receipts use the Desktop Agent IMS route. Saving setup does not turn reporting ON and never submits old OFF receipts.</p>

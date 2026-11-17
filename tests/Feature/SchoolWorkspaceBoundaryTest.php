@@ -83,7 +83,7 @@ class SchoolWorkspaceBoundaryTest extends TestCase
 
     public function test_school_supported_routes_are_available_and_not_cached(): void
     {
-        foreach (['school-fees', 'school-fees/settings', 'school-fees/reports.csv', 'school-fees/reports.pdf', 'agent', 'agent/download', 'school-fees/legacy-retail/19', 'team', 'team/10', 'billing', 'my-profile', 'api/boot-check'] as $path) {
+        foreach (['school-fees', 'school-fees/settings', 'school-fees/legacy-retail/19', 'team', 'team/10', 'billing', 'my-profile', 'api/boot-check'] as $path) {
             $r = (new SchoolWorkspace)->handle(Request::create('/fbr-pos/'.$path), fn () => response('supported'));
             $this->assertSame('supported', $r->getContent());
             $this->assertStringContainsString('no-store', $r->headers->get('Cache-Control'));

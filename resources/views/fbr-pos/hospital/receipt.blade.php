@@ -19,7 +19,8 @@ $paperWidth = match ($print['paper']) { '58mm'=>'58mm', 'a4'=>'180mm', default=>
 </div>
 @if(($payment->fbr_status ?? null)==='submitted' && !empty($payment->fbr_invoice_number))
 <p class="notice" id="hospital-fiscal-accepted"><strong>FBR IMS Accepted</strong><br>FBR Invoice: {{ $payment->fbr_invoice_number }}</p>
-@php $hospitalFbrQr=\App\Support\QrImage::dataUri((string)($payment->fbr_qr_payload ?: $payment->fbr_invoice_number),5,4); @endphp\n@if($hospitalFbrQr)<div class="receipt-brand"><img alt="FBR verification QR" style="width:34mm;height:34mm" src="{{ $hospitalFbrQr }}"></div>@endif
+@php $hospitalFbrQr=\App\Support\QrImage::dataUri((string)($payment->fbr_qr_payload ?: $payment->fbr_invoice_number),5,4); @endphp
+@if($hospitalFbrQr)<div class="receipt-brand"><img alt="FBR verification QR" style="width:34mm;height:34mm" src="{{ $hospitalFbrQr }}"></div>@endif
 @elseif(in_array(($payment->fbr_status ?? null),['pending','offline','verification_pending'],true))
 <p class="notice" id="hospital-fiscal-pending">FBR IMS: {{ $payment->fbr_status }}</p>
 @else

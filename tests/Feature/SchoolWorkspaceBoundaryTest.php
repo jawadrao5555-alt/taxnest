@@ -83,7 +83,7 @@ class SchoolWorkspaceBoundaryTest extends TestCase
 
     public function test_school_supported_routes_are_available_and_not_cached(): void
     {
-        foreach (['school-fees', 'school-fees/settings', 'school-fees/legacy-retail/19', 'team', 'team/10', 'billing', 'my-profile', 'api/boot-check'] as $path) {
+        foreach (['school-fees', 'school-fees/settings', 'school-fees/reports.csv', 'school-fees/reports.pdf', 'agent', 'agent/download', 'school-fees/legacy-retail/19', 'team', 'team/10', 'billing', 'my-profile', 'api/boot-check'] as $path) {
             $r = (new SchoolWorkspace)->handle(Request::create('/fbr-pos/'.$path), fn () => response('supported'));
             $this->assertSame('supported', $r->getContent());
             $this->assertStringContainsString('no-store', $r->headers->get('Cache-Control'));
@@ -108,16 +108,16 @@ class SchoolWorkspaceBoundaryTest extends TestCase
         }
     }
 
-    public function test_stale_school_fiscal_flags_cannot_change_runtime_verdict_or_agent_fallback(): void
+    public function test_configured_school_fiscal_flags_enable_only_the_fbr_agent_path(): void
     {
         $school = Company::find(1)->forceFill([
             'fbr_reporting_enabled' => true, 'agent_enabled' => true,
             'fbr_pos_enabled' => true, 'fbr_connection_mode' => 'fiscal_device',
             'fbr_pos_id' => '9999',
         ]);
-        $this->assertFalse($school->fbr_reporting_enabled);
-        $this->assertFalse($school->fbrPosIntegrationConfigured());
-        $this->assertFalse($school->agentServesFbr());
+        $this->assertTrue($school->fbr_reporting_enabled);
+        $this->assertTrue($school->fbrPosIntegrationConfigured());
+        $this->assertTrue($school->agentServesFbr());
         $this->assertFalse($school->agentHandlesPra());
         $this->assertFalse($school->fbrIntegrationUndecided());
     }

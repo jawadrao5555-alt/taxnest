@@ -29,10 +29,11 @@ input:focus-visible,select:focus-visible,button:focus-visible,a:focus-visible{ou
 <div class="hospital-sidebar-brand"><strong>TaxNest POS</strong><a href="https://taxnest.pk">taxnest.pk</a></div>
 </aside>
 <main>
-<header class="hospital-topbar"><h1>{{ $company->name }}</h1><div class="hospital-topbar-tools no-print">
+<header class="hospital-topbar"><div><p class="muted">{{ __('hospital.title') }}</p><h1>{{ $company->name }}</h1></div><div class="hospital-topbar-tools no-print">
 @if(isset($hospitalCampuses)&&$hospitalCampuses->count()>1)<form class="campus-switcher" action="/fbr-pos/hospital/campus" method="post">@csrf<label class="sr-only" for="hospital-campus">{{ __('hospital.campus') }}</label><select id="hospital-campus" name="branch_id" onchange="this.form.requestSubmit()">@foreach($hospitalCampuses as $campus)<option value="{{ $campus->id }}" @selected((int)$hospitalCampusId===(int)$campus->id)>{{ $campus->name }}</option>@endforeach</select><noscript><button>{{ __('hospital.campus') }}</button></noscript></form>
 @elseif(isset($hospitalCampuses)&&$hospitalCampuses->count()===1)<span class="muted">{{ $hospitalCampuses->first()->name }}</span>@else<span class="muted">No campus configured</span>@endif
-<span @class(['fiscal-badge','on'=>(bool)$company->fbr_reporting_enabled]) id="hospital-fiscal-status" role="status">{{ $company->fbr_reporting_enabled ? 'FBR IMS ON' : 'Fiscal OFF' }}</span>
+@php($hospitalImsOn = $company->fbr_reporting_enabled && $company->fbrPosIntegrationConfigured())
+<span @class(['fiscal-badge','on'=>$hospitalImsOn]) id="hospital-fiscal-status" role="status">{{ $hospitalImsOn ? 'FBR IMS ON' : 'Fiscal OFF' }}</span>
 @if(is_array(session('impersonation')))<form method="post" action="{{ route('saas.admin.impersonation.stop') }}">@csrf<button>{{ __('hospital_workspace.exit_company') }}</button></form>@else<form method="post" action="/fbr-pos/logout">@csrf<button>{{ __('pos.logout') }}</button></form>@endif
 </div></header>
 @if(!empty($hospitalUnassigned))<p class="notice">{{ __('hospital.unassigned_notice') }}</p>@endif

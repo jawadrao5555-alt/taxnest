@@ -17,7 +17,14 @@ $paperWidth = match ($print['paper']) { '58mm'=>'58mm', 'a4'=>'180mm', default=>
 @if($print['show_contact'])<div class="muted">@if($company->address)<div>{{ $company->address }}</div>@endif @if($company->phone)<div>{{ $company->phone }}</div>@endif @if($company->email)<div>{{ $company->email }}</div>@endif</div>@endif
 <h2>{{ __('hospital.receipt') }} HP-{{ $payment->id }}</h2><p>HI-{{ $invoice->id }} · {{ $payment->collected_at }}</p>
 </div>
+@if(($payment->fbr_status ?? null)==='submitted' && !empty($payment->fbr_invoice_number))
+<p class="notice" id="hospital-fiscal-accepted"><strong>FBR IMS Accepted</strong><br>FBR Invoice: {{ $payment->fbr_invoice_number }}</p>
+<div class="receipt-brand"><img alt="FBR verification QR" style="width:34mm;height:34mm" src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data={{ urlencode($payment->fbr_qr_payload ?: $payment->fbr_invoice_number) }}"></div>
+@elseif(in_array(($payment->fbr_status ?? null),['pending','offline','verification_pending'],true))
+<p class="notice" id="hospital-fiscal-pending">FBR IMS: {{ $payment->fbr_status }}</p>
+@else
 <p class="notice">{{ __('hospital_print.local_only') }}</p>
+@endif
 <dl><dt>{{ __('hospital.patient') }}</dt><dd>{{ $invoice->patient_reference }}@if($invoice->patient_name ?? null)<br>{{ $invoice->patient_name }}@endif</dd><dt>{{ __('hospital.service') }}</dt><dd>@if($lines)@foreach($lines as $line)<div>{{ $line['label'] }} · PKR {{ number_format($line['amount_paisa']/100,2) }}</div>@endforeach @else{{ __('hospital.'.$invoice->service_head) }}@endif</dd><dt>{{ __('hospital.method') }}</dt><dd>{{ __('hospital_print.'.$payment->payment_method) }}@if($payment->payment_reference ?? null)<br>{{ $payment->payment_reference }}@endif</dd><dt>{{ __('hospital.campus') }}</dt><dd>{{ $payment->campus_name }}</dd><dt>{{ __('hospital.cashier') }}</dt><dd>{{ $payment->cashier_name }}</dd><dt>{{ __('hospital.total') }}</dt><dd>PKR {{ number_format($invoice->total_paisa/100,2) }}</dd><dt>{{ __('hospital.amount') }}</dt><dd id="hospital-payment-amount" data-paisa="{{ $payment->amount_paisa }}">PKR {{ number_format($payment->amount_paisa/100,2) }}</dd><dt>{{ __('hospital.receipt_balance') }}</dt><dd id="hospital-receipt-balance" data-paisa="{{ $payment->balance_paisa }}">PKR {{ number_format($payment->balance_paisa/100,2) }}</dd></dl>
 <div class="actions no-print"><button type="button" id="hospital-print-receipt" onclick="window.print()">{{ __('hospital.print') }}</button>@if($preview ?? false)<a href="/fbr-pos/hospital/printing">{{ __('hospital_print.settings') }}</a>@else<a href="/fbr-pos/hospital/invoices/{{ $invoice->id }}{{ !empty($hospitalUnassigned) ? '?unassigned=1' : '' }}">{{ __('hospital.invoice') }} HI-{{ $invoice->id }}</a>@endif</div>
 <p class="muted no-print">{{ __('hospital_print.browser_printer') }} @if($print['printer_label']){{ __('hospital_print.preferred') }}: {{ $print['printer_label'] }}@endif</p>

@@ -142,6 +142,8 @@ class FbrPosHospitalController extends Controller
                 'collected_by'=>Auth::guard('fbrpos')->id(),'cashier_name'=>Auth::guard('fbrpos')->user()->name,'campus_name'=>$this->campus($company),
                 'collected_at'=>$at,'created_at'=>$at,'updated_at'=>$at]);
         },3);
+        \App\Services\HospitalPaymentImsService::queueFinalizedReceipt((int)$company->id,(int)$id);
+        \App\Services\HospitalPaymentImsService::reconcileReceipt((int)$company->id,(int)$id);
         return $this->response($r,$id);
     }
     public function invoice(int $id) {
@@ -151,7 +153,7 @@ class FbrPosHospitalController extends Controller
         return response()->view('fbr-pos.hospital.invoice',compact('company','invoice','payments','balance','requestKey','closed'))->header('Cache-Control','private, no-store');
     }
     public function receipt(int $id) {
-        $company=$this->company(true); $payment=$this->rows('hospital_payments',$company)->where('id',$id)->first(); abort_unless($payment,404);
+        $company=$this->company(true); \App\Services\HospitalPaymentImsService::reconcileReceipt((int)$company->id,$id); $payment=$this->rows('hospital_payments',$company)->where('id',$id)->first(); abort_unless($payment,404);
         $invoice=$this->rows('hospital_invoices',$company)->where('id',$payment->invoice_id)->first(); abort_unless($invoice,404);
         return response()->view('fbr-pos.hospital.receipt',compact('company','invoice','payment'))->header('Cache-Control','private, no-store');
     }
@@ -176,6 +178,20 @@ class FbrPosHospitalController extends Controller
         }
         $invoices=$q->orderByDesc('id')->paginate(20)->withQueryString();
         return response()->view('fbr-pos.hospital.history',compact('company','invoices'))->header('Cache-Control','private, no-store');
+    }
+    public function patientLedger(Request $r) {
+        $company=$this->company(true);
+        $d=$r->validate(['search'=>'nullable|string|max:100']);
+        $search=trim((string)($d['search']??''));
+        $q=$this->rows('hospital_invoices',$company);
+        if($search!=='') $q->where(function($q)use($search){$q->where('patient_reference','like','%'.$search.'%')->orWhere('patient_name','like','%'.$search.'%');});
+        $paid="COALESCE((SELECT SUM(hp.amount_paisa) FROM hospital_payments hp WHERE hp.invoice_id = hospital_invoices.id AND hp.company_id = hospital_invoices.company_id AND (hp.branch_id = hospital_invoices.branch_id OR (hp.branch_id IS NULL AND hospital_invoices.branch_id IS NULL))),0)";
+        $invoices=$q->select('hospital_invoices.*')->selectRaw($paid.' AS paid_paisa')
+            ->selectRaw('(hospital_invoices.total_paisa - '.$paid.') AS balance_paisa')->orderByDesc('id')->paginate(30)->withQueryString();
+        $summary=['charged_paisa'=>(int)$invoices->getCollection()->sum('total_paisa'),
+            'paid_paisa'=>(int)$invoices->getCollection()->sum('paid_paisa'),
+            'balance_paisa'=>(int)$invoices->getCollection()->sum('balance_paisa')];
+        return response()->view('fbr-pos.hospital.patient-ledger',compact('company','invoices','summary','search'))->header('Cache-Control','private, no-store');
     }
     private function totals(Company $c,string $date): array {
         $q=$this->rows('hospital_payments',$c)->whereDate('collected_at',$date);

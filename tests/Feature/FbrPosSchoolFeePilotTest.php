@@ -746,7 +746,7 @@ class FbrPosSchoolFeePilotTest extends TestCase
     {
         DB::table('companies')->where('id', $this->school->id)->update(['fbr_reporting_enabled' => true]);
         $school = $this->school->fresh();
-        $this->assertFalse($school->fbr_reporting_enabled);
+        $this->assertTrue($school->fbr_reporting_enabled);
         $this->assertFalse($school->fbrPosIntegrationConfigured());
         $transaction = new FbrPosTransaction(['company_id' => $school->id]);
         $transaction->setRelation('company', $school);

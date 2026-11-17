@@ -51,7 +51,7 @@ class SharedFbrCategorySettingsTest extends TestCase
     {
         $company = $this->company($category);
         $other = Company::create(['name' => 'Other synthetic company', 'ntn' => 'SYN-'.Str::random(8)]);
-        $otherBefore = $other->getAttributes();
+        $otherBefore = $other->fresh()->getAttributes();
         $controller = app(FbrPosController::class);
         $request = $this->request([], 'GET');
         $response = (new SchoolWorkspace)->handle($request, function () use ($controller, $request) {

@@ -49,8 +49,10 @@ class CollectionFbrSubmissionTest extends TestCase
             $invoice = DB::table('hospital_invoices')->insertGetId(['company_id' => $company->id,
                 'request_key' => (string) Str::uuid(), 'patient_reference' => 'SYN-PATIENT',
                 'service_head' => 'consultation', 'total_paisa' => 50000, 'created_by' => 1,
+                'campus_name' => 'Synthetic branch',
                 'created_at' => now(), 'updated_at' => now()]);
             $data += ['invoice_id' => $invoice, 'balance_paisa' => 37500,
+                'cashier_name' => 'Synthetic cashier', 'campus_name' => 'Synthetic branch',
                 'fiscal_route_snapshot' => PilotFiscalRouteSnapshot::newHospitalPayment($company, $invoice)];
             $service = HospitalPaymentImsService::class;
         }

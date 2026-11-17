@@ -119,7 +119,7 @@ jobs:
         run: composer install --no-interaction --prefer-dist --no-progress --no-ansi --no-scripts
       - name: Check school and hospital collections and existing retail regressions
         run: |
-          for test in tests/Feature/FbrPosSchoolFeePilotTest.php tests/Feature/FbrPosHospitalCollectionTest.php tests/Feature/RequestedPackageSignupTest.php tests/Feature/FbrPosStoreReplayGuardTest.php tests/Feature/FbrPosFiscalReceiptIdentityTest.php; do
+          for test in tests/Feature/SharedFbrCategorySettingsTest.php tests/Feature/CollectionFbrSubmissionTest.php tests/Feature/FbrPosSchoolFeePilotTest.php tests/Feature/FbrPosHospitalCollectionTest.php tests/Feature/RequestedPackageSignupTest.php tests/Feature/FbrPosStoreReplayGuardTest.php tests/Feature/FbrPosFiscalReceiptIdentityTest.php; do
             bash scripts/rc-safe-run -- vendor/bin/phpunit "$test" --testdox || exit $?
           done
       - name: Check PRA DI sandbox and production environment isolation

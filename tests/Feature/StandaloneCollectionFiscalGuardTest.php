@@ -34,7 +34,7 @@ class StandaloneCollectionFiscalGuardTest extends TestCase
     {
         foreach (['education', 'clinic', 'hospital'] as $category) {
             $id = DB::table('companies')->insertGetId(['product_type' => 'fbrpos', 'pos_type' => 'retail',
-                'business_category' => $category, 'fbr_reporting_enabled' => true, 'fbr_pos_id' => '123', 'fbr_pos_token' => 'synthetic']);
+                'business_category' => $category, 'fbr_reporting_enabled' => true, 'fbr_pos_id' => '123']);
             $company = Company::findOrFail($id);
             $this->assertTrue($company->isLocalCollectionPilot());
             $this->assertTrue($company->fbr_reporting_enabled);

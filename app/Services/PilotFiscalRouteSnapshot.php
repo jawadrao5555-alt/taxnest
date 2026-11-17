@@ -19,13 +19,13 @@ final class PilotFiscalRouteSnapshot
         abort_unless(isset(self::SOURCES[$source]) && self::SOURCES[$source][0] === $category, 422);
         abort_unless($category === 'school' ? $company->isSchoolFeePilot() : $company->isHospitalCollectionPilot(), 422);
         $ims = (bool) $company->fbr_reporting_enabled
-            && $company->fbrPosIntegrationConfigured()
-            && ($company->fbr_connection_mode ?? 'cloud') === 'fiscal_device';
+            && $company->agentServesFbr()
+            && $company->fbrPosIntegrationConfigured();
         return json_encode([
             'version' => 1, 'company_id' => (int) $company->id, 'category' => $category,
             'source' => $source, 'route' => $ims ? 'ims' : 'off', 'eligible' => $ims,
             'adapter_version' => $ims ? 'standalone-fbr-pos-agent-v1' : null,
-            'environment' => $ims ? ($company->fbr_pos_environment ?? 'sandbox') : null,
+            'environment' => $ims ? ($company->fbr_pos_environment === 'production' ? 'production' : 'sandbox') : null,
         ], JSON_THROW_ON_ERROR);
     }
 

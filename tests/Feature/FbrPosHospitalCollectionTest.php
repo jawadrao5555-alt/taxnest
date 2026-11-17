@@ -134,6 +134,29 @@ class FbrPosHospitalCollectionTest extends TestCase
     private function denied(callable $f,int $status): void {
         try{$f();$this->fail('Expected denied');}catch(HttpExceptionInterface $e){$this->assertSame($status,$e->getStatusCode());}
     }
+    public function test_dashboard_separates_daily_collections_and_scoped_outstanding(): void
+    {
+        $this->withoutVite();
+        $this->collect($this->payload(['payment_method'=>'bank','payment_reference'=>'SYNTHETIC-BANK-01']));
+        $invoice=DB::table('hospital_invoices')->first();
+        // Corrupt foreign payment must never reduce this campus/company balance.
+        $foreign=(array)DB::table('hospital_payments')->first(); unset($foreign['id']);
+        $foreign['company_id']=999; $foreign['request_key']=(string)Str::uuid(); $foreign['amount_paisa']=50000;
+        DB::table('hospital_payments')->insert($foreign);
+        $response=app(FbrPosHospitalController::class)->dashboard();
+        $data=$response->original->getData();
+        $this->assertSame(60000,$data['outstanding']);
+        $this->assertSame(40000,$data['totals']['bank_paisa']);
+        $this->assertSame(0,$data['totals']['cash_paisa']);
+        $this->assertSame(1,$data['totals']['receipt_count']);
+        $this->assertSame('Synthetic Hospital',$data['campusName']);
+        $html=$response->getContent();
+        $this->assertStringContainsString('hospital-outstanding',$html);
+        $this->assertStringContainsString('data-paisa="60000"',$html);
+        $this->assertStringContainsString('Fiscal OFF',$html);
+        Http::assertNothingSent();
+    }
+
     public function test_partial_payments_are_immutable_and_replay_safe_with_correct_balance(): void {
         $first=$this->payload();$id=$this->collect($first)->getData(true)['receipt_id'];
         $invoice=DB::table('hospital_invoices')->first();$original=DB::table('hospital_payments')->find($id);
@@ -156,7 +179,7 @@ class FbrPosHospitalCollectionTest extends TestCase
         $this->assertStringNotContainsString('alt="FBR QR Code"', $html);
         $this->assertStringNotContainsString('class="fbr-number"', $html);
         $this->assertStringNotContainsString('data-fiscal-qr', $html);
-        foreach(['SYN-P-001','Consultation','400.00','600.00','Synthetic Cashier','Synthetic Hospital','LOCAL COLLECTION ONLY'] as $v)$this->assertStringContainsString($v,$html);
+        foreach(['SYN-P-001','Consultation','400.00','600.00','Synthetic Cashier','Synthetic Hospital','FBR OFF'] as $v)$this->assertStringContainsString($v,$html);
         Http::assertNothingSent();
     }
     public function test_service_heads_methods_and_payment_confirmation(): void {
@@ -315,5 +338,46 @@ class FbrPosHospitalCollectionTest extends TestCase
         $this->assertCount(0,$history(['status'=>'partial']));
         DB::table('hospital_payments')->insert(['company_id'=>$this->hospital->id+99,'branch_id'=>null,'invoice_id'=>$invoice->id,'request_key'=>(string)Str::uuid(),'amount_paisa'=>1,'payment_method'=>'cash','balance_paisa'=>0,'collected_by'=>$this->cashier->id,'cashier_name'=>'Other','campus_name'=>'Other','collected_at'=>now(),'created_at'=>now(),'updated_at'=>now()]);
         $this->assertCount(1,$history(['status'=>'settled']));
+    }
+
+    public function test_new_payment_receipts_freeze_independent_routes_without_rewriting_legacy_bill_or_receipt(): void
+    {
+        (require database_path('migrations/2027_01_01_000000_add_pilot_fiscal_route_snapshots.php'))->up();
+        Http::fake();
+        $payload=$this->payload();
+        $firstId=$this->collect($payload)->getData(true)['receipt_id'];
+        $invoice=DB::table('hospital_invoices')->first();
+        $first=DB::table('hospital_payments')->find($firstId);
+        $snapshot=json_decode($first->fiscal_route_snapshot,true);
+        $this->assertSame(2,$snapshot['version']);
+        $this->assertSame('hospital_payment',$snapshot['source']);
+        $this->assertSame((int)$invoice->id,$snapshot['invoice_id']);
+        $this->assertSame('off',$snapshot['route']);
+        $this->assertNull($invoice->fiscal_route_snapshot);
+        $this->assertSame($firstId,$this->collect($payload)->getData(true)['receipt_id']);
+        $this->assertEquals($first,DB::table('hospital_payments')->find($firstId));
+        // Simulate a historical inherited bill route; it must not arm a new receipt.
+        $old=json_decode(\App\Services\PilotFiscalRouteSnapshot::newBill($this->hospital,'hospital','hospital_invoice'),true);
+        $old['route']='ims';$raw=json_encode($old);
+        DB::table('hospital_invoices')->where('id',$invoice->id)->update(['fiscal_route_snapshot'=>$raw]);
+        DB::table('hospital_payments')->where('id',$firstId)->update(['fiscal_route_snapshot'=>$raw]);
+        $legacy=DB::table('hospital_payments')->find($firstId);
+        $this->assertSame('ims',\App\Services\PilotFiscalRouteSnapshot::recoveryPlan($this->hospital->id,'hospital','hospital_payment',$firstId)['route']);
+        $nextPayload=$this->payload(['amount'=>'600']);
+        $secondId=$this->collect($nextPayload,$invoice->id)->getData(true)['receipt_id'];
+        $second=DB::table('hospital_payments')->find($secondId);
+        $next=json_decode($second->fiscal_route_snapshot,true);
+        $this->assertSame(2,$next['version']);$this->assertSame('off',$next['route']);
+        $this->assertSame('local_only',\App\Services\PilotFiscalRouteSnapshot::recoveryPlan($this->hospital->id,'hospital','hospital_payment',$secondId)['state']);
+        $this->assertSame(0,(int)$second->balance_paisa);
+        $this->assertSame($secondId,$this->collect($nextPayload,$invoice->id)->getData(true)['receipt_id']);
+        $this->assertEquals($legacy,DB::table('hospital_payments')->find($firstId));
+        $this->assertEquals($second,DB::table('hospital_payments')->find($secondId));
+        $this->assertSame($raw,DB::table('hospital_invoices')->where('id',$invoice->id)->value('fiscal_route_snapshot'));
+        // Legacy receipt without provenance remains unknown, never backfilled by retry.
+        DB::table('hospital_payments')->where('id',$firstId)->update(['fiscal_route_snapshot'=>null]);
+        $this->collect($payload);
+        $this->assertNull(DB::table('hospital_payments')->where('id',$firstId)->value('fiscal_route_snapshot'));
+        Http::assertNothingSent();
     }
 }

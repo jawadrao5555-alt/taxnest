@@ -25,8 +25,20 @@ final class PilotFiscalRouteSnapshot
             'version' => 1, 'company_id' => (int) $company->id, 'category' => $category,
             'source' => $source, 'route' => $ims ? 'ims' : 'off', 'eligible' => $ims,
             'adapter_version' => $ims ? 'standalone-fbr-pos-agent-v1' : null,
-            'environment' => $ims ? (($company->fbr_pos_environment ?? 'sandbox') === 'production' ? 'production' : 'sandbox') : null,
+            'environment' => $ims ? ($company->fbr_pos_environment === 'production' ? 'production' : 'sandbox') : null,
         ], JSON_THROW_ON_ERROR);
+    }
+
+    /** New payment receipts have their own routing event, independently of the internal bill. */
+    public static function newHospitalPayment(Company $company, int $invoiceId): string
+    {
+        abort_unless($company->isHospitalCollectionPilot(), 422);
+        abort_unless(DB::table('hospital_invoices')->where('company_id', $company->id)->where('id', $invoiceId)->exists(), 404);
+        $snapshot = json_decode(self::newBill($company, 'hospital', 'hospital_invoice'), true, 512, JSON_THROW_ON_ERROR);
+        $snapshot['version'] = 2;
+        $snapshot['source'] = 'hospital_payment';
+        $snapshot['invoice_id'] = $invoiceId;
+        return json_encode($snapshot, JSON_THROW_ON_ERROR);
     }
 
     public static function recoveryPlan(int $companyId, string $category, string $source, int $id, ?string $requestedRoute = null): array
@@ -41,17 +53,21 @@ final class PilotFiscalRouteSnapshot
         if ($raw === null) return $base + ['state' => 'legacy_unverified', 'reason' => 'missing_immutable_route'];
         try { $snapshot = json_decode($raw, true, 512, JSON_THROW_ON_ERROR); }
         catch (\JsonException) { return $base + ['state' => 'blocked', 'reason' => 'invalid_snapshot']; }
-        $expectedSource = $source === 'hospital_payment' ? 'hospital_invoice' : $source;
-        if (!is_array($snapshot) || ($snapshot['version'] ?? null) !== 1
+        $ownPaymentRoute = $source === 'hospital_payment' && is_array($snapshot) && ($snapshot['version'] ?? null) === 2;
+        $expectedSource = $source === 'hospital_payment' && !$ownPaymentRoute ? 'hospital_invoice' : $source;
+        if (!is_array($snapshot) || ($snapshot['version'] ?? null) !== ($ownPaymentRoute ? 2 : 1)
             || ($snapshot['company_id'] ?? null) !== $companyId || ($snapshot['category'] ?? null) !== $category
             || ($snapshot['source'] ?? null) !== $expectedSource
             || !in_array($snapshot['route'] ?? null, ['off', 'ims', 'di'], true)) {
             return $base + ['state' => 'blocked', 'reason' => 'invalid_snapshot_scope'];
         }
-        // Payment routing must match its own scoped parent, not just a matching category.
+        // New payment events bind to a scoped internal bill, not its reporting route.
+        // Preserve the strict equality rule for historical inherited version-one records.
         if ($source === 'hospital_payment') {
             $parent = DB::table('hospital_invoices')->where('company_id', $companyId)->where('id', $row->invoice_id)->first();
-            if (!$parent || ($parent->fiscal_route_snapshot ?? null) !== $raw) {
+            if (!$parent || ($ownPaymentRoute
+                ? ($snapshot['invoice_id'] ?? null) !== (int) $row->invoice_id
+                : ($parent->fiscal_route_snapshot ?? null) !== $raw)) {
                 return $base + ['state' => 'blocked', 'reason' => 'parent_snapshot_mismatch'];
             }
         }

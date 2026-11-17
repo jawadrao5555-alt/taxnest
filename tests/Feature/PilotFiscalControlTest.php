@@ -25,15 +25,15 @@ class PilotFiscalControlTest extends TestCase
         }
         $this->assertSame(2,AdminAuditLog::where('action','Pilot fiscal ON rejected')->count());Http::assertNothingSent();
     }
-    public function test_configured_school_can_enable_ims_for_new_receipts_but_hospital_waits_for_397():void
+    public function test_configured_school_and_hospital_can_enable_ims_for_new_receipts():void
     {
         $this->owner();
         $school=$this->company();$school->update(['fbr_reporting_enabled'=>false,'fbr_pos_enabled'=>true,'fbr_pos_id'=>'123456','fbr_connection_mode'=>'fiscal_device','agent_enabled'=>true]);
         $this->postJson($this->url($school),['route'=>'ims'])->assertOk()->assertJsonPath('enabled',true)->assertJsonPath('selected_route','ims');
         $this->assertTrue($school->fresh()->fbr_reporting_enabled);
         $hospital=$this->company('hospital');$hospital->update(['fbr_reporting_enabled'=>false,'fbr_pos_enabled'=>true,'fbr_pos_id'=>'654321','fbr_connection_mode'=>'fiscal_device','agent_enabled'=>true]);
-        $this->postJson($this->url($hospital),['route'=>'ims'])->assertStatus(422)->assertJsonPath('enabled',false);
-        $this->assertFalse($hospital->fresh()->fbr_reporting_enabled);
+        $this->postJson($this->url($hospital),['route'=>'ims'])->assertOk()->assertJsonPath('enabled',true)->assertJsonPath('selected_route','ims');
+        $this->assertTrue($hospital->fresh()->fbr_reporting_enabled);
     }
     public function test_off_only_updates_selected_flag_and_preserves_other_tenant_and_history():void
     {

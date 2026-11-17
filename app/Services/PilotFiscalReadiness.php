@@ -11,7 +11,7 @@ final class PilotFiscalReadiness
     {
         abort_unless($company->isLocalCollectionPilot(), 404);
         $category = $company->isSchoolFeePilot() ? 'school' : 'hospital';
-        $imsImplemented = $company->isSchoolFeePilot();
+        $imsImplemented = true;
         $activationAvailable = $imsImplemented && $company->fbrPosIntegrationConfigured();
 
         // Evidence is deliberately not accepted from request data or tenant settings.

@@ -58,7 +58,15 @@ class FbrPosHospitalController extends Controller
     }
     public function dashboard() {
         $company=$this->company(); $date=today()->toDateString(); $totals=$this->totals($company,$date); $closed=$this->closed($company,$date);
-        return response()->view('fbr-pos.hospital.dashboard',compact('company','date','totals','closed'))->header('Cache-Control','private, no-store');
+        // Scope both sides of the balance to this company and active campus.
+        // A payment linked to a foreign/corrupt invoice cannot reduce this balance.
+        $paid = DB::table('hospital_payments as hp')->selectRaw('COALESCE(SUM(hp.amount_paisa),0)')
+            ->whereColumn('hp.invoice_id','hospital_invoices.id')->whereColumn('hp.company_id','hospital_invoices.company_id')
+            ->whereRaw('(hp.branch_id = hospital_invoices.branch_id OR (hp.branch_id IS NULL AND hospital_invoices.branch_id IS NULL))');
+        $balances = $this->rows('hospital_invoices',$company)->select('total_paisa')->selectSub($paid,'paid_paisa')->get();
+        $outstanding = (int)$balances->sum(fn($invoice)=>max(0,(int)$invoice->total_paisa-(int)$invoice->paid_paisa));
+        $campusName = $this->campus($company);
+        return response()->view('fbr-pos.hospital.dashboard',compact('company','date','totals','closed','outstanding','campusName'))->header('Cache-Control','private, no-store');
     }
     public function switchCampus(Request $r) {
         $this->company(); $d=$r->validate(['branch_id'=>'required|integer|min:1']);
@@ -126,11 +134,16 @@ class FbrPosHospitalController extends Controller
                 $paid=(int)$this->rows('hospital_payments',$company)->where('invoice_id',$invoiceId)->orderBy('id')->lockForUpdate()->get(['id','amount_paisa'])->sum('amount_paisa');
                 if ($amount>$total-$paid) $this->error('amount','overpayment');
             }
-            return DB::table('hospital_payments')->insertGetId(['company_id'=>$company->id,'branch_id'=>$this->branch(),'invoice_id'=>$invoiceId,
+            // Each finalized payment is a distinct event; never inherit a bill-era route.
+            $routeFields = \Illuminate\Support\Facades\Schema::hasColumn('hospital_payments', 'fiscal_route_snapshot')
+                ? ['fiscal_route_snapshot' => \App\Services\PilotFiscalRouteSnapshot::newHospitalPayment($company, (int) $invoiceId)] : [];
+            return DB::table('hospital_payments')->insertGetId($routeFields + ['company_id'=>$company->id,'branch_id'=>$this->branch(),'invoice_id'=>$invoiceId,
                 'request_key'=>$d['request_key'],'amount_paisa'=>$amount,'payment_reference'=>$d['payment_reference']?:null,'payment_method'=>$d['payment_method'],'balance_paisa'=>$total-$paid-$amount,
                 'collected_by'=>Auth::guard('fbrpos')->id(),'cashier_name'=>Auth::guard('fbrpos')->user()->name,'campus_name'=>$this->campus($company),
                 'collected_at'=>$at,'created_at'=>$at,'updated_at'=>$at]);
         },3);
+        \App\Services\HospitalPaymentImsService::queueFinalizedReceipt((int)$company->id,(int)$id);
+        \App\Services\HospitalPaymentImsService::reconcileReceipt((int)$company->id,(int)$id);
         return $this->response($r,$id);
     }
     public function invoice(int $id) {
@@ -140,7 +153,7 @@ class FbrPosHospitalController extends Controller
         return response()->view('fbr-pos.hospital.invoice',compact('company','invoice','payments','balance','requestKey','closed'))->header('Cache-Control','private, no-store');
     }
     public function receipt(int $id) {
-        $company=$this->company(true); $payment=$this->rows('hospital_payments',$company)->where('id',$id)->first(); abort_unless($payment,404);
+        $company=$this->company(true); \App\Services\HospitalPaymentImsService::reconcileReceipt((int)$company->id,$id); $payment=$this->rows('hospital_payments',$company)->where('id',$id)->first(); abort_unless($payment,404);
         $invoice=$this->rows('hospital_invoices',$company)->where('id',$payment->invoice_id)->first(); abort_unless($invoice,404);
         return response()->view('fbr-pos.hospital.receipt',compact('company','invoice','payment'))->header('Cache-Control','private, no-store');
     }
@@ -165,6 +178,20 @@ class FbrPosHospitalController extends Controller
         }
         $invoices=$q->orderByDesc('id')->paginate(20)->withQueryString();
         return response()->view('fbr-pos.hospital.history',compact('company','invoices'))->header('Cache-Control','private, no-store');
+    }
+    public function patientLedger(Request $r) {
+        $company=$this->company(true);
+        $d=$r->validate(['search'=>'nullable|string|max:100']);
+        $search=trim((string)($d['search']??''));
+        $q=$this->rows('hospital_invoices',$company);
+        if($search!=='') $q->where(function($q)use($search){$q->where('patient_reference','like','%'.$search.'%')->orWhere('patient_name','like','%'.$search.'%');});
+        $paid="COALESCE((SELECT SUM(hp.amount_paisa) FROM hospital_payments hp WHERE hp.invoice_id = hospital_invoices.id AND hp.company_id = hospital_invoices.company_id AND (hp.branch_id = hospital_invoices.branch_id OR (hp.branch_id IS NULL AND hospital_invoices.branch_id IS NULL))),0)";
+        $invoices=$q->select('hospital_invoices.*')->selectRaw($paid.' AS paid_paisa')
+            ->selectRaw('(hospital_invoices.total_paisa - '.$paid.') AS balance_paisa')->orderByDesc('id')->paginate(30)->withQueryString();
+        $summary=['charged_paisa'=>(int)$invoices->getCollection()->sum('total_paisa'),
+            'paid_paisa'=>(int)$invoices->getCollection()->sum('paid_paisa'),
+            'balance_paisa'=>(int)$invoices->getCollection()->sum('balance_paisa')];
+        return response()->view('fbr-pos.hospital.patient-ledger',compact('company','invoices','summary','search'))->header('Cache-Control','private, no-store');
     }
     private function totals(Company $c,string $date): array {
         $q=$this->rows('hospital_payments',$c)->whereDate('collected_at',$date);

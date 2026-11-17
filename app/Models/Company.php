@@ -29,10 +29,10 @@ class Company extends Model
         return $this->isSchoolFeePilot() || $this->isHospitalCollectionPilot();
     }
 
-    /** School IMS is released first; Hospital remains fail-closed until #397. */
+    /** School and Hospital use the same standalone FBR POS Agent transport. */
     public function getFbrReportingEnabledAttribute($value): bool
     {
-        return !$this->isHospitalCollectionPilot() && (bool) $value;
+        return (bool) $value;
     }
 
 
@@ -731,10 +731,7 @@ class Company extends Model
      */
     public function agentServesFbr(): bool
     {
-        // School is the first focused release. Hospital is enabled only by its
-        // own #397 release after School reaches main and Hospital is reverified.
-        if ($this->isHospitalCollectionPilot()) return false;
-        if ($this->isSchoolFeePilot()) {
+        if ($this->isLocalCollectionPilot()) {
             $posId = preg_replace('/[^0-9]/', '', (string) ($this->fbr_pos_id ?? ''));
             if ($posId === '' || (int) $posId === 0) return false;
         }
@@ -758,7 +755,6 @@ class Company extends Model
      */
     public function fbrPosIntegrationConfigured(): bool
     {
-        if ($this->isHospitalCollectionPilot()) return false;
         $posId = preg_replace('/[^0-9]/', '', (string) ($this->fbr_pos_id ?? ''));
         if ($posId === '' || (int) $posId === 0) {
             return false;

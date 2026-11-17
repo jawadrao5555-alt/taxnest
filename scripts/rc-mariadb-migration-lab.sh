@@ -109,6 +109,7 @@ concurrency(){
     clean_php php "$ROOT/tests/native/rc_pilot_fiscal_control.php" | tee "$EVIDENCE_DIR/pilot-fiscal-control.log"
     grep -Fqx "PASS: native School Hospital concurrent OFF and rejected ON remain disabled with exact audit current actor denial atomic rollback and unchanged acknowledgements foreign tenant no provider calls" "$EVIDENCE_DIR/pilot-fiscal-control.log" || fail pilot-fiscal-control-missing-proof
     grep -Fqx "PASS: native School Hospital OFF IMS DI snapshots survive concurrent control and same-route unknown recovery without mutation backfill or provider calls" "$EVIDENCE_DIR/pilot-fiscal-control.log" || fail pilot-fiscal-route-snapshot-missing-proof
+    grep -Fqx "PASS: native Hospital per-payment route version2 independent of null bill route immutable same-route HOLD no backfill no provider calls" "$EVIDENCE_DIR/pilot-fiscal-control.log" || fail hospital-payment-route-missing-proof
     clean_php php "$ROOT/tests/native/rc_platform_expense_concurrency.php" | tee "$EVIDENCE_DIR/platform-expense-concurrency.log"
     grep -Fqx "PASS: native platform expense duplicate request and reversal preserve one immutable original and offset with audit; changed data, current demotion and tenant guards denied; competing admin reversal bounded; no payment executed" "$EVIDENCE_DIR/platform-expense-concurrency.log" || fail platform-expense-missing-concurrency-proof
     clean_php php "$ROOT/tests/native/rc_madadgar_escalation.php" | tee "$EVIDENCE_DIR/madadgar-escalation.log"

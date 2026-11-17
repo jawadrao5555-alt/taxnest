@@ -21,12 +21,12 @@ class PilotFiscalReadinessTest extends TestCase
             $url = '/admin/companies/'.$company->id.'/pilot-fiscal-control';
             $before = DB::table('companies')->find($company->id);
             $state = $this->getJson($url)->assertOk()->assertJsonPath('readiness.category',$label)
-                ->assertJsonPath('readiness.integration_implemented',$label==='school')
+                ->assertJsonPath('readiness.integration_implemented',true)
                 ->assertJsonPath('readiness.activation_available',false)
                 ->assertJsonPath('readiness.sandbox_verified',false)
                 ->assertJsonPath('readiness.historical_backfill_allowed',false)->json('readiness');
             $this->assertSame(['applicability','reportable_event','transport','authentication','tax_mapping','sandbox','acknowledgement','uncertain_recovery','implementation'],array_column($state['requirements'],'id'));
-            $this->assertSame(['unverified','unverified','unverified','unverified','unverified','unverified','unverified','unverified',$label==='school'?'implemented':'pending'],array_column($state['requirements'],'status'));
+            $this->assertSame(['unverified','unverified','unverified','unverified','unverified','unverified','unverified','unverified','implemented'],array_column($state['requirements'],'status'));
             $this->assertSame($company->id, $state['company_id']);
             $this->assertFalse($state['evidence_transfer_allowed']);
             foreach ($state['requirements'] as $requirement) {
@@ -82,7 +82,7 @@ class PilotFiscalReadinessTest extends TestCase
                 $this->assertSame($company->id,$candidate['company_id']);
                 $this->assertSame($label,$candidate['category']);
                 $this->assertFalse($candidate['eligible']);
-                $this->assertSame($label==='school'&&$candidate['route']==='ims',$candidate['adapter_implemented']);
+                $this->assertSame($candidate['route']==='ims',$candidate['adapter_implemented']);
                 $this->assertFalse($candidate['sandbox_verified']);
                 foreach ($candidate['requirements'] as $requirement) {
                     $this->assertSame($candidate['route'],$requirement['route']);

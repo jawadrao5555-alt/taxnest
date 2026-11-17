@@ -3,6 +3,8 @@
 <h1>{{ __('hospital_workspace.settings') }}</h1>
 <p class="notice">{{ __('hospital.scope') }}</p>
 @if($errors->any())<p role="alert" class="error">{{ $errors->first() }}</p>@endif
+@if(session('status'))<p role="status" class="notice">{{ session('status') }}</p>@endif
+@include('fbr-pos.partials.collection-ims-settings', ['imsRoutes' => 'fbrpos.hospital', 'imsSectionId' => 'hospital-ims-settings'])
 <section class="card"><h2>{{ __('hospital_workspace.services') }}</h2><p>{{ __('hospital_workspace.catalog_note') }}</p>
 @foreach($services as $service)
 <form class="hospital-edit-service" method="post" action="/fbr-pos/hospital/settings/services">@csrf<input type="hidden" name="code" value="{{ $service->code }}">

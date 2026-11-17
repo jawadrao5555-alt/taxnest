@@ -28,8 +28,8 @@ class SchoolWorkspace
             return redirect()->away($root.'/settings')->header('Cache-Control', 'private, no-store');
         }
         $allowed = ($path === ltrim($root, '/') || str_starts_with($path, ltrim($root, '/').'/'))
-            || ($school && in_array($suffix, ['school-fees/reports.csv', 'school-fees/reports.pdf', 'agent', 'agent/download', 'agent/generate', 'agent/regenerate'], true))
-            || in_array($suffix, ['dashboard', 'transactions', 'day-close', 'set-language', 'set-dark-mode', 'billing', 'billing/checkout', 'payment-proof', 'my-profile', 'suggestions', 'tutorials', 'team', 'logout'], true)
+            || ($school && in_array($suffix, ['school-fees/reports.csv', 'school-fees/reports.pdf'], true))
+            || in_array($suffix, ['dashboard', 'transactions', 'day-close', 'set-language', 'set-dark-mode', 'billing', 'billing/checkout', 'payment-proof', 'my-profile', 'suggestions', 'tutorials', 'team', 'logout', 'agent', 'agent/download', 'agent/generate', 'agent/regenerate'], true)
             || $request->is('fbr-pos/team/*', 'fbr-pos/billing/documents/*')
             // Read-only freshness probes remain available; integration decisions may rewrite legacy invoices.
             || in_array($suffix, ['api/boot-check', 'api/boot-diagnostics'], true);

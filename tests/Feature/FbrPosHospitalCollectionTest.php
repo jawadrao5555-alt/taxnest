@@ -153,7 +153,7 @@ class FbrPosHospitalCollectionTest extends TestCase
         $html=$response->getContent();
         $this->assertStringContainsString('hospital-outstanding',$html);
         $this->assertStringContainsString('data-paisa="60000"',$html);
-        $this->assertStringContainsString('FBR OFF',$html);
+        $this->assertStringContainsString('Fiscal OFF',$html);
         Http::assertNothingSent();
     }
 

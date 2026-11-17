@@ -12,11 +12,7 @@
 <section class="card"><h2>Help & support</h2><p>School POS guide and product support.</p><a class="button" href="/product-guide#school-standalone">School POS guide</a> <a href="/fbr-pos/suggestions">Contact support</a></section>
 <section class="card"><h2>Reports</h2><p>Collections, payment methods and IMS results with PDF/CSV exports.</p><a class="button" href="{{ route('fbrpos.school-fees.reports') }}">Open reports</a></section>
 </div>
-<section class="card" id="school-ims-settings"><h2>FBR IMS integration</h2>
-<p>Finalized School payment receipts use the Desktop Agent IMS route. Saving setup does not turn reporting ON and never submits old OFF receipts.</p>
-<dl><dt>Reporting</dt><dd><strong>{{ $company->fbr_reporting_enabled ? 'ON' : 'OFF' }}</strong> · SaaS Admin controlled</dd><dt>Agent</dt><dd>{{ $company->agent_enabled ? 'Enabled' : 'Not paired' }}@if($company->agent_last_seen) · Last seen {{ $company->agent_last_seen }}@endif</dd><dt>Setup</dt><dd>{{ $imsConfigured ? 'Ready for enabled receipts' : 'Incomplete' }}</dd></dl>
-<form method="post" action="{{ route('fbrpos.school-fees.ims-settings') }}">@csrf<div class="grid"><label>Registered IMS POS ID<input name="fbr_pos_id" maxlength="100" value="{{ old('fbr_pos_id',$company->fbr_pos_id) }}" autocomplete="off"></label><label>Environment<select name="fbr_pos_environment"><option value="sandbox" @selected(old('fbr_pos_environment',$company->fbr_pos_environment ?? 'sandbox')==='sandbox')>Sandbox</option><option value="production" @selected(old('fbr_pos_environment',$company->fbr_pos_environment ?? 'sandbox')==='production')>Production</option></select></label></div><div class="actions"><button type="submit">Save IMS setup</button><a class="button" href="{{ route('fbrpos.agent') }}">Pair / check Desktop Agent</a></div></form>
-</section>
+@include('fbr-pos.partials.collection-ims-settings', ['imsRoutes' => 'fbrpos.school-fees', 'imsSectionId' => 'school-ims-settings'])
 <section class="card"><h2>{{ __('school.heads') }}</h2><p class="muted">{{ __('school_audit.rate_help') }}</p>
 @foreach($feeHeads as $head)
 <form method="post" action="/fbr-pos/school-fees/settings/fee-head" class="school-edit-head">@csrf

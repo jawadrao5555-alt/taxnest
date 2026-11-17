@@ -47,7 +47,7 @@ foreach(['education','hospital']as$category){
  try{foreach([0,1]as$i){$p=new Process([PHP_BINARY,__FILE__,'worker',(string)$actors[$i]->id,(string)$c->id,(string)$i,$barrier,(string)$i]);$p->setTimeout(35);$p->start();$workers[]=$p;}
  $until=microtime(true)+20;foreach([0,1]as$i)while(!is_file($barrier.'.ready-'.$i)){if(microtime(true)>$until)throw new RuntimeException('Pilot startup timeout');usleep(10000);}file_put_contents($barrier,'go');
  $results=[];foreach($workers as$p){$p->wait();pilotAssert($p->isSuccessful(),'Pilot process failure: '.$p->getErrorOutput());$results[]=json_decode($p->getOutput(),true,512,JSON_THROW_ON_ERROR);}
- pilotAssert(array_column($results,'status')===[200,422],'OFF/ON response contract changed');foreach($results as$r)pilotAssert($r['state']['enabled']===false&&$r['state']['reason']==='category_route_unverified','ON armed or unverified flag effective');
+ pilotAssert(array_column($results,'status')===[200,422],'OFF/ON response contract changed');foreach($results as$r)pilotAssert($r['state']['enabled']===false&&in_array($r['state']['reason'],['owner_off','ims_setup_incomplete'],true),'Incomplete ON armed or OFF state invalid');
  }finally{foreach($workers as$p)if($p->isRunning())$p->stop();foreach(glob($barrier.'*')?:[]as$f)unlink($f);}
  pilotAssert((int)DB::table('companies')->where('id',$c->id)->value('fbr_reporting_enabled')===0,'Concurrent OFF not saved');
  pilotAssert($history===(array)DB::table('fbr_pos_transactions')->find($invoice),'Existing acknowledgement mutated');

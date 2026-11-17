@@ -10,6 +10,9 @@
     @if(session('error'))
     <div class="mb-4 p-3 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 text-sm">{{ session('error') }}</div>
     @endif
+    @if($errors->any())
+    <div role="alert" class="mb-4 p-3 rounded-lg bg-red-50 text-red-700 text-sm">{{ $errors->first() }}</div>
+    @endif
     {{-- ═══ FBR Integration — optional (Sep 2026) ═══
          Three honest states: off (bills without FBR, simple details QR) / on
          (bills go to FBR) / setup_pending (shop wants FBR, details missing).
@@ -357,6 +360,7 @@
                 </form>
             </div>
 
+            @if(!$company->isLocalCollectionPilot())
             {{-- 📦 Peti (Wholesale) Rate (Task 1414): the ONE per-company switch +
                  the single "munafa %". OFF by default. Below the switch is the
                  "reh gaye" list of bulk-selling products that still need pack
@@ -414,6 +418,8 @@
                 </div>
                 @endif
             </div>
+
+            @endif
 
             <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">
                 <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-2">{{ __('pos.fbr_registration_details') }}</h3>

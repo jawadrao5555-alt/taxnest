@@ -2390,9 +2390,9 @@ class FbrService
 
     public function submitFbrPosTransaction(\App\Models\FbrPosTransaction $transaction): array
     {
-        // Covers manual submissions, queue retries and fiscal-device enqueue paths.
-        // No endpoint or school acknowledgement contract has been sandbox-verified.
-        if ($transaction->company?->isLocalCollectionPilot()) {
+        // Category receipts use the shared transport only through their saved payment route.
+        if ($transaction->company?->isLocalCollectionPilot()
+            && !CollectionFbrSubmission::canSubmit($transaction)) {
             return ['status' => 'blocked', 'errors' => [$transaction->company->isHospitalCollectionPilot() ? __('pos.fbr_missing_hospital_route') : __('pos.fbr_missing_school_route')]];
         }
 

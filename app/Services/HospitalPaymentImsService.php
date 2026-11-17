@@ -21,6 +21,9 @@ final class HospitalPaymentImsService
             $payment=DB::table('hospital_payments')->where('company_id',$companyId)->where('id',$paymentId)->lockForUpdate()->firstOrFail();
             $snapshot=self::snapshot($payment->fiscal_route_snapshot??null);
             if(($snapshot['route']??'off')!=='ims'||!($snapshot['eligible']??false))return ['queued'=>false,'reason'=>'local_only'];
+            if (!CollectionFbrSubmission::matchesRoute($company, $snapshot)) {
+                return ['queued' => false, 'reason' => 'original_route_changed'];
+            }
             abort_unless((int)$payment->amount_paisa>0&&$payment->collected_at!==null,422);
             $existing=$payment->fbr_pos_transaction_id?FbrPosTransaction::where('company_id',$companyId)->find($payment->fbr_pos_transaction_id):null;
             if($existing){self::copyBack($paymentId,$existing);return ['queued'=>true,'transaction_id'=>$existing->id,'existing'=>true];}
@@ -41,6 +44,7 @@ final class HospitalPaymentImsService
                 'tax_rate'=>$rate,'tax_amount'=>$tax,'subtotal'=>$subtotal,'total'=>$gross,'is_tax_exempt'=>$rate<=0]);
             DB::table('hospital_payments')->where('id',$paymentId)->update(['fbr_pos_transaction_id'=>$mirror->id,
                 'fbr_status'=>'pending','fbr_error_message'=>null,'updated_at'=>now()]);
+            CollectionFbrSubmission::dispatch($mirror);
             return ['queued'=>true,'transaction_id'=>$mirror->id,'existing'=>false];
         },3);
     }

@@ -29,10 +29,10 @@ class Company extends Model
         return $this->isSchoolFeePilot() || $this->isHospitalCollectionPilot();
     }
 
-    /** Fail closed even when a stale settings form or admin wrote the raw flag. */
+    /** School and Hospital use the same standalone FBR POS Agent transport. */
     public function getFbrReportingEnabledAttribute($value): bool
     {
-        return !$this->isLocalCollectionPilot() && (bool) $value;
+        return (bool) $value;
     }
 
 
@@ -731,7 +731,10 @@ class Company extends Model
      */
     public function agentServesFbr(): bool
     {
-        if ($this->isLocalCollectionPilot()) return false;
+        if ($this->isLocalCollectionPilot()) {
+            $posId = preg_replace('/[^0-9]/', '', (string) ($this->fbr_pos_id ?? ''));
+            if ($posId === '' || (int) $posId === 0) return false;
+        }
         return (bool) $this->fbr_pos_enabled
             && ($this->fbr_connection_mode ?? 'cloud') === 'fiscal_device';
     }
@@ -752,13 +755,12 @@ class Company extends Model
      */
     public function fbrPosIntegrationConfigured(): bool
     {
-        if ($this->isLocalCollectionPilot()) return false;
         $posId = preg_replace('/[^0-9]/', '', (string) ($this->fbr_pos_id ?? ''));
         if ($posId === '' || (int) $posId === 0) {
             return false;
         }
 
-        if ($this->agentServesFbr() && $this->agent_enabled) {
+        if (($this->fbr_connection_mode ?? 'cloud') === 'fiscal_device' && $this->fbr_pos_enabled && $this->agent_enabled) {
             return true;
         }
 
@@ -845,14 +847,12 @@ class Company extends Model
      */
     public function fbrIntegrationMissing(): array
     {
-        if ($this->isHospitalCollectionPilot()) return ['hospital_route'];
-        if ($this->isSchoolFeePilot()) return ['school_route'];
         $missing = [];
         $posId = preg_replace('/[^0-9]/', '', (string) ($this->fbr_pos_id ?? ''));
         if ($posId === '' || (int) $posId === 0) {
             $missing[] = 'pos_id';
         }
-        if ($this->agentServesFbr()) {
+        if (($this->fbr_connection_mode ?? 'cloud') === 'fiscal_device') {
             if (!$this->agent_enabled) {
                 $missing[] = 'agent';
             }

@@ -179,7 +179,7 @@ class FbrPosHospitalCollectionTest extends TestCase
         $this->assertStringNotContainsString('alt="FBR QR Code"', $html);
         $this->assertStringNotContainsString('class="fbr-number"', $html);
         $this->assertStringNotContainsString('data-fiscal-qr', $html);
-        foreach(['SYN-P-001','Consultation','400.00','600.00','Synthetic Cashier','Synthetic Hospital','LOCAL COLLECTION ONLY'] as $v)$this->assertStringContainsString($v,$html);
+        foreach(['SYN-P-001','Consultation','400.00','600.00','Synthetic Cashier','Synthetic Hospital','FBR OFF'] as $v)$this->assertStringContainsString($v,$html);
         Http::assertNothingSent();
     }
     public function test_service_heads_methods_and_payment_confirmation(): void {

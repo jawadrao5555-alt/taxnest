@@ -1017,7 +1017,6 @@ class AgentController extends Controller
                 'conflicting_number' => $praInvoiceNumber !== '' && $praInvoiceNumber !== $storedNumber,
             ]);
             $this->telemetryUpdate($company, ['agent_last_seen' => now()]);
-            \App\Services\HospitalPaymentImsService::reconcileTransaction($txn->fresh());
 
             return response()->json([
                 'ok' => true,
@@ -1243,6 +1242,7 @@ class AgentController extends Controller
                 $request->input('agent_version')
             );
             $this->telemetryUpdate($company, ['agent_last_seen' => now()]);
+            \App\Services\HospitalPaymentImsService::reconcileTransaction($txn->fresh());
 
             return response()->json([
                 'ok' => true,

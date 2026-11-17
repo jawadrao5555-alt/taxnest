@@ -220,6 +220,9 @@ class FbrIntegrationDecisionService
      */
     public function convertConfigOnlyFailures(Company $company, ?int $userId, string $reason = 'manual'): int
     {
+        if ($company->isLocalCollectionPilot()) {
+            return 0;
+        }
         return DB::transaction(function () use ($company, $userId, $reason) {
             $rows = $this->configOnlyFailureQuery($company->id)
                 ->lockForUpdate()

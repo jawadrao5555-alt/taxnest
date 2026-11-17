@@ -10,7 +10,6 @@ use App\Services\HospitalPaymentImsService;
 use App\Services\SchoolFeeImsService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
@@ -31,58 +30,20 @@ final class CollectionImsController extends Controller
 
     public function save(Request $request)
     {
-        $company = $this->owner($request);
-        $data = $request->validate([
-            'fbr_pos_id' => ['nullable', 'string', 'regex:/^[0-9]{1,20}$/D'],
-            'fbr_pos_environment' => 'required|in:sandbox,production',
-            'fbr_pos_token' => 'nullable|string|max:2000',
-            'fbr_access_code' => 'nullable|string|max:500',
-            'fbr_sales_tax_registration_number' => 'nullable|string|max:30',
-            'fbr_tax_office' => 'nullable|string|max:150',
-        ]);
-
-        DB::transaction(function () use ($company, $data) {
-            $locked = Company::whereKey($company->id)->lockForUpdate()->firstOrFail();
-            $posId = $data['fbr_pos_id'] ?? null;
-            if ($locked->fbr_reporting_enabled && (!$posId || !trim($posId, '0'))) {
-                throw ValidationException::withMessages(['fbr_pos_id' => 'Turn reporting OFF before removing the registered POS ID.']);
-            }
-            if ($locked->fbr_reporting_enabled && ((string) $posId !== (string) $locked->fbr_pos_id
-                || $data['fbr_pos_environment'] !== ($locked->fbr_pos_environment ?? 'sandbox'))) {
-                throw ValidationException::withMessages(['fbr_pos_id' => 'Turn reporting OFF before changing the POS ID or environment.']);
-            }
-            $locked->fbr_pos_id = $posId;
-            $locked->fbr_pos_environment = $data['fbr_pos_environment'];
-            $locked->fbr_connection_mode = 'fiscal_device';
-            $locked->fbr_pos_enabled = (bool) trim((string) $posId, '0');
-            foreach (['fbr_pos_token', 'fbr_access_code'] as $key) {
-                if (!empty($data[$key])) {
-                    $locked->{$key} = Crypt::encryptString($data[$key]);
-                }
-            }
-            foreach (['fbr_sales_tax_registration_number', 'fbr_tax_office'] as $key) {
-                if (array_key_exists($key, $data)) $locked->{$key} = $data[$key];
-            }
-            $locked->save();
-        }, 3);
-
-        return back()->with('status', 'IMS setup saved.');
+        $this->owner($request);
+        return app(FbrPosController::class)->fbrSettings($request);
     }
 
     public function toggle(Request $request)
     {
         $company = $this->owner($request);
         $enabled = $request->validate(['enabled' => 'required|boolean'])['enabled'];
-        DB::transaction(function () use ($company, $enabled) {
-            $locked = Company::whereKey($company->id)->lockForUpdate()->firstOrFail();
-            if ($enabled && (!$locked->agentServesFbr() || !$locked->fbrPosIntegrationConfigured())) {
-                throw ValidationException::withMessages(['enabled' => 'Save the registered POS ID and pair the Desktop Agent before turning ON reporting.']);
-            }
-            $locked->fbr_reporting_enabled = (bool) $enabled;
-            $locked->save();
-        }, 3);
-
-        return back()->with('status', $enabled ? 'FBR IMS reporting ON for eligible new receipts.' : 'FBR IMS reporting OFF.');
+        $result = app(\App\Services\FbrIntegrationDecisionService::class)
+            ->setReporting($company, (bool) $enabled, auth('fbrpos')->id());
+        if (!$result['ok']) {
+            throw ValidationException::withMessages(['enabled' => __('pos.fbr_integration_missing_title')]);
+        }
+        return back()->with('status', $enabled ? __('pos.fbr_reporting_enabled_msg') : __('pos.fbr_reporting_disabled_msg'));
     }
 
     public function diagnostics(Request $request)
@@ -129,7 +90,7 @@ final class CollectionImsController extends Controller
                     return 'This receipt was saved as local-only or has no verified IMS route. It cannot be retried.';
                 }
                 $environment = $locked->fbr_pos_environment === 'production' ? 'production' : 'sandbox';
-                if (!$locked->fbr_reporting_enabled || !$locked->agentServesFbr() || !$locked->fbrPosIntegrationConfigured()
+                if (!$locked->fbr_reporting_enabled || !$locked->fbrPosIntegrationConfigured()
                     || ($snapshot['environment'] ?? null) !== $environment) {
                     return 'Restore the receipt’s original IMS environment and enable reporting before retrying.';
                 }
@@ -139,12 +100,16 @@ final class CollectionImsController extends Controller
                     return !empty($result['queued']) ? 'Existing receipt queued for IMS.' : 'IMS queue is unavailable. Ask your administrator to check the receipt.';
                 }
                 $mirror = FbrPosTransaction::where('company_id', $locked->id)->findOrFail($receipt->fbr_pos_transaction_id);
+                if (!\App\Services\CollectionFbrSubmission::canSubmit($mirror)) {
+                    return 'Restore the original FBR submission mode, POS ID and environment before retrying.';
+                }
                 if ($mirror->fbr_invoice_number || $mirror->fbr_status === 'submitted') {
                     return 'A fiscal result already exists for this receipt.';
                 }
                 if (!in_array($mirror->fbr_status, ['failed', 'config_error'], true) || !FbrPosAgentClaim::prepareRetry($mirror)) {
                     return 'This receipt is already queued or needs reconciliation before another attempt.';
                 }
+                \App\Services\CollectionFbrSubmission::dispatch($mirror);
                 $service::reconcileReceipt((int) $locked->id, $id);
 
                 return 'Existing receipt queued for IMS retry.';

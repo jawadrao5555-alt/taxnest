@@ -7369,5 +7369,7 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'sale_staff_check_before_payment' => 'Payment se pehle owner ki manzoori check karein.',
     'sale_delivery_clear_selection' => 'Intikhab khatam karein',
     'sale_delivery_select_all_shown' => 'Dikhai gai sab deliveries chunein',
+    'fbr_agent_connection_online' => 'Desktop Agent online hai. Submission ke baad receipt par FBR ka result dekhein.',
+    'fbr_agent_connection_offline' => 'Desktop Agent offline hai. Desktop Agent page khol kar is counter ko connect karein.',
 ];
 

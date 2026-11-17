@@ -12,7 +12,7 @@
 <section class="card"><h2>Help & support</h2><p>School POS guide and product support.</p><a class="button" href="/product-guide#school-standalone">School POS guide</a> <a href="/fbr-pos/suggestions">Contact support</a></section>
 <section class="card"><h2>Reports</h2><p>Collections, payment methods and IMS results with PDF/CSV exports.</p><a class="button" href="{{ route('fbrpos.school-fees.reports') }}">Open reports</a></section>
 </div>
-@include('fbr-pos.partials.collection-ims-settings', ['imsRoutes' => 'fbrpos.school-fees', 'imsSectionId' => 'school-ims-settings'])
+@include('fbr-pos.partials.collection-fbr-settings-link')
 <section class="card"><h2>{{ __('school.heads') }}</h2><p class="muted">{{ __('school_audit.rate_help') }}</p>
 @foreach($feeHeads as $head)
 <form method="post" action="/fbr-pos/school-fees/settings/fee-head" class="school-edit-head">@csrf

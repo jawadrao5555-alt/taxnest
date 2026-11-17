@@ -4096,6 +4096,7 @@ class FbrPosController extends Controller
         }
 
         if ($request->isMethod('post')) {
+            abort_if($request->session()->get('impersonation.readonly'), 403);
             if ($request->has('pin_update')) {
                 if ($request->has('remove_pin')) {
                     $company->update(['confidential_pin' => null]);
@@ -4114,6 +4115,7 @@ class FbrPosController extends Controller
             // Pending-bill day-close policy (FBR mirror of PRA 'Khud Final', Aug 2026):
             // 'carry' = leave provisionals untouched (default) | 'finalize' = auto-promote at day close.
             if ($request->has('dayclose_pending_update')) {
+                abort_if($company->isLocalCollectionPilot(), 422);
                 $request->validate(['pending_policy' => 'required|in:carry,finalize']);
                 // Prod schema drift guard — never pretend to save into a missing column.
                 if (!\Illuminate\Support\Facades\Schema::hasColumn('companies', 'pos_dayclose_provisional_action')) {
@@ -4136,6 +4138,7 @@ class FbrPosController extends Controller
             // Gated on its own presence marker so a stale cached form that
             // predates this card can never silently flip the switch OFF.
             if ($request->has('peti_rate_update')) {
+                abort_if($company->isLocalCollectionPilot(), 422);
                 $request->validate([
                     // 0–100% — a margin above 100 or below 0 makes no business
                     // sense; the safety clamps (never below cost, never above
@@ -4855,6 +4858,15 @@ class FbrPosController extends Controller
 
         if (Auth::guard('fbrpos')->user()->role !== 'company_admin') {
             return response()->json(['success' => false, 'message' => __('pos.only_company_admin_test_connection')]);
+        }
+
+        if (($company->fbr_connection_mode ?? 'cloud') === 'fiscal_device') {
+            return response()->json([
+                'success' => $company->agentOnline(),
+                'message' => $company->agentOnline()
+                    ? __('pos.fbr_agent_connection_online')
+                    : __('pos.fbr_agent_connection_offline'),
+            ]);
         }
 
         $env = $company->fbr_pos_environment ?? 'sandbox';

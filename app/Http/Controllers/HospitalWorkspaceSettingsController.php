@@ -4,7 +4,7 @@ namespace App\Http\Controllers;
 use App\Models\{Company, Branch};
 use App\Services\{BranchContextService, PlanLimitService};
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\{Auth, DB};
+use Illuminate\Support\Facades\{Auth, DB, Schema};
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
@@ -25,14 +25,21 @@ final class HospitalWorkspaceSettingsController extends Controller
         return response()->view('fbr-pos.hospital.settings', [
             'company' => $company, 'campuses' => Branch::where('company_id', $company->id)->get(),
             'services' => DB::table('hospital_services')->where('company_id', $company->id)->orderBy('label')->get(),
+            'imsServiceSettingsAvailable' => Schema::hasColumns('hospital_services', ['ims_pct_code', 'ims_tax_rate']),
         ])->header('Cache-Control', 'private, no-store');
     }
     public function saveService(Request $request)
     {
         $company = $this->company();
         abort_if((bool) $request->session()->get('impersonation.readonly'), 403);
+        if ($request->filled('ims_pct_code') && is_string($request->input('ims_pct_code'))) {
+            $request->merge(['ims_pct_code' => str_replace('.', '', trim($request->input('ims_pct_code')))]);
+        }
         $d = $request->validate(['code' => 'nullable|string|max:20', 'label' => 'required|string|max:80',
-            'service_head' => 'required|in:consultation,lab,procedure', 'rate' => ['required','regex:/^\d{1,8}(?:\.\d{1,2})?$/'], 'active' => 'required|boolean']);
+            'service_head' => 'required|in:consultation,lab,procedure', 'rate' => ['required','regex:/^\d{1,8}(?:\.\d{1,2})?$/'], 'active' => 'required|boolean',
+            'ims_pct_code' => ['nullable', 'string', 'regex:/^[0-9]{8}$/D'],
+            'ims_tax_rate' => ['nullable', 'numeric', 'decimal:0,2', 'between:0,100'],
+        ]);
         $d['label'] = trim($d['label']);
         if ($d['label'] === '') throw ValidationException::withMessages(['label' => __('hospital_workspace.label_required')]);
         [$whole, $fraction] = array_pad(explode('.', $d['rate'], 2), 2, '');
@@ -43,7 +50,14 @@ final class HospitalWorkspaceSettingsController extends Controller
             $code = ($d['code'] ?? '') ?: null;
             if ($code) abort_unless(DB::table('hospital_services')->where('company_id',$company->id)->where('code',$code)->exists(),404);
             $code ??= 'h'.strtolower(Str::random(12));
-            DB::table('hospital_services')->updateOrInsert(['company_id'=>$company->id,'code'=>$code], [
+            $imsSettings = [];
+            foreach (['ims_pct_code', 'ims_tax_rate'] as $field) {
+                if (array_key_exists($field, $d)) {
+                    abort_unless(Schema::hasColumn('hospital_services', $field), 503);
+                    $imsSettings[$field] = $d[$field] === '' ? null : $d[$field];
+                }
+            }
+            DB::table('hospital_services')->updateOrInsert(['company_id'=>$company->id,'code'=>$code], $imsSettings + [
                 'label'=>$d['label'],'service_head'=>$d['service_head'],'rate_paisa'=>$rate,'active'=>(bool)$d['active'],'updated_at'=>now(),
             ]);
         });

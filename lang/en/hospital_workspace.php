@@ -1,5 +1,7 @@
 <?php
 return [
+    'ims_pct_code' => 'IMS HS / PCT code (optional)',
+    'ims_tax_rate' => 'IMS tax rate % (optional)',
     'dashboard' => 'Hospital dashboard',
     'menu' => 'Workspace settings & help',
     'exit_company' => 'Exit Manage as Company',

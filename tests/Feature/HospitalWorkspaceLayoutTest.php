@@ -20,14 +20,14 @@ class HospitalWorkspaceLayoutTest extends TestCase
             'hospitalIsOwner' => $owner, 'slot' => new \Illuminate\Support\HtmlString('<h1>Shared page</h1>')])->render();
     }
 
-    public function test_shared_pages_use_school_navigation_and_explicit_off_status(): void
+    public function test_shared_pages_use_hospital_navigation_and_explicit_off_status(): void
     {
         $html = $this->renderWorkspace();
         $this->assertStringContainsString('tnMadadgar(', $html);
         $this->assertStringContainsString('data-madadgar-placement="inline"', $html);
         $this->assertStringContainsString('collection-support-dock', $html);
         $this->assertStringContainsString('min-width:44px;min-height:44px', $html);
-        foreach (['hospital-fiscal-status', 'FBR OFF', '/fbr-pos/team', '/fbr-pos/hospital/printing',
+        foreach (['hospital-fiscal-status', 'Fiscal OFF', '/fbr-pos/team', '/fbr-pos/hospital/printing',
             '/fbr-pos/billing', '/fbr-pos/hospital/settings', 'Shared page', 'hospital-language'] as $text) {
             $this->assertStringContainsString($text, $html);
         }

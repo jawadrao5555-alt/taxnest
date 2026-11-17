@@ -108,17 +108,17 @@ class HospitalWorkspaceBoundaryTest extends TestCase
         }
     }
 
-    public function test_stale_school_fiscal_flags_cannot_change_runtime_verdict_or_agent_fallback(): void
+    public function test_configured_hospital_fiscal_flags_enable_only_the_fbr_agent_path(): void
     {
-        $school = Company::find(1)->forceFill([
+        $hospital = Company::find(1)->forceFill([
             'fbr_reporting_enabled' => true, 'agent_enabled' => true,
             'fbr_pos_enabled' => true, 'fbr_connection_mode' => 'fiscal_device',
             'fbr_pos_id' => '9999',
         ]);
-        $this->assertFalse($school->fbr_reporting_enabled);
-        $this->assertFalse($school->fbrPosIntegrationConfigured());
-        $this->assertFalse($school->agentServesFbr());
-        $this->assertFalse($school->agentHandlesPra());
-        $this->assertFalse($school->fbrIntegrationUndecided());
+        $this->assertTrue($hospital->fbr_reporting_enabled);
+        $this->assertTrue($hospital->fbrPosIntegrationConfigured());
+        $this->assertTrue($hospital->agentServesFbr());
+        $this->assertFalse($hospital->agentHandlesPra());
+        $this->assertFalse($hospital->fbrIntegrationUndecided());
     }
 }

@@ -875,7 +875,7 @@ class AgentController extends Controller
         \App\Services\FbrPosAgentClaim::quarantineExpired((int) $company->id);
         $identity = app(\App\Services\FbrPosIdentity::class);
         $deviceUid = $this->requestDeviceUid($request);
-        $pending = $company->isSchoolFeePilot() && !$company->fbr_reporting_enabled
+        $pending = $company->isLocalCollectionPilot() && !$company->fbr_reporting_enabled
             ? collect()
             : $identity->route(FbrPosTransaction::where('company_id', $company->id), (int) $company->id, $deviceUid)
             ->whereIn('fbr_status', ['offline', 'pending', 'failed'])
@@ -1242,7 +1242,6 @@ class AgentController extends Controller
                 $request->input('agent_version')
             );
             $this->telemetryUpdate($company, ['agent_last_seen' => now()]);
-            \App\Services\SchoolFeeImsService::reconcileTransaction($txn->fresh());
 
             return response()->json([
                 'ok' => true,
@@ -1331,7 +1330,6 @@ class AgentController extends Controller
                     $request->input('agent_version')
                 );
                 $this->telemetryUpdate($company, ['agent_last_seen' => now()]);
-                \App\Services\SchoolFeeImsService::reconcileTransaction($txn->fresh());
 
                 return response()->json(['ok' => true, 'verification_pending' => true]);
             }
@@ -1371,7 +1369,6 @@ class AgentController extends Controller
         }
 
         $this->telemetryUpdate($company, ['agent_last_seen' => now()]);
-        \App\Services\SchoolFeeImsService::reconcileTransaction($txn->fresh());
 
         return response()->json(['ok' => true]);
         });

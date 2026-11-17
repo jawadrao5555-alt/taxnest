@@ -1,5 +1,7 @@
 <?php
 return [
+    'ims_pct_code' => 'IMS HS / PCT code (ikhtiyari)',
+    'ims_tax_rate' => 'IMS tax rate % (ikhtiyari)',
     'dashboard' => 'Hospital dashboard',
     'menu' => 'Workspace settings aur madad',
     'exit_company' => 'Manage as Company se niklein',

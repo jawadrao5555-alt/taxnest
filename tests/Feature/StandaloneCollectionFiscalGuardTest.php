@@ -30,20 +30,18 @@ class StandaloneCollectionFiscalGuardTest extends TestCase
         Schema::create('fbr_pos_transaction_items', function (Blueprint $t) { $t->id(); $t->unsignedBigInteger('transaction_id'); });
     }
 
-    public function test_standalone_hospital_aliases_block_every_fiscal_dispatch_even_with_stale_settings(): void
+    public function test_standalone_categories_require_complete_agent_setup_before_dispatch(): void
     {
         foreach (['clinic', 'hospital'] as $category) {
             $id = DB::table('companies')->insertGetId(['product_type' => 'fbrpos', 'pos_type' => 'retail',
-                'business_category' => $category, 'fbr_reporting_enabled' => true, 'fbr_pos_id' => '123', 'fbr_pos_token' => 'synthetic']);
+                'business_category' => $category, 'fbr_reporting_enabled' => true, 'fbr_pos_id' => '123']);
             $company = Company::findOrFail($id);
             $this->assertTrue($company->isLocalCollectionPilot());
-            $this->assertFalse($company->fbr_reporting_enabled);
+            $this->assertTrue($company->fbr_reporting_enabled);
             $this->assertFalse($company->agentServesFbr());
             $this->assertFalse($company->agentHandlesPra());
             $this->assertFalse($company->fbrPosIntegrationConfigured());
             $this->assertFalse($company->fbrIntegrationUndecided());
-            $toggle = app(\App\Services\FbrIntegrationDecisionService::class)->setReporting($company, true, null);
-            $this->assertFalse($toggle['ok']);
             $txId = DB::table('fbr_pos_transactions')->insertGetId(['company_id' => $id, 'created_at' => now(), 'updated_at' => now()]);
             $before = (array) DB::table('fbr_pos_transactions')->find($txId);
             $this->assertSame('blocked', app(FbrService::class)->submitFbrPosTransaction(FbrPosTransaction::find($txId))['status']);

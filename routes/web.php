@@ -2641,6 +2641,7 @@ Route::prefix('fbr-pos')->middleware(['fbrpos.auth', 'company.approval', \App\Ht
     Route::post('/hospital', [\App\Http\Controllers\FbrPosHospitalController::class, 'store'])->name('fbrpos.hospital.store')->middleware('plan.limit:invoices');
     Route::get('/hospital/dashboard', [\App\Http\Controllers\FbrPosHospitalController::class, 'dashboard'])->name('fbrpos.hospital.dashboard');
     Route::get('/hospital/history', [\App\Http\Controllers\FbrPosHospitalController::class, 'history'])->name('fbrpos.hospital.history');
+    Route::get('/hospital/patient-ledger', [\App\Http\Controllers\FbrPosHospitalController::class, 'patientLedger'])->name('fbrpos.hospital.patient-ledger');
     Route::get('/hospital/day-close', [\App\Http\Controllers\FbrPosHospitalController::class, 'dayClose'])->name('fbrpos.hospital.day-close');
     Route::post('/hospital/day-close', [\App\Http\Controllers\FbrPosHospitalController::class, 'close'])->name('fbrpos.hospital.close');
     Route::post('/hospital/campus', [\App\Http\Controllers\FbrPosHospitalController::class, 'switchCampus'])->name('fbrpos.hospital.campus');

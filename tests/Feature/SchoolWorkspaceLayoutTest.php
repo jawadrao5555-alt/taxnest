@@ -27,7 +27,7 @@ class SchoolWorkspaceLayoutTest extends TestCase
         $this->assertStringContainsString('data-madadgar-placement="inline"', $html);
         $this->assertStringContainsString('collection-support-dock', $html);
         $this->assertStringContainsString('min-width:44px;min-height:44px', $html);
-        foreach (['school-fiscal-status', 'FBR OFF', '/fbr-pos/team', '/fbr-pos/school-fees/printing',
+        foreach (['school-fiscal-status', 'Fiscal OFF', 'TaxNest', 'School POS', '/fbr-pos/team', '/fbr-pos/school-fees/printing',
             '/fbr-pos/billing', '/fbr-pos/school-fees/legacy-retail', 'Shared page', 'school-language'] as $text) {
             $this->assertStringContainsString($text, $html);
         }

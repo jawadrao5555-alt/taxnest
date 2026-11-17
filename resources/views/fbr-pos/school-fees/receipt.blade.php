@@ -20,8 +20,17 @@
 @if($print['show_contact'])<div class="muted">@if($company->address)<div>{{ $company->address }}</div>@endif @if($company->phone)<div>{{ $company->phone }}</div>@endif @if($company->email)<div>{{ $company->email }}</div>@endif</div>@endif
 <h2>{{ __('pos.school_receipt') }} · SF-{{ $receipt->id }}</h2>
 </div>
+@if(($receipt->fbr_pos_transaction_id ?? null) && ($receipt->fbr_status ?? null)==='submitted' && ($receipt->fbr_invoice_number ?? null) && ($receipt->fbr_qr_payload ?? null))
+<div class="notice" id="school-fbr-accepted"><strong>FBR IMS Accepted</strong><br>{{ $receipt->fbr_invoice_number }}
+@php $schoolFbrQr=\App\Support\QrImage::dataUri((string)$receipt->fbr_qr_payload,5,4); @endphp
+@if($schoolFbrQr)<br><img src="{{ $schoolFbrQr }}" alt="FBR fiscal QR" style="width:34mm;height:34mm;margin:8px auto;display:block">@endif</div>
+@elseif(in_array(($receipt->fbr_status ?? null),['pending','offline','verification_pending'],true))
+<div class="notice" id="school-fbr-pending">FBR IMS: {{ str_replace('_',' ',ucfirst($receipt->fbr_status)) }}</div>
+@else
 <div class="notice">{{ __('pos.school_local_receipt') }}</div>
+@endif
 <dl><dt>{{ __('pos.school_student_reference') }}</dt><dd>{{ $receipt->student_reference }}@if($receipt->student_name ?? null)<br>{{ $receipt->student_name }}@endif</dd><dt>{{ __('pos.school_collected_at') }}</dt><dd>{{ $receipt->collected_at }}</dd><dt>{{ __('pos.school_payment') }}</dt><dd id="school-receipt-method">{{ __('school_print.'.$method) }}</dd>
+<dt>{{ __('school_audit.reference') }}</dt><dd id="school-payment-reference">{{ $receipt->payment_reference ?? __('school.not_recorded') }}</dd>
 <dt>{{ __('school.period') }}</dt><dd id="school-receipt-period">{{ $receipt->fee_period ?? __('school.not_recorded') }}</dd><dt>{{ __('school.campus') }}</dt><dd id="school-receipt-campus">{{ $receipt->campus_name ?? __('school.not_recorded') }}</dd><dt>{{ __('school.cashier') }}</dt><dd id="school-receipt-cashier">{{ $receipt->cashier_name ?? __('school.not_recorded') }}</dd></dl>
 <table id="school-receipt-head"><thead><tr><th>{{ __('pos.school_fee_head') }}</th><th>{{ __('school_print.amount') }}</th></tr></thead><tbody>@foreach($lines as $line)<tr><td>{{ $line['label'] }}</td><td>PKR {{ number_format($line['amount_paisa']/100, 2) }}</td></tr>@endforeach</tbody></table>
 <dl><dt>{{ __('school_print.payable') }}</dt><dd>PKR {{ number_format(($receipt->payable_paisa ?? $receipt->amount_paisa)/100, 2) }}</dd><dt>{{ __('school_print.paid') }}</dt><dd>PKR {{ number_format(($receipt->paid_paisa ?? $receipt->amount_paisa)/100, 2) }}</dd><dt>{{ __('school_print.balance') }}</dt><dd id="school-receipt-balance">PKR {{ number_format(($receipt->balance_paisa ?? 0)/100, 2) }}</dd></dl>

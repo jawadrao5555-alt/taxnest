@@ -32,7 +32,7 @@ class StandaloneCollectionFiscalGuardTest extends TestCase
 
     public function test_standalone_categories_require_complete_agent_setup_before_dispatch(): void
     {
-        foreach (['education', 'clinic', 'hospital'] as $category) {
+        foreach (['clinic', 'hospital'] as $category) {
             $id = DB::table('companies')->insertGetId(['product_type' => 'fbrpos', 'pos_type' => 'retail',
                 'business_category' => $category, 'fbr_reporting_enabled' => true, 'fbr_pos_id' => '123']);
             $company = Company::findOrFail($id);

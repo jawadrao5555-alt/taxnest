@@ -7,7 +7,7 @@ return [
     'period' => 'Fee month',
     'period_required' => 'Select the fee month for this payment.',
     'head_unavailable' => 'This fee head is unavailable. Refresh and select an active fee head.',
-    'settings' => 'Fee heads and campuses',
+    'settings' => 'Settings',
     'heads' => 'Fee heads',
     'label' => 'Fee head label',
     'active' => 'Active',

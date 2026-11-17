@@ -191,7 +191,7 @@ echo "PASS: native school duplicate collection and close remain single; collect-
 // payments must serialize and never overshoot payable or contaminate cash totals.
 $ledger = schoolFixture(bin2hex(random_bytes(5)));
 $initial = array_replace(schoolPayload(), [
-    'student_name' => 'Synthetic Ledger Student', 'amount' => '400.00', 'payment_method' => 'card',
+    'student_name' => 'Synthetic Ledger Student', 'amount' => '400.00', 'payment_method' => 'card', 'payment_reference' => 'SYN-NATIVE-CARD',
     'fee_lines' => [['fee_head' => 'tuition', 'amount' => '1000.00'], ['fee_head' => 'exam', 'amount' => '200.00']],
 ]);
 $initialRace = schoolRace($ledger, array_fill(0, 2, ['action' => 'store', 'payload' => $initial]));
@@ -221,3 +221,28 @@ foreach (['amount' => '199.00', 'payment_method' => 'bank', 'student_name' => 'C
 }
 if ($savedClose !== (array) DB::table('school_fee_day_closes')->where('company_id', $ledger['company'])->first()) throw new RuntimeException('Ledger retry changed closing snapshot');
 echo "PASS: native School multi-head card duplicate recovery, concurrent bank overpayment exclusion, cash-only close and immutable partial-payment replay\n";
+
+// Audit follow-up: native JSON head filters, bank/card references and additive
+// schema/rate configuration must preserve the original ledger and close exactly.
+$originalReceipt = (array) $ledgerRows()->orderBy('id')->first();
+$originalAccount = (array) $accountRows()->first();
+$paymentReference = $originalReceipt['payment_reference'];
+if ($paymentReference !== 'SYN-NATIVE-CARD') throw new RuntimeException('Native reference not stored');
+if (schoolRequest($ledger, 'store', array_replace($initial, ['payment_reference'=>'CHANGED']))['status'] !== 422) throw new RuntimeException('Changed native reference accepted');
+$historyRequest = Request::create('/fbr-pos/transactions', 'GET', ['fee_head'=>'exam','payment_method'=>'card','from'=>substr($ledger['now'],0,10),'to'=>substr($ledger['now'],0,10)]);
+$historyRequest->setLaravelSession(app('session')->driver());
+app()->instance('request', $historyRequest);
+$history = app(FbrPosSchoolFeeController::class)->history($historyRequest)->original->getData();
+if ($history['receipts']->count() !== 1 || (int)$history['receipts']->first()->id !== (int)$originalReceipt['id']) throw new RuntimeException('Native itemized head/date/method filter mismatch');
+$rateRequest = Request::create('/fbr-pos/school-fees/settings/fee-head','POST',['code'=>'tuition','label'=>'New future tuition','active'=>1,'default_amount'=>'2500.75']);
+$rateRequest->setLaravelSession(app('session')->driver());
+app()->instance('request',$rateRequest);
+app(FbrPosSchoolFeeController::class)->saveFeeHead($rateRequest);
+if ((int)DB::table('school_fee_heads')->where('company_id',$ledger['company'])->where('code','tuition')->value('default_amount_paisa') !== 250075) throw new RuntimeException('Native rate not saved');
+$migration = require dirname(__DIR__,2).'/database/migrations/2026_11_16_130000_add_school_rates_and_payment_references.php';
+$migration->down(); $migration->up();
+if ($originalReceipt !== (array)$ledgerRows()->orderBy('id')->first() || $originalAccount !== (array)$accountRows()->first()
+    || $savedClose !== (array)DB::table('school_fee_day_closes')->where('company_id',$ledger['company'])->first()) throw new RuntimeException('Rate or migration changed native receipt account or close');
+if (schoolRequest($ledger,'store',$initial)['data']['receipt_id'] !== $originalReceipt['id']) throw new RuntimeException('Rate update broke exact initial retry');
+echo "PASS: native School itemized JSON filter and immutable payment reference; future-only rate and additive migration preserve receipt account and closing values/types
+";

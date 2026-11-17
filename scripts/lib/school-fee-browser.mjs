@@ -62,9 +62,14 @@ export async function schoolFeeWorkflow(page, t, v, { baseUrl, saveEvidenceScree
     await Promise.all([page.waitForNavigation({ waitUntil: 'domcontentloaded' }), campus.locator('button[type="submit"]').click()]);
   }
   await collectionSharedWorkspaceChecks(page,'school',v,{baseUrl,saveEvidenceScreenshot},campusName);
+  await page.goto(baseUrl+'/fbr-pos/team',{waitUntil:'domcontentloaded'});
+  const teamText=await page.locator('body').innerText();
+  if(/Main shop/i.test(teamText) || !teamText.includes('No campus assigned')) throw new Error('School team still uses retail main-shop terminology');
+  await saveEvidenceScreenshot(page,'school-campus-team-labels-'+v.width);
   await page.goto(baseUrl+'/fbr-pos/school-fees/settings',{waitUntil:'domcontentloaded'});
   const headForm = page.locator('#school-add-head');
   await headForm.locator('[name="label"]').fill(customLabel);
+  await headForm.locator('[name="default_amount"]').fill('1250.50');
   await Promise.all([page.waitForNavigation({ waitUntil: 'domcontentloaded' }), headForm.locator('button[type="submit"]').click()]);
   await page.goto(baseUrl + '/fbr-pos/school-fees', { waitUntil: 'domcontentloaded' });
   const switcher = page.locator('#school-campus-switcher');
@@ -75,6 +80,7 @@ export async function schoolFeeWorkflow(page, t, v, { baseUrl, saveEvidenceScree
   if (!/^\d{4}-\d{2}$/.test(feePeriod)) throw new Error('School fee period default is invalid');
   await page.locator('#school-collection [name="fee_head"]').selectOption({ label: customLabel });
   const feeHead = await page.locator('#school-collection [name="fee_head"]').inputValue();
+  if(await page.locator('#school-collection [name="amount"]').inputValue() !== '1250.50') throw new Error('Configured default fee rate did not populate new collection');
   const reportTotals = async path => {
     const response = await page.goto(baseUrl + path, { waitUntil: 'domcontentloaded' });
     if (!response?.ok()) throw new Error('School cash report failed: ' + path);
@@ -87,6 +93,8 @@ export async function schoolFeeWorkflow(page, t, v, { baseUrl, saveEvidenceScree
   const dashboardTotals = async () => {
     await page.goto(baseUrl + '/fbr-pos/dashboard', { waitUntil: 'domcontentloaded' });
     await page.locator('#school-today-count').waitFor();
+    for(const selector of ['#school-today-total','#school-today-card','#school-today-bank','#school-outstanding']) await page.locator(selector).waitFor({state:'visible'});
+    if(!await page.getByRole('heading',{name:'School setup checklist',exact:true}).count()) throw new Error('School dashboard omitted guided setup');
     for (const label of ['Collect Fee', 'Receipts / Reprint', 'Cash Day Close']) {
       if (!await page.getByRole('link', { name: label, exact: true }).count()) throw new Error('School navigation missing ' + label);
     }
@@ -321,7 +329,7 @@ export async function schoolFeeWorkflow(page, t, v, { baseUrl, saveEvidenceScree
   }
   const dashboardAfter = await dashboardTotals();
   if (dashboardAfter.count !== dashboardBefore.count + 1 || dashboardAfter.paisa !== dashboardBefore.paisa + 125050
-      || dashboardBefore.status !== 'Open' || dashboardAfter.status !== 'Closed') throw new Error('School dashboard totals/status disagree with final cash close');
+      || dashboardBefore.status !== 'No day close recorded yet' || dashboardAfter.status !== 'Closed') throw new Error('School dashboard totals/status disagree with final cash close');
   await schoolLedgerChecks(page, v, { baseUrl, saveEvidenceScreenshot }, { campusName, receiptPath, feePeriod });
   for(const path of ['/fbr-pos/school-fees','/fbr-pos/dashboard']) await privateCollectionCacheCheck(page, { baseUrl, path, screenshotName:'school-offline-private-cache-'+path.split('/').pop()+'-'+v.width, saveEvidenceScreenshot });
   pass('SCHOOL FEE PASS: ' + v.width + ': campus setup/custom fee head/month and cashier snapshots, receipt search/counted-cash variance, school-only settings and no-store/BFCache recovery, working logo/contact and 58mm/A4/80mm preview, multi-head bank partial/card balance with lost-response explicit recovery and changed-payload rejection, noncash exclusion from cash total, cross-campus receipt refusal, public category selection, real cash POST with lost response, refresh recovery to same receipt, UUID-only storage/failure guard, closed-day recovery, persisted receipt/history, same-key retry, print CSS and reprint action; no fiscal submission and no physical printer claim');
@@ -399,7 +407,9 @@ async function schoolLedgerChecks(page, v, { baseUrl, saveEvidenceScreenshot }, 
   await form.locator('[name="student_name"]').fill('Synthetic learner '+v.width);
   await form.locator('[name="amount"]').fill('500.00');
   await form.locator('[name="payment_method"]').selectOption('bank');
+  await form.locator('[name="payment_reference"]').fill('SYN-BANK-'+v.width);
   await page.locator('#school-multi-mode').check();
+  if(await page.locator('#school-single-head').isVisible() || await form.locator('[name="fee_head"]').isEnabled()) throw new Error('Multi-head mode retained conflicting single-head control');
   await page.locator('.school-line-head').first().selectOption('tuition');
   await page.locator('.school-line-amount').first().fill('1000.00');
   await page.locator('#school-add-line').click();
@@ -412,7 +422,7 @@ async function schoolLedgerChecks(page, v, { baseUrl, saveEvidenceScreenshot }, 
   const firstHtml = await (await page.request.get(baseUrl+firstPath)).text();
   const first=await page.locator('article').innerText();
   if(!/bank/i.test(await page.locator('#school-receipt-method').innerText())) throw new Error('Bank receipt has wrong payment method');
-  for (const value of [ref,'1,500.00','500.00','1,000.00']) if(!first.includes(value)) throw new Error('Partial multi-head receipt missing '+value);
+  for (const value of [ref,'SYN-BANK-'+v.width,'1,500.00','500.00','1,000.00']) if(!first.includes(value)) throw new Error('Partial multi-head receipt missing '+value);
   await saveEvidenceScreenshot(page,'school-multihead-bank-receipt-'+v.width);
   await scrolledPixelDetail(page,['#school-receipt-method','#school-receipt-campus','#school-receipt-cashier','#school-receipt-head','#school-receipt-balance','#school-print-receipt'],'school-bank-receipt-details-'+v.width,saveEvidenceScreenshot);
   await page.goto(baseUrl+'/fbr-pos/school-fees?student_search='+ref,{waitUntil:'domcontentloaded'});
@@ -421,6 +431,7 @@ async function schoolLedgerChecks(page, v, { baseUrl, saveEvidenceScreenshot }, 
   await balance.locator('.school-pay-balance').click();
   await form.locator('[name="amount"]').fill('1000.00');
   await form.locator('[name="payment_method"]').selectOption('card');
+  await form.locator('[name="payment_reference"]').fill('SYN-CARD-'+v.width);
   await form.locator('[name="cash_confirmed"]').check();
   const originalPayload = await form.evaluate(f => Object.fromEntries(new FormData(f)));
   const feeRows = await page.locator('.school-line').evaluateAll(rows => rows.map(r => ({ fee_head:r.querySelector('select').value,amount:r.querySelector('input').value })));
@@ -446,15 +457,21 @@ async function schoolLedgerChecks(page, v, { baseUrl, saveEvidenceScreenshot }, 
   if(new URL(page.url()).pathname===firstPath) throw new Error('Second installment reused first receipt');
   const replay=await page.request.post(baseUrl+'/fbr-pos/school-fees',{headers:{Accept:'application/json'},form:originalPayload});
   if(!replay.ok()||Number((await replay.json()).receipt_id)!==installmentReceipt) throw new Error('Exact installment retry did not return same receipt');
-  for(const change of [{payment_method:'cash'},{account_id:''},{account_id:String(Number(originalPayload.account_id)+1)},{'fee_lines[0][amount]':'999.00'}]) {
+  for(const change of [{payment_reference:'CHANGED-REFERENCE'},{payment_method:'cash'},{account_id:''},{account_id:String(Number(originalPayload.account_id)+1)},{'fee_lines[0][amount]':'999.00'}]) {
     const conflict=await page.request.post(baseUrl+'/fbr-pos/school-fees',{headers:{Accept:'application/json'},form:{...originalPayload,...change}});
     if(conflict.status()!==422 || !(await conflict.json()).errors?.request_key) throw new Error('Changed installment retry was not clearly rejected');
   }
   if(!/card/i.test(await page.locator('#school-receipt-method').innerText())) throw new Error('Card receipt has wrong payment method');
+  if((await page.locator('#school-payment-reference').innerText()).trim() !== 'SYN-CARD-'+v.width) throw new Error('Recovered card receipt lost its immutable payment reference');
   await saveEvidenceScreenshot(page,'school-card-balance-paid-'+v.width);
   await scrolledPixelDetail(page,['#school-receipt-method','#school-receipt-campus','#school-receipt-cashier','#school-receipt-head','#school-receipt-balance','#school-print-receipt'],'school-card-receipt-details-'+v.width,saveEvidenceScreenshot);
   if(await (await page.request.get(baseUrl+firstPath)).text() !== firstHtml) throw new Error('Later installment changed first partial receipt snapshot');
   if(Number((await page.locator('#school-receipt-balance').innerText()).replace(/[^0-9.]/g,'')) !== 0) throw new Error('Final card installment did not settle balance');
+  await page.goto(baseUrl+'/fbr-pos/transactions?search='+encodeURIComponent(ref)+'&payment_method=bank',{waitUntil:'domcontentloaded'});
+  for(const name of ['from','to','payment_method','fee_head','cashier']) await page.locator(`[name="${name}"]`).waitFor({state:'visible'});
+  const filtered=await page.locator('tbody').innerText();
+  if(!filtered.includes('SYN-BANK-'+v.width) || filtered.includes('SYN-CARD-'+v.width)) throw new Error('School receipt history method filter mixed bank/card references');
+  await saveEvidenceScreenshot(page,'school-bank-history-filter-'+v.width);
   await page.goto(baseUrl+'/fbr-pos/day-close',{waitUntil:'domcontentloaded'});
   if(Number(await page.locator('#school-cash-total').getAttribute('data-paisa'))!==0) throw new Error('Recorded bank/card payments contaminated cash close total');
   await saveEvidenceScreenshot(page,'school-noncash-cash-total-'+v.width);

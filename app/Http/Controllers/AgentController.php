@@ -875,7 +875,9 @@ class AgentController extends Controller
         \App\Services\FbrPosAgentClaim::quarantineExpired((int) $company->id);
         $identity = app(\App\Services\FbrPosIdentity::class);
         $deviceUid = $this->requestDeviceUid($request);
-        $pending = $identity->route(FbrPosTransaction::where('company_id', $company->id), (int) $company->id, $deviceUid)
+        $pending = $company->isSchoolFeePilot() && !$company->fbr_reporting_enabled
+            ? collect()
+            : $identity->route(FbrPosTransaction::where('company_id', $company->id), (int) $company->id, $deviceUid)
             ->whereIn('fbr_status', ['offline', 'pending', 'failed'])
             ->whereNull('fbr_invoice_number')
             ->whereNull('fbr_submission_hash')
@@ -1196,24 +1198,13 @@ class AgentController extends Controller
         $fbrInvoiceNumber = trim((string) $request->input('pra_invoice_number', ''));
         $this->recordFbrCallbackDiagnostic($request, $company, $txn);
         $response = $request->input('response');
-        $code = null;
-        if (is_array($response)) {
-            foreach (['Code', 'response_code', 'code'] as $key) {
-                if (array_key_exists($key, $response) && $response[$key] !== null) {
-                    $candidate = trim((string) $response[$key]);
-                    if ($candidate !== '') {
-                        $code = $candidate;
-                        break;
-                    }
-                }
-            }
-        }
+        $code = \App\Services\FbrPosFiscalResult::code(is_array($response) ? $response : null);
         $explicitCode100 = $code === '100';
-        $returnedFiscalNumber = \App\Services\FbrPosFiscalResult::fromResponse(is_array($response) ? $response : null);
-        $treatAsSuccess = $request->boolean('success')
-            && $explicitCode100
-            && $returnedFiscalNumber !== null
-            && hash_equals($returnedFiscalNumber, $fbrInvoiceNumber);
+        $treatAsSuccess = \App\Services\FbrPosFiscalResult::explicitAcknowledgement(
+            is_array($response) ? $response : null,
+            $request->boolean('success'),
+            $fbrInvoiceNumber
+        ) !== null;
         $evidence = app(FbrPosSubmissionEvidenceService::class);
         $numberOnly = false;
         $reportedClaim = $request->input('submission_claim');
@@ -1251,6 +1242,7 @@ class AgentController extends Controller
                 $request->input('agent_version')
             );
             $this->telemetryUpdate($company, ['agent_last_seen' => now()]);
+            \App\Services\SchoolFeeImsService::reconcileTransaction($txn->fresh());
 
             return response()->json([
                 'ok' => true,
@@ -1339,6 +1331,7 @@ class AgentController extends Controller
                     $request->input('agent_version')
                 );
                 $this->telemetryUpdate($company, ['agent_last_seen' => now()]);
+                \App\Services\SchoolFeeImsService::reconcileTransaction($txn->fresh());
 
                 return response()->json(['ok' => true, 'verification_pending' => true]);
             }
@@ -1378,6 +1371,7 @@ class AgentController extends Controller
         }
 
         $this->telemetryUpdate($company, ['agent_last_seen' => now()]);
+        \App\Services\SchoolFeeImsService::reconcileTransaction($txn->fresh());
 
         return response()->json(['ok' => true]);
         });

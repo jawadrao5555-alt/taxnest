@@ -2660,6 +2660,12 @@ Route::prefix('fbr-pos')->middleware(['fbrpos.auth', 'company.approval', \App\Ht
     Route::get('/school-fees/settings', [\App\Http\Controllers\FbrPosSchoolFeeController::class, 'settings'])->name('fbrpos.school-fees.settings');
     Route::post('/school-fees/settings/fee-head', [\App\Http\Controllers\FbrPosSchoolFeeController::class, 'saveFeeHead'])->name('fbrpos.school-fees.fee-head');
     Route::post('/school-fees/settings/campus', [\App\Http\Controllers\FbrPosSchoolFeeController::class, 'addCampus'])->name('fbrpos.school-fees.add-campus');
+    Route::post('/school-fees/settings/ims', [\App\Http\Controllers\FbrPosSchoolFeeController::class, 'saveImsSettings'])->name('fbrpos.school-fees.ims-settings');
+    Route::get('/school-fees/student-ledger', [\App\Http\Controllers\FbrPosSchoolFeeController::class, 'studentLedger'])->name('fbrpos.school-fees.student-ledger');
+    Route::get('/school-fees/outstanding', [\App\Http\Controllers\FbrPosSchoolFeeController::class, 'outstanding'])->name('fbrpos.school-fees.outstanding');
+    Route::get('/school-fees/reports', [\App\Http\Controllers\SchoolFeeReportController::class, 'index'])->name('fbrpos.school-fees.reports');
+    Route::get('/school-fees/reports.csv', [\App\Http\Controllers\SchoolFeeReportController::class, 'csv'])->name('fbrpos.school-fees.reports.csv');
+    Route::get('/school-fees/reports.pdf', [\App\Http\Controllers\SchoolFeeReportController::class, 'pdf'])->name('fbrpos.school-fees.reports.pdf');
     Route::get('/school-fees', [\App\Http\Controllers\FbrPosSchoolFeeController::class, 'index'])->name('fbrpos.school-fees.index');
     Route::post('/school-fees', [\App\Http\Controllers\FbrPosSchoolFeeController::class, 'store'])->name('fbrpos.school-fees.store')->middleware('plan.limit:invoices');
     Route::post('/school-fees/campus', [\App\Http\Controllers\FbrPosSchoolFeeController::class, 'switchCampus'])->name('fbrpos.school-fees.campus');

@@ -16,11 +16,12 @@ export async function pilotFiscalControlWorkflow(page,t,v,{baseUrl,login,loopbac
   await page.goto(url(c.id),{waitUntil:'domcontentloaded'});
   const panel=page.locator('#pilot-fiscal-control');await panel.waitFor({state:'visible'});
   check((await panel.locator('[data-pilot-fiscal-status]').innerText()).includes('OFF'),'Pilot effective OFF absent');
-  check(await panel.locator('#pilot-fiscal-on').isDisabled(),'Unverified ON control enabled');
+  check(await panel.locator('#pilot-fiscal-route').inputValue()==='off','Pilot route selector is not OFF');
+  check(await panel.locator('#pilot-fiscal-route option[value=di]').isDisabled(),'DI route option enabled');
   const before=await page.request.get(url(c.id),{headers:{Accept:'application/json'}});check(before.status()===200,'Owner fiscal read failed');const initial=await before.json();
   check(initial.company_id===c.id&&initial.enabled===false&&initial.historical_submission===false,'Fiscal state company mismatch or armed');
   const token=await page.locator('meta[name=csrf-token]').getAttribute('content');
-  const rejected=await page.request.post(url(c.id),{headers:{Accept:'application/json','X-CSRF-TOKEN':token},data:{enabled:true}});
+  const rejected=await page.request.post(url(c.id),{headers:{Accept:'application/json','X-CSRF-TOKEN':token},data:{route:'ims'}});
   check(rejected.status()===422,'Direct unverified ON was not rejected');
   check(JSON.stringify(await rejected.json())===JSON.stringify(initial),'Rejected ON mutated effective fiscal state');
   await Promise.all([page.waitForNavigation({waitUntil:'domcontentloaded'}),panel.locator('#pilot-fiscal-off').click()]);
@@ -29,7 +30,7 @@ export async function pilotFiscalControlWorkflow(page,t,v,{baseUrl,login,loopbac
   const other=f.companies.find(x=>x.id!==c.id);const sibling=await page.request.get(url(other.id),{headers:{Accept:'application/json'}});
   check((await sibling.json()).company_id===other.id,'Company-specific control lost target scope');
   await saveEvidenceScreenshot(page,'pilot-fiscal-control-'+c.category+'-'+v.width);
-  await scrolledPixelDetail(page,['#pilot-fiscal-off','#pilot-fiscal-on','#pilot-fiscal-blocker'],'pilot-fiscal-control-'+c.category+'-controls-'+v.width,saveEvidenceScreenshot);
+  await scrolledPixelDetail(page,['#pilot-fiscal-off','#pilot-fiscal-route','#pilot-fiscal-blocker'],'pilot-fiscal-control-'+c.category+'-controls-'+v.width,saveEvidenceScreenshot);
  }
  for(const denied of [{login:f.support,loginPath:'/admin/login',expected:403},{login:f.companies[0].owner,loginPath:'/fbr-pos/login',expected:302}]){
   const ctx=await page.context().browser().newContext({viewport:v,serviceWorkers:'block'});
@@ -50,5 +51,5 @@ export async function pilotFiscalControlWorkflow(page,t,v,{baseUrl,login,loopbac
   check(state.status()===200&&data.company_id===c.id&&data.enabled===false&&data.historical_submission===false,'Forbidden probe changed effective fiscal state');
   check(JSON.stringify(await companySnapshot(c))===JSON.stringify(snapshots.get(c.id)),'Forbidden probe changed displayed reporting status or rendered history totals');
  }
- pass('PILOT FISCAL CONTROL PASS: '+v.width+': school/hospital effective OFF, disabled ON, direct ON422 unchanged state, explicit targeted OFF, tenant/support denied; no bill or fiscal dispatch');
+ pass('PILOT FISCAL CONTROL PASS: '+v.width+': school/hospital effective OFF, incomplete IMS setup rejected with unchanged state, explicit targeted OFF, tenant/support denied; no bill or fiscal dispatch');
 }

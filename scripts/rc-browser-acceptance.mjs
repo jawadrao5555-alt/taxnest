@@ -2380,9 +2380,16 @@ async function customerSurveyJourney(page,t,v) {
  pass(t.name+'/'+v.width+': real targeted rating/text response persists and does not repeat; native presentation keeps the same authenticated routes');
 }
 async function customerBulkNavigation(page,t,v) {
+ const chartAsset=baseUrl+'/vendor/chart.umd.min.js*';
+ await page.route(chartAsset,async route=>{await new Promise(resolve=>setTimeout(resolve,500));await route.continue();});
+ const chartsReady=()=>page.waitForFunction(()=>{
+  const canvases=[...document.querySelectorAll('#salesChart, #orderTypeChart')];
+  return canvases.length>0&&typeof window.Chart==='function'&&canvases.every(canvas=>!!window.Chart.getChart(canvas));
+ },null,{timeout:10000});
  const opened=await page.goto(baseUrl+'/pos/restaurant/dashboard',{waitUntil:'domcontentloaded'});
  if(!opened?.ok())throw new Error('Dashboard did not render for metric navigation');
  await waitForOperationalSurface(page);await dismiss(page);
+ await chartsReady();
  const root=page.locator('[data-dashboard-metrics]');await root.waitFor();
  const reports=page.locator('[data-dashboard-report-section]');
  if(await root.evaluate(el=>el.getBoundingClientRect().bottom)>await reports.evaluate(el=>el.getBoundingClientRect().top))throw new Error('Reports must appear below the themed dashboard');
@@ -2392,6 +2399,7 @@ async function customerBulkNavigation(page,t,v) {
  const returnToDashboard=async()=>{
   await page.goto(baseUrl+'/pos/restaurant/dashboard',{waitUntil:'domcontentloaded'});
   await waitForOperationalSurface(page);await dismiss(page);
+  await chartsReady();
  };
  for(const metric of ['revenue','orders','customers']) {
   const link=page.locator('[data-dashboard-metric="'+metric+'"]');await link.waitFor();
@@ -2425,7 +2433,8 @@ async function customerBulkNavigation(page,t,v) {
   await returnToDashboard();
  }
  await saveEvidenceScreenshot(page,'customer-bulk-metrics-'+v.width);
- pass(t.name+'/'+v.width+': dashboard card totals match their detail; Sales, Tax and Day Close share the dashboard reporting layout');
+ await page.unroute(chartAsset);
+ pass(t.name+'/'+v.width+': delayed Chart dependency renders after every navigation; dashboard card totals match their detail; Sales, Tax and Day Close share the dashboard reporting layout');
 }
 async function one(browser,label,v,t) {
   if(t.madadgarReadCases)t={...t,login:t.madadgarReadCases[v.width].login};

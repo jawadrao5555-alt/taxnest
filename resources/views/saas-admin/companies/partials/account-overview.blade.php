@@ -8,7 +8,15 @@
 @endphp
 @include('billing._policy-status', ['policySubscription' => $sub])
 @if($company->isLocalCollectionPilot() && auth('admin')->user()?->isSuperAdmin())
-<a class="block my-3 underline" href="{{ route('saas.admin.pilot-fiscal-control',$company->id) }}">School / Hospital fiscal control: OFF — route unverified</a>
+@php
+    $pilotFiscalConfigured = $company->fbrPosIntegrationConfigured();
+    $pilotFiscalLabel = match (true) {
+        $pilotFiscalConfigured && $company->fbr_reporting_enabled => 'IMS ON',
+        $pilotFiscalConfigured => 'OFF — local billing only',
+        default => 'OFF — IMS setup incomplete',
+    };
+@endphp
+<a class="block my-3 underline" href="{{ route('saas.admin.pilot-fiscal-control',$company->id) }}">{{ $company->isSchoolFeePilot() ? 'School' : 'Hospital' }} fiscal control: {{ $pilotFiscalLabel }}</a>
 @endif
 <section id="company-account-overview" data-company-account data-company-control="{{ $account['control'] }}" data-subscription-allowed="{{ $account['access']['allowed'] === null ? 'unknown' : ($account['access']['allowed'] ? 'yes' : 'no') }}" class="mb-6 space-y-4 min-w-0">
     <div class="{{ $panelClass }}">

@@ -56,6 +56,30 @@ final class CollectionFbrSubmission
         return ($plan['state'] ?? null) === 'reconciliation_required';
     }
 
+    public static function receiptPath(FbrPosTransaction $transaction): ?string
+    {
+        $company = $transaction->company;
+        if (!$company?->isLocalCollectionPilot()) {
+            return null;
+        }
+
+        $school = $company->isSchoolFeePilot();
+        $table = $school ? 'school_fee_receipts' : 'hospital_payments';
+        if (!Schema::hasColumn($table, 'fbr_pos_transaction_id')) {
+            return null;
+        }
+        $receipt = DB::table($table)->where('company_id', $company->id)
+            ->where('fbr_pos_transaction_id', $transaction->id)
+            ->first(['id', 'branch_id']);
+        if (!$receipt) {
+            return null;
+        }
+
+        $path = $school ? '/fbr-pos/school-fees/'.$receipt->id.'/receipt' : '/fbr-pos/hospital/receipts/'.$receipt->id;
+
+        return $path.($receipt->branch_id === null ? '?unassigned=1' : '');
+    }
+
     public static function dispatch(FbrPosTransaction $transaction): void
     {
         if (($transaction->company->fbr_connection_mode ?? 'cloud') === 'cloud') {

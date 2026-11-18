@@ -72,7 +72,7 @@ final class FbrPosOwnerReconciliation
             throw ValidationException::withMessages(['fiscal_number' => 'Enter the actual fiscal invoice number from the checked evidence.']);
         }
         return DB::transaction(function () use ($actor, $companyId, $id, $data) {
-            Company::where('id', $companyId)->lockForUpdate()->firstOrFail();
+            $company = Company::where('id', $companyId)->lockForUpdate()->firstOrFail();
             $bill = FbrPosTransaction::withoutGlobalScopes()->where('company_id', $companyId)->lockForUpdate()->findOrFail($id);
             $audit = DB::table('fbr_pos_owner_reconciliations')->where('company_id', $companyId)
                 ->where('transaction_id', $id)->where('request_key', $data['request_key'])->first();
@@ -91,11 +91,28 @@ final class FbrPosOwnerReconciliation
             if ($bill->fbr_invoice_number && ($data['decision'] !== 'accepted' || $bill->fbr_invoice_number !== $data['fiscal_number'])) {
                 throw ValidationException::withMessages(['fiscal_number' => 'An existing fiscal number cannot be removed or replaced.']);
             }
+            if ($company->isLocalCollectionPilot()) {
+                $pos = (string) $bill->fbr_pos_id_snapshot;
+                $prefix = str_pad($pos, 6, '0', STR_PAD_LEFT);
+                abort_unless(CollectionFbrSubmission::canSubmit($bill) && CollectionFbrSubmission::receiptPath($bill), 409);
+                if ($data['decision'] !== 'accepted'
+                    || $data['environment'] !== $bill->fbr_requested_environment_snapshot
+                    || !preg_match('/^\d{1,6}$/D', $pos)
+                    || !str_starts_with((string) $data['fiscal_number'], $prefix)) {
+                    throw ValidationException::withMessages([
+                        'fiscal_number' => 'Record the accepted fiscal number for the original POS and environment.',
+                    ]);
+                }
+            }
+
             $patch = ['fbr_status' => $data['decision'] === 'accepted' ? 'submitted' : 'failed', 'fbr_submission_hash' => null];
             if ($bill->getAttribute('fbr_agent_claimed_at') !== null) $patch['fbr_agent_claimed_at'] = null;
             if ($data['decision'] === 'accepted') $patch['fbr_invoice_number'] = $data['fiscal_number'];
             // No fabricated Code 100, response or automatic central-verification claim.
             $bill->update($patch);
+            if ($company->isLocalCollectionPilot()) {
+                CollectionFbrSubmission::reconcile($bill);
+            }
             DB::table('fbr_pos_owner_reconciliations')->insert([
                 'company_id' => $companyId, 'transaction_id' => $id, 'actor_id' => $actor->id,
                 'request_key' => $data['request_key'], 'decision' => $data['decision'],

@@ -40,7 +40,13 @@ final class ReviewedDeviceProof
         ])->validate();
         return DB::transaction(function() use($companyId,$data,$actor) {
             $company=Company::whereKey($companyId)->lockForUpdate()->firstOrFail();
-            abort_if($company->isLocalCollectionPilot(),422,'School and Hospital reporting routes remain unverified; device proof cannot authorize them.');
+            if ($company->isLocalCollectionPilot()) {
+                abort_unless($company->fbr_connection_mode === 'fiscal_device'
+                    && $company->fbrPosIntegrationConfigured()
+                    && (string) $company->fbr_pos_id === $data['pos_id']
+                    && ($company->fbr_pos_environment ?? 'sandbox') === $data['environment'],
+                    422, 'Device evidence must match the collection workspace’s configured fiscal device, POS ID and environment.');
+            }
             $device=Schema::hasTable('pos_agent_devices') ? DB::table('pos_agent_devices')->where('company_id',$companyId)->where('device_uid',$data['device_uid'])->first() : null;
             abort_unless($device && $device->device_uid === $data['device_uid'],422,'Review requires the exact device already registered to this company.');
             unset($data['independent_evidence_reviewed']);

@@ -18,7 +18,7 @@ return new class extends Migration {
             $table->json('before_state');
             $table->json('after_state')->nullable();
             $table->timestamp('created_at');
-            $table->timestamp('invoice_created_at');
+            $table->dateTime('invoice_created_at');
             $table->index(['company_id', 'action', 'invoice_created_at'], 'hospital_corrections_quota_idx');
         });
     }

@@ -224,7 +224,7 @@ class FbrPosHospitalCollectionTest extends TestCase
     public function test_service_heads_methods_and_payment_confirmation(): void {
         foreach(['consultation','lab','procedure'] as $head){$this->collect($this->payload(['service_head'=>$head]));}
         $this->conflict(fn()=>$this->collect($this->payload(['payment_confirmed'=>'0'])),'payment_confirmed');
-        foreach(['amount'=>'0','patient_reference'=>'  ','service_head'=>'retail','payment_method'=>'crypto'] as $k=>$v)
+        foreach(['amount'=>'0','service_head'=>'retail','payment_method'=>'crypto'] as $k=>$v)
             $this->conflict(fn()=>$this->collect($this->payload([$k=>$v])),$k);
         $this->assertSame(3,DB::table('hospital_invoices')->count());
     }

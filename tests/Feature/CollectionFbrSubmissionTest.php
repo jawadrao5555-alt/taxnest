@@ -5,8 +5,10 @@ namespace Tests\Feature;
 use App\Jobs\SubmitCollectionFbrReceipt;
 use App\Models\Company;
 use App\Models\FbrPosTransaction;
+use App\Models\User;
 use App\Services\CollectionFbrSubmission;
 use App\Services\FbrService;
+use App\Services\FbrPosOwnerReconciliation;
 use App\Services\HospitalPaymentImsService;
 use App\Services\PilotFiscalRouteSnapshot;
 use App\Services\SchoolFeeImsService;
@@ -86,6 +88,41 @@ class CollectionFbrSubmissionTest extends TestCase
         $this->assertSame('123456SYN000001', $receipt->fbr_invoice_number);
         $this->assertSame($receipt->fbr_invoice_number, $receipt->fbr_qr_payload);
         $this->assertSame(12500, (int) $receipt->amount_paisa);
+    }
+
+    #[DataProvider('categories')]
+    public function test_portal_evidence_recovers_existing_number_without_queuing_again(string $category): void
+    {
+        [$company, $table, $id, $mirror] = $this->receipt($category);
+        $mirror->forceFill(['fbr_status' => 'verification_pending'])->save();
+        $owner = (new User)->forceFill(['id' => 1, 'company_id' => $company->id, 'role' => 'company_admin']);
+        $evidence = [
+            'request_key' => (string) Str::uuid(),
+            'fingerprint' => FbrPosOwnerReconciliation::fingerprint($mirror),
+            'decision' => 'accepted',
+            'evidence_source' => 'fbr_portal',
+            'evidence_reference' => 'Synthetic portal record',
+            'environment' => 'sandbox',
+            'fiscal_number' => '123456SYN000002',
+            'confirmed' => true,
+        ];
+        $service = app(FbrPosOwnerReconciliation::class);
+        try {
+            $service->resolve($owner, $company->id, $mirror->id, array_replace($evidence, [
+                'fiscal_number' => '654321SYN000002',
+            ]));
+            $this->fail('A fiscal number from another POS must be rejected.');
+        } catch (\Illuminate\Validation\ValidationException $error) {
+            $this->assertArrayHasKey('fiscal_number', $error->errors());
+        }
+        $service->resolve($owner, $company->id, $mirror->id, $evidence);
+        $service->resolve($owner, $company->id, $mirror->id, $evidence);
+        Bus::assertDispatchedTimes(SubmitCollectionFbrReceipt::class, 1);
+        $receipt = DB::table($table)->find($id);
+        $this->assertSame('submitted', $receipt->fbr_status);
+        $this->assertSame('123456SYN000002', $receipt->fbr_invoice_number);
+        $this->assertSame($receipt->fbr_invoice_number, $receipt->fbr_qr_payload);
+        $this->assertNull($mirror->fresh()->fbr_response_code);
     }
 
     #[DataProvider('categories')]

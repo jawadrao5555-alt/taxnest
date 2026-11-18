@@ -74,6 +74,7 @@
     "braces": "file:../../tools/npm-patches/braces"
   },
   "overrides": {
+    "picomatch": "npm:@ryotsu/picomatch@4.0.7-a",
     "braces": "$braces"
   }
 }

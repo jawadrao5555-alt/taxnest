@@ -8,8 +8,10 @@
         @page {
             /* 🖨️ Safer A4 margins — prevents corner-cut on consumer printers
                (most can't reach within 12mm of paper edge). */
-            margin: 15mm 15mm 18mm 15mm;
+            margin: {{ !empty($thermal) ? ($receiptPreferences['margin_mm'] ?? 3).'mm' : '15mm 15mm 18mm 15mm' }};
+            @if(empty($thermal))
             size: A4 portrait;
+            @endif
         }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -82,6 +84,22 @@
         .footer p { font-size: 9px; color: #374151; line-height: 1.6; }
         .footer .brand { font-size: 10px; font-weight: bold; color: #1e3a5f; margin-top: 3px; }
     </style>
+    @if(!empty($thermal))
+    <style>
+        body { font-size: 9px; overflow-wrap: break-word; }
+        .header-bar, .grand-total-box { background: white; padding: 4px 0; }
+        .header-bar h1, .header-bar p, .grand-total-box .lbl, .grand-total-box .val { color: black; letter-spacing: 0; }
+        .header-bar h1 { font-size: 11px; }
+        .grand-total-box .lbl, .grand-total-box .val { font-size: 11px; }
+        .invoice-box, .info-section { padding: 3px; margin-bottom: 4px; }
+        .invoice-row .lbl, .invoice-row .val, .info-row .lbl, .info-row .val,
+        .total-row .lbl, .total-row .val { font-size: 8px; letter-spacing: 0; }
+        table.items { table-layout: fixed; }
+        table.items thead th, table.items tbody td { padding: 3px 1px; font-size: 7px; letter-spacing: 0; }
+        table.items thead th { color: black; background: white; border-bottom: 1px solid black; }
+        table.items tbody td.r { white-space: normal; }
+    </style>
+    @endif
     @if($urduScript)
     <style>
         /* Urdu script mode (Task 260): mPDF renders this path — DomPDF is
@@ -105,7 +123,7 @@
 <body>
     <div class="receipt">
         <div class="header-bar">
-            @if($company->logo_path)
+            @if($company->logo_path && ($receiptPreferences['show_logo'] ?? true))
             <div class="logo">
                 <img src="{{ public_path('storage/' . $company->logo_path) }}" alt="{{ $company->name }}">
             </div>

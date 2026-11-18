@@ -6,7 +6,14 @@
  const message=@json(__('hospital.recovery'));let pending=null,ready=true,busy=false;
  const show=s=>{notice.textContent=s;notice.hidden=false;};
  try{pending=sessionStorage.getItem(storageKey);if(pending){if(!/^[0-9a-f-]{36}$/i.test(pending))throw Error();key.value=pending;show(message);}}catch(_){ready=false;show(@json(__('hospital.storage')));}
- const controls=()=>{button.disabled=!ready||busy||(form.dataset.closed==='1'&&!pending);}; controls();window.addEventListener('pageshow',controls);
+ const controls=()=>{button.disabled=!ready||busy||(form.dataset.closed==='1'&&!pending);}; controls();
+ window.addEventListener('pageshow',event=>{
+  if(event.persisted&&!busy){
+   try{pending=sessionStorage.getItem(storageKey);key.value=pending||crypto.randomUUID();if(!pending)notice.hidden=true;}
+   catch(_){ready=false;show(@json(__('hospital.storage')));}
+  }
+  controls();
+ });
  form.addEventListener('submit',async e=>{e.preventDefault();if(button.disabled)return;
  try{sessionStorage.setItem(storageKey,key.value);if(sessionStorage.getItem(storageKey)!==key.value)throw Error();pending=key.value;}catch(_){ready=false;show(@json(__('hospital.storage')));controls();return;}
  busy=true;controls();const abort=new AbortController();const timer=setTimeout(()=>abort.abort(),30000);

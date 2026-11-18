@@ -50,4 +50,5 @@
 })();
 </script>
 @endif
+@include('fbr-pos.partials.collection-ims-auto-update', ['imsReceipt' => $receipt])
 @endsection

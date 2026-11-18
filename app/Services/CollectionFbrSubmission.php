@@ -87,6 +87,16 @@ final class CollectionFbrSubmission
         }
     }
 
+    public static function receiptStatus(object $receipt): \Illuminate\Http\JsonResponse
+    {
+        $mirror = empty($receipt->fbr_pos_transaction_id) ? null : FbrPosTransaction::query()
+            ->where('company_id', $receipt->company_id)
+            ->find($receipt->fbr_pos_transaction_id, ['id', 'fbr_status']);
+
+        return response()->json(['status' => $mirror?->fbr_status ?? $receipt->fbr_status ?? null])
+            ->header('Cache-Control', 'private, no-store');
+    }
+
     public static function reconcile(FbrPosTransaction $transaction): void
     {
         SchoolFeeImsService::reconcileTransaction($transaction);

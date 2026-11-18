@@ -34,4 +34,5 @@ $paperWidth = match ($print['paper']) { '58mm'=>'58mm', 'a4'=>'180mm', default=>
 @if(!($preview ?? false))
 <script>(()=>{const key=@json('taxnest.hospital.pending.'.$company->id.'.'.($payment->branch_id??0).'.'.auth('fbrpos')->id().'.'.($payment->request_key===$invoice->request_key?'new':$invoice->id));try{if(sessionStorage.getItem(key)===@json($payment->request_key))sessionStorage.removeItem(key);}catch(_){}})();</script>
 @endif
+@include('fbr-pos.partials.collection-ims-auto-update', ['imsReceipt' => $payment])
 @endsection

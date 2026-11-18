@@ -153,8 +153,14 @@ class FbrPosHospitalController extends Controller
         return response()->view('fbr-pos.hospital.invoice',compact('company','invoice','payments','balance','requestKey','closed'))->header('Cache-Control','private, no-store');
     }
     public function receipt(int $id) {
-        $company=$this->company(true); \App\Services\HospitalPaymentImsService::reconcileReceipt((int)$company->id,$id); $payment=$this->rows('hospital_payments',$company)->where('id',$id)->first(); abort_unless($payment,404);
+        $company=$this->company(true);
+        $payment=$this->rows('hospital_payments',$company)->where('id',$id)->first(); abort_unless($payment,404);
         $invoice=$this->rows('hospital_invoices',$company)->where('id',$payment->invoice_id)->first(); abort_unless($invoice,404);
+        if (request()->query('fiscal_status') === '1' && request()->wantsJson()) {
+            return \App\Services\CollectionFbrSubmission::receiptStatus($payment);
+        }
+        \App\Services\HospitalPaymentImsService::reconcileReceipt((int)$company->id,$id);
+        $payment=$this->rows('hospital_payments',$company)->where('id',$id)->first(); abort_unless($payment,404);
         return response()->view('fbr-pos.hospital.receipt',compact('company','invoice','payment'))->header('Cache-Control','private, no-store');
     }
     public function history(Request $r) {

@@ -1288,6 +1288,10 @@ class AgentController extends Controller
                 $request->input('agent_version')
             );
 
+            if ($company->isLocalCollectionPilot()) {
+                \App\Services\CollectionFbrSubmission::reconcile($txn);
+            }
+
             Log::info('Agent: FBR submission success', [
                 'company_id' => $company->id,
                 'transaction_id' => $txnId,

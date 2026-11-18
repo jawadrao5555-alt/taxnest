@@ -30,6 +30,14 @@ class HospitalPaymentImsServiceTest extends TestCase
         $this->assertSame('8000.00', number_format((float) $mirror->total_amount, 2, '.', ''));
         $this->assertSame(1,DB::table('fbr_pos_transaction_items')->where('transaction_id',$mirror->id)->count());
         DB::table('fbr_pos_transactions')->where('id',$mirror->id)->update(['fbr_status'=>'submitted','fbr_invoice_number'=>'203480SYN000001','fbr_response_code'=>'100']);
+        $pendingReceipt = DB::table('hospital_payments')->find($payment);
+        $this->assertSame('pending', $pendingReceipt->fbr_status);
+        $status = \App\Services\CollectionFbrSubmission::receiptStatus($pendingReceipt);
+        $this->assertSame(['status' => 'submitted'], $status->getData(true));
+        $foreignReceipt = clone $pendingReceipt;
+        $foreignReceipt->company_id = $company->id + 1;
+        $this->assertSame(['status' => 'pending'],
+            \App\Services\CollectionFbrSubmission::receiptStatus($foreignReceipt)->getData(true));
         HospitalPaymentImsService::reconcileReceipt($company->id,$payment);
         $saved=DB::table('hospital_payments')->find($payment);
         $this->assertSame('submitted',$saved->fbr_status);$this->assertSame('203480SYN000001',$saved->fbr_invoice_number);

@@ -678,8 +678,14 @@ class FbrPosSchoolFeeController extends Controller
     public function receipt(int $id)
     {
         $company = $this->company();
+        $scope = $this->historyScope($company, request())->where('id', $id);
+        $receipt = $scope->first();
+        abort_unless($receipt, 404);
+        if (request()->query('fiscal_status') === '1' && request()->wantsJson()) {
+            return \App\Services\CollectionFbrSubmission::receiptStatus($receipt);
+        }
         \App\Services\SchoolFeeImsService::reconcileReceipt((int) $company->id, $id);
-        $receipt = $this->historyScope($company, request())->where('id', $id)->first();
+        $receipt = $scope->first();
         abort_unless($receipt, 404);
         return response()->view('fbr-pos.school-fees.receipt', compact('company', 'receipt'))
             ->header('Cache-Control', 'private, no-store');

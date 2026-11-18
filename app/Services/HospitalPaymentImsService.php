@@ -40,7 +40,7 @@ final class HospitalPaymentImsService
                 'created_by'=>$payment->collected_by,'cash_received'=>$gross,'change_due'=>0]);
             $mirror->forceFill(['created_at'=>$payment->collected_at,'updated_at'=>$payment->collected_at])->save();
             FbrPosTransactionItem::create(['transaction_id'=>$mirror->id,'item_name'=>'Hospital payment','hs_code'=>$pct?:null,
-                'uom'=>'Numbers, pieces, units','quantity'=>1,'unit_price'=>$subtotal,'discount'=>0,'item_discount'=>0,
+                'uom'=>'U','quantity'=>1,'unit_price'=>$subtotal,'discount'=>0,'item_discount'=>0,
                 'tax_rate'=>$rate,'tax_amount'=>$tax,'subtotal'=>$subtotal,'total'=>$gross,'is_tax_exempt'=>$rate<=0]);
             DB::table('hospital_payments')->where('id',$paymentId)->update(['fbr_pos_transaction_id'=>$mirror->id,
                 'fbr_status'=>'pending','fbr_error_message'=>null,'updated_at'=>now()]);

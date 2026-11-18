@@ -70,6 +70,7 @@ class CollectionFbrSubmissionTest extends TestCase
         $service::queueFinalizedReceipt($company->id, $id);
         Bus::assertDispatchedTimes(SubmitCollectionFbrReceipt::class, 1);
         $this->assertSame(125.0, (float) $mirror->total_amount);
+        $this->assertSame('U', $mirror->items()->sole()->uom);
         $this->assertTrue(CollectionFbrSubmission::canSubmit($mirror));
 
         $fbr = \Mockery::mock(FbrService::class)->makePartial()->shouldAllowMockingProtectedMethods();

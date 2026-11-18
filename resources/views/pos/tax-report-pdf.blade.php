@@ -56,6 +56,16 @@
 
     <div class="content">
         @include('pos.partials.tax-report-summary')
+        @php
+            $rows = ($taxRateFilter ?? false)
+                ? $transactions->filter(fn ($transaction) => isset($itemValues[$transaction->id]))
+                : $transactions;
+            $tables = $rows->chunk(100);
+            if ($tables->isEmpty()) {
+                $tables = collect([collect()]);
+            }
+        @endphp
+        @foreach($tables as $tableRows)
         <table>
             <thead>
                 <tr>
@@ -82,7 +92,7 @@
                 </tr>
             </thead>
             <tbody>
-                @foreach($transactions as $t)
+                @foreach($tableRows as $t)
                 @php
                     $iv = ($taxRateFilter ?? false) ? ($itemValues[$t->id] ?? null) : null;
                     // Credit-note row marking (Task 695): badge + signed amounts
@@ -91,9 +101,6 @@
                     $rowSign = ($rowIsReturn && ($billTypeFilter ?? '') !== 'returns') ? -1 : 1;
                     $retStyle = $rowIsReturn ? 'color:#dc2626;' : '';
                 @endphp
-                @if(($taxRateFilter ?? false) && !$iv)
-                    @continue
-                @endif
                 <tr>
                     <td style="font-weight:bold;">{{ $t->invoice_number }}
                         @if($rowIsReturn)<span class="badge badge-return">{{ __('pos.credit_note_badge') }}</span>@endif
@@ -134,6 +141,7 @@
                     </td>
                 </tr>
                 @endforeach
+                @if($loop->last)
                 <tr class="total-row">
                     @if($taxRateFilter ?? false)
                     <td colspan="5" style="font-size:9px;">{{ $taxRateLabel }} {{ __('pos.tr_totals', ['count' => $summary->total_invoices]) }}</td>
@@ -153,8 +161,10 @@
                     <td colspan="2"></td>
                     @endif
                 </tr>
+                @endif
             </tbody>
         </table>
+        @endforeach
 
         {{-- Credit-note summary line (Task 695): refunds are never hidden — the
              netted totals above already subtract them. --}}

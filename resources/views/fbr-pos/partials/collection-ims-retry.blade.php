@@ -5,7 +5,7 @@
 @endphp
 @if(!($preview ?? false))
     <div class="no-print">
-        @if(session('ims_status'))
+        @if(($showImsFlash ?? true) && session('ims_status'))
             <p role="status" class="notice">{{ session('ims_status') }}</p>
         @endif
         @if($imsEligible && empty($imsReceipt->fbr_pos_transaction_id))

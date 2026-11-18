@@ -177,7 +177,12 @@ class FbrPosHospitalController extends Controller
             if (isset($d[$field.'_max'])) $q->whereRaw($expression.' <= ?',[$this->money($d[$field.'_max'])]);
         }
         $invoices=$q->orderByDesc('id')->paginate(20)->withQueryString();
-        return response()->view('fbr-pos.hospital.history',compact('company','invoices'))->header('Cache-Control','private, no-store');
+        $paymentsByInvoice = $this->rows('hospital_payments', $company)
+            ->whereIn('invoice_id', $invoices->getCollection()->pluck('id'))
+            ->orderBy('id')->get()->groupBy('invoice_id');
+
+        return response()->view('fbr-pos.hospital.history', compact('company', 'invoices', 'paymentsByInvoice'))
+            ->header('Cache-Control', 'private, no-store');
     }
     public function patientLedger(Request $r) {
         $company=$this->company(true);

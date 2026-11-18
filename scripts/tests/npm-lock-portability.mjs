@@ -63,12 +63,13 @@ import { fileURLToPath } from 'node:url';
 // Reviewed 6 Oct 2026: source-map-js 1.2.2 and root selector-parser 7.1.6
 // address GHSA-68fv-2mgg-jv7q / GHSA-rj75-hqrm-r3gf. All other
 // graph entries, local-fork hashes and registry/integrity checks stay pinned.
+// Pin the reviewed picomatch security fork for GHSA-fc5q-39xc-vjpf.
 const LOCKS = [
   {
     lock: 'package-lock.json',
-    packages: 249,
-    resolved: 242,
-    graph: '12cbb9422d7c8aea18b891e515284094599ef3633ccf31a0656ff5fceee107ac',
+    packages: 245,
+    resolved: 238,
+    graph: '350f486f1b17b9a2f90012f80efb4cbb090878ddbda51f158151947ef0a52b57',
   },
   {
     lock: 'agent-realtime-gateway/package-lock.json',
@@ -80,13 +81,13 @@ const LOCKS = [
     lock: 'artifacts/mockup-sandbox/package-lock.json',
     packages: 318,
     resolved: 311,
-    graph: '0afcf5508dabc193fce98a83ba74efd4e9d2d603292028f60f21daf070c77ecc',
+    graph: '87b1b51d9abe6ba98ea93ffa586226b83330d2fbc2ba22283de7c9bd991fc2b0',
   },
   {
     lock: 'pra-agent/package-lock.json',
     packages: 294,
     resolved: 293,
-    graph: '92327689122cee695fe213182908e5816d3517f59e3cc5f4f567f1fe1d9d263a',
+    graph: '070fb25ed323cc2773cf480c5e0476a63624dac80cfdab415b977bed2c0cc18e',
   },
   {
     lock: 'tools/video-pipeline/package-lock.json',

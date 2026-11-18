@@ -1,6 +1,6 @@
 {
   "name": "taxnest-pra-agent",
-  "version": "1.13.37",
+  "version": "1.13.38",
   "description": "TaxNest PRA Sync Agent — auto-syncs your POS invoices to PRA from your local Pakistani PC.",
   "main": "main.js",
   "author": "TaxNest (Pvt) Ltd",
@@ -91,6 +91,7 @@
     "electronVersion": "42.11.16"
   },
   "overrides": {
+    "picomatch": "npm:@ryotsu/picomatch@4.0.7-a",
     "@electron/get": "$@electron/get",
     "follow-redirects": "1.16.2",
     "minimatch": "$minimatch"

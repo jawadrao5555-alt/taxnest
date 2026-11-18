@@ -134,6 +134,45 @@ class FbrPosHospitalCollectionTest extends TestCase
     private function denied(callable $f,int $status): void {
         try{$f();$this->fail('Expected denied');}catch(HttpExceptionInterface $e){$this->assertSame($status,$e->getStatusCode());}
     }
+    public function test_same_amount_walk_ins_are_distinct_and_retries_are_idempotent(): void
+    {
+        $first = $this->payload(['patient_reference' => '', 'patient_name' => '']);
+        $this->collect($first);
+        $this->collect($first);
+        $this->collect($this->payload(['patient_reference' => '', 'patient_name' => '']));
+        $this->assertSame(2, DB::table('hospital_payments')->count());
+        $this->assertSame(2, DB::table('hospital_invoices')->distinct()->count('patient_reference'));
+        $this->assertSame(2, DB::table('hospital_invoices')->whereNull('patient_name')->count());
+    }
+
+    public function test_owner_corrects_and_voids_local_invoice_but_cannot_void_an_ims_receipt(): void
+    {
+        (require database_path('migrations/2027_01_01_000000_add_pilot_fiscal_route_snapshots.php'))->up();
+        (require database_path('migrations/2027_01_01_000005_create_hospital_invoice_corrections.php'))->up();
+        $original = $this->payload();
+        $this->collect($original);
+        $this->collect($this->payload());
+        $fiscal = DB::table('hospital_payments')->orderByDesc('id')->first();
+        DB::table('hospital_payments')->where('id', $fiscal->id)->update([
+            'fiscal_route_snapshot' => json_encode(['route' => 'ims', 'eligible' => true]),
+        ]);
+        $local = DB::table('hospital_payments')->orderBy('id')->first();
+        $correction = ['action' => 'edit', 'expected_branch_key' => 0, 'reason' => 'Synthetic correction',
+            'patient_name' => '', 'total_amount' => '500.00', 'payment_amount' => '450.00'];
+        $controller = app(FbrPosHospitalController::class);
+        $this->denied(fn () => $controller->correctLocalInvoice($this->request($correction), $local->invoice_id), 403);
+        $this->cashier->forceFill(['role' => 'company_admin', 'pos_role' => null]);
+        $this->actingAs($this->cashier, 'fbrpos');
+        $controller->correctLocalInvoice($this->request($correction), $local->invoice_id);
+        $this->assertDatabaseHas('hospital_payments', ['id' => $local->id, 'amount_paisa' => 45000, 'balance_paisa' => 5000]);
+        $void = array_replace($correction, ['action' => 'void']);
+        $this->denied(fn () => $controller->correctLocalInvoice($this->request($void), $fiscal->invoice_id), 409);
+        $controller->correctLocalInvoice($this->request($void), $local->invoice_id);
+        $this->assertDatabaseMissing('hospital_payments', ['id' => $local->id]);
+        $this->assertDatabaseHas('hospital_invoice_corrections', ['invoice_id' => $local->invoice_id, 'action' => 'void']);
+        $this->conflict(fn () => $this->collect($original), 'request_key');
+    }
+
     public function test_dashboard_separates_daily_collections_and_scoped_outstanding(): void
     {
         $this->withoutVite();

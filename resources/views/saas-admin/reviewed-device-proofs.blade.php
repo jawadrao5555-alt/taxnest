@@ -1,7 +1,7 @@
 <x-admin-layout>
 <div class="max-w-5xl mx-auto p-4 text-white space-y-4">
 <h1 class="text-xl font-bold">Reviewed fiscal-device evidence: {{ $company->name }}</h1>
-<p>No reviewed proof means HOLD. A heartbeat or an agent's own claim is not independent proof. The device must already be registered to this company. School and Hospital approvals remain blocked. Record only evidence you personally reviewed for this exact company, device fingerprint, POS ID and environment. This does not enable reporting, authorize School/Hospital routes, or prove central FBR verification.</p>
+<p>Without reviewed Production evidence, a number-only response stays verification pending. A heartbeat or an agent's own claim is not independent proof. The device must already be registered to this company. School and Hospital evidence must match the fiscal device, POS ID and environment configured in the workspace. Record only evidence you personally reviewed for this exact company, device fingerprint, POS ID and environment. This does not enable reporting, authorize School/Hospital routes, or prove central FBR verification.</p>
 <a href="{{ route('saas.admin.companies.show',$company->id) }}">Back to company</a>
 <form method="POST" action="{{ route('saas.admin.device-proofs.store',$company->id) }}" class="space-y-3">
 @csrf

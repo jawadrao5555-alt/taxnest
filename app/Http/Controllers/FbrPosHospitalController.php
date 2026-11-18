@@ -53,7 +53,7 @@ class FbrPosHospitalController extends Controller
     public function index() {
         $company=$this->company(); $requestKey=(string)Str::uuid(); $closed=$this->closed($company,today()->toDateString());
         $services=DB::table('hospital_services')->where('company_id',$company->id)->where('active',true)->orderBy('label')->get();
-        $patients=$this->rows('hospital_invoices',$company)->select('patient_reference','patient_name')->distinct()->limit(100)->get();
+        $patients=$this->rows('hospital_invoices',$company)->where('patient_reference', 'not like', 'Walk-in-%')->select('patient_reference','patient_name')->distinct()->limit(100)->get();
         return response()->view('fbr-pos.hospital.index',compact('company','requestKey','closed','services','patients'))->header('Cache-Control','private, no-store');
     }
     public function dashboard() {
@@ -79,14 +79,14 @@ class FbrPosHospitalController extends Controller
         $company=$this->company($invoiceId !== null); $this->writable($r);
         $rules=['request_key'=>'required|uuid','expected_branch_key'=>'required|integer|min:0',
             'amount'=>$this->amountRule(),'payment_method'=>'required|in:cash,card,bank','payment_reference'=>'nullable|string|max:100'];
-        if ($invoiceId===null) $rules+=['patient_reference'=>'required|string|max:100',
+        if ($invoiceId===null) $rules+=['patient_reference'=>'nullable|string|max:100',
             'patient_name'=>'nullable|string|max:100','service_head'=>'required|in:consultation,lab,procedure','total_amount'=>$this->amountRule(),
             'service_lines'=>'nullable|array|min:1|max:20','service_lines.*.service_head'=>'required|string|max:20','service_lines.*.amount'=>$this->amountRule()];
         $d=$r->validate($rules); $d['payment_reference']=trim($d['payment_reference']??''); $d['patient_name']=trim($d['patient_name']??''); $this->scope($d); $amount=$this->money($d['amount']);
         if ($amount<=0) $this->error('amount','positive_amount');
         if ($invoiceId===null) {
-            $d['patient_reference']=trim($d['patient_reference']); $total=$this->money($d['total_amount']);
-            if ($d['patient_reference']==='') $this->error('patient_reference','positive_amount');
+            $d['patient_reference'] = trim($d['patient_reference'] ?? '') ?: 'Walk-in-'.$d['request_key'];
+            $total=$this->money($d['total_amount']);
             if ($total<=0) $this->error('total_amount','positive_amount');
         } else $total=null;
         $lineInputs=$invoiceId===null?array_map(fn($line)=>['service_head'=>$line['service_head'],'amount_paisa'=>$this->money($line['amount'])],$d['service_lines']??[['service_head'=>$d['service_head'],'amount'=>$d['total_amount']]]):[];
@@ -94,6 +94,11 @@ class FbrPosHospitalController extends Controller
         $id=DB::transaction(function()use($r,$company,$d,$amount,$total,$invoiceId,$lineInputs) {
             Company::whereKey($company->id)->lockForUpdate()->firstOrFail();
             $quotaContext=\App\Services\ProspectiveQuotaGuard::context((int)$company->id,false);
+            if (Schema::hasTable('hospital_invoice_corrections') && DB::table('hospital_invoice_corrections')
+                ->where('company_id', $company->id)->where('action', 'void')
+                ->whereJsonContains('payment_keys', $d['request_key'])->exists()) {
+                throw ValidationException::withMessages(['request_key' => 'This receipt was voided. Start a new collection.']);
+            }
             $saved=DB::table('hospital_payments')->where('company_id',$company->id)->where('request_key',$d['request_key'])->lockForUpdate()->first();
             if ($saved) {
                 if (($saved->branch_id===null?null:(int)$saved->branch_id)!==$this->branch()
@@ -146,11 +151,101 @@ class FbrPosHospitalController extends Controller
         \App\Services\HospitalPaymentImsService::reconcileReceipt((int)$company->id,(int)$id);
         return $this->response($r,$id);
     }
+    private function localCorrectionAllowed(Company $company, object $invoice, $payments): bool
+    {
+        if (!Schema::hasTable('hospital_invoice_corrections') || $payments->isEmpty()) {
+            return false;
+        }
+        $dates = collect([$invoice->created_at])->merge($payments->pluck('collected_at'))
+            ->map(fn ($value) => \Illuminate\Support\Carbon::parse($value)->toDateString())->unique();
+        foreach ($dates as $date) {
+            if ($this->closed($company, $date)) {
+                return false;
+            }
+        }
+        return $payments->every(function ($payment) {
+            $route = json_decode($payment->fiscal_route_snapshot ?? 'null', true);
+            return ($route['route'] ?? null) === 'off'
+                && empty($payment->fbr_pos_transaction_id)
+                && empty($payment->fbr_invoice_number)
+                && empty($payment->fbr_status);
+        });
+    }
+
+    public function correctLocalInvoice(Request $request, int $id)
+    {
+        $company = $this->company(true);
+        $this->writable($request);
+        abort_unless(app(BranchContextService::class)->isOwner() && auth('fbrpos')->user()?->role === 'company_admin', 403);
+        $data = $request->validate([
+            'action' => 'required|in:edit,void',
+            'expected_branch_key' => 'required|integer|min:0',
+            'reason' => 'required|string|max:300',
+            'patient_name' => 'nullable|string|max:100',
+            'total_amount' => ['required_if:action,edit', 'nullable', 'regex:/^\d{1,8}(?:\.\d{1,2})?$/'],
+            'payment_amount' => ['nullable', 'regex:/^\d{1,8}(?:\.\d{1,2})?$/'],
+        ]);
+        $this->scope($data);
+        DB::transaction(function () use ($company, $id, $data) {
+            Company::whereKey($company->id)->lockForUpdate()->firstOrFail();
+            $invoice = $this->rows('hospital_invoices', $company)->where('id', $id)->lockForUpdate()->first();
+            abort_unless($invoice, 404);
+            $payments = $this->rows('hospital_payments', $company)->where('invoice_id', $id)
+                ->orderBy('id')->lockForUpdate()->get();
+            abort_unless($this->localCorrectionAllowed($company, $invoice, $payments), 409,
+                'Only local receipts outside closed days can be corrected.');
+            $patch = [];
+            $paid = (int) $payments->sum('amount_paisa');
+            if ($data['action'] === 'edit') {
+                $total = $this->money($data['total_amount']);
+                if (isset($data['payment_amount']) && $payments->count() !== 1) {
+                    throw ValidationException::withMessages(['payment_amount' => 'A payment amount can only be edited on a single-payment invoice.']);
+                }
+                $paid = isset($data['payment_amount']) ? $this->money($data['payment_amount']) : $paid;
+                if ($paid <= 0 || $total < $paid) {
+                    throw ValidationException::withMessages(['total_amount' => 'Payment must be positive and cannot exceed the invoice total.']);
+                }
+                $patch = ['patient_name' => trim($data['patient_name'] ?? '') ?: null, 'total_paisa' => $total];
+            }
+
+            DB::table('hospital_invoice_corrections')->insert([
+                'company_id' => $company->id, 'invoice_id' => $id,
+                'actor_id' => auth('fbrpos')->id(), 'action' => $data['action'], 'reason' => $data['reason'],
+                'payment_keys' => json_encode($payments->pluck('request_key')->values(), JSON_THROW_ON_ERROR),
+                'before_state' => json_encode(['invoice' => $invoice, 'payments' => $payments], JSON_THROW_ON_ERROR),
+                'after_state' => $patch ? json_encode($patch + ['paid_paisa' => $paid], JSON_THROW_ON_ERROR) : null,
+                'invoice_created_at' => $invoice->created_at,
+                'created_at' => now(),
+            ]);
+            if ($data['action'] === 'void') {
+                $this->rows('hospital_payments', $company)->where('invoice_id', $id)->delete();
+                $this->rows('hospital_invoices', $company)->where('id', $id)->delete();
+
+                return;
+            }
+            $this->rows('hospital_invoices', $company)->where('id', $id)->update($patch + ['updated_at' => now()]);
+            $remaining = $patch['total_paisa'];
+            foreach ($payments as $payment) {
+                $amount = $payments->count() === 1 ? $paid : (int) $payment->amount_paisa;
+                $remaining -= $amount;
+                $this->rows('hospital_payments', $company)->where('id', $payment->id)->update([
+                    'amount_paisa' => $amount, 'balance_paisa' => $remaining, 'updated_at' => now(),
+                ]);
+            }
+        }, 3);
+
+        return redirect()->route($data['action'] === 'void' ? 'fbrpos.hospital.history' : 'fbrpos.hospital.invoice',
+            ($data['action'] === 'edit' ? ['id' => $id] : []) + ($this->unassigned ? ['unassigned' => 1] : []))
+            ->with('hospital_correction', $data['action'] === 'void' ? 'Local invoice voided.' : 'Local invoice updated.');
+    }
+
     public function invoice(int $id) {
         $company=$this->company(true); $invoice=$this->rows('hospital_invoices',$company)->where('id',$id)->first(); abort_unless($invoice,404);
         $payments=$this->rows('hospital_payments',$company)->where('invoice_id',$id)->orderBy('id')->get();
         $balance=(int)$invoice->total_paisa-(int)$payments->sum('amount_paisa'); $requestKey=(string)Str::uuid(); $closed=$this->closed($company,today()->toDateString());
-        return response()->view('fbr-pos.hospital.invoice',compact('company','invoice','payments','balance','requestKey','closed'))->header('Cache-Control','private, no-store');
+        $canCorrect = auth('fbrpos')->user()?->role === 'company_admin' && app(BranchContextService::class)->isOwner()
+            && !session('impersonation.readonly') && $this->localCorrectionAllowed($company, $invoice, $payments);
+        return response()->view('fbr-pos.hospital.invoice',compact('company','invoice','payments','balance','requestKey','closed','canCorrect'))->header('Cache-Control','private, no-store');
     }
     public function receipt(int $id) {
         $company=$this->company(true);

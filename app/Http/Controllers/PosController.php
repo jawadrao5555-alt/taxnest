@@ -6925,7 +6925,10 @@ class PosController extends Controller
         $data['pdfUrdu'] = $isUrdu;
         $data['numberReportPages'] = in_array($view, ['pos.day-close-pdf', 'pos.reports-analytics-pdf'], true);
 
-        if ($isUrdu) {
+        // DomPDF lays out the entire tax detail table in memory. Use the
+        // existing paginating report renderer for long exports.
+        $largeTaxReport = $view === 'pos.tax-report-pdf' && $data['transactions']->count() > 150;
+        if ($isUrdu || $largeTaxReport) {
             try {
                 return \App\Support\MpdfRenderer::render(
                     $view, $data, 'a4-report', $filename, !$download, $orientation

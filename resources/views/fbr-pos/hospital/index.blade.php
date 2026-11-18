@@ -4,7 +4,7 @@
 <section class="card">
 <form id="hospital-collection" method="post" action="/fbr-pos/hospital" data-closed="{{ $closed ? 1 : 0 }}">
 @csrf<input type="hidden" name="request_key" value="{{ $requestKey }}"><input type="hidden" name="expected_branch_key" value="{{ $hospitalCampusId ?? 0 }}">
-<label for="patient_reference">{{ __('hospital.patient') }}</label><input id="patient_reference" name="patient_reference" list="hospital-patient-lookup" maxlength="100" required autocomplete="off">
+<label for="patient_reference">{{ __('hospital.patient') }}</label><input id="patient_reference" name="patient_reference" placeholder="Optional — walk-in" list="hospital-patient-lookup" maxlength="100" autocomplete="off">
 <datalist id="hospital-patient-lookup">@foreach($patients as $patient)<option value="{{ $patient->patient_reference }}">{{ $patient->patient_name }}</option>@endforeach</datalist>
 <label for="patient_name">{{ __('hospital_ledger.patient_name') }}</label><input id="patient_name" name="patient_name" maxlength="100">
 <label for="service_head">{{ __('hospital.service') }}</label><select id="service_head" name="service_head">@foreach(['consultation','lab','procedure'] as $head)<option value="{{ $head }}">{{ __('hospital.'.$head) }}</option>@endforeach</select>

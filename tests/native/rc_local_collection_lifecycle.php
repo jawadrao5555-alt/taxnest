@@ -23,6 +23,11 @@ $seed=function(Company $company):void {
  DB::table('school_fee_heads')->insert($base+['code'=>'life','label'=>'Synthetic fee','active'=>true]);
  DB::table('school_fee_day_closes')->insert($base+['branch_key'=>0,'report_date'=>today()->toDateString(),'receipt_count'=>1,'cash_amount_paisa'=>10000,'counted_cash_paisa'=>10000,'variance_paisa'=>0,'closed_by'=>1,'closed_at'=>now()]);
  $invoice=DB::table('hospital_invoices')->insertGetId($base+['branch_id'=>null,'request_key'=>(string)Str::uuid(),'patient_reference'=>'SYN-LIFE','service_head'=>'consultation','total_paisa'=>20000,'created_by'=>1,'campus_name'=>'Synthetic']);
+ DB::table('hospital_invoice_corrections')->insert([
+  'company_id'=>$company->id,'invoice_id'=>$invoice,'actor_id'=>1,'action'=>'edit',
+  'reason'=>'Synthetic lifecycle correction','payment_keys'=>'[]','before_state'=>'{}',
+  'after_state'=>'{}','created_at'=>now(),'invoice_created_at'=>now(),
+ ]);
  DB::table('hospital_payments')->insert($base+['branch_id'=>null,'invoice_id'=>$invoice,'request_key'=>(string)Str::uuid(),'amount_paisa'=>10000,'balance_paisa'=>10000,'payment_method'=>'bank','collected_by'=>1,'cashier_name'=>'Synthetic','campus_name'=>'Synthetic','collected_at'=>now()]);
  DB::table('hospital_services')->insert($base+['code'=>'life','label'=>'Synthetic service','service_head'=>'consultation','rate_paisa'=>20000,'active'=>true]);
  DB::table('hospital_day_closes')->insert($base+['branch_key'=>0,'report_date'=>today()->toDateString(),'receipt_count'=>1,'cash_paisa'=>0,'card_paisa'=>0,'bank_paisa'=>10000,'counted_cash_paisa'=>0,'variance_paisa'=>0,'closed_by'=>1,'cashier_name'=>'Synthetic','campus_name'=>'Synthetic','closed_at'=>now()]);

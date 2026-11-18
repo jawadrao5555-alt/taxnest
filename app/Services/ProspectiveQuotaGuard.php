@@ -52,6 +52,10 @@ final class ProspectiveQuotaGuard {
   $table=$context['company']->isSchoolFeePilot()?'school_fee_receipts':($context['company']->isHospitalCollectionPilot()?'hospital_invoices':null);
   if(!$table)self::deny('Collection category requires review.');
   $count=DB::table($table)->where('company_id',$companyId)->whereBetween('created_at',[$context['from'],now()->endOfMonth()])->orderBy('id')->lockForUpdate()->get(['id'])->count();
+  if ($table === 'hospital_invoices' && \Illuminate\Support\Facades\Schema::hasTable('hospital_invoice_corrections')) {
+   $count += DB::table('hospital_invoice_corrections')->where('company_id', $companyId)->where('action', 'void')
+    ->whereBetween('invoice_created_at', [$context['from'], now()->endOfMonth()])->count();
+  }
   if($count >= $context['limit'])self::deny();
  }
  public static function assertDi(Invoice $invoice, ?string $environment, ?array $context): void {

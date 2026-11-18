@@ -10,7 +10,7 @@ export async function reviewedDeviceProofWorkflow(page,t,v,{baseUrl,login,waitFo
   };
   const assert=(ok,msg)=>{if(!ok)throw Error(msg);};
   await page.goto(baseUrl+path,{waitUntil:'domcontentloaded'});await waitForOperationalSurface(page);
-  await page.getByText('No reviewed proof means HOLD.',{exact:false}).waitFor();
+  await page.getByText('Without reviewed Production evidence.',{exact:false}).waitFor();
   assert(await page.locator('[data-proof-id]').count()===0,'Fresh synthetic company unexpectedly has reviewed proof');
   const form=page.locator('form[action$="/device-proofs"]');
   await form.getByLabel('Device fingerprint',{exact:true}).fill('Synthetic-Browser-Device-'+v.width);

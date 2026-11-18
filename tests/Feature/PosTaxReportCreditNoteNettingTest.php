@@ -441,6 +441,34 @@ class PosTaxReportCreditNoteNettingTest extends TestCase
         $this->assertSame('', $data['billTypeFilter']);
     }
 
+    public function test_month_size_tax_report_renders_as_one_complete_pdf(): void
+    {
+        app()->setLocale('en');
+        $data = $this->pdfViewData();
+        $sample = $data['transactions']->first();
+        $data['transactions'] = collect(range(1, 1450))->map(function (int $number) use ($sample) {
+            $row = clone $sample;
+            $row->invoice_number = sprintf('MONTH-%04d', $number);
+
+            return $row;
+        });
+
+        $html = view('pos.tax-report-pdf', $data)->render();
+        $this->assertStringContainsString('MONTH-0001', $html);
+        $this->assertStringContainsString('MONTH-1450', $html);
+        $this->assertSame(1, substr_count($html, 'class="total-row"'));
+
+        $controller = new class extends PosController {
+            public function renderTaxReport(array $data): \Illuminate\Http\Response
+            {
+                return $this->renderReportPdf('pos.tax-report-pdf', $data, 'month-tax-report.pdf', 'landscape');
+            }
+        };
+        $response = $controller->renderTaxReport($data);
+        $this->assertSame('application/pdf', $response->headers->get('Content-Type'));
+        $this->assertStringStartsWith('%PDF-', (string) $response->getContent());
+    }
+
     public function test_pdf_sales_only_summary_matches_screen(): void
     {
         $this->assertPdfSummaryMatchesScreen(['bill_type' => 'sales'], self::PDF_SUMMARY_FIELDS);

@@ -43,7 +43,7 @@ class ReviewedDeviceProofTest extends TestCase
         $this->assertSame('saas-admin.reviewed-device-proofs',$response->getOriginalContent()->name());
         $view=file_get_contents(resource_path('views/saas-admin/reviewed-device-proofs.blade.php'));
         $this->assertStringContainsString('independent_evidence_reviewed',$view);
-        $this->assertStringContainsString('No reviewed proof means HOLD',$view);
+        $this->assertStringContainsString('Without reviewed Production evidence',$view);
         $this->assertStringNotContainsString('fbr_enabled',$view);
         DB::table('admin_users')->where('id',auth('admin')->id())->update(['role'=>'support']);
         $this->expectException(\Symfony\Component\HttpKernel\Exception\HttpException::class);

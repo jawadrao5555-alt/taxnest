@@ -15,14 +15,20 @@
     <div class="grid lg:grid-cols-2 gap-6 mb-8">
         <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
             <h2 class="text-sm font-semibold text-white mb-3">Company search</h2>
-            <p class="text-[11px] text-gray-500 mb-3">Same filter pattern as Companies (search + status). TaxNest PRA POS PRA scope only. Super admin can open any matching shop — POS managers/viewers cannot use this panel.</p>
+            <p class="text-[11px] text-gray-500 mb-3">Find a company across products and open its available operational report.</p>
             <form method="get" action="{{ route('saas.admin.live-ops') }}" class="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-3">
-                <input type="text" name="search" value="{{ $search ?? $q }}" placeholder="Search name, NTN, owner, id, account code…" class="sm:col-span-2 w-full rounded-lg bg-gray-950 border border-gray-700 text-sm text-white px-3 py-2">
-                <select name="status" class="rounded-lg bg-gray-950 border border-gray-700 text-sm text-white px-3 py-2">
+                <input type="text" name="search" aria-label="Company search" value="{{ $search ?? $q }}" placeholder="Search name, NTN, owner, id, account code…" class="w-full rounded-lg bg-gray-950 border border-gray-700 text-sm text-white px-3 py-2">
+                <select name="status" aria-label="Company status" class="rounded-lg bg-gray-950 border border-gray-700 text-sm text-white px-3 py-2">
                     <option value="">All statuses</option>
                     <option value="approved" @selected(($status ?? '') === 'approved')>Approved</option>
                     <option value="pending" @selected(($status ?? '') === 'pending')>Pending</option>
                     <option value="suspended" @selected(($status ?? '') === 'suspended')>Suspended</option>
+                </select>
+                <select name="product" aria-label="Product" class="rounded-lg bg-gray-950 border border-gray-700 text-sm text-white px-3 py-2">
+                    <option value="">All products</option>
+                    @foreach(\App\Support\ProductCatalog::TYPES as $type)
+                        <option value="{{ $type }}" @selected($product === $type)>{{ \App\Support\ProductCatalog::label($type) }}</option>
+                    @endforeach
                 </select>
                 <button class="sm:col-span-3 px-3 py-2 rounded-lg bg-indigo-600 text-white text-sm">Search</button>
             </form>
@@ -35,10 +41,19 @@
                             @if($c->account_code)<span class="text-gray-600">{{ $c->account_code }}</span>@endif
                             @if($c->status)<span class="text-[10px] uppercase text-gray-500">{{ $c->status }}</span>@endif
                         </div>
-                        <a href="{{ route('saas.admin.live-ops.company', $c->id) }}" class="text-indigo-400 hover:underline">Diagnostic</a>
+                        @php
+                            $productType = \App\Support\ProductCatalog::normalize($c->product_type);
+                            [$reportUrl, $reportLabel] = match ($productType) {
+                                'pos' => [route('saas.admin.live-ops.company', $c->id), 'PRA diagnostic'],
+                                'fbrpos' => [route('saas.admin.live-ops.fbr-reconciliation', $c->id), 'FBR reconciliation'],
+                                'di' => [route('saas.admin.dashboard.detail', ['metric' => 'di_invoices', 'company_id' => $c->id]), 'DI invoice report'],
+                                default => [route('saas.admin.companies.show', $c->id), 'Company details'],
+                            };
+                        @endphp
+                        <a href="{{ $reportUrl }}" class="text-indigo-400 hover:underline">{{ $reportLabel }}</a>
                     </li>
                 @empty
-                    <li class="text-gray-500">{{ ($search ?? $q ?? '') === '' && ($status ?? '') === '' ? 'Enter a search term (same idea as /admin/companies).' : 'No TaxNest PRA POS PRA matches.' }}</li>
+                    <li class="text-gray-500">{{ ($search ?? $q ?? '') === '' && ($status ?? '') === '' && $product === null ? 'Enter a search term or choose a filter.' : 'No matching companies.' }}</li>
                 @endforelse
             </ul>
         </div>

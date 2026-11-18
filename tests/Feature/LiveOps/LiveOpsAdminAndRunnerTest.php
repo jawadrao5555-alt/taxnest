@@ -49,6 +49,24 @@ class LiveOpsAdminAndRunnerTest extends LiveOpsTestCase
             ->assertSee('UI Shop');
     }
 
+    public function test_company_lookup_filters_by_product_and_links_to_scoped_reports(): void
+    {
+        $this->makeCompany('Synthetic PRA Lookup');
+        $fbr = $this->makeCompany('Synthetic FBR Lookup', ['product_type' => 'fbrpos']);
+        $di = $this->makeCompany('Synthetic DI Lookup', ['product_type' => 'di']);
+
+        $this->actingAsAdmin()->get('/admin/live-ops?search=Synthetic&product=fbrpos')
+            ->assertOk()
+            ->assertSee('Synthetic FBR Lookup')
+            ->assertSee(route('saas.admin.live-ops.fbr-reconciliation', $fbr))
+            ->assertDontSee('Synthetic PRA Lookup')
+            ->assertDontSee('Synthetic DI Lookup');
+        $this->get('/admin/live-ops?search=Synthetic&product=di')
+            ->assertOk()
+            ->assertSee(route('saas.admin.dashboard.detail', ['metric' => 'di_invoices', 'company_id' => $di]))
+            ->assertDontSee('Synthetic FBR Lookup');
+    }
+
     public function test_empty_history_explains_each_section_without_enabling_actions(): void
     {
         $this->actingAsAdmin()->get('/admin/live-ops')->assertOk()

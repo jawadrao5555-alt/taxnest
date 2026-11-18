@@ -87,7 +87,7 @@ const LOCKS = [
     lock: 'pra-agent/package-lock.json',
     packages: 294,
     resolved: 293,
-    graph: '99927ba10a5e1083127132511c851cdccdebf161940b82309dafa3583b3727bb',
+    graph: '070fb25ed323cc2773cf480c5e0476a63624dac80cfdab415b977bed2c0cc18e',
   },
   {
     lock: 'tools/video-pipeline/package-lock.json',

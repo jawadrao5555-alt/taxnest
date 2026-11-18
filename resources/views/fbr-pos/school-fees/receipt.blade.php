@@ -11,8 +11,9 @@
 .school-receipt{width:{{ $paperWidth }};max-width:100%;margin:18px auto;overflow-wrap:anywhere;color:#111}.school-receipt-logo{display:block;max-width:32mm;max-height:24mm;object-fit:contain;margin:0 auto 8px}.school-receipt h1,.school-receipt h2{font-size:19px}.school-receipt dl{font-size:13px;grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.school-receipt table{table-layout:fixed;font-size:13px}.school-receipt td,.school-receipt th{padding:6px 2px}.school-receipt .total{font-size:22px}.school-receipt .receipt-brand{text-align:{{ $print['center'] ? 'center' : 'start' }}}
 @media print{ @page{size:{{ $print['paper'] === 'a4' ? 'A4 portrait' : $print['paper'].' auto' }};margin:{{ $print['paper'] === 'a4' ? '15mm' : '0' }}} main{width:{{ $paperWidth }}!important;max-width:{{ $paperWidth }}!important;padding:{{ $print['margin_mm'] }}mm!important;margin:0 auto!important}main> :not(.school-receipt){display:none!important}.school-receipt{width:100%;margin:0;border:0;border-radius:0;box-shadow:none;padding:0}.school-receipt .notice{padding:5px;font-size:11px}.school-receipt h1,.school-receipt h2{font-size:16px}.school-receipt dl,.school-receipt table{font-size:11px}}
 </style>
+@include('fbr-pos.partials.collection-receipt-design')
 @if($preview ?? false)<div id="school-print-preview-notice" class="notice no-print">{{ __('school_print.preview_notice') }}</div>@endif
-<article class="card school-receipt" data-paper="{{ $print['paper'] }}">
+<article class="card school-receipt collection-print-receipt" data-paper="{{ $print['paper'] }}">
 @if($preview ?? false)<p class="notice">{{ __('school_print.preview_notice') }}</p>@endif
 <div class="receipt-brand">
 @if($print['show_logo'] && $company->logo_path)<img data-school-logo class="school-receipt-logo" src="{{ asset('storage/'.$company->logo_path) }}" alt="{{ $company->name }}">@endif
@@ -21,9 +22,8 @@
 <h2>{{ __('pos.school_receipt') }} · SF-{{ $receipt->id }}</h2>
 </div>
 @if(($receipt->fbr_pos_transaction_id ?? null) && ($receipt->fbr_status ?? null)==='submitted' && ($receipt->fbr_invoice_number ?? null) && ($receipt->fbr_qr_payload ?? null))
-<div class="notice" id="school-fbr-accepted"><strong>FBR IMS Accepted</strong><br>{{ $receipt->fbr_invoice_number }}
 @php $schoolFbrQr=\App\Support\QrImage::dataUri((string)$receipt->fbr_qr_payload,5,4); @endphp
-@if($schoolFbrQr)<br><img src="{{ $schoolFbrQr }}" alt="FBR fiscal QR" style="width:34mm;height:34mm;margin:8px auto;display:block">@endif</div>
+@php($acceptedFiscalNumber = $receipt->fbr_invoice_number)
 @elseif(in_array(($receipt->fbr_status ?? null),['pending','offline','verification_pending'],true))
 <div class="notice" id="school-fbr-pending">FBR IMS: {{ str_replace('_',' ',ucfirst($receipt->fbr_status)) }}</div>
 @elseif(!in_array(($receipt->fbr_status ?? null), ['failed', 'config_error'], true) && (json_decode($receipt->fiscal_route_snapshot ?? 'null', true)['route'] ?? null) !== 'ims')
@@ -35,8 +35,14 @@
 <dt>{{ __('school.period') }}</dt><dd id="school-receipt-period">{{ $receipt->fee_period ?? __('school.not_recorded') }}</dd><dt>{{ __('school.campus') }}</dt><dd id="school-receipt-campus">{{ $receipt->campus_name ?? __('school.not_recorded') }}</dd><dt>{{ __('school.cashier') }}</dt><dd id="school-receipt-cashier">{{ $receipt->cashier_name ?? __('school.not_recorded') }}</dd></dl>
 <table id="school-receipt-head"><thead><tr><th>{{ __('pos.school_fee_head') }}</th><th>{{ __('school_print.amount') }}</th></tr></thead><tbody>@foreach($lines as $line)<tr><td>{{ $line['label'] }}</td><td>PKR {{ number_format($line['amount_paisa']/100, 2) }}</td></tr>@endforeach</tbody></table>
 <dl><dt>{{ __('school_print.payable') }}</dt><dd>PKR {{ number_format(($receipt->payable_paisa ?? $receipt->amount_paisa)/100, 2) }}</dd><dt>{{ __('school_print.paid') }}</dt><dd>PKR {{ number_format(($receipt->paid_paisa ?? $receipt->amount_paisa)/100, 2) }}</dd><dt>{{ __('school_print.balance') }}</dt><dd id="school-receipt-balance">PKR {{ number_format(($receipt->balance_paisa ?? 0)/100, 2) }}</dd></dl>
-<div class="total">{{ __('school_print.this_payment') }}: PKR {{ number_format($receipt->amount_paisa / 100, 2) }}</div>
+<div class="total receipt-payment">{{ __('school_print.this_payment') }}: PKR {{ number_format($receipt->amount_paisa / 100, 2) }}</div>
 <p class="muted">{{ __('pos.school_no_tax_inference') }}</p>
+@if(isset($acceptedFiscalNumber))
+<div class="receipt-fiscal" id="school-fbr-accepted">
+@if($schoolFbrQr)<img alt="FBR fiscal QR" src="{{ $schoolFbrQr }}">@endif
+<div><strong>FBR IMS Accepted</strong><br>FBR Invoice: {{ $acceptedFiscalNumber }}</div>
+</div>
+@endif
 <div class="actions no-print"><button type="button" id="school-print-receipt" onclick="window.print()">{{ __('pos.school_print_reprint') }}</button>@if(!($preview ?? false))<a href="/fbr-pos/school-fees">{{ __('pos.school_new_collection') }}</a>@else<a href="/fbr-pos/school-fees/printing">{{ __('school_print.settings') }}</a>@endif</div>
 <p class="muted no-print">{{ __('school_print.browser_printer') }} @if($print['printer_label']){{ __('school_print.preferred') }}: {{ $print['printer_label'] }}@endif</p>
 </article>

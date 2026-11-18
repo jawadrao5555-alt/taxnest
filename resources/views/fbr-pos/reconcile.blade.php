@@ -1,6 +1,6 @@
 <x-fbr-pos-layout>
 <main class="mx-auto max-w-3xl space-y-5 px-4 py-6" data-fbr-owner-reconcile>
-    <a href="{{ route('fbrpos.failQueue') }}" class="text-teal-700 underline">Back to submission queue</a>
+    <a href="{{ $collectionReceipt ?? route('fbrpos.failQueue') }}" class="text-teal-700 underline">{{ $collectionReceipt ? 'Back to payment receipt' : 'Back to submission queue' }}</a>
     <h1 class="text-2xl font-bold dark:text-white">Reconcile existing invoice</h1>
     <section class="rounded-xl border p-4 dark:text-white">
         <p>Retailer invoice / USIN: <strong>{{ $bill->invoice_number }}</strong></p>
@@ -25,7 +25,9 @@
             <select required name="decision" class="block mt-1 w-full rounded border dark:bg-gray-800">
                 <option value="">Select the checked result</option>
                 <option value="accepted" @selected(old('decision') === 'accepted')>Accepted — record existing fiscal number; do not repost</option>
+                @if(!$collectionReceipt)
                 <option value="not_accepted" @selected(old('decision') === 'not_accepted')>IMS confirms rejection — allow retry of the same USIN</option>
+                @endif
             </select>
         </label>
         <label class="block">Evidence source

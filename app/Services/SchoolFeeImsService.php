@@ -93,7 +93,7 @@ final class SchoolFeeImsService
                 'transaction_id' => $mirror->id,
                 'item_name' => 'School fee payment',
                 'hs_code' => $pct ?: null,
-                'uom' => 'Numbers, pieces, units',
+                'uom' => 'U',
                 'quantity' => 1,
                 'unit_price' => $subtotal,
                 'discount' => 0,

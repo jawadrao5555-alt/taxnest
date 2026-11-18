@@ -5,13 +5,18 @@
 @endphp
 @if(!($preview ?? false))
     <div class="no-print">
-        @if(session('ims_status'))
+        @if(($showImsFlash ?? true) && session('ims_status'))
             <p role="status" class="notice">{{ session('ims_status') }}</p>
         @endif
         @if($imsEligible && empty($imsReceipt->fbr_pos_transaction_id))
             <p class="notice">IMS was selected for this receipt. The submission queue entry has not been saved.</p>
         @elseif(in_array($imsState, ['failed', 'config_error'], true))
             <p class="notice">IMS submission failed. Check setup and retry this receipt.</p>
+        @endif
+        @if($imsEligible && $imsState === 'verification_pending' && !empty($imsReceipt->fbr_pos_transaction_id)
+            && empty($imsReceipt->fbr_invoice_number) && auth('fbrpos')->user()?->role === 'company_admin'
+            && !session('impersonation.readonly'))
+            <a href="{{ route('fbrpos.reconcile', $imsReceipt->fbr_pos_transaction_id) }}">Record existing FBR invoice number</a>
         @endif
         @if($imsEligible && empty($imsReceipt->fbr_invoice_number)
             && (empty($imsReceipt->fbr_pos_transaction_id) || in_array($imsState, ['failed', 'config_error'], true))

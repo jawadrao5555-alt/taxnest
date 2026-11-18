@@ -64,6 +64,35 @@ class ReviewedDeviceProofTest extends TestCase
         $this->expectException(\Symfony\Component\HttpKernel\Exception\HttpException::class);
         ReviewedDeviceProof::approve(1,$this->data());
     }
+    public function test_configured_collection_device_can_be_reviewed_for_its_exact_pos_and_environment(): void
+    {
+        Schema::table('companies', function (Blueprint $table) {
+            $table->string('fbr_connection_mode')->nullable();
+            $table->string('fbr_pos_id')->nullable();
+            $table->string('fbr_pos_environment')->nullable();
+            $table->boolean('fbr_pos_enabled')->default(false);
+            $table->boolean('agent_enabled')->default(false);
+        });
+        foreach (['education', 'hospital'] as $category) {
+            DB::table('companies')->where('id', 1)->update([
+                'product_type' => 'fbrpos', 'pos_type' => $category, 'business_category' => $category,
+                'fbr_connection_mode' => 'fiscal_device', 'fbr_pos_id' => '123',
+                'fbr_pos_environment' => 'production', 'fbr_pos_enabled' => true, 'agent_enabled' => true,
+            ]);
+            $data = array_replace($this->data(), ['environment' => 'production']);
+            $id = ReviewedDeviceProof::approve(1, $data);
+            $this->assertSame($id, (int) ReviewedDeviceProof::reviewedProof(1, 'DEVICE-A', '123', 'production')->id);
+            foreach ([['pos_id' => '124'], ['environment' => 'sandbox']] as $change) {
+                try {
+                    ReviewedDeviceProof::approve(1, array_replace($data, $change));
+                    $this->fail('Mismatched collection device evidence was approved.');
+                } catch (\Symfony\Component\HttpKernel\Exception\HttpException $error) {
+                    $this->assertSame(422, $error->getStatusCode());
+                }
+            }
+        }
+    }
+
     public function test_approval_requires_independent_evidence_acknowledgement(): void {
         $data=$this->data();unset($data['independent_evidence_reviewed']);
         $this->expectException(\Illuminate\Validation\ValidationException::class);ReviewedDeviceProof::approve(1,$data);

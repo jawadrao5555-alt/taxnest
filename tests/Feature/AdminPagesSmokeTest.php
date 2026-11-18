@@ -283,6 +283,11 @@ class AdminPagesSmokeTest extends TestCase
         $response->assertSee('Smoke DI Co');
         $response->assertSee('Smoke POS Co');
         $response->assertSee('Smoke FBR Co');
+        $response->assertSee(route('saas.admin.usage').'#local-collections');
+        $response->assertDontSee('Local ledger below');
+
+        $this->get('/admin/company-usage')->assertOk()
+            ->assertSee('id="local-collections"', false);
     }
 
     /** /admin/dashboard renders 200 even on a completely empty database. */

@@ -98,11 +98,9 @@ class AdminDashboardController extends Controller
         $fbrAgg = FbrPosTransaction::whereIn('company_id', $fbrposCompaniesList->pluck('id'))
             ->select('company_id', DB::raw('COUNT(*) as tx_count'), DB::raw('COALESCE(SUM(total_amount),0) as revenue'))
             ->groupBy('company_id')->get()->keyBy('company_id');
-        $localReporter=app(\App\Services\Reporting\LocalCollectionReports::class);
         foreach ($fbrposCompaniesList as $fc) {
             $fc->fbrpos_transaction_count = (int) ($fbrAgg[$fc->id]->tx_count ?? 0);
             $fc->fbrpos_revenue = (float) ($fbrAgg[$fc->id]->revenue ?? 0);
-            $fc->local_collections=$fc->isLocalCollectionPilot() ? $localReporter->read($fc) : null;
         }
 
         $diAgg = Invoice::whereIn('company_id', $diCompaniesList->pluck('id'))

@@ -65,3 +65,58 @@ Relevant regression coverage includes table refresh ordering and concurrent rese
 Verify desktop and 390px layouts with actual controls. Run focused tests, the required native database and browser lanes, the full suite, and the final validate check on the release head. Record physical receipt acceptance separately when printer output matters.
 
 Customer media, recordings, identifying details, operational credentials and private audit material stay in their original private evidence locations. Public fixtures and acceptance examples use fictional data.
+
+
+## Owner consolidation decision
+
+On 19 November 2026 the owner requested the complete pending work of the referenced older PRs to be covered by this bulk, with source PR closure after implementation, production deployment and verification.
+
+The existing merged implementations in #311, #317, #324, #329, #371, #384 and #385 are part of the main baseline. Their relevant behavior receives regression verification through the thirteen outcomes above.
+
+Open source PRs #321 and #381 are closure candidates under the complete scope below. Each requirement retains its source identity and verification evidence.
+
+### Complete #321 carry-forward
+
+Authoritative source contract is the file at commit 007070b434b1931f773558d8016185ba99cdf466
+https://github.com/jawadrao5555-alt/taxnest/blob/007070b434b1931f773558d8016185ba99cdf466/docs/planning/bulk-onboarding-support-experience-2026-10-30.md
+
+That complete source contract, its B08-R01 through B08-R11 requirements, B08-A01 through B08-A05 acceptance cases, dependencies, evidence ledger and audit mappings remain the completion standard.
+
+- [ ] B08-R01 Product, package, trial, pricing, approval and policy acknowledgement across public and admin onboarding.
+- [ ] B08-R02 Business-specific setup and validated catalogue/opening-stock workflows with consistent tenant configuration.
+- [ ] B08-R03 Public product capabilities and readiness claims supported by evidence.
+- [ ] B08-R04 Accessible mobile, keyboard, labels, error feedback and saved-theme workflows.
+- [ ] B08-R05 Company-linked support ownership, timestamps, verified resolution and reopen.
+- [ ] B08-R06 Scoped assistant answers, sources, unavailable data and issue escalation.
+- [ ] B08-R07 AI usage, cost, latency, budgets, quotas, errors and escalation history.
+- [ ] B08-R08 Targeted New indicators and persistent per-user/version read state, including item 8 above.
+- [ ] B08-R09 Tutorial discovery, audience, captions, version ownership and notification/survey relevance.
+- [ ] B08-R10 Validated profile fields and owner-configured greeting preferences with synthetic delivery/retry/dedup verification.
+- [ ] B08-R11 Established Admin, customer-screen and printed-ticket language requirements.
+- [ ] B08-A01 Product/package/price and stock-import consistency acceptance.
+- [ ] B08-A02 Desktop/mobile, keyboard, focus, validation and theme acceptance.
+- [ ] B08-A03 Audience and read/unread persistence acceptance.
+- [ ] B08-A04 Verified support closure and reopen acceptance.
+- [ ] B08-A05 Assistant authorization, hostile-source, quota, revocation and greeting-calendar/dedup acceptance.
+
+### Complete #381 carry-forward
+
+Source head is 0aaeb0099eafe2b7383feb746704a05981a8001c.
+
+- [ ] Refresh the already-open Android Rider list after delivery push, assignment, reassignment and final-bill unassignment.
+- [ ] Refresh after reconnect reconciliation and outbox drains, coalesce bursts, and reject responses from a changed login session.
+- [ ] Verify permission-denied/no-push behavior, notification tap, existing poll fallback and account switching.
+- [ ] Reconcile version/build metadata with current main and verify install-over on a signed test phone.
+- [ ] Record hosted Android verification and actual phone acceptance for the complete source contract.
+
+### Coverage and closure ledger
+
+| Source | Coverage target | Verification needed before closure | Closure state |
+| --- | --- | --- | --- |
+| #321 | Complete B08 contract and acceptance above | Requirement-level code/test mapping, exact implementation head, green required CI, owner-approved production release and relevant live outcomes | Open |
+| #381 | Complete Rider refresh contract above | Code/test mapping, Android build/tests, signed install-over and actual phone acceptance, applicable release evidence | Open |
+| #311, #317, #324, #329, #371, #384, #385 | Existing merged baseline plus relevant follow-up regressions | Regression and post-release results for the affected outcomes | Already merged/closed |
+
+For a closure candidate, record the implementation commit and release containing every remaining source requirement, attach its actual verification results, then close the superseded open PR. Keep partial completion and remaining source requirements visible in this ledger until the whole candidate is verified. Planning checkmarks and a merged branch alone do not establish the deployment and behavior outcomes.
+
+#412 continues through its own Admin release. Its deployed result will become part of this bulk's main baseline.

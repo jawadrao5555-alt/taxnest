@@ -1,3 +1,4 @@
+import { openCollectionReceipt } from './open-collection-receipt.mjs';
 import {scrolledPixelDetail} from './scrolled-pixel-detail.mjs';
 import { collectionControlChecks } from './collection-controls-browser.mjs';
 import { collectionSharedWorkspaceChecks } from './collection-shared-workspace-browser.mjs';
@@ -183,10 +184,7 @@ export async function schoolFeeWorkflow(page, t, v, { baseUrl, saveEvidenceScree
   await saveEvidenceScreenshot(page, 'school-fee-lost-response-recovery-' + v.width);
   const posted = page.waitForResponse(response => new URL(response.url()).pathname === '/fbr-pos/school-fees'
     && response.request().method() === 'POST');
-  await Promise.all([
-    page.waitForURL(/\/fbr-pos\/school-fees\/\d+\/receipt$/, { waitUntil: 'domcontentloaded' }),
-    form.getByRole('button', { name: 'Record fee payment', exact: true }).click(),
-  ]);
+  await openCollectionReceipt(page, form.getByRole('button', { name: 'Record fee payment', exact: true }), /\/fbr-pos\/school-fees\/\d+\/receipt$/);
   const save = await posted;
   if (save.status() !== 200) throw new Error('Cash recovery did not return its persisted receipt');
   const receiptPath = new URL(page.url()).pathname;
@@ -317,10 +315,7 @@ export async function schoolFeeWorkflow(page, t, v, { baseUrl, saveEvidenceScree
   await form.locator('[name="fee_period"]').fill(feePeriod);
   await form.locator('[name="amount"]').fill('1250.50');
   await form.locator('[name="cash_confirmed"]').check();
-  await Promise.all([
-    page.waitForURL('**' + receiptPath),
-    form.getByRole('button', { name: 'Record fee payment', exact: true }).click(),
-  ]);
+  await openCollectionReceipt(page, form.getByRole('button', { name: 'Record fee payment', exact: true }), '**' + receiptPath);
   if (await page.evaluate(name => sessionStorage.getItem(name), pendingStorageKey) !== null) throw new Error('Closed-day matching receipt did not clear recovery');
   await page.goto(baseUrl + '/fbr-pos/school-fees', { waitUntil: 'domcontentloaded' });
   if (await form.locator('[name="request_key"]').inputValue() === key
@@ -417,7 +412,7 @@ async function schoolLedgerChecks(page, v, { baseUrl, saveEvidenceScreenshot }, 
   await page.locator('.school-line-amount').nth(1).fill('500.00');
   await form.locator('[name="cash_confirmed"]').check();
   await saveEvidenceScreenshot(page,'school-multihead-bank-entry-'+v.width);
-  await Promise.all([page.waitForURL(/\/fbr-pos\/school-fees\/\d+\/receipt$/),form.locator('button[type="submit"]').click()]);
+  await openCollectionReceipt(page, form.locator('button[type="submit"]'), /\/fbr-pos\/school-fees\/\d+\/receipt$/);
   const firstPath=new URL(page.url()).pathname;
   const firstHtml = await (await page.request.get(baseUrl+firstPath)).text();
   const first=await page.locator('article').innerText();

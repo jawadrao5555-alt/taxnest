@@ -208,16 +208,10 @@ fi
 
 if [ "$PROFILE" = "extended" ] || [ "$PROFILE" = "nestpos-extended" ]; then
   say "/pos/day-close markers (safe — no bill seeding)"
-  if fetch "/pos/day-close"; then
-    require "/pos/day-close" "auto day-close toggle" 'dc-auto-close-chk'
-    # X-Report card is state-dependent; presence of either card OR closed-day
-    # report links OR open-day empty is acceptable — we only FAIL if the page
-    # itself is broken (already covered by fetch). Soft note only:
-    if grep -qE 'day-close/x-report/|pos/day-close/[0-9]+/(pdf|thermal)|dc-auto-close-chk' "$TMPD/page.html"; then
-      ok "day-close page has expected controls/state markers"
-    else
-      bad "/pos/day-close missing expected controls"
-    fi
+  if source "$ROOT/scripts/lib/ci-live-verify-day-close.sh" && declare -F verify_day_close >/dev/null; then
+    verify_day_close || bad "/pos/day-close required probe did not pass"
+  else
+    bad "/pos/day-close required probe is unavailable"
   fi
 
   say "/pos/transactions markers"

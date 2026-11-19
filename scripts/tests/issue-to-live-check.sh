@@ -126,6 +126,10 @@ if [ -f "$ROOT/scripts/tests/ci-live-verify-login-redirect-check.sh" ]; then
     || bad "ci-live-verify login redirect diagnostics checks failed"
 fi
 
+python3 "$ROOT/scripts/tests/ci-live-verify-day-close-test.py" \
+  && ok "bounded read-only day-close probe and private diagnostics passed" \
+  || bad "day-close probe regression checks failed"
+
 echo ""
 if [ "$FAILS" -eq 0 ]; then
   echo "issue-to-live-check: ALL PASS"

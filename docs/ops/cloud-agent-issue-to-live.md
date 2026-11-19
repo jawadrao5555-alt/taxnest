@@ -99,6 +99,16 @@ After a successful remote apply, **the same** Deploy Production job runs
    merely HTTP 200
 5. Optionally assert commit-specific markers from `deploy/live-verify.markers`
 
+The extended Day Close probe makes at most three read-only GET attempts. It
+requires a complete Day Close report document and the actual auto-close
+checkbox; a persistent missing control still fails the release. A login
+document or HTTP 401/403/419 stops immediately. Diagnostics record only fixed
+reason codes and HTTP status, never response bodies, identities or session
+headers. This bounded probe does not redeploy, change a company setting,
+repair account roles or establish the cause of an earlier missing-control
+failure. A successful protected Actions run is still required for live
+acceptance.
+
 Default profile skips destructive bill-seed probes. Do not invent green fake
 markers.
 

@@ -8,22 +8,22 @@
         <p class="tn-dashboard-note">Company operations, payment review, and system visibility in one workspace.</p>
     </div>
 
-    <section class="mb-6"><h2 class="font-semibold">School / Hospital local collections</h2><p class="text-sm">Visible latest FBR companies only; all-time retained local ledgers. Separate from retail/fiscal totals and TaxNest subscription revenue. Use Company Usage for company/campus/date filters.</p>
-    @foreach($fbrposCompaniesList as $collectionCompany)@if($collectionCompany->local_collections)<article class="border rounded p-3 my-2"><h3>{{ $collectionCompany->name }}</h3>@include('saas-admin.partials.local-collections',['local'=>$collectionCompany->local_collections])</article>@endif @endforeach
-    </section>
+    <a href="{{ route('saas.admin.usage') }}#local-collections" class="mb-6 inline-block font-semibold underline">
+        School / Hospital local collections
+    </a>
     {{-- Agent Health (Task 635): same rule as /admin/companies (Task 629) —
          silent-print shops whose Desktop Agent is offline > 2 hours. Shown only
          when there is a problem so the dashboard stays clean on good days. --}}
     @if(($offlineAgentCount ?? 0) > 0)
-    <a href="{{ route('saas.admin.companies') }}" class="tn-alert block bg-red-900/20 border border-red-800/60 rounded-xl p-4 mb-6 hover:bg-red-900/30 transition">
+    <a href="{{ route('saas.admin.companies') }}#agent-health" class="block rounded-xl border border-rose-300 bg-rose-50 p-4 mb-6 text-rose-950 hover:bg-rose-100 dark:border-rose-800 dark:bg-rose-950 dark:text-rose-100 dark:hover:bg-rose-900 transition">
         <div class="flex items-center gap-3">
-            <svg class="w-6 h-6 text-red-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/></svg>
+            <svg class="w-6 h-6 text-current shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/></svg>
             <div class="min-w-0">
                 {{-- Owner-facing saas-admin has no locale system — force the 'rur'
                      (Roman Urdu) lang keys so the owner keeps the Roman Urdu text
                      while the deploy Roman-Urdu scan stays clean (Task 650). --}}
-                <p class="text-sm font-bold text-red-300">{{ __($offlineAgentCount === 1 ? 'pos.admin_agent_offline_title_one' : 'pos.admin_agent_offline_title_many', ['count' => $offlineAgentCount], 'rur') }}</p>
-                <p class="text-xs text-red-400/80 mt-0.5">{{ __('pos.admin_agent_offline_sub', [], 'rur') }}</p>
+                <p class="text-sm font-bold">{{ __($offlineAgentCount === 1 ? 'pos.admin_agent_offline_title_one' : 'pos.admin_agent_offline_title_many', ['count' => $offlineAgentCount], 'rur') }}</p>
+                <p class="text-xs mt-0.5">{{ __('pos.admin_agent_offline_sub', [], 'rur') }}</p>
             </div>
         </div>
     </a>
@@ -252,8 +252,12 @@
                             <td class="px-4 py-3 text-gray-400 text-xs hidden sm:table-cell">{{ $company->ntn ?? '—' }}</td>
                             <td class="px-4 py-3 text-gray-400 text-xs hidden md:table-cell">{{ $company->owner_name ?? '—' }}</td>
                             <td class="px-4 py-3 text-center text-gray-300 hidden sm:table-cell">{{ $company->users_count }}</td>
-                            <td class="px-4 py-3 text-center text-gray-300 hidden md:table-cell">{{ $company->local_collections ? 'Local ledger below' : number_format($company->fbrpos_transaction_count ?? 0) }}</td>
-                            <td class="px-4 py-3 text-right text-blue-400 text-xs hidden lg:table-cell">{{ $company->local_collections ? 'Retail archive only' : 'PKR '.number_format($company->fbrpos_revenue ?? 0, 0) }}</td>
+                            <td class="px-4 py-3 text-center text-gray-300 hidden md:table-cell">@if($company->isLocalCollectionPilot())
+                                <a class="underline" href="{{ route('saas.admin.usage', ['company_id' => $company->id]) }}#local-collections">Local ledger</a>
+                                @else
+                                {{ number_format($company->fbrpos_transaction_count ?? 0) }}
+                                @endif</td>
+                            <td class="px-4 py-3 text-right text-blue-400 text-xs hidden lg:table-cell">{{ $company->isLocalCollectionPilot() ? 'Retail archive only' : 'PKR '.number_format($company->fbrpos_revenue ?? 0, 0) }}</td>
                             <td class="px-4 py-3 text-center">
                                 <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium {{ $sc[$company->status] ?? 'bg-gray-800 text-gray-400' }}">{{ $company->status }}</span>
                             </td>

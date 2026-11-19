@@ -18,7 +18,7 @@
     {{-- Agent Health (Task 629): silent-print shops whose Desktop Agent has been
          offline > 2 hours — cashiers there are on Chrome popup fallback right now. --}}
     @if(($offlineAgents ?? collect())->isNotEmpty())
-    <div class="tn-directory-alert bg-red-900/20 border border-red-800/60 rounded-xl p-4 mb-6">
+    <div id="agent-health" class="tn-directory-alert bg-red-900/20 border border-red-800/60 rounded-xl p-4 mb-6">
         <div class="flex items-center gap-2 mb-3">
             <svg class="w-5 h-5 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/></svg>
             <h2 class="text-sm font-bold text-red-300">Agent Health — {{ $offlineAgents->count() }} {{ $offlineAgents->count() === 1 ? 'shop' : 'shops' }} with Desktop Agent offline &gt; 2 hours (silent print enabled)</h2>

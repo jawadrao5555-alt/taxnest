@@ -34,7 +34,7 @@ $paperWidth = match ($print['paper']) { '58mm'=>'58mm', 'a4'=>'180mm', default=>
 <div><strong>FBR IMS Accepted</strong><br>FBR Invoice: {{ $acceptedFiscalNumber }}</div>
 </div>
 @endif
-<div class="actions no-print"><button type="button" id="hospital-print-receipt" onclick="window.print()">{{ __('hospital.print') }}</button>@if($preview ?? false)<a href="/fbr-pos/hospital/printing">{{ __('hospital_print.settings') }}</a>@else<a href="/fbr-pos/hospital/invoices/{{ $invoice->id }}{{ !empty($hospitalUnassigned) ? '?unassigned=1' : '' }}">{{ __('hospital.invoice') }} HI-{{ $invoice->id }}</a>@endif</div>
+<div class="actions no-print"><button type="button" id="hospital-print-receipt" @disabled(!($preview ?? false) && (!empty($payment->fbr_pos_transaction_id) || (json_decode($payment->fiscal_route_snapshot ?? 'null', true)['route'] ?? null) === 'ims') && empty($hospitalFbrQr)) onclick="window.print()">{{ __('hospital.print') }}</button>@if($preview ?? false)<a href="/fbr-pos/hospital/printing">{{ __('hospital_print.settings') }}</a>@else<a href="/fbr-pos/hospital/invoices/{{ $invoice->id }}{{ !empty($hospitalUnassigned) ? '?unassigned=1' : '' }}">{{ __('hospital.invoice') }} HI-{{ $invoice->id }}</a>@endif</div>
 <p class="muted no-print">{{ __('hospital_print.browser_printer') }} @if($print['printer_label']){{ __('hospital_print.preferred') }}: {{ $print['printer_label'] }}@endif</p>
 </article>
 @if(!($preview ?? false))

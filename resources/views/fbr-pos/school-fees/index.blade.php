@@ -146,6 +146,8 @@
             pending = key.value;
             recover.hidden = false;
         } catch (_) { storageReady = false; show(storageMessage); updateControls(); return; }
+        const receiptWindow = window.open('', '_blank', 'popup,width=740,height=840');
+        let receiptOpened = false;
         submitting = true;
         updateControls();
         const abort = new AbortController();
@@ -163,13 +165,20 @@
             const result = await response.json();
             if (response.ok && result.success && /^\/fbr-pos\/school-fees\/\d+\/receipt$/.test(result.receipt_url)) {
                 // Only the matching saved receipt may clear this recovery key.
-                window.location.assign(result.receipt_url);
+                if (receiptWindow && !receiptWindow.closed) {
+                    receiptWindow.location.replace(result.receipt_url);
+                    receiptOpened = true;
+                    if (sessionStorage.getItem(storageKey) === key.value) sessionStorage.removeItem(storageKey);
+                    window.location.reload();
+                } else {
+                    window.location.assign(result.receipt_url);
+                }
                 return;
             }
             const errors = Object.values(result.errors || {}).flat().join(' ');
             show((errors || result.message || recoveryMessage) + ' ' + recoveryMessage);
         } catch (_) { show(recoveryMessage); }
-        finally { clearTimeout(timeout); submitting = false; updateControls(); }
+        finally { if (!receiptOpened && receiptWindow && !receiptWindow.closed) receiptWindow.close();  clearTimeout(timeout); submitting = false; updateControls(); }
     });
 })();
 </script>

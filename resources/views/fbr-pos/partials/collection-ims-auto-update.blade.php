@@ -7,7 +7,7 @@
     url.searchParams.set('fiscal_status', '1');
     let printing = false;
     let needsRefresh = false;
-    let delay = 5000;
+    let delay = 500;
 
     function refreshIfReady() {
         if (needsRefresh && !printing && !document.hidden) window.location.reload();
@@ -32,6 +32,18 @@
                 if (response.ok) {
                     const { status } = await response.json();
                     if (status && status !== initialStatus) {
+                        if (status === 'submitted') {
+                            const page = await fetch(window.location.href, { cache: 'no-store', signal: AbortSignal.timeout(5000) });
+                            if (page.ok && !page.redirected) {
+                                const updated = new DOMParser().parseFromString(await page.text(), 'text/html')
+                                    .querySelector('article.collection-print-receipt');
+                                const current = document.querySelector('article.collection-print-receipt');
+                                if (current && updated?.querySelector('.receipt-fiscal img') && !printing && !document.hidden) {
+                                    current.replaceWith(updated);
+                                    return;
+                                }
+                            }
+                        }
                         needsRefresh = true;
                         refreshIfReady();
                         return;
@@ -45,7 +57,7 @@
         delay = Math.min(delay + 1000, 30000);
     }
 
-    window.setTimeout(checkStatus, delay);
+    checkStatus();
 })();
 </script>
 @endif

@@ -1,3 +1,4 @@
+import { openCollectionReceipt } from './open-collection-receipt.mjs';
 import {scrolledPixelDetail} from './scrolled-pixel-detail.mjs';
 import { collectionControlChecks } from './collection-controls-browser.mjs';
 import { collectionSharedWorkspaceChecks } from './collection-shared-workspace-browser.mjs';
@@ -71,7 +72,7 @@ export async function hospitalWorkflow(page, t, v, { baseUrl, saveEvidenceScreen
   await collectionControlChecks(page, '#hospital-collection');
   await saveEvidenceScreenshot(page, 'hospital-cash-entry-' + v.width);
   const lostInitialId = await loseResponseAndRefresh(create, baseUrl + '/fbr-pos/hospital', initialPayload);
-  await Promise.all([page.waitForURL(/\/fbr-pos\/hospital\/receipts\/\d+$/), create.locator('button[type="submit"]').click()]);
+  await openCollectionReceipt(page, create.locator('button[type="submit"]'), /\/fbr-pos\/hospital\/receipts\/\d+$/);
   const firstReceipt = new URL(page.url()).pathname;
   const firstId = Number(firstReceipt.split('/').pop());
   if (firstId !== lostInitialId) throw new Error('Hospital initial refresh recovery returned another receipt');
@@ -110,7 +111,7 @@ export async function hospitalWorkflow(page, t, v, { baseUrl, saveEvidenceScreen
     await payment.locator('[name="payment_reference"]').fill(payload.payment_reference);
     await payment.locator('[name="payment_confirmed"]').check();
     const lostPartialId = await loseResponseAndRefresh(payment, invoiceUrl + '/payments', payload);
-    await Promise.all([page.waitForURL(/\/fbr-pos\/hospital\/receipts\/\d+$/), payment.locator('button[type="submit"]').click()]);
+    await openCollectionReceipt(page, payment.locator('button[type="submit"]'), /\/fbr-pos\/hospital\/receipts\/\d+$/);
     if (lostPartialId && Number(new URL(page.url()).pathname.split('/').pop()) !== lostPartialId) throw new Error('Hospital partial-payment refresh recovery returned another receipt');
     await assertReceipt(30000, remaining);
     const pendingKeys=await page.evaluate(()=>Object.keys(sessionStorage).filter(name=>name.startsWith('taxnest.hospital.pending.')));

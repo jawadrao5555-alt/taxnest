@@ -2,7 +2,7 @@
 
 Recorded on 19 November 2026 after review of supplied customer evidence and the owner's corrections.
 
-Status is a Draft scope and acceptance register. Application implementation and current-build reproduction remain pending. This commit contains this register only.
+Status is Draft implementation in progress. Requirement-level acceptance remains open until the corresponding application, database and browser verification is recorded below.
 
 ## Relationship to existing work
 
@@ -120,3 +120,21 @@ Source head is 0aaeb0099eafe2b7383feb746704a05981a8001c.
 For a closure candidate, record the implementation commit and release containing every remaining source requirement, attach its actual verification results, then close the superseded open PR. Keep partial completion and remaining source requirements visible in this ledger until the whole candidate is verified. Planning checkmarks and a merged branch alone do not establish the deployment and behavior outcomes.
 
 #412 continues through its own Admin release. Its deployed result will become part of this bulk's main baseline.
+
+## Implementation checkpoint: table refresh
+
+Baseline now includes #412 merge `2c3345306c51166bf170ddd35ad1b64033ae715d`. The [production run](https://github.com/jawadrao5555-alt/taxnest/actions/runs/44588503997) applied that exact commit and passed the SHA and health checks, but failed the Day Close `dc-auto-close-chk` assertion. That release is **not live verified**. The logs establish the missing assertion; they do not yet establish why the rendered control is absent.
+
+Item 1 reproduction used the actual baseline `loadTableStatus()` JavaScript with two deferred requests: accept the newer table response, then reject the earlier request. The baseline retained the new table and ETag but set `tablesError=true`. The correction ignores obsolete responses, body parsing and failures; only the latest request controls loading, the accepted board and its ETag. HTTP access errors, server errors and transport errors have distinct messages. Both table surfaces retain the previous board and identify stale data, with the time of the last successful refresh.
+
+| Compatibility case | Checkpoint evidence |
+| --- | --- |
+| Reported overlapping refresh failure | Extracted application method: newer successful board survives older timeout and older body completion |
+| Previously working ETag refresh | 304 retains the accepted body and clears a recoverable error |
+| Empty, malformed or inaccessible response | Real empty array remains valid; malformed data does not erase the board or update its validator; 401/403/419 and server errors remain distinct |
+| Cart, reservation and KOT behavior | Cart identity is unchanged by failed refresh; existing concurrent table-selection and auto-KOT tests pass |
+| Multiple tenants and terminals | Endpoint and authorization contracts are unchanged; each page owns its request sequence; existing server-side tenant/ETag tests still require the PHP lane |
+
+Executed locally: `node --test scripts/tests/restaurant-table-refresh.test.mjs scripts/tests/b03-table-commit.test.mjs scripts/tests/b03-phone-search.test.mjs scripts/tests/b03-delivery-navigation.test.mjs scripts/tests/customer-bulk-print-flows.test.mjs` — **34 passed**. The new refresh tests are included in the existing PR checks customer-flow lane. `git diff --check` passed. `npm run build`, the source-only Tailwind checks and the landing asset contract passed. The local CSS rebuild omitted vendor pagination rules because Composer dependencies are absent, so the existing committed CSS/manifest are retained; comparison showed no new CSS rules required by this change. A complete dependency build remains required in CI.
+
+Limitations: this environment has no PHP executable, Composer or MariaDB, and no sudo installer. Full Laravel rendering, native database verification, desktop/390px application browser acceptance, body-stream timeout behavior and remaining requirements are pending. Node method tests are not application browser acceptance. No acceptance checkbox or source closure is earned by this checkpoint. #381 still requires actual signed test-phone acceptance.

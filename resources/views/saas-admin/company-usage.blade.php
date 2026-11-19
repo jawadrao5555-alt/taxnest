@@ -3,6 +3,7 @@
     <h1 class="text-2xl font-bold text-white mb-6">Company Usage Monitoring</h1>
     <p class="mb-4 text-sm text-gray-600 dark:text-gray-300">Billing, terminal and stock figures below cover PRA POS only; a dash means not applicable or unavailable. Staff activity comes from recorded logins and session heartbeats. Opening this page does not count as company activity.</p>
 
+    <h2 id="local-collections" class="mb-2 text-lg font-semibold">School / Hospital local collections</h2>
     <form method="get" class="mb-4 grid sm:grid-cols-4 gap-2"><label>Company ID<input name="company_id" type="number" min="1" value="{{ request('company_id') }}"></label><label>Campus ID (0 = unassigned)<input name="branch_id" type="number" min="0" value="{{ request('branch_id') }}"></label><label>From calendar date<input name="date_from" type="date" value="{{ request('date_from') }}"></label><label>To calendar date<input name="date_to" type="date" value="{{ request('date_to') }}"></label><button>Filter local collections</button></form>
     <p>Local filters below apply only to School/Hospital collections. PRA usage columns remain all-time.</p>
     <div class="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">

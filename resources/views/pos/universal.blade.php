@@ -2042,8 +2042,14 @@ window.addEventListener('popstate', function() {
                         <button @click="tableBoardOpen = false" class="text-gray-400 hover:text-gray-600 flex-shrink-0"><svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
                     </div>
                     <div class="p-3 overflow-y-auto">
+                        <div x-show="!tablesLoading && tablesError && tableFloors.length" class="mb-3 text-xs text-amber-600 dark:text-amber-400" role="status">
+                            <p x-text="tableStatusErrorMessage()"></p>
+                            <p>{{ __('pos.tables_cached_warning') }}</p>
+                            <button type="button" @click="loadTableStatus()" class="mt-1 font-bold underline">{{ __('pos.tables_offline_retry') }}</button>
+                        </div>
+                        <p x-show="tablesCheckedAt" class="mb-2 text-xs text-gray-500 dark:text-gray-400"><span>{{ __('pos.tables_last_checked') }}</span> <span x-text="tablesCheckedAt ? new Date(tablesCheckedAt).toLocaleTimeString() : ''"></span></p>
                         <template x-if="tableFloors.length === 0">
-                            <p class="text-xs text-center py-6" :class="(tablesError && !tablesLoading) ? 'text-amber-600 dark:text-amber-400 font-bold' : 'text-gray-400'" x-text="tablesLoading ? window.TXT.tables_loading_js : (tablesError ? window.TXT.tables_offline : window.TXT.no_tables_set)"></p>
+                            <p class="text-xs text-center py-6" :class="(tablesError && !tablesLoading) ? 'text-amber-600 dark:text-amber-400 font-bold' : 'text-gray-400'" x-text="tablesLoading ? window.TXT.tables_loading_js : (tablesError ? tableStatusErrorMessage() : window.TXT.no_tables_set)"></p>
                         </template>
                         <template x-for="floor in tableFloors" :key="'bf' + floor.name">
                             <div>
@@ -2232,6 +2238,7 @@ window.addEventListener('popstate', function() {
                  /pos/restaurant/api/table-status. Green=free, amber=reserved, red=occupied.
                  Selecting a table RESERVES it server-side (race-safe) before it sticks. --}}
             <div class="p-4 max-h-[65vh] overflow-y-auto">
+                <p x-show="tablesCheckedAt" class="mb-2 text-xs text-gray-500 dark:text-gray-400"><span>{{ __('pos.tables_last_checked') }}</span> <span x-text="tablesCheckedAt ? new Date(tablesCheckedAt).toLocaleTimeString() : ''"></span></p>
                 <template x-if="tablesLoading && tableFloors.length === 0">
                     <p class="text-center text-sm text-gray-400 py-6">{{ __('pos.loading_tables') }}</p>
                 </template>
@@ -2241,7 +2248,8 @@ window.addEventListener('popstate', function() {
                 {{-- Rabta toot jaye to sach: tables "configure nahi" nahi hain, load nahi ho sakeen. --}}
                 <template x-if="!tablesLoading && tablesError">
                     <div class="text-center py-6">
-                        <p class="text-sm font-bold text-amber-600 dark:text-amber-400">{{ __('pos.tables_offline') }}</p>
+                        <p role="status" class="text-sm font-bold text-amber-600 dark:text-amber-400" x-text="tableStatusErrorMessage()"></p>
+                        <p x-show="tableFloors.length" class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ __('pos.tables_cached_warning') }}</p>
                         <button type="button" @click="loadTableStatus()" class="mt-3 px-4 py-2 rounded-xl bg-amber-500 text-white text-sm font-bold">{{ __('pos.tables_offline_retry') }}</button>
                     </div>
                 </template>
@@ -5219,6 +5227,7 @@ function restaurantPos() {
         _heldEtag: null,     // Task 1097: ETag from last held-orders poll (If-None-Match fast-path)
         _incomingEtag: null, // Task 1097: ETag from last incoming-orders poll
         _tableEtag: null,    // Task 1109: ETag from last table-status poll (If-None-Match fast-path)
+        _tableRequestSerial: 0,
         // Task 502: Tables page open-order card → boot par isi order ka direct recall.
         bootRecallOrderId: {!! $jsEnc($recallOrderIdForJs ?? null, 'null') !!},
         showTablePicker: false,
@@ -5236,6 +5245,8 @@ function restaurantPos() {
         // Table-status fetch nakaam (net/server down) — tab "no tables configured"
         // dikhana JHOOT hai; picker aur board dono sach batate hain.
         tablesError: false,
+        tablesErrorKind: '',
+        tablesCheckedAt: null,
         // Occupied-timer tick — bumped every 30s so elapsed labels re-render live.
         nowTick: Date.now(),
         showPayModal: false,
@@ -9146,26 +9157,50 @@ function restaurantPos() {
                 clearTimeout(timer);
             }
         },
+        tableStatusErrorMessage() {
+            if (this.tablesErrorKind === 'auth') return window.TXT.tables_session_expired;
+            if (this.tablesErrorKind === 'server') return window.TXT.tables_server_error;
+            return window.TXT.tables_offline;
+        },
         async loadTableStatus() {
+            const serial = ++this._tableRequestSerial;
             this.tablesLoading = true;
             try {
                 const hdrs = { 'Accept': 'application/json' };
                 if (this._tableEtag) hdrs['If-None-Match'] = this._tableEtag;
                 const res = await this._fetchWithTimeout('/pos/restaurant/api/table-status', { headers: hdrs });
-                if (res.status === 304) { this.tablesError = false; this.tablesLoading = false; return; }
-                if (!res.ok) { this.tablesError = true; this.tablesLoading = false; return; }
-                const etag = res.headers.get('ETag');
-                if (etag) this._tableEtag = etag;
-                const list = await res.json();
-                const groups = {};
-                (Array.isArray(list) ? list : []).forEach(t => {
-                    const f = t.floor || 'Main';
-                    (groups[f] = groups[f] || []).push(t);
-                });
-                this.tableFloors = Object.keys(groups).map(name => ({ name, tables: groups[name] }));
+                if (serial !== this._tableRequestSerial) return;
+                if (res.status === 304) {
+                    if (!this._tableEtag) throw new Error('Uncached table response');
+                } else if (!res.ok || res.redirected) {
+                    this.tablesError = true;
+                    this.tablesErrorKind = [401, 403, 419].includes(res.status) || res.redirected ? 'auth' : 'server';
+                    return;
+                } else {
+                    const list = await res.json();
+                    if (serial !== this._tableRequestSerial) return;
+                    if (!Array.isArray(list) || list.some(t => !t || !t.id)) throw new Error('Invalid table response');
+                    const groups = new Map();
+                    list.forEach(t => {
+                        const f = t.floor || 'Main';
+                        if (!groups.has(f)) groups.set(f, []);
+                        groups.get(f).push(t);
+                    });
+                    this.tableFloors = Array.from(groups, ([name, tables]) => ({ name, tables }));
+                    // Cache validators belong to the body we actually accepted.
+                    this._tableEtag = res.headers.get('ETag') || null;
+                }
                 this.tablesError = false;
-            } catch (e) { this.tablesError = true; console.error('[tables] status load failed', e); }
-            this.tablesLoading = false;
+                this.tablesErrorKind = '';
+                this.tablesCheckedAt = Date.now();
+            } catch (e) {
+                if (serial === this._tableRequestSerial) {
+                    this.tablesError = true;
+                    this.tablesErrorKind = e instanceof TypeError || e.name === 'AbortError' ? 'network' : 'server';
+                }
+            } finally {
+                if (serial === this._tableRequestSerial) this.tablesLoading = false;
+            }
         },
         // Task 899 / 935: cross-terminal held-orders sync — refreshes this.heldOrders from
         // the server every 25 s. Works BOTH directions: a cancel on Tab B disappears here

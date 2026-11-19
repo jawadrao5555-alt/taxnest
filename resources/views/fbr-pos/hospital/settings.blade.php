@@ -5,6 +5,17 @@
 @if($errors->any())<p role="alert" class="error">{{ $errors->first() }}</p>@endif
 @if(session('status'))<p role="status" class="notice">{{ session('status') }}</p>@endif
 @include('fbr-pos.partials.collection-fbr-settings-link')
+<section class="card"><h2>{{ __('hospital_workspace.profile_printing') }}</h2>
+<div class="actions">
+<a href="/fbr-pos/hospital/printing">{{ __('hospital_workspace.profile_printing') }}</a>
+<a href="/fbr-pos/my-profile">{{ __('hospital_workspace.my_profile') }}</a>
+<a href="/fbr-pos/billing">{{ __('hospital_workspace.billing') }}</a>
+<a href="/product-guide#hospital-standalone">{{ __('hospital_workspace.help') }}</a>
+</div></section>
+<section class="card" id="hospital-preferences">
+<h2>{{ __('hospital_workspace.language') }}</h2>
+<form method="post" action="/fbr-pos/set-language">@csrf<label for="hospital-language">{{ __('hospital_workspace.language') }}</label><select id="hospital-language" name="language"><option value="en" @selected(app()->getLocale()==='en')>English</option><option value="rur" @selected(app()->getLocale()==='rur')>Roman Urdu</option><option value="ur" @selected(app()->getLocale()==='ur')>اردو</option></select><button>{{ __('hospital_workspace.save_language') }}</button></form>
+</section>
 <section class="card"><h2>{{ __('hospital_workspace.services') }}</h2><p>{{ __('hospital_workspace.catalog_note') }}</p>
 @foreach($services as $service)
 <form class="hospital-edit-service" method="post" action="/fbr-pos/hospital/settings/services">@csrf<input type="hidden" name="code" value="{{ $service->code }}">
@@ -17,5 +28,6 @@
 @endforeach
 <form id="hospital-add-service" method="post" action="/fbr-pos/hospital/settings/services">@csrf<input type="hidden" name="active" value="1"><label>{{ __('hospital_workspace.label') }}<input name="label" required maxlength="80"></label><label>{{ __('hospital.service') }}<select name="service_head">@foreach(['consultation','lab','procedure'] as $head)<option value="{{ $head }}">{{ __('hospital.'.$head) }}</option>@endforeach</select></label><label>{{ __('hospital_workspace.rate') }}<input name="rate" inputmode="decimal" required></label><button>{{ __('hospital_workspace.add_service') }}</button></form></section>
 <section class="card"><h2>{{ __('hospital_workspace.campuses') }}</h2><p>{{ __('hospital_workspace.campus_note') }}</p><p><a href="/fbr-pos/team">{{ __('hospital_workspace.team') }}</a></p><ul>@foreach($campuses as $campus)<li>{{ $campus->name }} · {{ $campus->city }}</li>@endforeach</ul>
-<form id="hospital-add-campus" method="post" action="/fbr-pos/hospital/settings/campus">@csrf<label>{{ __('school.name') }}<input name="name" required maxlength="255"></label><label>{{ __('school.city') }}<input name="city" maxlength="100"></label><label>{{ __('school.address') }}<input name="address" maxlength="1000"></label><button>{{ __('school.add_campus') }}</button></form></section>
+<form id="hospital-add-campus" method="post" action="/fbr-pos/hospital/settings/campus">@csrf<label>{{ __('school.name') }}<input name="name" required maxlength="255"></label><label>{{ __('school.city') }}<input name="city" maxlength="100"></label><label>{{ __('school.address') }}<input name="address" maxlength="1000"></label><button>{{ __('hospital_workspace.add_branch') }}</button></form></section>
 @endsection
+

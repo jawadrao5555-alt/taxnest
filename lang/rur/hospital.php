@@ -1,8 +1,8 @@
 <?php
 return [
-    'unassigned_scope' => 'Purane baghair campus bills (sirf owner)',
-    'current_scope' => 'Maujooda campus bills',
-    'unassigned_notice' => 'Sirf owner ka unassigned scope. Purana balance apne asal ledger mein rehta hai; adaigi aur closing active campus se alag hain. Is scope mein naya bill nahi banta.',
+    'unassigned_scope' => 'Purane baghair branch bills (sirf owner)',
+    'current_scope' => 'Maujooda branch bills',
+    'unassigned_notice' => 'Sirf owner ka unassigned scope. Purana balance apne asal ledger mein rehta hai; adaigi aur closing active branch se alag hain. Is scope mein naya bill nahi banta.',
 
     'title' => 'Hospital / Clinic wasooliyan',
     'collect' => 'Adaigi darj karein',
@@ -26,16 +26,16 @@ return [
     'confirm_required' => 'Tasdeeq karein ke adaigi pehle wasool ho chuki hai.',
     'overpayment' => 'Adaigi baqi bill balance se zyada hai.',
     'retry_conflict' => 'Yeh payment ID mukhtalif tafseel ke saath mehfooz hai. Asal receipt kholein; dobara wasool na karein.',
-    'campus_changed' => 'Active campus badal gaya. Asal campus par wapas ja kar page reload karein. Is request se adaigi darj nahi hui.',
-    'closed' => 'Is campus ki yeh tareekh band hai. Nayi adaigi band hai; pehle mehfooz adaigi recover ho sakti hai.',
-    'recovery' => 'Pichli adaigi mehfooz ho sakti hai. Dobara wasool na karein. Wohi asal tafseel likh kar wahi receipt hasil karein. Yeh tab khula rakhein; recovery isi tab, account aur campus tak hai.',
+    'campus_changed' => 'Active branch badal gaya. Asal branch par wapas ja kar page reload karein. Is request se adaigi darj nahi hui.',
+    'closed' => 'Is branch ki yeh tareekh band hai. Nayi adaigi band hai; pehle mehfooz adaigi recover ho sakti hai.',
+    'recovery' => 'Pichli adaigi mehfooz ho sakti hai. Dobara wasool na karein. Wohi asal tafseel likh kar wahi receipt hasil karein. Yeh tab khula rakhein; recovery isi tab, account aur branch tak hai.',
     'storage' => 'Recovery storage dastiyab nahi. Nayi request nahi bheji gayi. Dobara darj karne se pehle saved receipts dekhein.',
     'invoice' => 'Bill',
     'receipt' => 'Adaigi ki receipt',
     'balance' => 'Baqi balance',
     'receipt_balance' => 'Is adaigi ke baad balance',
     'paid' => 'Ab tak ada shuda',
-    'campus' => 'Campus',
+    'campus' => 'Branch',
     'cashier' => 'Cashier',
     'date' => 'Tareekh',
     'print' => 'Print / Dobara print',
@@ -55,3 +55,4 @@ return [
     'closed_label' => 'Band',
     'close_policy' => 'Calendar tareekh ki closing cash, card aur bank alag mehfooz karti hai. Sirf cash drawer count se milta hai. Band hone par isi tareekh ki nayi adaigi ya reopening nahi hoti.',
 ];
+

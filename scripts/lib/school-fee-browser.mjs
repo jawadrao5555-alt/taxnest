@@ -344,7 +344,9 @@ async function schoolWorkspaceChecks(page, v, { baseUrl, saveEvidenceScreenshot 
     await saveEvidenceScreenshot(page, 'school-workspace-' + path.split('/').pop() + '-' + v.width);
   }
   for(const language of ['ur','rur','en']) {
-    await page.locator('#school-workspace-menu summary').click();
+    await page.goto(baseUrl + '/fbr-pos/school-fees/settings', { waitUntil: 'domcontentloaded' });
+    if (await page.locator('#school-workspace-menu').count()) throw new Error('Duplicate owner settings menu is visible');
+    await page.locator('#school-records a').waitFor({state:'visible'});
     await page.locator('#school-language').selectOption(language);
     const languageForm=page.locator('#school-language').locator('..');
     await Promise.all([page.waitForNavigation({waitUntil:'domcontentloaded'}),languageForm.locator('button').click()]);
@@ -481,3 +483,4 @@ async function assertPrivateReceiptHtmlRedirect(page,baseUrl,path) {
   const location=response.headers().location;
   if(response.status()!==302 || !location || new URL(location,baseUrl).origin!==new URL(baseUrl).origin || new URL(location,baseUrl).pathname!=='/fbr-pos/dashboard') throw new Error('Denied receipt HTML did not redirect safely within its own panel');
 }
+

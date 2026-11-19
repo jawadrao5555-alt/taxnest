@@ -58,12 +58,11 @@
 <span @class(['fiscal-badge','on'=>(bool)$company->fbr_reporting_enabled]) id="school-fiscal-status" role="status">{{ $company->fbr_reporting_enabled ? 'FBR IMS ON' : 'Fiscal OFF' }}</span>
 @if(is_array(session('impersonation')))<form method="post" action="{{ route('saas.admin.impersonation.stop') }}">@csrf<button type="submit">{{ __('school_workspace.exit_company') }}</button></form>@else<form method="post" action="/fbr-pos/logout">@csrf<button type="submit">{{ __('pos.logout') }}</button></form>@endif
 </div></header>
+@unless($schoolCanConfigure ?? false)
 <details class="no-print" id="school-workspace-menu"><summary>{{ __('school_workspace.workspace_menu') }}</summary><nav class="actions" aria-label="{{ __('school_workspace.workspace_menu') }}">
-@if($schoolCanConfigure ?? false)
-<a href="/fbr-pos/team">{{ __('school_workspace.team_access') }}</a><a href="/fbr-pos/school-fees/settings">{{ __('school.settings') }}</a><a href="/fbr-pos/school-fees/printing">{{ __('school_workspace.profile_printing') }}</a><a href="/fbr-pos/billing">{{ __('school_workspace.billing') }}</a><a href="/fbr-pos/school-fees/legacy-retail">{{ __('school_workspace.retail_archive') }}</a>
-@endif
 <a href="/fbr-pos/my-profile">{{ __('school_workspace.my_profile') }}</a><a href="#school-help-guide">{{ __('school_workspace.help') }}</a>
 </nav><form method="post" action="/fbr-pos/set-language">@csrf<label for="school-language">{{ __('school_workspace.language') }}</label><select id="school-language" name="language"><option value="en" @selected(app()->getLocale()==='en')>English</option><option value="rur" @selected(app()->getLocale()==='rur')>Roman Urdu</option><option value="ur" @selected(app()->getLocale()==='ur')>اردو</option></select><button type="submit">{{ __('school_workspace.save_language') }}</button></form></details>
+@endunless
 <details class="no-print" id="school-help-guide"><summary>{{ __('school_workspace.help') }}</summary><p>{{ __('school_audit.guide') }}</p><a href="/product-guide#school-standalone">{{ __('school_workspace.help') }}</a><p>{{ __('school_ledger.pending_recovery') }}</p><p>{{ __('school_ledger.record_only') }}</p><a href="/fbr-pos/suggestions">{{ __('school_audit.support') }}</a></details>
 <x-prospective-policy-reminder guard="fbrpos" />
 @if(isset($slot))<section class="school-shared-page">{{ $slot }}</section>@else @yield('content') @endif
@@ -75,3 +74,4 @@ window.addEventListener('pageshow', function(event) { if(event.persisted) window
 </main>
 </div>
 @if($showInteractiveSupport ?? true)<footer class="no-print collection-support-dock"><x-madadgar-support product="fbrpos" placement="inline" /></footer>@endif</body></html>
+

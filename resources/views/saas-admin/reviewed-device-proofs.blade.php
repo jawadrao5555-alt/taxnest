@@ -8,13 +8,13 @@
 <p>Review the registered device against your IMS setup and the matching Live FBR portal record. Once Production evidence is recorded, future matching number-only responses can update School and Hospital receipts automatically. Existing pending receipts require their own invoice reconciliation.</p>
 <form method="POST"  action="{{ route('saas.admin.device-proofs.store',$company->id) }}" class="space-y-3">
 @csrf
-<label class="block">Device fingerprint
-<select name="device_uid" required class="block w-full bg-gray-800 rounded p-2">
+<label class="block" for="reviewed-proof-device">Device fingerprint</label>
+<select id="reviewed-proof-device" name="device_uid" required class="block w-full bg-gray-800 rounded p-2">
 <option value="">Select registered Agent device</option>
 @foreach(($devices ?? collect()) as $device)
 <option value="{{ $device }}" @selected(old('device_uid') === $device)>{{ $device }}</option>
 @endforeach
-</select></label>
+</select>
 <label class="block">POS ID<input name="pos_id" required maxlength="64" value="{{ old('pos_id', $company->fbr_pos_id) }}" class="block w-full bg-gray-800 rounded p-2"></label>
 @foreach(['evidence_reference'=>'Non-secret evidence reference','evidence_sha256'=>'Evidence SHA-256'] as $name=>$label)
 <label class="block">{{ $label }}<input name="{{ $name }}" required value="{{ old($name) }}" class="block w-full bg-gray-800 rounded p-2" maxlength="{{ $name==='evidence_reference'?300:($name==='device_uid'?128:64) }}"></label>

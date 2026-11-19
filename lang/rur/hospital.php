@@ -55,3 +55,4 @@ return [
     'closed_label' => 'Band',
     'close_policy' => 'Calendar tareekh ki closing cash, card aur bank alag mehfooz karti hai. Sirf cash drawer count se milta hai. Band hone par isi tareekh ki nayi adaigi ya reopening nahi hoti.',
 ];
+

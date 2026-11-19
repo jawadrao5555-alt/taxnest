@@ -299,9 +299,15 @@ class PlanLimitService
 
         $monthlyCount = function () use ($companyId, $company): int {
             if ($company?->isHospitalCollectionPilot()) {
-                return \Illuminate\Support\Facades\DB::table('hospital_invoices')
-                    ->where('company_id', $companyId)
-                    ->whereBetween('created_at', [ProspectiveQuotaRetention::monthStart($companyId), now()->endOfMonth()])->count();
+                $period = [ProspectiveQuotaRetention::monthStart($companyId), now()->endOfMonth()];
+                $active = \Illuminate\Support\Facades\DB::table('hospital_invoices')
+                    ->where('company_id', $companyId)->whereBetween('created_at', $period)->count();
+                $voided = \Illuminate\Support\Facades\Schema::hasTable('hospital_invoice_corrections')
+                    ? \Illuminate\Support\Facades\DB::table('hospital_invoice_corrections')->where('company_id', $companyId)
+                        ->where('action', 'void')->whereBetween('invoice_created_at', $period)->count()
+                    : 0;
+
+                return $active + $voided;
             }
             if ($company?->isSchoolFeePilot()) {
                 return \Illuminate\Support\Facades\DB::table('school_fee_receipts')

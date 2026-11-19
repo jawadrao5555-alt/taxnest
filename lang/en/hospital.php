@@ -24,3 +24,4 @@ return [
  'variance_required'=>'Explain any difference between counted and expected cash.', 'open'=>'Open', 'closed_label'=>'Closed',
  'close_policy'=>'Calendar-date closing freezes cash, card and bank totals separately. Only cash is compared with the drawer count. No reopening or new same-date payments after close.',
 ];
+

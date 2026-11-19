@@ -60,6 +60,14 @@ class SchoolFeeImsServiceTest extends TestCase
             'fbr_status' => 'submitted', 'fbr_invoice_number' => 'SYNTHETIC-FBR-100',
             'fbr_response_code' => '100', 'fbr_error_message' => null,
         ])->save();
+        $pendingReceipt = DB::table('school_fee_receipts')->find($receiptId);
+        $this->assertSame('pending', $pendingReceipt->fbr_status);
+        $status = \App\Services\CollectionFbrSubmission::receiptStatus($pendingReceipt);
+        $this->assertSame(['status' => 'submitted'], $status->getData(true));
+        $foreignReceipt = clone $pendingReceipt;
+        $foreignReceipt->company_id = $company->id + 1;
+        $this->assertSame(['status' => 'pending'],
+            \App\Services\CollectionFbrSubmission::receiptStatus($foreignReceipt)->getData(true));
         SchoolFeeImsService::reconcileTransaction($mirror->fresh());
         $receipt = DB::table('school_fee_receipts')->find($receiptId);
         $this->assertSame('submitted', $receipt->fbr_status);

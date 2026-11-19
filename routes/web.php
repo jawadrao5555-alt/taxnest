@@ -2656,6 +2656,7 @@ Route::prefix('fbr-pos')->middleware(['fbrpos.auth', 'company.approval', \App\Ht
     Route::post('/hospital/printing', [\App\Http\Controllers\HospitalReceiptSettingsController::class, 'update'])->name('fbrpos.hospital.printing.update');
     Route::get('/hospital/printing/preview', [\App\Http\Controllers\HospitalReceiptSettingsController::class, 'preview'])->name('fbrpos.hospital.printing.preview');
     Route::get('/hospital/invoices/{id}', [\App\Http\Controllers\FbrPosHospitalController::class, 'invoice'])->whereNumber('id')->name('fbrpos.hospital.invoice');
+    Route::post('/hospital/invoices/{id}/correct', [\App\Http\Controllers\FbrPosHospitalController::class, 'correctLocalInvoice'])->whereNumber('id')->name('fbrpos.hospital.invoice.correct');
     Route::post('/hospital/invoices/{id}/payments', [\App\Http\Controllers\FbrPosHospitalController::class, 'payment'])->whereNumber('id')->name('fbrpos.hospital.payment');
     Route::get('/hospital/receipts/{id}', [\App\Http\Controllers\FbrPosHospitalController::class, 'receipt'])->whereNumber('id')->name('fbrpos.hospital.receipt');
     Route::get('/school-fees/printing', [\App\Http\Controllers\SchoolReceiptSettingsController::class, 'index'])->name('fbrpos.school-fees.printing');

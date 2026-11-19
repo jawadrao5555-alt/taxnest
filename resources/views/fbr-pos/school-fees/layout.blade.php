@@ -74,3 +74,4 @@ window.addEventListener('pageshow', function(event) { if(event.persisted) window
 </main>
 </div>
 @if($showInteractiveSupport ?? true)<footer class="no-print collection-support-dock"><x-madadgar-support product="fbrpos" placement="inline" /></footer>@endif</body></html>
+

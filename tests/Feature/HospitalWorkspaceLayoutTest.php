@@ -78,3 +78,4 @@ class HospitalWorkspaceLayoutTest extends TestCase
     }
 
 }
+

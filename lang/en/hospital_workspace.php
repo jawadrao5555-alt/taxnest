@@ -26,3 +26,4 @@ return [
     'add_branch' => 'Add branch',
     'no_branch' => 'No branch configured',
 ];
+

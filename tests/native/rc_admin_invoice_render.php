@@ -36,6 +36,20 @@ foreach ($case['previewDocuments'] ?? [] as $doc) {
     if (! str_starts_with($bytes, '%PDF-')) {
         throw new RuntimeException('Synthetic invoice PDF is invalid');
     }
+    if ($doc['product'] === 'fbrpos') {
+        foreach (['education' => 'school_receipt', 'hospital' => 'hospital_receipt'] as $category => $preference) {
+            $company->pos_type = $category;
+            $company->business_category = $category;
+            foreach (['58mm' => 164.41, '80mm' => 226.77, 'a4' => 595.28] as $format => $expectedWidth) {
+                $company->invoice_display_prefs = [$preference => ['paper' => $format]];
+                $pdf = app(\App\Services\AdminInvoiceDocument::class)->pdf($record, $company, $doc['product'])->output();
+                if (!preg_match('/\/MediaBox\s*\[\s*0(?:\.0+)?\s+0(?:\.0+)?\s+([\d.]+)/', $pdf, $box)
+                    || abs((float) $box[1] - $expectedWidth) > 1) {
+                    throw new RuntimeException("Unexpected {$category} admin PDF width for {$format}");
+                }
+            }
+        }
+    }
     echo 'PASS: actual native '.$doc['product']." admin invoice renderer; no fiscal transport\n";
 }
 if (count($case['previewDocuments'] ?? []) !== 3) {

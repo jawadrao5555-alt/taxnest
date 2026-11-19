@@ -86,3 +86,4 @@ class SchoolWorkspaceLayoutTest extends TestCase
     }
 
 }
+

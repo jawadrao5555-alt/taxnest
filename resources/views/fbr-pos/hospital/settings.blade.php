@@ -30,3 +30,4 @@
 <section class="card"><h2>{{ __('hospital_workspace.campuses') }}</h2><p>{{ __('hospital_workspace.campus_note') }}</p><p><a href="/fbr-pos/team">{{ __('hospital_workspace.team') }}</a></p><ul>@foreach($campuses as $campus)<li>{{ $campus->name }} · {{ $campus->city }}</li>@endforeach</ul>
 <form id="hospital-add-campus" method="post" action="/fbr-pos/hospital/settings/campus">@csrf<label>{{ __('school.name') }}<input name="name" required maxlength="255"></label><label>{{ __('school.city') }}<input name="city" maxlength="100"></label><label>{{ __('school.address') }}<input name="address" maxlength="1000"></label><button>{{ __('hospital_workspace.add_branch') }}</button></form></section>
 @endsection
+

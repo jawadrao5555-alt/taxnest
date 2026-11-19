@@ -26,3 +26,4 @@ return [
     'add_branch' => 'Branch banayein',
     'no_branch' => 'Koi branch configure nahi',
 ];
+

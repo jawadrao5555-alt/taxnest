@@ -36,3 +36,4 @@ export async function prospectiveReminderWorkflow(page,t,v,{baseUrl,login,loopba
  }
  pass('PROSPECTIVE REMINDERS PASS: '+v.width+': actual School dashboard frozen trial/confirmed/grace, EN/UR/RUR exact text/deadlines, readable bounded geometry and RTL; synthetic only, no bills or email sends');
 }
+

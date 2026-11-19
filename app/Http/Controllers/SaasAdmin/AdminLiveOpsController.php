@@ -12,6 +12,7 @@ use App\Models\LiveOpsRemediationRequest;
 use App\Services\LiveOps\LiveOpsDiagnosticsService;
 use App\Services\LiveOps\LiveOpsRemediationService;
 use App\Services\FbrPosReconciliationService;
+use App\Support\ProductCatalog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
 
@@ -50,13 +51,17 @@ class AdminLiveOpsController extends Controller
             ? LiveOpsAuditEvent::orderByDesc('id')->limit(30)->get()
             : collect();
 
-        // Same filter shape as /admin/companies (search + status), scoped to NestPOS PRA.
+        // Discover companies across products without changing diagnostic or remediation scope.
+        $product = ProductCatalog::normalize($request->validate([
+            'product' => ['nullable', ProductCatalog::validationRule()],
+        ])['product'] ?? null);
         $search = trim((string) $request->query('search', $request->query('q', '')));
         $status = trim((string) $request->query('status', ''));
         $companies = collect();
-        if ($search !== '' || $status !== '') {
+        if ($search !== '' || $status !== '' || $product !== null) {
             $companies = Company::query()
-                ->whereIn('product_type', config('live_ops.product_types', ['pos']))
+                ->when($product !== null, fn ($q) => $q->whereIn('product_type',
+                    $product === ProductCatalog::ERPS ? [$product, 'health'] : [$product]))
                 ->when($status !== '', fn ($q) => $q->where('status', $status))
                 ->when($search !== '', function ($q) use ($search) {
                     $q->where(function ($w) use ($search) {
@@ -74,7 +79,7 @@ class AdminLiveOpsController extends Controller
                 ->orderBy('name')
                 ->limit(25)
                 ->get(array_values(array_filter([
-                    'id', 'name', 'status', 'agent_last_seen', 'agent_enabled', 'agent_version', 'owner_name',
+                    'id', 'name', 'status', 'product_type',
                     Schema::hasColumn('companies', 'account_code') ? 'account_code' : null,
                     Schema::hasColumn('companies', 'ntn') ? 'ntn' : null,
                 ])));
@@ -83,6 +88,7 @@ class AdminLiveOpsController extends Controller
         return view('saas-admin.live-ops.index', [
             'search' => $search,
             'status' => $status,
+            'product' => $product,
             'q' => $search, // backward-compatible alias for older links
             'companies' => $companies,
             'recentReports' => $recentReports,

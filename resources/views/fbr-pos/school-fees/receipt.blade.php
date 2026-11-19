@@ -43,7 +43,7 @@
 <div><strong>FBR IMS Accepted</strong><br>FBR Invoice: {{ $acceptedFiscalNumber }}</div>
 </div>
 @endif
-<div class="actions no-print"><button type="button" id="school-print-receipt" onclick="window.print()">{{ __('pos.school_print_reprint') }}</button>@if(!($preview ?? false))<a href="/fbr-pos/school-fees">{{ __('pos.school_new_collection') }}</a>@else<a href="/fbr-pos/school-fees/printing">{{ __('school_print.settings') }}</a>@endif</div>
+<div class="actions no-print"><button type="button" id="school-print-receipt" @disabled(!($preview ?? false) && (!empty($receipt->fbr_pos_transaction_id) || (json_decode($receipt->fiscal_route_snapshot ?? 'null', true)['route'] ?? null) === 'ims') && empty($schoolFbrQr)) onclick="window.print()">{{ __('pos.school_print_reprint') }}</button>@if(!($preview ?? false))<a href="/fbr-pos/school-fees">{{ __('pos.school_new_collection') }}</a>@else<a href="/fbr-pos/school-fees/printing">{{ __('school_print.settings') }}</a>@endif</div>
 <p class="muted no-print">{{ __('school_print.browser_printer') }} @if($print['printer_label']){{ __('school_print.preferred') }}: {{ $print['printer_label'] }}@endif</p>
 </article>
 @if(!($preview ?? false))

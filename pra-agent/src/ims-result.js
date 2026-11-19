@@ -1,6 +1,16 @@
 'use strict';
 const {fiscalNumber}=require('./fiscal-result');
 
+// WCF can return a JSON object as a JSON string, sometimes encoded twice.
+function decodeResponse(data) {
+  let decoded = data;
+  for (let depth = 0; depth < 2 && typeof decoded === 'string'; depth++) {
+    if (decoded.length > 16384) return null;
+    try { decoded = JSON.parse(decoded); } catch (_) { return null; }
+  }
+  return decoded && typeof decoded === 'object' && !Array.isArray(decoded) ? decoded : null;
+}
+
 // Normalize only explicit fiscal acknowledgement names and bounded JSON envelopes.
 // Never turn an invoice number alone, prose, or a transport status into Code 100.
 function resultOnly(data, { includeCentral = false } = {}) {
@@ -70,4 +80,4 @@ function describeResponse(data) {
   }
   walk(data,'',0);return fields;
 }
-module.exports={resultOnly,describeResponse};
+module.exports={resultOnly,describeResponse,decodeResponse};

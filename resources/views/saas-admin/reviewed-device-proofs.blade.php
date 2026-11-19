@@ -3,12 +3,23 @@
 <h1 class="text-xl font-bold">Reviewed fiscal-device evidence: {{ $company->name }}</h1>
 <p>Without reviewed Production evidence, a number-only response stays verification pending. A heartbeat or an agent's own claim is not independent proof. The device must already be registered to this company. School and Hospital evidence must match the fiscal device, POS ID and environment configured in the workspace. Record only evidence you personally reviewed for this exact company, device fingerprint, POS ID and environment. This does not enable reporting, authorize School/Hospital routes, or prove central FBR verification.</p>
 <a href="{{ route('saas.admin.companies.show',$company->id) }}">Back to company</a>
-<form method="POST" action="{{ route('saas.admin.device-proofs.store',$company->id) }}" class="space-y-3">
+@if(session('success'))<p role="status">{{ session('success') }}</p>@endif
+@if($errors->any())<div role="alert">{{ $errors->first() }}</div>@endif
+<p>Review the registered device against your IMS setup and the matching Live FBR portal record. Once Production evidence is recorded, future matching number-only responses can update School and Hospital receipts automatically. Existing pending receipts require their own invoice reconciliation.</p>
+<form method="POST"  action="{{ route('saas.admin.device-proofs.store',$company->id) }}" class="space-y-3">
 @csrf
-@foreach(['device_uid'=>'Device fingerprint','pos_id'=>'POS ID','evidence_reference'=>'Non-secret evidence reference','evidence_sha256'=>'Evidence SHA-256'] as $name=>$label)
-<label class="block">{{ $label }}<input name="{{ $name }}" required class="block w-full bg-gray-800 rounded p-2" maxlength="{{ $name==='evidence_reference'?300:($name==='device_uid'?128:64) }}"></label>
+<label class="block" for="reviewed-proof-device">Device fingerprint</label>
+<select id="reviewed-proof-device" name="device_uid" required class="block w-full bg-gray-800 rounded p-2">
+<option value="">Select registered Agent device</option>
+@foreach(($devices ?? collect()) as $device)
+<option value="{{ $device }}" @selected(old('device_uid') === $device)>{{ $device }}</option>
 @endforeach
-<label for="reviewed-proof-environment" class="block">Environment</label><select id="reviewed-proof-environment" name="environment" class="block bg-gray-800 p-2"><option value="sandbox">Sandbox</option><option value="production">Production</option></select>
+</select>
+<label class="block">POS ID<input name="pos_id" required maxlength="64" value="{{ old('pos_id', $company->fbr_pos_id) }}" class="block w-full bg-gray-800 rounded p-2"></label>
+@foreach(['evidence_reference'=>'Non-secret evidence reference','evidence_sha256'=>'Evidence SHA-256'] as $name=>$label)
+<label class="block">{{ $label }}<input name="{{ $name }}" required value="{{ old($name) }}" class="block w-full bg-gray-800 rounded p-2" maxlength="{{ $name==='evidence_reference'?300:($name==='device_uid'?128:64) }}"></label>
+@endforeach
+<label for="reviewed-proof-environment" class="block">Environment</label><select id="reviewed-proof-environment" name="environment" class="block bg-gray-800 p-2"><option value="sandbox" @selected(old('environment', $company->fbr_pos_environment) === 'sandbox')>Sandbox</option><option value="production" @selected(old('environment', $company->fbr_pos_environment) === 'production')>Production</option></select>
 <label class="block">Review findings<textarea name="review_note" required minlength="10" maxlength="2000" class="block w-full bg-gray-800 p-2"></textarea></label>
 <label class="block"><input type="checkbox" name="independent_evidence_reviewed" value="1" required> I reviewed independent device/POS/environment evidence. No passwords, tokens or payment credentials are included.</label>
 <button class="border rounded p-2">Record reviewed proof</button>

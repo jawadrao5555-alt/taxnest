@@ -5,7 +5,7 @@ const os = require('os');
 const { startPrinting, stopPrinting, getPrintStatus, reportPrinters, nudgePrintPoll } = require('./printer');
 const { isCurrentHeartbeatRequest } = require('./heartbeat-guard');
 const { replayCallbacks } = require('./callback-retry-policy');
-const { describeResponse } = require('./ims-result');
+const { describeResponse, decodeResponse } = require('./ims-result');
 const { DiagnosticBuffer } = require('./diagnostic-buffer');
 const { parseFiscalResult } = require('./fiscal-result');
 const imsSoap = require('./ims-soap');
@@ -536,7 +536,7 @@ async function submitToPra(invoice, praEndpoint, praToken, praMode, praEnvironme
       timeout: 30000,
     });
 
-    const data = praRes.data;
+    const data = isFbrPos ? decodeResponse(praRes.data) : praRes.data;
     const diagnostics = { ...(isFiscalDevice ? callbackDiagnostics(data, invoice.requested_environment || praEnvironment) : {}), ...claimEvidence,
       ...(isFbrPos && Number(praRes.status) >= 200 && Number(praRes.status) < 300 ? { ims_diagnostic: 'response_received', ims_response_fields: describeResponse(data) } : {}) };
     // Tolerant comparison — the local IMS Fiscal Device service may return Code as a NUMBER (100),

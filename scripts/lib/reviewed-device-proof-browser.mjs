@@ -13,7 +13,7 @@ export async function reviewedDeviceProofWorkflow(page,t,v,{baseUrl,login,waitFo
   await page.getByText('Without reviewed Production evidence',{exact:false}).waitFor();
   assert(await page.locator('[data-proof-id]').count()===0,'Fresh synthetic company unexpectedly has reviewed proof');
   const form=page.locator('form[action$="/device-proofs"]');
-  await form.getByLabel('Device fingerprint',{exact:true}).fill('Synthetic-Browser-Device-'+v.width);
+  await form.getByLabel('Device fingerprint',{exact:true}).selectOption('Synthetic-Browser-Device-'+v.width);
   await form.getByLabel('POS ID',{exact:true}).fill('SYN-'+v.width);
   await form.getByLabel('Non-secret evidence reference',{exact:true}).fill('Synthetic browser fixture, not real device acceptance');
   await form.getByLabel('Evidence SHA-256',{exact:true}).fill('a'.repeat(64));

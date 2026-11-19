@@ -11,9 +11,10 @@ export async function prospectiveReminderWorkflow(page,t,v,{baseUrl,login,loopba
    await p.goto(baseUrl+'/fbr-pos/dashboard',{waitUntil:'domcontentloaded'});
    await waitForOperationalSurface(p);await dismiss(p);
    for(const locale of ['en','ur','rur']) {
-    await p.locator('#school-workspace-menu summary').click();
+    await p.goto(baseUrl+'/fbr-pos/school-fees/settings',{waitUntil:'domcontentloaded'});
     const select=p.locator('#school-language');await select.selectOption(locale);
     await Promise.all([p.waitForNavigation({waitUntil:'domcontentloaded'}),select.locator('..').locator('button').click()]);
+    await p.goto(baseUrl+'/fbr-pos/dashboard',{waitUntil:'domcontentloaded'});
     const notice=p.locator(`[data-prospective-reminder="${phase}"]`);await notice.waitFor({state:'visible'});
     if((await notice.innerText()).trim()!==f.texts[locale])throw Error('Reminder text is not exact frozen '+phase+'/'+locale+' translation');
     if(await notice.getAttribute('data-reminder-until')!==f.until)throw Error('Reminder deadline differs from frozen snapshot');
@@ -35,3 +36,4 @@ export async function prospectiveReminderWorkflow(page,t,v,{baseUrl,login,loopba
  }
  pass('PROSPECTIVE REMINDERS PASS: '+v.width+': actual School dashboard frozen trial/confirmed/grace, EN/UR/RUR exact text/deadlines, readable bounded geometry and RTL; synthetic only, no bills or email sends');
 }
+

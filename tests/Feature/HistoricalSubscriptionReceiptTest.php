@@ -19,7 +19,7 @@ class HistoricalSubscriptionReceiptTest extends TestCase
         $company = Company::create(['name' => 'Example customer', 'ntn' => 'T-HIST-1', 'product_type' => 'di',
             'status' => 'approved', 'company_status' => 'active']);
         $other = Company::create(['name' => 'Other tenant', 'ntn' => 'T-HIST-2', 'product_type' => 'di']);
-        $plan = PricingPlan::create(['name' => 'Kaarobar', 'price' => 1000, 'product_type' => 'di', 'is_trial' => false]);
+        $plan = PricingPlan::create(['name' => 'Kaarobar', 'price' => 1000, 'product_type' => 'di', 'is_trial' => false, 'invoice_limit' => 100]);
         $sub = Subscription::create(['company_id' => $company->id, 'pricing_plan_id' => $plan->id,
             'billing_cycle' => 'annual', 'start_date' => '2025-01-01', 'end_date' => '2025-12-31', 'active' => false]);
         $invoice = SubscriptionInvoice::create(['company_id' => $company->id, 'subscription_id' => $sub->id,
@@ -60,7 +60,7 @@ class HistoricalSubscriptionReceiptTest extends TestCase
         $this->actingAs($admin, 'admin');
         $company = Company::create(['name' => 'Customer', 'ntn' => 'T-PMT-1', 'product_type' => 'di']);
         $other = Company::create(['name' => 'Other tenant', 'ntn' => 'T-PMT-2', 'product_type' => 'di']);
-        $plan = PricingPlan::create(['name' => 'Annual', 'price' => 100, 'product_type' => 'di', 'is_trial' => false]);
+        $plan = PricingPlan::create(['name' => 'Annual', 'price' => 100, 'product_type' => 'di', 'is_trial' => false, 'invoice_limit' => 100]);
         $sub = Subscription::create(['company_id' => $company->id, 'pricing_plan_id' => $plan->id,
             'billing_cycle' => 'annual', 'start_date' => '2025-01-01', 'end_date' => '2025-12-31', 'active' => false]);
         $invoice = SubscriptionInvoice::create(['company_id' => $company->id, 'subscription_id' => $sub->id,

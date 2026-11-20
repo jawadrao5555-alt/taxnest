@@ -353,7 +353,7 @@ class FbrService
                 "rate" => $rateValue,
                 "hsCode" => $hsCode,
                 "discount" => (float) round($discount, 2),
-                "extraTax" => (float) round(floatval($extraTaxVal), 2),
+                "extraTax" => $isReduced && (float) $extraTaxVal === 0.0 ? "" : (float) round(floatval($extraTaxVal), 2),
                 "quantity" => (float) round($quantity, 4),
                 "saleType" => $saleTypeNormalized,
                 "fedPayable" => (float) round($fedPayable, 2),
@@ -388,7 +388,17 @@ class FbrService
                     ]);
                 }
 
-                if ($dbSroMapping && $dbSroMapping->sro_number) {
+                if ($env === 'sandbox' && $isReduced && ($sroValue !== '' || $serialNo !== '')) {
+                    // DSI has two independent lists. Only a matching HS rule can complete a partial pair.
+                    $mappedSro = trim((string) ($dbSroMapping->sro_number ?? ''));
+                    $mappedSerial = trim((string) ($dbSroMapping->serial_number_value ?? ''));
+                    if ($mappedSro !== '' && $mappedSerial !== ''
+                        && ($sroValue === '' || $sroValue === $mappedSro)
+                        && ($serialNo === '' || $serialNo === $mappedSerial)) {
+                        $sroValue = $mappedSro;
+                        $serialNo = $mappedSerial;
+                    }
+                } elseif ($dbSroMapping && $dbSroMapping->sro_number) {
                     $sroValue = $dbSroMapping->sro_number;
                     $serialNo = $dbSroMapping->serial_number_value ?? $serialNo;
                 } elseif ($isExempt) {
@@ -441,10 +451,21 @@ class FbrService
         ];
 
         if ($env === 'sandbox') {
-            $payload["scenarioId"] = $this->detectScenarioId($invoice, $payload);
+            $payload["scenarioId"] = $this->sandboxScenarioId($invoice);
         }
 
         return $payload;
+    }
+
+    /** The invoice preview and outbound DI payload must resolve the same sandbox scenario. */
+    public function sandboxScenarioId($invoice): ?string
+    {
+        if (($invoice->company->fbr_environment ?? 'sandbox') !== 'sandbox') {
+            return null;
+        }
+
+        $registration = $invoice->buyer_registration_type ?? $this->determineBuyerRegistrationType($invoice->buyer_ntn);
+        return $this->detectScenarioId($invoice, ['buyerRegistrationType' => $registration]);
     }
 
     /**
@@ -492,7 +513,9 @@ class FbrService
         $buyerRegType = strtolower($payload['buyerRegistrationType'] ?? 'unregistered');
         $isRegistered = ($buyerRegType === 'registered');
         $buyerNtn = trim($invoice->buyer_ntn ?? '');
-        $buyerCnic = trim($invoice->buyer_cnic ?? '');
+        $buyerRole = ($invoice->document_type ?? 'Sale Invoice') === 'Sale Invoice'
+            ? ($invoice->sandbox_buyer_role ?? null)
+            : null;
         $isEndConsumer = !$isRegistered && empty($buyerNtn);
 
         $is3rdSchedule = (strpos($saleType, '3rd schedule') !== false || $scheduleType === 'third_schedule');
@@ -523,8 +546,16 @@ class FbrService
             return 'SN003';
         }
 
-        if ($is3rdSchedule) {
-            return $isRegistered ? 'SN008' : 'SN027';
+        if ($is3rdSchedule || $scheduleType === '3rd_schedule') {
+            $retailSale = $buyerRole === null ? !$isRegistered : $buyerRole === 'retail_consumer';
+            return $retailSale ? 'SN027' : 'SN008';
+        }
+
+        if ($buyerRole !== null && $scheduleType === 'standard') {
+            if ($buyerRole === 'retail_consumer') {
+                return 'SN026';
+            }
+            return $isRegistered ? 'SN001' : 'SN002';
         }
 
         if ($isRegistered) {
@@ -658,6 +689,15 @@ class FbrService
             }
 
             $saleType = strtolower($item['saleType'] ?? '');
+
+            if (isset($payload['scenarioId']) && $saleType === 'goods at reduced rate') {
+                if (trim((string) ($item['sroScheduleNo'] ?? '')) === '') {
+                    $errors[] = ['code' => '0077', 'message' => "Item #{$sn}: Enter the SRO or schedule for this reduced-rate sale."];
+                }
+                if (trim((string) ($item['sroItemSerialNo'] ?? '')) === '') {
+                    $errors[] = ['code' => '0078', 'message' => "Item #{$sn}: Enter the item serial from the selected schedule."];
+                }
+            }
 
             // Zero-rated and exempt describe the tax treatment, not a free sale:
             // FBR rejects every zero-value line with error 0300.

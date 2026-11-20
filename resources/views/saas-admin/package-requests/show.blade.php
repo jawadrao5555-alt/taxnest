@@ -37,7 +37,7 @@
                     <label class="block">Reason for rejection
                         <textarea class="block w-full rounded bg-gray-800" name="rejection_reason" maxlength="1000" required>{{ old('rejection_reason') }}</textarea>
                     </label>
-                    <button class="rounded bg-red-800 px-4 py-2" type="submit">Reject package request</button>
+                    <button class="rounded bg-red-700 px-4 py-2" type="submit">Reject package request</button>
                 </form>
             </details>
         @elseif($sale->status === 'rejected')

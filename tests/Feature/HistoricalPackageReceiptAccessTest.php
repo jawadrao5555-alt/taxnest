@@ -68,16 +68,16 @@ final class HistoricalPackageReceiptAccessTest extends TestCase
 
     public function test_company_and_term_must_match_before_recovery_or_manual_collection(): void
     {
-        $this->post(route('saas.admin.companies.package-receipts.record', [2, 11]))->assertNotFound();
+        $this->postJson(route('saas.admin.companies.package-receipts.record', [2, 11]))->assertNotFound();
         DB::table('payment_proofs')->insert(['id' => 5, 'company_id' => 2, 'subscription_id' => 12, 'status' => 'verified', 'request_type' => 'subscription']);
-        $this->post(route('saas.admin.companies.package-receipts.recover', [1, 11, 5]))->assertNotFound();
+        $this->postJson(route('saas.admin.companies.package-receipts.recover', [1, 11, 5]))->assertNotFound();
         $this->assertDatabaseCount('subscription_invoices', 0);
     }
 
     public function test_another_companys_unpaid_charge_cannot_be_collected_for_this_term(): void
     {
         DB::table('subscription_invoices')->insert(['id' => 99, 'company_id' => 2, 'subscription_id' => 12]);
-        $this->post(route('saas.admin.companies.package-receipts.record', [1, 11]), [
+        $this->postJson(route('saas.admin.companies.package-receipts.record', [1, 11]), [
             'payment_method' => 'cash',
             'verified_received_amount' => '100.00',
             'payment_date' => today()->toDateString(),
@@ -104,7 +104,7 @@ final class HistoricalPackageReceiptAccessTest extends TestCase
     {
         DB::table('subscription_invoices')->insert(['id' => 24, 'company_id' => 2, 'subscription_id' => 12]);
         DB::table('subscription_payments')->insert(['id' => 81, 'subscription_invoice_id' => 24]);
-        $this->post(route('saas.admin.companies.package-receipts.attest', [1, 11, 81]))->assertNotFound();
+        $this->postJson(route('saas.admin.companies.package-receipts.attest', [1, 11, 81]))->assertNotFound();
         $this->assertDatabaseCount('payment_proofs', 0);
     }
 

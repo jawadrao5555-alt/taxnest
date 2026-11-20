@@ -110,6 +110,6 @@ class AdminPackageSettlementTest extends TestCase
         $this->assertSame($replay->id, $document->id);
         $this->assertEquals(1000, $document->payments()->sole()->amount);
         $this->assertEquals(9000, $proof->fresh()->amount);
-        $this->assertFalse($sub->fresh()->active);
+        $this->assertFalse((bool) $sub->fresh()->active);
     }
 }

@@ -20,7 +20,7 @@ class SignupPackageRequestTest extends TestCase
     private function signup(): SignupPackageRequest
     {
         Mail::fake();
-        $plan = PricingPlan::create(['name' => 'Kaarobar', 'product_type' => 'di', 'is_trial' => false,
+        $plan = PricingPlan::updateOrCreate(['name' => 'Kaarobar', 'product_type' => 'di', 'is_trial' => false], [
             'price' => 1000, 'price_quarterly' => 2500, 'invoice_limit' => 50, 'user_limit' => 2, 'branch_limit' => 1]);
         $this->post('/register', [
             'requested_plan' => $plan->name, 'requested_billing_cycle' => 'quarterly',
@@ -30,6 +30,7 @@ class SignupPackageRequestTest extends TestCase
         ])->assertSessionHasNoErrors()->assertRedirect('/login');
 
         $sale = SignupPackageRequest::sole();
+        $this->assertSame($plan->id, $sale->pricing_plan_id);
         $this->assertSame('pending', $sale->status);
         $this->assertSame('quarterly', $sale->billing_cycle);
         $this->assertSame('signup', $sale->quote_source);

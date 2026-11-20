@@ -353,7 +353,7 @@ class FbrService
                 "rate" => $rateValue,
                 "hsCode" => $hsCode,
                 "discount" => (float) round($discount, 2),
-                "extraTax" => (float) round(floatval($extraTaxVal), 2),
+                "extraTax" => $isReduced && (float) $extraTaxVal === 0.0 ? "" : (float) round(floatval($extraTaxVal), 2),
                 "quantity" => (float) round($quantity, 4),
                 "saleType" => $saleTypeNormalized,
                 "fedPayable" => (float) round($fedPayable, 2),

@@ -18,18 +18,32 @@
     </div>
     @endif
 
-    <form method="POST" action="{{ route('register') }}">
+    @php
+        $signupCycles = ($registrationPlans ?? collect())->mapWithKeys(fn ($plan) => [
+            $plan->name => \App\Services\SubscriptionAssignmentService::cyclesForPlan($plan),
+        ]);
+    @endphp
+    <form method="POST" action="{{ route('register') }}" x-data="{
+        plan: @js(old('requested_plan', $pickedPlanName ?? '')), cycle: @js(old('requested_billing_cycle', $pickedCycle ?? 'annual')),
+        cycles: @js($signupCycles), available(value) { return (this.cycles[this.plan] || []).includes(value); }
+    }">
         @csrf
 
         {{-- Server-provided, product-compatible packages; store() revalidates selection. --}}
         <label for="required-signup-package" class="block text-sm font-semibold">{{ __('billing_policy.plan') }}</label>
-                <select id="required-signup-package" name="requested_plan" required class="w-full rounded-xl border-gray-300">
+                <select id="required-signup-package" name="requested_plan" x-model="plan" @change="if (!available(cycle)) cycle = 'annual'" required class="w-full rounded-xl border-gray-300">
                     <option value="">{{ __('billing_policy.choose_plan') }}</option>
                     @foreach(($registrationPlans ?? collect()) as $signupPlan)<option value="{{ $signupPlan->name }}" @selected(old('requested_plan', $pickedPlanName ?? '') === $signupPlan->name)>{{ $signupPlan->name }}</option>@endforeach
                 </select>
                 <x-input-error :messages="$errors->get('requested_plan')" class="mt-2" />
                 @include('billing._signup-policy')
-                <input type="hidden" name="requested_billing_cycle" value="{{ $pickedCycle ?? 'annual' }}">
+                <label for="signup-cycle" class="mt-3 block text-sm font-semibold">Billing period</label>
+                <select id="signup-cycle" name="requested_billing_cycle" x-model="cycle" class="w-full rounded-xl border-gray-300" required>
+                    @foreach(\App\Services\SubscriptionAssignmentService::SELLABLE_CYCLES as $period)
+                        <option value="{{ $period }}" :disabled="!available(@js($period))" @selected(old('requested_billing_cycle', $pickedCycle ?? 'annual') === $period)>{{ \App\Models\Subscription::getCycleLabel($period) }}</option>
+                    @endforeach
+                </select>
+                <x-input-error :messages="$errors->get('billing_cycle')" class="mt-2" />
 
         <div class="mt-4">
             <x-input-label for="company_name" value="Company Name" />

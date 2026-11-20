@@ -331,7 +331,7 @@ class PosAuthController extends Controller
                 'ntn' => $request->company_ntn,
             ], $company->id, 'pos');
 
-            if (\App\Services\ProspectiveSubscriptionPolicy::available()) \App\Services\TrialSubscriptionService::ensureSelectedTrial($company->id,'pos',$selectedPlan->id);
+            if (\App\Services\ProspectiveSubscriptionPolicy::available()) \App\Services\TrialSubscriptionService::ensureSelectedTrial($company->id,'pos',$selectedPlan->id, true);
             else $this->startTrial($company->id, 'pos');
 
             return $user;

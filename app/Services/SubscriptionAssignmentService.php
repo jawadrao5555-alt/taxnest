@@ -268,6 +268,12 @@ class SubscriptionAssignmentService
      */
     public static function assignRequestedPlanOnApproval(\App\Models\Company $company): ?Subscription
     {
+        // A separately reviewed package can only become a sale through verified payment.
+        if (\Illuminate\Support\Facades\Schema::hasTable('signup_package_requests')
+            && \App\Models\SignupPackageRequest::where('company_id', $company->id)->exists()) {
+            return null;
+        }
+
         $planId = $company->requested_plan_id ?? null;
         if (!$planId) {
             return null;

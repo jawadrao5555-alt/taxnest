@@ -1872,6 +1872,13 @@ Route::prefix('admin')->middleware(['admin.auth'])->group(function () {
     Route::post('/sales', [AdminSaleController::class, 'store'])->name('saas.admin.sales.store');
     Route::post('/sales/{id}/toggle', [AdminSaleController::class, 'toggle'])->name('saas.admin.sales.toggle');
     Route::delete('/sales/{id}', [AdminSaleController::class, 'destroy'])->name('saas.admin.sales.destroy');
+    Route::prefix('package-requests')->name('saas.admin.package-requests.')->controller(\App\Http\Controllers\SaasAdmin\SignupPackageRequestController::class)->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::get('/{sale}', 'show')->name('show');
+        Route::post('/{sale}/confirm', 'confirm')->name('confirm');
+        Route::post('/{sale}/reject', 'reject')->name('reject');
+    });
+
     Route::get('/subscriptions', [AdminSubscriptionController::class, 'index'])->name('saas.admin.subscriptions');
     Route::get('/subscriptions/quote', [AdminSubscriptionController::class, 'quote'])->name('saas.admin.subscriptions.quote');
     Route::post('/subscriptions/assign', [AdminSubscriptionController::class, 'assign'])->name('saas.admin.subscriptions.assign');

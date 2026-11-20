@@ -92,6 +92,7 @@
 
                 <div class="premium-card p-6">
                     <h3 class="text-sm font-extrabold text-gray-900 dark:text-white mb-4 uppercase tracking-wider">Buyer Information</h3>
+                    @include('invoice.partials.sandbox-buyer-role')
 
                     <div class="mb-4">
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Customer Lookup</label>

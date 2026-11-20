@@ -325,6 +325,7 @@ class InvoiceController extends Controller
             'buyer_address' => 'required|string|max:500',
             'branch_id' => 'nullable|exists:branches,id',
             'document_type' => 'required|string|in:Sale Invoice,Credit Note,Debit Note',
+            'sandbox_buyer_role' => 'nullable|string|in:business,retail_consumer',
             'reference_invoice_number' => $request->input('document_type') !== 'Sale Invoice' ? 'required|string|max:255' : 'nullable|string|max:255',
             'destination_province' => 'required|string|max:100',
             'invoice_date' => 'nullable|date|before_or_equal:today',
@@ -404,6 +405,8 @@ class InvoiceController extends Controller
             $invoice = Invoice::create([
                 'company_id' => $companyId,
                 ...\App\Services\DiInvoiceInventory::eligibility($company),
+                'sandbox_buyer_role' => ($company->fbr_environment ?? 'sandbox') === 'sandbox' && $documentType === 'Sale Invoice'
+                    ? $request->input('sandbox_buyer_role') : null,
                 'invoice_number' => $invoiceNumber,
                 'internal_invoice_number' => $invoiceNumber,
                 'buyer_name' => $request->buyer_name,
@@ -575,7 +578,10 @@ class InvoiceController extends Controller
                 ->first();
         }
 
-        return view('invoice.show', compact('invoice', 'complianceReport', 'riskAnalysis', 'sroSuggestions', 'vendorRisk'));
+        $sandboxScenario = in_array($invoice->status, ['draft', 'failed'], true)
+            ? app(FbrService::class)->sandboxScenarioId($invoice) : null;
+
+        return view('invoice.show', compact('invoice', 'complianceReport', 'riskAnalysis', 'sroSuggestions', 'vendorRisk', 'sandboxScenario'));
     }
 
     public function edit(Invoice $invoice)
@@ -594,7 +600,7 @@ class InvoiceController extends Controller
         $provinces = self::getPakistanProvinces();
         $servicesTaxRate = ScheduleEngine::servicesRateForProvince($invoice->supplier_province ?? $company->province ?? null);
         $branchServicesRates = $branches->mapWithKeys(fn ($b) => [$b->id => ScheduleEngine::servicesRateForProvince($b->province ?: ($company->province ?? null))]);
-        return view('invoice.edit', compact('invoice', 'branches', 'standardTaxRate', 'provinces', 'servicesTaxRate', 'branchServicesRates'));
+        return view('invoice.edit', compact('invoice', 'company', 'branches', 'standardTaxRate', 'provinces', 'servicesTaxRate', 'branchServicesRates'));
     }
 
     public function update(Request $request, Invoice $invoice)
@@ -619,6 +625,7 @@ class InvoiceController extends Controller
             'buyer_address' => 'required|string|max:500',
             'branch_id' => 'nullable|exists:branches,id',
             'document_type' => 'required|string|in:Sale Invoice,Credit Note,Debit Note',
+            'sandbox_buyer_role' => 'nullable|string|in:business,retail_consumer',
             'reference_invoice_number' => $request->input('document_type') !== 'Sale Invoice' ? 'required|string|max:255' : 'nullable|string|max:255',
             'destination_province' => 'required|string|max:100',
             'invoice_date' => 'nullable|date|before_or_equal:today',
@@ -742,6 +749,9 @@ class InvoiceController extends Controller
                 }
             }
 
+            if (($company->fbr_environment ?? 'sandbox') === 'sandbox' && $request->has('sandbox_buyer_role')) {
+                $updateData['sandbox_buyer_role'] = $documentType === 'Sale Invoice' ? $request->input('sandbox_buyer_role') : null;
+            }
             $invoice->update($updateData);
 
             $invoice->items()->delete();
@@ -2438,6 +2448,7 @@ class InvoiceController extends Controller
             $newInvoice = Invoice::create([
                 'company_id' => $invoice->company_id,
                 ...\App\Services\DiInvoiceInventory::eligibility($invoice->company),
+                'sandbox_buyer_role' => ($invoice->company->fbr_environment ?? 'sandbox') === 'sandbox' ? $invoice->sandbox_buyer_role : null,
                 'invoice_number' => $newInvoiceNumber,
                 'internal_invoice_number' => $newInvoiceNumber,
                 'buyer_name' => $invoice->buyer_name,

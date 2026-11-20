@@ -451,10 +451,21 @@ class FbrService
         ];
 
         if ($env === 'sandbox') {
-            $payload["scenarioId"] = $this->detectScenarioId($invoice, $payload);
+            $payload["scenarioId"] = $this->sandboxScenarioId($invoice);
         }
 
         return $payload;
+    }
+
+    /** The invoice preview and outbound DI payload must resolve the same sandbox scenario. */
+    public function sandboxScenarioId($invoice): ?string
+    {
+        if (($invoice->company->fbr_environment ?? 'sandbox') !== 'sandbox') {
+            return null;
+        }
+
+        $registration = $invoice->buyer_registration_type ?? $this->determineBuyerRegistrationType($invoice->buyer_ntn);
+        return $this->detectScenarioId($invoice, ['buyerRegistrationType' => $registration]);
     }
 
     /**
@@ -502,7 +513,9 @@ class FbrService
         $buyerRegType = strtolower($payload['buyerRegistrationType'] ?? 'unregistered');
         $isRegistered = ($buyerRegType === 'registered');
         $buyerNtn = trim($invoice->buyer_ntn ?? '');
-        $buyerCnic = trim($invoice->buyer_cnic ?? '');
+        $buyerRole = ($invoice->document_type ?? 'Sale Invoice') === 'Sale Invoice'
+            ? ($invoice->sandbox_buyer_role ?? null)
+            : null;
         $isEndConsumer = !$isRegistered && empty($buyerNtn);
 
         $is3rdSchedule = (strpos($saleType, '3rd schedule') !== false || $scheduleType === 'third_schedule');
@@ -533,8 +546,16 @@ class FbrService
             return 'SN003';
         }
 
-        if ($is3rdSchedule) {
-            return $isRegistered ? 'SN008' : 'SN027';
+        if ($is3rdSchedule || $scheduleType === '3rd_schedule') {
+            $retailSale = $buyerRole === null ? !$isRegistered : $buyerRole === 'retail_consumer';
+            return $retailSale ? 'SN027' : 'SN008';
+        }
+
+        if ($buyerRole !== null && $scheduleType === 'standard') {
+            if ($buyerRole === 'retail_consumer') {
+                return 'SN026';
+            }
+            return $isRegistered ? 'SN001' : 'SN002';
         }
 
         if ($isRegistered) {

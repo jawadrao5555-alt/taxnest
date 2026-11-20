@@ -22,6 +22,7 @@ class Invoice extends Model
         'buyer_cnic',
         'buyer_address',
         'buyer_registration_type',
+        'sandbox_buyer_role',
         'total_amount',
         'total_value_excluding_st',
         'total_sales_tax',

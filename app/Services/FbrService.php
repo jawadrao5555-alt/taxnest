@@ -388,7 +388,7 @@ class FbrService
                     ]);
                 }
 
-                if ($env === 'sandbox' && $isReduced) {
+                if ($env === 'sandbox' && $isReduced && ($sroValue !== '' || $serialNo !== '')) {
                     // DSI has two independent lists. Only a matching HS rule can complete a partial pair.
                     $mappedSro = trim((string) ($dbSroMapping->sro_number ?? ''));
                     $mappedSerial = trim((string) ($dbSroMapping->serial_number_value ?? ''));

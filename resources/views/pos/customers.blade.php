@@ -1,6 +1,9 @@
 <x-pos-layout>
 <div class="p-4 sm:p-6 max-w-7xl mx-auto">
-    @php($customerListFilters = ($quietOnly ?? false) ? ['group' => 'gone-quiet'] : [])
+    @php
+        $customerListFilters = ($quietOnly ?? false) ? ['group' => 'gone-quiet'] : [];
+        $savedAddressUpdateUrl = route('pos.customers.addresses.update', ['customer' => 'CUSTOMER', 'address' => 'ADDRESS'], false);
+    @endphp
     @include('pos.partials.back-link')
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <h1 class="text-xl font-bold text-gray-900 dark:text-white">{{ __('pos.pos_customers') }}</h1>
@@ -206,7 +209,7 @@
                 if (!text || this.addrSaving) return;
                 this.addrSaving = true; this.addrError = '';
                 const existing = this.editingAddress;
-                const updateUrl = @json(route('pos.customers.addresses.update', ['customer' => 'CUSTOMER', 'address' => 'ADDRESS'], false));
+                const updateUrl = {{ Js::from($savedAddressUpdateUrl) }};
                 const url = existing
                     ? updateUrl.replace('CUSTOMER', customerId).replace('ADDRESS', existing.id)
                     : '/pos/api/customer-addresses';
@@ -276,11 +279,11 @@
         var clearBtn = document.getElementById('custClearBtn');
         if (!input || !table) return;
 
-        var foundTpl = @json(__('pos.customers_found_of_total', ['found' => '__F__', 'total' => '__T__']));
-        var totalTpl = @json(__('pos.customers_total_line', ['total' => '__T__']));
+        var foundTpl = {{ Js::from(__('pos.customers_found_of_total', ['found' => '__F__', 'total' => '__T__'])) }};
+        var totalTpl = {{ Js::from(__('pos.customers_total_line', ['total' => '__T__'])) }};
         var searchingTxt = @json(__('pos.searching_dots'));
         var failedTxt = @json(__('pos.network_error'));
-        var baseUrl = @json(route('pos.customers', $customerListFilters, false));
+        var baseUrl = {{ Js::from(route('pos.customers', $customerListFilters, false)) }};
 
         var timer = null, controller = null, lastSent = null;
 

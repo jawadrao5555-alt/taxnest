@@ -35,25 +35,25 @@ class PosSavedCustomerAddressEditTest extends TestCase
             'delivery_address' => 'Original default',
         ]);
         $owner = User::factory()->create([
-            'company_id' => $company->id, 'pos_role' => 'pos_admin', 'role' => 'company_admin',
+            'company_id' => $company->id, 'pos_role' => 'pos_admin', 'role' => 'company_admin', 'is_active' => true,
         ]);
         $this->actingAs($owner, 'pos');
 
-        $defaultUrl = route('pos.customers.addresses.update', [$customer->id, 0]);
+        $defaultUrl = route('pos.customers.addresses.update', [$customer->id, 0], false);
         $defaultUpdate = ['address' => 'New default', 'expected_address' => 'Original default', 'expected_label' => null];
         $this->patchJson($defaultUrl, $defaultUpdate)->assertOk()->assertJsonPath('address.address', 'New default');
         $this->patchJson($defaultUrl, $defaultUpdate)->assertConflict();
         $this->assertSame('New default', $customer->fresh()->address);
         $this->assertDatabaseHas('pos_transactions', ['id' => $bill, 'delivery_address' => 'Original default']);
 
-        $extraUrl = route('pos.customers.addresses.update', [$customer->id, $extra->id]);
+        $extraUrl = route('pos.customers.addresses.update', [$customer->id, $extra->id], false);
         $extraUpdate = ['address' => 'New office', 'label' => 'Office', 'expected_address' => 'Original office', 'expected_label' => 'Work'];
         $this->patchJson($extraUrl, array_replace($extraUpdate, ['address' => 'NEW DEFAULT']))->assertUnprocessable();
         $this->patchJson($extraUrl, $extraUpdate)->assertOk()->assertJsonPath('address.label', 'Office');
         $this->assertSame('New office', $extra->fresh()->address);
 
-        $this->patchJson(route('pos.customers.addresses.update', [$foreignCustomer->id, $otherExtra->id]), $extraUpdate)->assertNotFound();
-        $this->patchJson(route('pos.customers.addresses.update', [$customer->id, $otherExtra->id]), $extraUpdate)->assertNotFound();
+        $this->patchJson(route('pos.customers.addresses.update', [$foreignCustomer->id, $otherExtra->id], false), $extraUpdate)->assertNotFound();
+        $this->patchJson(route('pos.customers.addresses.update', [$customer->id, $otherExtra->id], false), $extraUpdate)->assertNotFound();
         $this->assertSame('Foreign office', $otherExtra->fresh()->address);
     }
 

@@ -128,7 +128,9 @@
                             <td class="px-4 py-3 text-gray-400 text-xs hidden lg:table-cell">{{ optional($proof->payment_date)->format('d M Y') ?? '—' }}</td>
                             <td class="px-4 py-3 text-gray-400 text-xs hidden sm:table-cell">{{ $proof->created_at->format('d M Y, H:i') }}</td>
                             <td class="px-4 py-3 text-center">
-                                @if($proof->file_pruned_at)
+                                @if($proof->admin_settlement_origin)
+                                    <span class="text-xs">Admin collection · {{ ucfirst($proof->payment_method) }}</span>
+                                @elseif($proof->file_pruned_at)
                                     <span class="text-[11px] text-gray-500 dark:text-gray-400" title="File deleted by retention cleanup on {{ $proof->file_pruned_at->format('d M Y') }} — record kept for audit">File removed</span>
                                 @else
                                     <a href="{{ route('saas.admin.payment-proofs.download', $proof->id) }}"

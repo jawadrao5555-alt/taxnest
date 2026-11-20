@@ -1865,6 +1865,7 @@ Route::prefix('admin')->middleware(['admin.auth'])->group(function () {
     Route::post('/sales/{id}/toggle', [AdminSaleController::class, 'toggle'])->name('saas.admin.sales.toggle');
     Route::delete('/sales/{id}', [AdminSaleController::class, 'destroy'])->name('saas.admin.sales.destroy');
     Route::get('/subscriptions', [AdminSubscriptionController::class, 'index'])->name('saas.admin.subscriptions');
+    Route::get('/subscriptions/quote', [AdminSubscriptionController::class, 'quote'])->name('saas.admin.subscriptions.quote');
     Route::post('/subscriptions/assign', [AdminSubscriptionController::class, 'assign'])->name('saas.admin.subscriptions.assign');
 
     // Agents/Partners program (super-admin only, guarded in controller).

@@ -2,7 +2,7 @@
 
 namespace App\Services;
 
-use App\Models\{AdminAuditLog, AdminUser, Company, Franchise, PaymentProof, PricingPlan, SignupPackageRequest, Subscription, SubscriptionInvoice};
+use App\Models\{AdminAuditLog, AdminUser, Company, Franchise, PaymentProof, PricingPlan, SignupPackageRequest, Subscription, SubscriptionInvoice, SubscriptionPayment};
 use Illuminate\Support\Facades\{DB, Schema, Validator};
 use Illuminate\Validation\ValidationException;
 
@@ -115,6 +115,83 @@ final class AdminPackageSettlement
                 'company_id' => $companyId, 'subscription_invoice_id' => $document->id
             ]);
             return $document;
+        }, 3);
+    }
+
+    /** Attach a review to already posted money; do not post another receipt, charge or commission. */
+    public static function attestAllocatedPayment(int $companyId, int $subscriptionId, int $paymentId, array $evidence, int $adminId): PaymentProof
+    {
+        self::assertActor($adminId);
+        $input = Validator::make($evidence, [
+            'idempotency_key' => ['required', 'uuid'],
+            'payment_method' => ['nullable', 'string', 'max:50'],
+            'reference' => ['nullable', 'string', 'max:120'],
+        ])->validate();
+
+        return DB::transaction(function () use ($companyId, $subscriptionId, $paymentId, $input, $adminId) {
+            Company::whereKey($companyId)->lockForUpdate()->firstOrFail();
+            $sub = Subscription::where('company_id', $companyId)->whereKey($subscriptionId)->lockForUpdate()->firstOrFail();
+            $payment = SubscriptionPayment::whereKey($paymentId)->whereHas('invoice', function ($q) use ($companyId, $subscriptionId) {
+                $q->packageCharge()->where('company_id', $companyId)->where('subscription_id', $subscriptionId);
+            })->lockForUpdate()->firstOrFail();
+            $invoice = SubscriptionInvoice::where('company_id', $companyId)->where('subscription_id', $subscriptionId)
+                ->whereKey($payment->subscription_invoice_id)->lockForUpdate()->firstOrFail();
+            if (!$payment->paid_at || $payment->paid_at->isAfter(now()) || !is_numeric($payment->amount) || $payment->amount <= 0) {
+                self::invalid('The original payment must have a positive amount and an identifiable collection date.');
+            }
+            $originalMethod = trim((string) $payment->payment_method);
+            $providedMethod = trim((string) ($input['payment_method'] ?? ''));
+            if ($originalMethod !== '' && $providedMethod !== '' && strcasecmp($originalMethod, $providedMethod) !== 0) {
+                self::invalid('The receipt method must match the original allocated payment.');
+            }
+            if ($originalMethod === '' && !in_array($providedMethod, ['cash', 'card'], true)) {
+                self::invalid('Select the actual collection method, cash or card.');
+            }
+            $providedRef = trim((string) ($input['reference'] ?? ''));
+            $originalRef = trim((string) $payment->transaction_ref);
+            if ($originalRef !== '' && $providedRef !== '' && $providedRef !== $originalRef) {
+                self::invalid('The receipt reference must match the original allocated payment.');
+            }
+            $method = $originalMethod !== '' ? $originalMethod : $providedMethod;
+            $ref = $originalRef !== '' ? $originalRef : ($providedRef !== '' ? $providedRef : null);
+            $fingerprint = hash('sha256', json_encode(['allocated', $companyId, $subscriptionId, $paymentId,
+                $method, $ref, number_format($payment->amount, 2, '.', ''), $payment->paid_at->toDateTimeString()], JSON_THROW_ON_ERROR));
+            $existing = PaymentProof::where('company_id', $companyId)
+                ->where(function ($q) use ($input, $paymentId) {
+                    $q->where('admin_settlement_key', $input['idempotency_key'])->orWhere('admin_allocated_payment_id', $paymentId);
+                })->lockForUpdate()->get();
+            if ($existing->isNotEmpty()) {
+                $proof = $existing->first();
+                if ($existing->count() !== 1 || (int) $proof->admin_allocated_payment_id !== $paymentId
+                    || !hash_equals((string) $proof->admin_settlement_fingerprint, $fingerprint)) {
+                    self::invalid('This payment already has different evidence or the confirmation has been reused.');
+                }
+                return $proof;
+            }
+            self::guardPendingProof($companyId);
+            $unallocatedProof = PaymentProof::subscriptionKind()->where('company_id', $companyId)
+                ->where('status', 'verified')->whereNull('admin_allocated_payment_id')
+                ->where(function ($q) use ($subscriptionId) {
+                    $q->where('subscription_id', $subscriptionId)->orWhereNull('subscription_id');
+                })->lockForUpdate()->first();
+            if ($invoice->payment_proof_id || $unallocatedProof) {
+                self::invalid('Package payment evidence already exists. Review the original proof before attaching another.');
+            }
+            $proof = (new PaymentProof)->forceFill([
+                'company_id' => $companyId, 'pricing_plan_id' => $sub->pricing_plan_id,
+                'subscription_id' => $subscriptionId, 'billing_cycle' => $sub->billing_cycle, 'request_type' => 'subscription',
+                'amount' => $payment->amount, 'payment_date' => $payment->paid_at->toDateString(),
+                'payment_method' => $method, 'reference' => $ref, 'proof_path' => '', 'status' => 'verified',
+                'verified_by' => $adminId, 'verified_at' => now(), 'admin_settlement_origin' => 'allocated',
+                'admin_settlement_key' => $input['idempotency_key'], 'admin_settlement_fingerprint' => $fingerprint,
+                'admin_settlement_invoice_id' => $invoice->id, 'admin_allocated_payment_id' => $paymentId,
+            ]);
+            $proof->save();
+            AdminAuditLog::log($adminId, 'Existing allocated package payment attested', 'PaymentProof', $proof->id, [
+                'company_id' => $companyId, 'subscription_id' => $subscriptionId, 'subscription_invoice_id' => $invoice->id,
+                'subscription_payment_id' => $paymentId, 'original_amount' => $payment->amount, 'method' => $method,
+            ]);
+            return $proof;
         }, 3);
     }
 

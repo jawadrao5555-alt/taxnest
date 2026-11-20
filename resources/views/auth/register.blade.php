@@ -31,7 +31,7 @@
 
         {{-- Server-provided, product-compatible packages; store() revalidates selection. --}}
         <label for="required-signup-package" class="block text-sm font-semibold">{{ __('billing_policy.plan') }}</label>
-                <select id="required-signup-package" name="requested_plan" x-model="plan" @change="if (!available(cycle)) cycle = 'annual'" required class="w-full rounded-xl border-gray-300">
+                <select id="required-signup-package" name="requested_plan" required x-model="plan" @change="if (!available(cycle)) cycle = 'annual'" class="w-full rounded-xl border-gray-300">
                     <option value="">{{ __('billing_policy.choose_plan') }}</option>
                     @foreach(($registrationPlans ?? collect()) as $signupPlan)<option value="{{ $signupPlan->name }}" @selected(old('requested_plan', $pickedPlanName ?? '') === $signupPlan->name)>{{ $signupPlan->name }}</option>@endforeach
                 </select>

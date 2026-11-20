@@ -9,6 +9,7 @@
         @php
             $termCharges = $charges->get($term->id, collect());
             $termProofs = $proofs->get($term->id, collect());
+            $hasUnallocatedProof = $termProofs->contains(fn ($proof) => !$proof->admin_allocated_payment_id);
             $plan = $term->entitlementPlan();
             $openCharge = $termCharges->count() === 1 ? $termCharges->first() : null;
             $canSettleCharge = $openCharge
@@ -44,7 +45,7 @@
                     </div>
                     @if($allocatedProof)
                         <p class="text-sm text-emerald-300">Verified collection proof #{{ $allocatedProof->id }} for payment #{{ $payment->id }}.</p>
-                    @elseif(!$company->trashed() && !$charge->payment_proof_id && $termProofs->isEmpty()
+                    @elseif(!$company->trashed() && !$charge->payment_proof_id && !$hasUnallocatedProof
                         && $payment->amount > 0 && $payment->paid_at && !$payment->paid_at->isFuture())
                         <details class="text-sm text-gray-200">
                             <summary class="cursor-pointer text-indigo-400">Confirm existing collection for payment #{{ $payment->id }}</summary>

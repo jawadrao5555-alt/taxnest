@@ -3193,7 +3193,7 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'ph_provisional_search' => 'Customer ka naam, phone ya bill number se dhoondein...',
     'ph_reason' => 'Wajah',
     'ph_reason_examples' => 'maslan: Purchase, Wastage, Count correction',
-    'ph_reprint_search' => 'Serial, customer ya raqam se dhoondein...',
+    'ph_reprint_search' => 'Phone, bill number, naam ya raqam se dhoondein',
     'ph_scan_barcode' => 'Barcode scan karein ya type karein',
     'ph_search_customer_name' => 'Gahak ka naam talash karein',
     'ph_search_ingredients' => 'Ingredients talash karein...',

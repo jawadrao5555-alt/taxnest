@@ -3191,7 +3191,7 @@ return [
     'ph_provisional_search' => 'کسٹمر نام، فون یا بل نمبر سے سرچ کریں...',
     'ph_reason' => 'وجہ',
     'ph_reason_examples' => 'مثلاً خریداری، ضیاع، کاؤنٹ کی درستگی',
-    'ph_reprint_search' => 'سیریل، کسٹمر یا رقم سے سرچ کریں...',
+    'ph_reprint_search' => 'فون، بل نمبر، نام یا رقم سے تلاش کریں',
     'ph_scan_barcode' => 'بار کوڈ سکین کریں یا ٹائپ کریں',
     'ph_search_customer_name' => 'گاہک کا نام تلاش کریں',
     'ph_search_ingredients' => 'اجزاء سرچ کریں...',

@@ -42,7 +42,12 @@ final class HistoricalPackageReceiptController extends Controller
             'payment_date' => ['required', 'date_format:Y-m-d', 'before_or_equal:today'],
             'reference' => ['nullable', 'string', 'max:100'],
             'idempotency_key' => ['required', 'uuid'],
+            'subscription_invoice_id' => ['nullable', 'integer', 'min:1'],
         ]);
+        if (isset($details['subscription_invoice_id'])) {
+            SubscriptionInvoice::packageCharge()->where('company_id', $companyId)
+                ->where('subscription_id', $subscriptionId)->findOrFail($details['subscription_invoice_id']);
+        }
         $settlement->historical($companyId, $subscriptionId, $details, (int) $admin->id);
 
         return back()->with('success', 'Payment recorded for the selected package term.');

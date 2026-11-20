@@ -70,6 +70,19 @@ final class HistoricalPackageReceiptAccessTest extends TestCase
         $this->assertDatabaseCount('subscription_invoices', 0);
     }
 
+    public function test_another_companys_unpaid_charge_cannot_be_collected_for_this_term(): void
+    {
+        DB::table('subscription_invoices')->insert(['id' => 99, 'company_id' => 2, 'subscription_id' => 12]);
+        $this->post(route('saas.admin.companies.package-receipts.record', [1, 11]), [
+            'payment_method' => 'cash',
+            'verified_received_amount' => '100.00',
+            'payment_date' => today()->toDateString(),
+            'idempotency_key' => (string) \Illuminate\Support\Str::uuid(),
+            'subscription_invoice_id' => 99,
+        ])->assertNotFound();
+        $this->assertDatabaseCount('subscription_invoices', 1);
+    }
+
     public function test_support_user_cannot_issue_receipts(): void
     {
         DB::table('admin_users')->where('id', 1)->update(['role' => 'support']);

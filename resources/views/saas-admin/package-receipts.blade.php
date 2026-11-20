@@ -10,6 +10,13 @@
             $termCharges = $charges->get($term->id, collect());
             $termProofs = $proofs->get($term->id, collect());
             $plan = $term->entitlementPlan();
+            $openCharge = $termCharges->count() === 1 ? $termCharges->first() : null;
+            $canSettleCharge = $openCharge
+                && in_array($openCharge->status, ['pending', 'unpaid'], true)
+                && !$openCharge->paid_at && !$openCharge->document_snapshot && !$openCharge->document_number
+                && $openCharge->payments->isEmpty() && $openCharge->amount > 0
+                && $term->final_price !== null && number_format($openCharge->amount, 2, '.', '') === $term->final_price;
+            $canRecord = $termCharges->isEmpty() || $canSettleCharge;
         @endphp
         <section class="space-y-3 rounded-lg border border-gray-700 bg-gray-900 p-4">
             <h2 class="text-lg font-semibold text-white">{{ $plan?->name ?? 'Package name unavailable' }} &middot; Term #{{ $term->id }}</h2>
@@ -39,7 +46,7 @@
             @foreach($termProofs as $proof)
                 <div class="flex flex-wrap items-center gap-3 text-sm text-gray-300">
                     <span>Verified proof #{{ $proof->id }} &middot; Submitted PKR {{ number_format($proof->amount, 2) }} &middot; {{ $proof->payment_method ?: 'Method unrecorded' }}</span>
-                    @if($termCharges->isEmpty() && !$company->trashed())
+                    @if($canRecord && !$company->trashed())
                         <form method="POST" action="{{ route('saas.admin.companies.package-receipts.recover', [$company->id, $term->id, $proof->id]) }}">
                             @csrf
                             <button class="text-indigo-400 underline" type="submit">Recover receipt from verified proof</button>
@@ -50,28 +57,32 @@
 
             @if($termCharges->isEmpty() && $termProofs->isEmpty())
                 <p class="text-sm text-gray-300">No recorded payment or verified proof for this term.</p>
-                @if(!$company->trashed() && $term->final_price > 0 && !$plan?->is_trial && !$term->isTrialActive() && !$term->isTrialExpired())
-                    <details class="text-sm text-gray-200">
-                        <summary class="cursor-pointer text-indigo-400">Record payment for this term</summary>
-                        <form method="POST" action="{{ route('saas.admin.companies.package-receipts.record', [$company->id, $term->id]) }}" class="mt-4 grid gap-3 sm:grid-cols-2">
-                            @csrf
-                            <input type="hidden" name="idempotency_key" value="{{ (string) \Illuminate\Support\Str::uuid() }}">
-                            <label>Payment method
-                                <select name="payment_method" required class="w-full rounded bg-gray-800"><option value="">Select method</option><option value="cash">Cash</option><option value="card">Card</option></select>
-                            </label>
-                            <label>Actual amount received (PKR)
-                                <input type="number" name="verified_received_amount" min="0.01" step="0.01" required class="w-full rounded bg-gray-800">
-                            </label>
-                            <label>Date received
-                                <input type="date" name="payment_date" max="{{ now()->toDateString() }}" required class="w-full rounded bg-gray-800">
-                            </label>
-                            <label>Reference (optional)
-                                <input type="text" name="reference" maxlength="100" class="w-full rounded bg-gray-800">
-                            </label>
-                            <button class="rounded bg-indigo-600 px-3 py-2 text-white" type="submit">Confirm payment received</button>
-                        </form>
-                    </details>
-                @endif
+            @endif
+            @if($termProofs->isEmpty() && $canRecord && !$company->trashed() && $term->final_price > 0 && !$plan?->is_trial && !$term->isTrialActive() && !$term->isTrialExpired())
+                <details class="text-sm text-gray-200">
+                    <summary class="cursor-pointer text-indigo-400">Record payment for this term</summary>
+                    <form method="POST" action="{{ route('saas.admin.companies.package-receipts.record', [$company->id, $term->id]) }}" class="mt-4 grid gap-3 sm:grid-cols-2">
+                        @csrf
+                        @if($canSettleCharge)
+                            <input type="hidden" name="subscription_invoice_id" value="{{ $openCharge->id }}">
+                            <p class="sm:col-span-2">Apply payment to charge #{{ $openCharge->id }}.</p>
+                        @endif
+                        <input type="hidden" name="idempotency_key" value="{{ (string) \Illuminate\Support\Str::uuid() }}">
+                        <label>Payment method
+                            <select name="payment_method" required class="w-full rounded bg-gray-800"><option value="">Select method</option><option value="cash">Cash</option><option value="card">Card</option></select>
+                        </label>
+                        <label>Actual amount received (PKR)
+                            <input type="number" name="verified_received_amount" min="0.01" step="0.01" required class="w-full rounded bg-gray-800">
+                        </label>
+                        <label>Date received
+                            <input type="date" name="payment_date" max="{{ now()->toDateString() }}" required class="w-full rounded bg-gray-800">
+                        </label>
+                        <label>Reference (optional)
+                            <input type="text" name="reference" maxlength="100" class="w-full rounded bg-gray-800">
+                        </label>
+                        <button class="rounded bg-indigo-600 px-3 py-2 text-white" type="submit">Confirm payment received</button>
+                    </form>
+                </details>
             @endif
         </section>
     @empty

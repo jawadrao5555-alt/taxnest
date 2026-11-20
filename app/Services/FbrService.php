@@ -388,7 +388,17 @@ class FbrService
                     ]);
                 }
 
-                if ($dbSroMapping && $dbSroMapping->sro_number) {
+                if ($env === 'sandbox' && $isReduced) {
+                    // DSI has two independent lists. Only a matching HS rule can complete a partial pair.
+                    $mappedSro = trim((string) ($dbSroMapping->sro_number ?? ''));
+                    $mappedSerial = trim((string) ($dbSroMapping->serial_number_value ?? ''));
+                    if ($mappedSro !== '' && $mappedSerial !== ''
+                        && ($sroValue === '' || $sroValue === $mappedSro)
+                        && ($serialNo === '' || $serialNo === $mappedSerial)) {
+                        $sroValue = $mappedSro;
+                        $serialNo = $mappedSerial;
+                    }
+                } elseif ($dbSroMapping && $dbSroMapping->sro_number) {
                     $sroValue = $dbSroMapping->sro_number;
                     $serialNo = $dbSroMapping->serial_number_value ?? $serialNo;
                 } elseif ($isExempt) {
@@ -658,6 +668,15 @@ class FbrService
             }
 
             $saleType = strtolower($item['saleType'] ?? '');
+
+            if (isset($payload['scenarioId']) && $saleType === 'goods at reduced rate') {
+                if (trim((string) ($item['sroScheduleNo'] ?? '')) === '') {
+                    $errors[] = ['code' => '0077', 'message' => "Item #{$sn}: Enter the SRO or schedule for this reduced-rate sale."];
+                }
+                if (trim((string) ($item['sroItemSerialNo'] ?? '')) === '') {
+                    $errors[] = ['code' => '0078', 'message' => "Item #{$sn}: Enter the item serial from the selected schedule."];
+                }
+            }
 
             // Zero-rated and exempt describe the tax treatment, not a free sale:
             // FBR rejects every zero-value line with error 0300.

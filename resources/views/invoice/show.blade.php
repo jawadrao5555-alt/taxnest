@@ -15,6 +15,9 @@
                         Back to Invoices
                     </a>
                     <h2 id="invoice-heading" class="font-extrabold text-2xl text-gray-900 dark:text-white leading-tight tracking-tight min-w-0 break-words">Invoice {{ $invoice->display_invoice_number }}</h2>
+                    @if(!empty($sandboxScenario))
+                        <span class="text-sm font-semibold text-violet-700 dark:text-violet-300">Sandbox scenario {{ $sandboxScenario }}</span>
+                    @endif
                 </div>
             </div>
             <div class="flex items-center flex-wrap gap-2 min-w-0" id="actionButtonsBlock" aria-label="Invoice actions">

@@ -1,5 +1,6 @@
 <x-pos-layout>
 <div class="p-4 sm:p-6 max-w-7xl mx-auto">
+    @php($customerListFilters = ($quietOnly ?? false) ? ['group' => 'gone-quiet'] : [])
     @include('pos.partials.back-link')
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <h1 class="text-xl font-bold text-gray-900 dark:text-white">{{ __('pos.pos_customers') }}</h1>
@@ -95,7 +96,16 @@
          paginated now, so the search must hit the DB (kisi bhi page se milta hai).
          The old client-side row filter stays as an instant filter WITHIN the page. --}}
     <div class="mb-3">
+        @if($customerListFilters)
+            <div class="mb-2 flex flex-wrap items-center gap-3 text-sm">
+                <span class="font-semibold text-gray-900 dark:text-gray-100">{{ __('pos.inactive_regulars_title') }}</span>
+                <a href="{{ route('pos.customers') }}" class="text-purple-700 dark:text-purple-300 underline">{{ __('pos.clear') }}</a>
+            </div>
+        @endif
         <form method="GET" action="{{ route('pos.customers') }}" class="flex items-center gap-2 max-w-xl">
+            @foreach($customerListFilters as $name => $value)
+                <input type="hidden" name="{{ $name }}" value="{{ $value }}">
+            @endforeach
             <div class="relative flex-1">
                 <svg class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z"/></svg>
                 <input type="text" id="custSearchInput" name="q" value="{{ $q ?? '' }}" placeholder="{{ __('pos.search_customer_placeholder') }}" autocomplete="off" data-lpignore="true" data-form-type="other" data-1p-ignore
@@ -104,7 +114,7 @@
             {{-- The Search button stays: without JS (or mid-load) the form still
                  works exactly as before — the live search is an enhancement. --}}
             <button type="submit" class="px-4 py-2 text-sm font-bold text-white bg-purple-600 hover:bg-purple-700 rounded-lg">{{ __('pos.search_btn') }}</button>
-            <a id="custClearBtn" href="{{ route('pos.customers') }}" class="px-3 py-2 text-sm font-bold text-gray-600 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 {{ ($q ?? '') !== '' ? '' : 'hidden' }}">{{ __('pos.clear_btn') }}</a>
+            <a id="custClearBtn" href="{{ route('pos.customers', $customerListFilters) }}" class="px-3 py-2 text-sm font-bold text-gray-600 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 {{ ($q ?? '') !== '' ? '' : 'hidden' }}">{{ __('pos.clear_btn') }}</a>
         </form>
         <p id="custCountLine" class="text-xs text-gray-400 mt-1">
             @if(($q ?? '') !== '')
@@ -241,7 +251,7 @@
         var totalTpl = @json(__('pos.customers_total_line', ['total' => '__T__']));
         var searchingTxt = @json(__('pos.searching_dots'));
         var failedTxt = @json(__('pos.network_error'));
-        var baseUrl = @json(route('pos.customers', [], false));
+        var baseUrl = @json(route('pos.customers', $customerListFilters, false));
 
         var timer = null, controller = null, lastSent = null;
 
@@ -266,7 +276,10 @@
             if (controller) controller.abort();
             controller = new AbortController();
             countLine.textContent = searchingTxt;
-            var url = baseUrl + '?rows=1' + (q ? '&q=' + encodeURIComponent(q) : '');
+            var url = new URL(baseUrl, window.location.href);
+            if (q) url.searchParams.set('q', q);
+            var pageUrl = url.pathname + url.search;
+            url.searchParams.set('rows', '1');
             fetch(url, {
                 headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
                 credentials: 'same-origin',
@@ -285,7 +298,7 @@
                     if (clearBtn) clearBtn.classList.toggle('hidden', !q);
                     // Keep the address bar honest: a refresh repeats the search.
                     try {
-                        window.history.replaceState({}, '', q ? baseUrl + '?q=' + encodeURIComponent(q) : baseUrl);
+                        window.history.replaceState({}, '', pageUrl);
                     } catch (e) { /* older browsers: not worth failing over */ }
                 })
                 .catch(function (e) {

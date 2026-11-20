@@ -189,4 +189,30 @@ class PosInactiveRegularDismissTest extends TestCase
         $this->assertSame(2, substr_count($html, 'class="py-2 flex items-center gap-3" style="display:none"'),
             '…but only three are visible at a time.');
     }
+    public function test_view_all_and_live_search_use_only_undismissed_quiet_regulars_from_this_company(): void
+    {
+        $mine = $this->company();
+        $theirs = $this->company();
+        $owner = $this->user($mine);
+        $this->quietRegular($mine, 'Synthetic Quiet A', 20);
+        $dismissed = $this->quietRegular($mine, 'Synthetic Quiet B', 20);
+        $this->quietRegular($mine, 'Synthetic Current', 2);
+        $this->quietRegular($theirs, 'Synthetic Quiet Other Tenant', 20);
+        PosRepeatCustomerAlert::dismiss($mine->id, $dismissed->id, $owner->id);
+
+        $this->actingAs($owner, 'pos')->get('/pos/dashboard')
+            ->assertOk()->assertSee(route('pos.customers', ['group' => 'gone-quiet']));
+        $this->getJson('/pos/customers?group=gone-quiet&rows=1&q=Synthetic')
+            ->assertOk()
+            ->assertJsonPath('total', 1)
+            ->assertJsonPath('found', 1)
+            ->assertSee('Synthetic Quiet A')
+            ->assertDontSee('Synthetic Quiet B')
+            ->assertDontSee('Synthetic Quiet Other Tenant')
+            ->assertDontSee('Synthetic Current');
+
+        $this->actingAs($this->user($mine, 'pos_cashier'), 'pos')
+            ->getJson('/pos/customers?group=gone-quiet&rows=1')->assertForbidden();
+    }
+
 }

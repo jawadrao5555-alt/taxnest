@@ -1316,6 +1316,7 @@
 
                 <div class="p-4 sm:p-6">
                     {{ $slot }}
+                    <x-software-version />
                 </div>
             </main>
         </div>

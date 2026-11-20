@@ -27,6 +27,7 @@
         @if(session('error'))<div class="mb-4 rounded-lg bg-red-100 text-red-800 px-4 py-3 text-sm">{{ session('error') }}</div>@endif
         @if($errors->any())<div class="mb-4 rounded-lg bg-red-100 text-red-800 px-4 py-3 text-sm">{{ $errors->first() }}</div>@endif
         {{ $slot }}
+        <x-software-version />
     </main>
 </div>
 </body>

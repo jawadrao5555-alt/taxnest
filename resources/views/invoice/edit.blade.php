@@ -251,15 +251,16 @@
                                             SRO Reference
                                         </button>
                                     </div>
-                                    <input type="text" :name="'items[' + index + '][sro_schedule_no]'" x-model="item.sro_schedule_no" placeholder="e.g. SRO 1125(I)/2011"
+                                    <input type="text" :name="'items[' + index + '][sro_schedule_no]'" x-model="item.sro_schedule_no" list="dsi-sro-schedules" placeholder="e.g. SRO 1125(I)/2011"
                                         :class="item.requires_sro ? 'border-amber-300 bg-amber-50 focus:ring-amber-500 focus:border-amber-500' : 'border-gray-300 focus:ring-emerald-500 focus:border-emerald-500'"
                                         class="w-full rounded-lg shadow-sm text-sm">
                                 </div>
                                 <div x-show="item.requires_serial || item.optional_serial">
                                     <label class="block text-xs font-medium mb-1" :class="item.requires_serial ? 'text-amber-600' : 'text-gray-500 dark:text-gray-400'" x-text="item.requires_serial ? 'SRO Item Serial No *' : 'SRO Item Serial No (optional)'"></label>
-                                    <input type="text" :name="'items[' + index + '][serial_no]'" x-model="item.serial_no" placeholder="e.g. 42"
+                                    <input type="text" :name="'items[' + index + '][serial_no]'" x-model="item.serial_no" list="dsi-item-serials" placeholder="e.g. 42"
                                         :class="item.requires_serial ? 'border-amber-300 bg-amber-50 focus:ring-amber-500 focus:border-amber-500' : 'border-gray-300 focus:ring-emerald-500 focus:border-emerald-500'"
                                         class="w-full rounded-lg shadow-sm text-sm">
+                                    <p class="mt-1 text-xs text-gray-600 dark:text-gray-300">The DSI template lists schedules and serials separately. Check the selected pair with Validate FBR Payload.</p>
                                 </div>
                             </div>
 
@@ -924,6 +925,7 @@
         }
     </script>
 
+    @include('invoice.partials.dsi-sro-options')
     <div x-data="sroReferenceModal()" @open-sro-modal.window="openModal($event.detail.itemIndex)" x-cloak>
         <div x-show="isOpen" class="fixed inset-0 z-50 overflow-hidden" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0">
             <div class="absolute inset-0 bg-black/50" @click="isOpen = false"></div>

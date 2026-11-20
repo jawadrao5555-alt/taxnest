@@ -30,6 +30,14 @@
         $periodEnd ??= $invoice->subscription?->end_date?->toDateString();
     }
     $method = $snapshot['payment_method'] ?? $payment?->payment_method;
+    $reference = $snapshot['transaction_ref'] ?? $payment?->transaction_ref;
+    $confirmedMethod = $historical && blank($method) && filled(($attestation ?? null)?->payment_method);
+    if ($confirmedMethod) {
+        $method = $attestation->payment_method;
+    }
+    if ($historical && blank($reference)) {
+        $reference = ($attestation ?? null)?->reference;
+    }
     $received = $snapshot['verified_received'] ?? $payment?->amount;
 @endphp
 <div class="brand">TaxNest</div>
@@ -43,9 +51,9 @@
     @if($cycle) · {{ ucwords(str_replace('_', ' ', $cycle)) }} @endif
     @if($periodStart || $periodEnd)<br>Period: {{ $periodStart ?? 'Date unavailable' }} to {{ $periodEnd ?? 'Date unavailable' }}@endif
     @if($kind === 'receipt')
-        <br>Payment method: <strong>{{ filled($method) ? ucwords(str_replace('_', ' ', $method)) : 'Not recorded' }}</strong>
+        <br>Payment method: <strong>{{ filled($method) ? ucwords(str_replace('_', ' ', $method)) : 'Not recorded' }}</strong>@if($confirmedMethod) (confirmed by admin)@endif
         <br>{{ isset($snapshot['payment_date']) ? 'Payment date' : 'Recorded payment date' }}: {{ $snapshot['payment_date'] ?? $payment?->paid_at?->format('d M Y') ?? 'Not recorded' }}
-        <br>Transaction reference: {{ ($snapshot['transaction_ref'] ?? $payment?->transaction_ref) ?: 'Not recorded' }}
+        <br>Transaction reference: {{ filled($reference) ? $reference : 'Not recorded' }}
         <br>Invoice: {{ $snapshot['invoice_number'] ?? $invoice->document_number ?? ('Charge #'.$invoice->getKey()) }}
     @endif
     @if(data_get($snapshot, 'review.at'))<br>Verified on: {{ data_get($snapshot, 'review.at') }}@endif

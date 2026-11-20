@@ -4,9 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Models\SubscriptionInvoice;
 use App\Models\SubscriptionPayment;
+use App\Models\PaymentProof;
 use App\Services\HealthAccessService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 
 final class SubscriptionDocumentController extends Controller
 {
@@ -83,8 +85,17 @@ final class SubscriptionDocumentController extends Controller
         }
         $snapshot = $payment ? ($payment->receipt_snapshot ?? []) : $invoice->document_snapshot;
         abort_unless(is_array($snapshot), 404);
+        $attestation = null;
+        if ($historical && (blank($payment->payment_method) || blank($payment->transaction_ref))
+            && $invoice->subscription_id && Schema::hasColumn('payment_proofs', 'admin_allocated_payment_id')) {
+            $attestation = PaymentProof::subscriptionKind()->where('company_id', $invoice->company_id)
+                ->where('subscription_id', $invoice->subscription_id)->where('admin_settlement_invoice_id', $invoice->id)
+                ->where('admin_allocated_payment_id', $payment->id)->where('admin_settlement_origin', 'allocated')
+                ->where('status', 'verified')->whereNotNull('verified_by')->whereNotNull('verified_at')
+                ->first(['payment_method', 'reference']);
+        }
         $number = $payment ? $payment->receiptDisplayNumber() : $invoice->document_number;
-        $pdf = Pdf::loadView('billing.subscription-document-pdf', compact('kind', 'invoice', 'payment', 'snapshot', 'number', 'historical'))
+        $pdf = Pdf::loadView('billing.subscription-document-pdf', compact('kind', 'invoice', 'payment', 'snapshot', 'number', 'historical', 'attestation'))
             ->setPaper('A4', 'portrait');
 
         $filename = strtolower((string) $number).'.pdf';

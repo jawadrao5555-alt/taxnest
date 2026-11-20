@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Models\{AdminUser, Company, PricingPlan, Subscription, SubscriptionInvoice, SubscriptionPayment};
+use App\Models\{AdminUser, Company, PaymentProof, PricingPlan, Subscription, SubscriptionInvoice, SubscriptionPayment};
 use App\Services\SubscriptionBillingHistory;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -51,5 +51,48 @@ class HistoricalSubscriptionReceiptTest extends TestCase
         $this->assertFalse($partial->hasDownloadableReceipt());
         $this->assertFalse($undated->hasDownloadableReceipt());
         $this->assertFalse($zero->hasDownloadableReceipt());
+    }
+
+    public function test_only_the_scoped_verified_attestation_supplies_missing_details_on_a_historical_reprint(): void
+    {
+        $admin = AdminUser::create(['name' => 'Review', 'email' => 'attested@example.invalid',
+            'role' => 'super_admin', 'password' => 'SyntheticOnly123!']);
+        $this->actingAs($admin, 'admin');
+        $company = Company::create(['name' => 'Customer', 'ntn' => 'T-PMT-1', 'product_type' => 'di']);
+        $other = Company::create(['name' => 'Other tenant', 'ntn' => 'T-PMT-2', 'product_type' => 'di']);
+        $plan = PricingPlan::create(['name' => 'Annual', 'price' => 100, 'product_type' => 'di', 'is_trial' => false]);
+        $sub = Subscription::create(['company_id' => $company->id, 'pricing_plan_id' => $plan->id,
+            'billing_cycle' => 'annual', 'start_date' => '2025-01-01', 'end_date' => '2025-12-31', 'active' => false]);
+        $invoice = SubscriptionInvoice::create(['company_id' => $company->id, 'subscription_id' => $sub->id,
+            'amount' => 100, 'status' => 'paid', 'due_date' => '2025-01-01']);
+        $payment = $invoice->payments()->create(['amount' => 100, 'payment_method' => '', 'paid_at' => '2025-01-01']);
+        $proof = new PaymentProof;
+        $proof->forceFill(['company_id' => $other->id, 'subscription_id' => $sub->id, 'request_type' => 'subscription',
+            'status' => 'verified', 'verified_by' => $admin->id, 'verified_at' => now(), 'payment_date' => '2025-01-01',
+            'amount' => 100, 'payment_method' => 'card', 'reference' => 'TEST-REF', 'proof_path' => '',
+            'admin_settlement_origin' => 'allocated', 'admin_allocated_payment_id' => $payment->id,
+            'admin_settlement_invoice_id' => $invoice->id])->save();
+        $route = 'saas.admin.billing.documents.receipt';
+        $params = ['company' => $company->id, 'payment' => $payment->id];
+        $rendered = [];
+        \Illuminate\Support\Facades\View::composer('billing.subscription-document-pdf', function ($view) use (&$rendered) {
+            $rendered = $view->getData();
+        });
+        $this->get(route($route, $params))->assertOk();
+        $this->assertNull($rendered['attestation']);
+        $proof->update(['company_id' => $company->id, 'status' => 'pending']);
+        $this->get(route($route, $params))->assertOk();
+        $this->assertNull($rendered['attestation']);
+        $proof->update(['status' => 'verified']);
+        foreach ([[], ['print' => 1]] as $query) {
+            $this->get(route($route, $params + $query))->assertOk();
+            $this->assertSame('card', $rendered['attestation']->payment_method);
+            $this->view('billing.subscription-document-pdf', $rendered)->assertSee('Card')
+                ->assertSee('confirmed by admin')->assertSee('TEST-REF');
+        }
+        $payment->update(['payment_method' => 'bank_transfer', 'transaction_ref' => 'LEDGER']);
+        $this->get(route($route, $params))->assertOk();
+        $this->view('billing.subscription-document-pdf', $rendered)->assertSee('Bank Transfer')->assertSee('LEDGER')
+            ->assertDontSee('confirmed by admin')->assertDontSee('TEST-REF');
     }
 }

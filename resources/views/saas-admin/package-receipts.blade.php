@@ -29,15 +29,46 @@
             @foreach($termCharges as $charge)
                 <div class="text-sm text-gray-200">Charge #{{ $charge->id }} &middot; PKR {{ number_format($charge->amount, 2) }} &middot; {{ ucfirst($charge->status) }}</div>
                 @forelse($charge->payments as $payment)
+                    @php
+                        $allocatedProof = $termProofs->firstWhere('admin_allocated_payment_id', $payment->id);
+                    @endphp
                     <div class="flex flex-wrap gap-3 text-sm text-gray-300">
                         <span>Payment #{{ $payment->id }} &middot; PKR {{ number_format($payment->amount, 2) }} &middot; {{ $payment->payment_method ?: 'Method unrecorded' }} &middot; {{ $payment->paid_at?->format('d M Y') ?? 'Date unrecorded' }}</span>
                         @if($payment->hasDownloadableReceipt())
+                            @unless($payment->receipt_snapshot)<span>Historical ledger receipt</span>@endunless
                             <a class="text-indigo-400 underline" href="{{ route('saas.admin.billing.documents.receipt', [$company->id, $payment->id]) }}">Download receipt</a>
                             <a class="text-indigo-400 underline" href="{{ route('saas.admin.billing.documents.receipt', ['company'=>$company->id, 'payment'=>$payment->id, 'print'=>1]) }}" target="_blank" rel="noopener">Print receipt</a>
                         @else
                             <span>Insufficient evidence for a receipt</span>
                         @endif
                     </div>
+                    @if($allocatedProof)
+                        <p class="text-sm text-emerald-300">Verified collection proof #{{ $allocatedProof->id }} for payment #{{ $payment->id }}.</p>
+                    @elseif(!$company->trashed() && !$charge->payment_proof_id && $termProofs->isEmpty()
+                        && $payment->amount > 0 && $payment->paid_at && !$payment->paid_at->isFuture())
+                        <details class="text-sm text-gray-200">
+                            <summary class="cursor-pointer text-indigo-400">Confirm existing collection for payment #{{ $payment->id }}</summary>
+                            <form method="POST" action="{{ route('saas.admin.companies.package-receipts.attest', [$company->id, $term->id, $payment->id]) }}" class="mt-3 grid gap-3 sm:grid-cols-2">
+                                @csrf
+                                <input type="hidden" name="idempotency_key" value="{{ (string) \Illuminate\Support\Str::uuid() }}">
+                                @if(filled($payment->payment_method))
+                                    <p>Recorded method: {{ $payment->payment_method }}</p>
+                                @else
+                                    <label>Original payment method
+                                        <select name="payment_method" required class="w-full rounded bg-gray-800"><option value="">Select method</option><option value="cash">Cash</option><option value="card">Card</option></select>
+                                    </label>
+                                @endif
+                                @if(filled($payment->transaction_ref))
+                                    <p>Recorded reference: {{ $payment->transaction_ref }}</p>
+                                @else
+                                    <label>Supporting reference (optional)
+                                        <input type="text" name="reference" maxlength="100" class="w-full rounded bg-gray-800">
+                                    </label>
+                                @endif
+                                <button type="submit" class="rounded bg-indigo-600 px-3 py-2 text-white">Confirm existing collection &amp; create proof</button>
+                            </form>
+                        </details>
+                    @endif
                 @empty
                     <p class="text-sm text-amber-300">No payment allocated to this charge.</p>
                 @endforelse
@@ -45,7 +76,8 @@
 
             @foreach($termProofs as $proof)
                 <div class="flex flex-wrap items-center gap-3 text-sm text-gray-300">
-                    <span>Verified proof #{{ $proof->id }} &middot; Submitted PKR {{ number_format($proof->amount, 2) }} &middot; {{ $proof->payment_method ?: 'Method unrecorded' }}</span>
+                    <a class="text-indigo-400 underline" href="{{ route('saas.admin.payment-proofs', ['company_id' => $company->id, 'status' => 'verified']) }}">Verified proof #{{ $proof->id }}</a>
+                    <span> Submitted PKR {{ number_format($proof->amount, 2) }} &middot; {{ $proof->payment_method ?: 'Method unrecorded' }}</span>
                     @if($canRecord && !$company->trashed())
                         <form method="POST" action="{{ route('saas.admin.companies.package-receipts.recover', [$company->id, $term->id, $proof->id]) }}">
                             @csrf

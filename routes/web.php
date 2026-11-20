@@ -1655,6 +1655,7 @@ Route::prefix('admin')->middleware(['admin.auth'])->group(function () {
         ->group(function () {
             Route::get('/', 'index')->name('saas.admin.companies.package-receipts');
             Route::post('/terms/{subscriptionId}', 'record')->whereNumber('subscriptionId')->name('saas.admin.companies.package-receipts.record');
+            Route::post('/terms/{subscriptionId}/payments/{paymentId}/attest', 'attest')->whereNumber(['subscriptionId', 'paymentId'])->name('saas.admin.companies.package-receipts.attest');
             Route::post('/terms/{subscriptionId}/proofs/{proofId}', 'recover')->whereNumber(['subscriptionId', 'proofId'])->name('saas.admin.companies.package-receipts.recover');
         });
     Route::get('/companies/{company}/billing/invoices/{invoice}', [\App\Http\Controllers\SubscriptionDocumentController::class, 'adminInvoice'])->whereNumber(['company', 'invoice'])->name('saas.admin.billing.documents.invoice');

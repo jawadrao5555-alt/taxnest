@@ -29,6 +29,10 @@ final class HistoricalPackageReceiptAccessTest extends TestCase
             $table->id(); $table->unsignedBigInteger('company_id'); $table->unsignedBigInteger('subscription_id');
             $table->unsignedBigInteger('payment_proof_id')->nullable(); $table->json('document_snapshot')->nullable();
         });
+        Schema::create('subscription_payments', function (Blueprint $table) {
+            $table->id(); $table->unsignedBigInteger('subscription_invoice_id');
+            $table->string('payment_method')->nullable();
+        });
         Schema::create('payment_proofs', function (Blueprint $table) {
             $table->id(); $table->unsignedBigInteger('company_id'); $table->unsignedBigInteger('subscription_id');
             $table->string('status'); $table->string('request_type')->nullable();
@@ -81,6 +85,27 @@ final class HistoricalPackageReceiptAccessTest extends TestCase
             'subscription_invoice_id' => 99,
         ])->assertNotFound();
         $this->assertDatabaseCount('subscription_invoices', 1);
+    }
+
+    public function test_collection_attestation_rejects_missing_and_relabelled_methods(): void
+    {
+        DB::table('subscription_invoices')->insert(['id' => 24, 'company_id' => 1, 'subscription_id' => 11]);
+        DB::table('subscription_payments')->insert(['id' => 81, 'subscription_invoice_id' => 24]);
+        $action = route('saas.admin.companies.package-receipts.attest', [1, 11, 81]);
+        $request = ['idempotency_key' => (string) \Illuminate\Support\Str::uuid()];
+        $this->post($action, $request)->assertSessionHasErrors('payment_method');
+        DB::table('subscription_payments')->where('id', 81)->update(['payment_method' => 'bank_transfer']);
+        $this->post($action, $request + ['payment_method' => 'card'])->assertSessionHasErrors('payment_method');
+        $this->assertDatabaseCount('payment_proofs', 0);
+        $this->assertDatabaseCount('subscription_payments', 1);
+    }
+
+    public function test_attestation_is_scoped_to_the_payment_company_and_term(): void
+    {
+        DB::table('subscription_invoices')->insert(['id' => 24, 'company_id' => 2, 'subscription_id' => 12]);
+        DB::table('subscription_payments')->insert(['id' => 81, 'subscription_invoice_id' => 24]);
+        $this->post(route('saas.admin.companies.package-receipts.attest', [1, 11, 81]))->assertNotFound();
+        $this->assertDatabaseCount('payment_proofs', 0);
     }
 
     public function test_support_user_cannot_issue_receipts(): void

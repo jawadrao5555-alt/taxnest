@@ -8,6 +8,7 @@ use App\Models\Company;
 use App\Models\PaymentProof;
 use App\Models\Subscription;
 use App\Models\SubscriptionInvoice;
+use App\Models\SubscriptionPayment;
 use App\Services\AdminPackageSettlement;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -62,6 +63,25 @@ final class HistoricalPackageReceiptController extends Controller
         $settlement->historicalVerifiedProof($companyId, $subscriptionId, $proofId, (int) $admin->id);
 
         return back()->with('success', 'Receipt is available for the verified proof.');
+    }
+
+    public function attest(Request $request, int $companyId, int $subscriptionId, int $paymentId, AdminPackageSettlement $settlement): RedirectResponse
+    {
+        $admin = AdminUser::requireBillingAdministrator();
+        $this->requireTerm($companyId, $subscriptionId);
+        $payment = SubscriptionPayment::whereHas('invoice', fn ($query) => $query->packageCharge()
+            ->where('company_id', $companyId)->where('subscription_id', $subscriptionId))->findOrFail($paymentId);
+        $methodRule = filled($payment->payment_method)
+            ? ['nullable', \Illuminate\Validation\Rule::in([$payment->payment_method])]
+            : ['required', 'in:cash,card'];
+        $evidence = $request->validate([
+            'payment_method' => $methodRule,
+            'reference' => ['nullable', 'string', 'max:100'],
+            'idempotency_key' => ['required', 'uuid'],
+        ]);
+        $proof = $settlement->attestAllocatedPayment($companyId, $subscriptionId, $paymentId, $evidence, (int) $admin->id);
+
+        return back()->with('success', "Verified proof #{$proof->id} is linked to existing payment #{$payment->id}.");
     }
 
     private function requireTerm(int $companyId, int $subscriptionId): void

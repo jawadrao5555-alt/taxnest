@@ -168,6 +168,7 @@
             newAddrLabel: '',
             newAddrText: '',
             addrSaving: false,
+            editingAddress: null,
             init() {
                 this.$watch('editing', (open) => {
                     if (open && !this.addrLoaded) this.loadAddresses();
@@ -187,27 +188,55 @@
             },
             // Task 103: add a new address from this page too. Server enforces the
             // duplicate + 15-address guards; surface its message on 422.
+            editAddress(row) {
+                this.editingAddress = { ...row };
+                this.newAddrText = row.address;
+                this.newAddrLabel = row.id === 0 ? '' : (row.label || '');
+                this.addrError = '';
+                this.$nextTick(() => this.$refs.addrText.focus());
+            },
+            resetAddressForm() {
+                this.editingAddress = null;
+                this.newAddrLabel = '';
+                this.newAddrText = '';
+                this.addrError = '';
+            },
             async saveAddress() {
                 const text = this.newAddrText.trim();
                 if (!text || this.addrSaving) return;
                 this.addrSaving = true; this.addrError = '';
+                const existing = this.editingAddress;
+                const updateUrl = @json(route('pos.customers.addresses.update', ['customer' => 'CUSTOMER', 'address' => 'ADDRESS'], false));
+                const url = existing
+                    ? updateUrl.replace('CUSTOMER', customerId).replace('ADDRESS', existing.id)
+                    : '/pos/api/customer-addresses';
+                const body = { customer_id: customerId, address: text, label: this.newAddrLabel.trim() || null };
+                if (existing) {
+                    body.expected_address = existing.address;
+                    body.expected_label = existing.id === 0 ? null : existing.label;
+                }
                 try {
-                    const res = await fetch('/pos/api/customer-addresses', {
-                        method: 'POST',
+                    const res = await fetch(url, {
+                        method: existing ? 'PATCH' : 'POST',
                         headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
-                        body: JSON.stringify({ customer_id: customerId, address: text, label: this.newAddrLabel.trim() || null }),
+                        body: JSON.stringify(body),
                     });
                     const data = await res.json().catch(() => null);
-                    if (data && data.success && data.address) {
-                        this.addresses.push(data.address);
-                        this.newAddrLabel = ''; this.newAddrText = '';
+                    if (res.ok && data?.success && data.address) {
+                        if (existing) {
+                            this.addresses = this.addresses.map(row => row.id === existing.id ? data.address : row);
+                        } else {
+                            this.addresses.push(data.address);
+                        }
+                        this.resetAddressForm();
                     } else {
-                        this.addrError = (data && data.message) || @json(__('pos.could_not_save_address'));
+                        this.addrError = data?.message || @json(__('pos.could_not_save_address'));
                     }
                 } catch (e) {
                     this.addrError = @json(__('pos.network_error'));
+                } finally {
+                    this.addrSaving = false;
                 }
-                this.addrSaving = false;
             },
             async deleteAddress(a) {
                 if (!confirm(@json(__('pos.confirm_delete_address')) + '\n' + (a.label ? a.label + ': ' : '') + a.address)) return;

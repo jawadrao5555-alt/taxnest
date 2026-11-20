@@ -10588,6 +10588,55 @@ class PosController extends Controller
         ])->header('Cache-Control', 'no-store, private');
     }
 
+    public function updateSavedCustomerAddress(Request $request, int $customer, int $address)
+    {
+        abort_unless(auth('pos')->user()?->isPosAdmin(), 403);
+        $companyId = app('currentCompanyId');
+        $data = $request->validate([
+            'address' => 'required|string|max:500',
+            'label' => 'nullable|string|max:50',
+            'expected_address' => 'required|string',
+            'expected_label' => 'present|nullable|string|max:50',
+        ]);
+
+        return DB::transaction(function () use ($companyId, $customer, $address, $data) {
+            $profile = PosCustomer::where('company_id', $companyId)->lockForUpdate()->findOrFail($customer);
+            $extras = \App\Models\PosCustomerAddress::where('company_id', $companyId)
+                ->where('customer_id', $customer)->lockForUpdate()->get();
+            $extra = $address === 0 ? null : $extras->firstWhere('id', $address);
+            abort_if($address > 0 && !$extra, 404);
+
+            $previous = $extra ? $extra->address : $profile->address;
+            $previousLabel = $extra?->label;
+            abort_if(trim((string) $previous) === '', 404);
+            if (trim($previous) !== trim($data['expected_address'])
+                || trim((string) $previousLabel) !== trim((string) $data['expected_label'])) {
+                return response()->json(['message' => __('pos.customer_contact_changed')], 409);
+            }
+
+            $text = trim($data['address']);
+            $label = $data['label'] ?? null;
+            $normalized = mb_strtolower($text);
+            $duplicate = ($address > 0 && mb_strtolower(trim((string) $profile->address)) === $normalized)
+                || $extras->contains(fn ($row) => (int) $row->id !== $address
+                    && mb_strtolower(trim($row->address)) === $normalized);
+            if ($duplicate) {
+                return response()->json(['message' => __('pos.address_already_saved')], 422);
+            }
+
+            if ($extra) {
+                $extra->update(['address' => $text, 'label' => $label]);
+            } else {
+                $profile->update(['address' => $text]);
+            }
+
+            return response()->json([
+                'success' => true,
+                'address' => ['id' => $address, 'label' => $extra ? $label : 'Default', 'address' => $text],
+            ])->header('Cache-Control', 'private, no-store');
+        }, 3);
+    }
+
     public function apiStoreCustomerAddress(Request $request)
     {
         $companyId = app('currentCompanyId');

@@ -27,7 +27,7 @@ final class SubscriptionDocumentController extends Controller
     {
         $companyId = (int) app('currentCompanyId');
         $this->authorizeCompanyUser($request);
-        $record = SubscriptionPayment::whereNotNull('receipt_number')->whereNotNull('receipt_snapshot')
+        $record = SubscriptionPayment::downloadableReceipt()
             ->whereHas('invoice', fn ($query) => $query->where('company_id', $companyId))->find($payment);
         if (! $record) {
             return $this->notFound();
@@ -51,7 +51,7 @@ final class SubscriptionDocumentController extends Controller
     public function adminReceipt(int $company, int $payment)
     {
         abort_unless(auth('admin')->user()?->fresh(), 403);
-        $record = SubscriptionPayment::whereNotNull('receipt_number')->whereNotNull('receipt_snapshot')
+        $record = SubscriptionPayment::downloadableReceipt()
             ->whereHas('invoice', fn ($query) => $query->where('company_id', $company))->find($payment);
         if (! $record) {
             return $this->notFound();
@@ -76,14 +76,20 @@ final class SubscriptionDocumentController extends Controller
 
     private function download(string $kind, SubscriptionInvoice $invoice, ?SubscriptionPayment $payment)
     {
-        $invoice->loadMissing(['company', 'subscription.pricingPlan']);
-        $snapshot = $kind === 'receipt' ? $payment?->receipt_snapshot : $invoice->document_snapshot;
+        $invoice->loadMissing(['company', 'subscription' => fn ($query) => $query->where('company_id', $invoice->company_id)->with('pricingPlan')]);
+        $historical = $payment && $payment->receipt_snapshot === null;
+        if ($payment && ! $payment->hasDownloadableReceipt()) {
+            return $this->notFound();
+        }
+        $snapshot = $payment ? ($payment->receipt_snapshot ?? []) : $invoice->document_snapshot;
         abort_unless(is_array($snapshot), 404);
-        $number = $kind === 'receipt' ? $payment->receipt_number : $invoice->document_number;
-        $pdf = Pdf::loadView('billing.subscription-document-pdf', compact('kind', 'invoice', 'payment', 'snapshot', 'number'))
+        $number = $payment ? $payment->receiptDisplayNumber() : $invoice->document_number;
+        $pdf = Pdf::loadView('billing.subscription-document-pdf', compact('kind', 'invoice', 'payment', 'snapshot', 'number', 'historical'))
             ->setPaper('A4', 'portrait');
 
-        return $pdf->download(strtolower((string) $number).'.pdf')
+        $filename = strtolower((string) $number).'.pdf';
+        $response = request()->boolean('print') ? $pdf->stream($filename) : $pdf->download($filename);
+        return $response
             ->header('Cache-Control', 'private, no-store')
             ->header('X-Content-Type-Options', 'nosniff');
     }
@@ -95,3 +101,4 @@ final class SubscriptionDocumentController extends Controller
             ->header('X-Content-Type-Options', 'nosniff');
     }
 }
+

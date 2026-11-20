@@ -9,19 +9,21 @@
             @forelse($billingHistory as $document)
                 @php
                     $snapshot = $document->document_snapshot ?? [];
-                    $purchase = $snapshot['purchase'] ?? [];
+                    $issued = filled($document->document_number) && (bool) $snapshot;
+                    $purchase = $snapshot['purchase'] ?? $document->subscription?->purchase_snapshot ?? [];
                     $plan = $purchase['plan']['name'] ?? $purchase['label'] ?? $document->subscription?->pricingPlan?->name ?? 'Purchase record';
                     $period = $purchase['period'] ?? [];
                 @endphp
                 <tr class="border-b border-gray-100 dark:border-gray-800 align-top">
-                    <td class="p-2"><span class="font-semibold">{{ $document->document_number }}</span><br><span class="text-xs text-gray-500">{{ $plan }} · {{ str_replace('_', ' ', $document->status) }}</span></td>
+                    <td class="p-2"><span class="font-semibold">{{ $issued ? $document->document_number : 'Charge #'.$document->id }}</span><br><span class="text-xs text-gray-500">{{ $plan }} · {{ str_replace('_', ' ', $document->status) }}</span></td>
                     <td class="p-2 whitespace-nowrap">{{ $period['start'] ?? 'Not recorded' }}<br>{{ $period['end'] ?? 'Not recorded' }}</td>
-                    <td class="p-2">PKR {{ number_format((float) ($snapshot['amount_due'] ?? $document->amount), 2) }}<br><span class="text-xs text-gray-500">PKR {{ number_format((float) ($snapshot['verified_received'] ?? 0), 2) }}</span></td>
-                    <td class="p-2">PKR {{ number_format((float) ($snapshot['remaining_balance'] ?? 0), 2) }}<br><span class="text-xs text-gray-500">Excess PKR {{ number_format((float) ($snapshot['unallocated_excess'] ?? 0), 2) }}</span></td>
+                    <td class="p-2">PKR {{ number_format((float) ($snapshot['amount_due'] ?? $document->amount), 2) }}<br><span class="text-xs text-gray-500">PKR {{ number_format((float) ($snapshot['verified_received'] ?? $document->payments->sum('amount')), 2) }}</span></td>
+                    <td class="p-2">@if($issued)PKR {{ number_format((float) ($snapshot['remaining_balance'] ?? 0), 2) }}<br><span class="text-xs text-gray-500">Excess PKR {{ number_format((float) ($snapshot['unallocated_excess'] ?? 0), 2) }}</span>@else Not recorded @endif</td>
                     <td class="p-2 whitespace-nowrap">
-                        <a class="font-semibold underline" href="{{ route($billingDocumentRoutes['invoice'], ['invoice' => $document->id]) }}">Invoice PDF</a>
+                        @if($issued)<a class="font-semibold underline" href="{{ route($billingDocumentRoutes['invoice'], ['invoice' => $document->id]) }}">Invoice PDF</a>@endif
                         @foreach($document->payments as $recordedPayment)
-                            <br><a class="font-semibold underline" href="{{ route($billingDocumentRoutes['receipt'], ['payment' => $recordedPayment->id]) }}">Receipt {{ $recordedPayment->receipt_number }}</a>
+                            <div><a class="font-semibold underline" href="{{ route($billingDocumentRoutes['receipt'], ['payment' => $recordedPayment->id]) }}">Receipt {{ $recordedPayment->receiptDisplayNumber() }}</a>
+                                · <a class="underline" target="_blank" rel="noopener" href="{{ route($billingDocumentRoutes['receipt'], ['payment' => $recordedPayment->id, 'print' => 1]) }}">Print</a></div>
                         @endforeach
                     </td>
                 </tr>
@@ -34,3 +36,4 @@
     <div class="mt-3">{{ $billingHistory->links() }}</div>
 </section>
 @endif
+

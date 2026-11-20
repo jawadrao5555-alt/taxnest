@@ -18,12 +18,14 @@ final class SubscriptionBillingHistory
 
         return SubscriptionInvoice::query()
             ->where('company_id', $companyId)
-            ->whereNotNull('document_number')
-            ->whereNotNull('document_snapshot')
-            ->with(['subscription.pricingPlan', 'payments' => fn ($query) => $query
-                ->whereNotNull('receipt_number')->whereNotNull('receipt_snapshot')->orderBy('id')])
+            ->where(fn ($query) => $query
+                ->where(fn ($issued) => $issued->whereNotNull('document_number')->whereNotNull('document_snapshot'))
+                ->orWhereHas('payments', fn ($payment) => $payment->downloadableReceipt()))
+            ->with(['subscription' => fn ($query) => $query->where('company_id', $companyId)->with('pricingPlan'),
+                'payments' => fn ($query) => $query->downloadableReceipt()->orderBy('id')])
             ->orderByDesc('id')
             ->paginate(10, ['*'], $pageName)
             ->withQueryString();
     }
 }
+

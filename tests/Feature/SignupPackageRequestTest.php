@@ -60,6 +60,9 @@ class SignupPackageRequestTest extends TestCase
         PricingPlan::whereKey($sale->pricing_plan_id)->update(['price_quarterly' => 2700]);
         $this->post($confirm, $data + ['payment_method' => 'cash'])->assertSessionHasNoErrors()->assertRedirect($detail);
         $this->post($confirm, $data + ['payment_method' => 'cash'])->assertRedirect($detail);
+        $this->post($confirm, array_merge($data, ['payment_method' => 'card', 'idempotency_key' => (string) Str::uuid()]))
+            ->assertRedirect($detail)->assertSessionHas('success', fn ($message) => str_contains($message, 'No new payment was recorded.'));
+        $this->get($detail)->assertOk()->assertSee('Print receipt')->assertSee('Download receipt PDF');
         $this->assertSame('approved', $company->fresh()->status);
         $this->assertSame('approved', $sale->fresh()->status);
         $this->assertNotNull($sale->fresh()->subscription_invoice_id);

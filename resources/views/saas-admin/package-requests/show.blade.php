@@ -44,7 +44,10 @@
             <p>Reason for rejection: {{ $sale->rejection_reason }}</p>
         @elseif($sale->invoice)
             @foreach($sale->invoice->payments as $payment)
-                <a class="text-indigo-300 underline" href="{{ route('saas.admin.billing.documents.receipt', [$sale->company_id, $payment->id]) }}">Payment receipt PDF</a>
+                <div class="flex flex-wrap gap-4">
+                    <a class="text-indigo-300 underline" href="{{ route('saas.admin.billing.documents.receipt', [$sale->company_id, $payment->id]) }}">Download receipt PDF</a>
+                    <a class="text-indigo-300 underline" href="{{ route('saas.admin.billing.documents.receipt', [$sale->company_id, $payment->id, 'print' => 1]) }}" target="_blank" rel="noopener">Print receipt</a>
+                </div>
             @endforeach
         @endif
     </section>

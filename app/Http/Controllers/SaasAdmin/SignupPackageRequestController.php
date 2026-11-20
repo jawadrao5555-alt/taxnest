@@ -43,10 +43,10 @@ class SignupPackageRequestController extends Controller
             'reference' => 'nullable|string|max:120',
             'idempotency_key' => 'required|uuid',
         ]);
-        DB::transaction(function () use ($actor, $sale, $payment) {
+        $recorded = DB::transaction(function () use ($actor, $sale, $payment) {
             $company = Company::whereKey($sale->company_id)->lockForUpdate()->firstOrFail();
             $locked = SignupPackageRequest::whereKey($sale->id)->lockForUpdate()->firstOrFail();
-            if ($locked->status === 'approved') return;
+            if ($locked->status === 'approved') return false;
             if ($locked->status !== 'pending') {
                 throw ValidationException::withMessages(['package' => 'This package request was already rejected.']);
             }
@@ -64,9 +64,13 @@ class SignupPackageRequestController extends Controller
             if ($notifyActivation) {
                 DB::afterCommit(fn () => app(AdminCompanyController::class)->sendActivationNotification($company));
             }
+            return true;
         });
 
-        return redirect()->route('saas.admin.package-requests.show', $sale)->with('success', 'Package payment confirmed. The receipt is available below.');
+        $message = $recorded
+            ? 'Package payment confirmed. The receipt is available below.'
+            : 'This request was already settled. No new payment was recorded. The existing receipt is available below.';
+        return redirect()->route('saas.admin.package-requests.show', $sale)->with('success', $message);
     }
 
     public function reject(Request $request, SignupPackageRequest $sale)

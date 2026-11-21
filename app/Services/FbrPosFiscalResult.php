@@ -9,7 +9,11 @@ final class FbrPosFiscalResult
     {
         foreach (['Code', 'response_code', 'code'] as $key) {
             if (array_key_exists($key, $response ?? []) && $response[$key] !== null) {
-                $candidate = trim((string) $response[$key]);
+                $value = $response[$key];
+                if (!is_string($value) && !is_int($value) && !is_float($value)) {
+                    return null;
+                }
+                $candidate = trim((string) $value);
                 if ($candidate !== '') return $candidate;
             }
         }
@@ -37,8 +41,9 @@ final class FbrPosFiscalResult
         if (!$response) return null;
         $numbers = [];
         foreach (['InvoiceNumber', 'FBRInvoiceNumber', 'invoiceNumber'] as $key) {
-            if (!isset($response[$key]) || trim((string) $response[$key]) === '') continue;
-            $number = self::number($response[$key]);
+            $value = $response[$key] ?? null;
+            if ($value === null || (is_string($value) && trim($value) === '')) continue;
+            $number = self::number($value);
             if (!$number) return null;
             $numbers[] = $number;
         }

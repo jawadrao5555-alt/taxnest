@@ -71,6 +71,7 @@
                 @if(session('success'))<div class="mx-4 mt-4 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-700 text-emerald-800 dark:text-emerald-300 rounded-lg px-4 py-3 text-sm">{{ session('success') }}</div>@endif
                 @if(session('error'))<div class="mx-4 mt-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 text-red-800 dark:text-red-300 rounded-lg px-4 py-3 text-sm">{{ session('error') }}</div>@endif
                 {{ $slot }}
+                <x-software-version />
             </main>
         </div>
     </div>

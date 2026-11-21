@@ -1198,6 +1198,7 @@
                 </div>
 
                 {{ $slot }}
+                <x-software-version />
             </main>
             {{-- NOTE: outer fbrPosHeader x-data div closes AFTER modals (~line 610) so localOpen/failedOpen + handlers stay in scope --}}
         <x-pwa-push scope="fbrpos" />

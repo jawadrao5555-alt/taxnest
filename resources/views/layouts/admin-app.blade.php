@@ -574,6 +574,7 @@
                 </div>
                 @endif
                 {{ $slot }}
+                <x-software-version />
             </main>
         </div>
     </div>

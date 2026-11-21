@@ -49,6 +49,7 @@
                 {{ __('pos.inactive_regulars_hint', ['min' => \App\Services\PosRepeatCustomerAlert::MIN_ORDERS, 'days' => \App\Services\PosRepeatCustomerAlert::INACTIVE_DAYS]) }}
             </p>
         </div>
+        <a href="{{ route('pos.customers', ['group' => 'gone-quiet']) }}" class="flex-shrink-0 text-xs font-semibold text-sky-700 dark:text-sky-400 hover:underline">{{ __('pos.view_all_caps') }}</a>
     </div>
     <div class="divide-y divide-gray-100 dark:divide-gray-800">
         @foreach($icRows as $ic)
@@ -77,7 +78,7 @@
     </div>
     <p data-ic-error class="mt-2 text-[11px] text-red-600 dark:text-red-400" style="display:none">{{ __('pos.ic_dismiss_failed') }}</p>
     <p data-ic-more-wrap class="mt-2 text-[11px] text-gray-400"@if($icMore <= 0) style="display:none"@endif>
-        <a href="{{ route('pos.customers') }}" data-ic-more data-tpl="{{ __('pos.inactive_more_note', ['count' => ':count']) }}" class="font-semibold text-sky-700 dark:text-sky-400 hover:underline">{{ __('pos.inactive_more_note', ['count' => $icMore]) }}</a>
+        <a href="{{ route('pos.customers', ['group' => 'gone-quiet']) }}" data-ic-more data-tpl="{{ __('pos.inactive_more_note', ['count' => ':count']) }}" class="font-semibold text-sky-700 dark:text-sky-400 hover:underline">{{ __('pos.inactive_more_note', ['count' => $icMore]) }}</a>
     </p>
 </div>
 

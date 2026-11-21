@@ -1558,12 +1558,15 @@ window.addEventListener('popstate', function() {
                                     {{-- ZFC (Aug 2026): purana address wahin se DELETE bhi ho sake —
                                          selected address ka ✕. Customers page ka chakkar khatam. --}}
                                     <button x-show="selectedDeliveryAddress && customerAddresses.some(a => a.address === selectedDeliveryAddress)" @click="deleteSelectedAddress()" title="{{ __('pos.ti_delete_address') }}" class="text-xs font-bold text-red-500 dark:text-red-400 px-2 py-1.5 rounded-md border border-red-200 dark:border-red-800 hover:bg-red-50 dark:hover:bg-red-900/30 whitespace-nowrap">✕</button>
-                                    <button @click="showAddrNew = !showAddrNew; if (showAddrNew) $nextTick(() => document.getElementById('tnNewAddrInput')?.focus())" class="text-xs font-bold text-blue-600 dark:text-blue-300 px-2 py-1.5 rounded-md border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/30 whitespace-nowrap">{{ __('pos.new_short') }}</button>
+                                    <button @click="showAddrNew = !showAddrNew; if (showAddrNew) { addressSaveError = ''; $nextTick(() => document.getElementById('tnNewAddrInput')?.focus()) }" class="text-xs font-bold text-blue-600 dark:text-blue-300 px-2 py-1.5 rounded-md border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/30 whitespace-nowrap">{{ __('pos.new_short') }}</button>
                                 </div>
-                                <div x-show="showAddrNew" x-cloak class="flex items-center gap-1">
-                                    <input id="tnNewAddrLabel" type="text" x-model="newAddrLabel" @keydown.enter.prevent="saveNewAddress()" @keydown.escape.prevent="showAddrNew = false" placeholder="{{ __('pos.ph_addr_label') }}" autocomplete="off" name="pos_new_addr_label_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore class="w-24 flex-none text-sm rounded-md border-blue-200 dark:border-blue-800 dark:bg-gray-800 dark:text-white py-1.5 px-2 focus:ring-blue-500 focus:border-blue-400">
-                                    <input id="tnNewAddrInput" type="text" x-model="newAddrText" @keydown.enter.prevent="saveNewAddress()" @keydown.escape.prevent="showAddrNew = false" placeholder="{{ __('pos.ph_full_delivery_address') }}" autocomplete="off" name="pos_new_addr_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore class="flex-1 min-w-0 text-sm rounded-md border-blue-200 dark:border-blue-800 dark:bg-gray-800 dark:text-white py-1.5 px-2 focus:ring-blue-500 focus:border-blue-400">
-                                    <button @click="saveNewAddress()" class="text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 px-2 py-1.5 rounded-md">{{ __('pos.save_btn') }}</button>
+                                <div x-show="showAddrNew" x-cloak class="space-y-2">
+                                    <label for="tnNewAddrLabel" class="block text-xs font-semibold">{{ __('pos.ph_addr_label') }}</label>
+                                    <input id="tnNewAddrLabel" type="text" maxlength="50" x-model="newAddrLabel" :disabled="addressSaving" @keydown.enter.prevent="saveNewAddress()" autocomplete="off" name="pos_new_addr_label_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore class="w-full text-sm rounded-md border-blue-200 dark:border-blue-800 dark:bg-gray-800 dark:text-white py-1.5 px-2">
+                                    <label for="tnNewAddrInput" class="block text-xs font-semibold">{{ __('pos.ph_full_delivery_address') }}</label>
+                                    <textarea id="tnNewAddrInput" rows="2" maxlength="500" x-model="newAddrText" :disabled="addressSaving" @keydown.escape.prevent="if (!addressSaving) showAddrNew = false" autocomplete="off" name="pos_new_addr_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore class="w-full text-sm rounded-md border-blue-200 dark:border-blue-800 dark:bg-gray-800 dark:text-white py-1.5 px-2"></textarea>
+                                    <p x-show="addressSaveError" x-text="addressSaveError" role="alert" class="text-xs text-red-700 dark:text-red-300"></p>
+                                    <button type="button" @click="saveNewAddress()" :disabled="addressSaving || !newAddrText.trim()" class="text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 px-2 py-1.5 rounded-md disabled:opacity-50" :aria-busy="addressSaving">{{ __('pos.save_btn') }}</button>
                                 </div>
                             </div>
                         </template>
@@ -2042,8 +2045,14 @@ window.addEventListener('popstate', function() {
                         <button @click="tableBoardOpen = false" class="text-gray-400 hover:text-gray-600 flex-shrink-0"><svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
                     </div>
                     <div class="p-3 overflow-y-auto">
+                        <div x-show="!tablesLoading && tablesError && tableFloors.length" class="mb-3 text-xs text-amber-600 dark:text-amber-400" role="status">
+                            <p x-text="tableStatusErrorMessage()"></p>
+                            <p>{{ __('pos.tables_cached_warning') }}</p>
+                            <button type="button" @click="loadTableStatus()" class="mt-1 font-bold underline">{{ __('pos.tables_offline_retry') }}</button>
+                        </div>
+                        <p x-show="tablesCheckedAt" class="mb-2 text-xs text-gray-500 dark:text-gray-400"><span>{{ __('pos.tables_last_checked') }}</span> <span x-text="tablesCheckedAt ? new Date(tablesCheckedAt).toLocaleTimeString() : ''"></span></p>
                         <template x-if="tableFloors.length === 0">
-                            <p class="text-xs text-center py-6" :class="(tablesError && !tablesLoading) ? 'text-amber-600 dark:text-amber-400 font-bold' : 'text-gray-400'" x-text="tablesLoading ? window.TXT.tables_loading_js : (tablesError ? window.TXT.tables_offline : window.TXT.no_tables_set)"></p>
+                            <p class="text-xs text-center py-6" :class="(tablesError && !tablesLoading) ? 'text-amber-600 dark:text-amber-400 font-bold' : 'text-gray-400'" x-text="tablesLoading ? window.TXT.tables_loading_js : (tablesError ? tableStatusErrorMessage() : window.TXT.no_tables_set)"></p>
                         </template>
                         <template x-for="floor in tableFloors" :key="'bf' + floor.name">
                             <div>
@@ -2232,6 +2241,7 @@ window.addEventListener('popstate', function() {
                  /pos/restaurant/api/table-status. Green=free, amber=reserved, red=occupied.
                  Selecting a table RESERVES it server-side (race-safe) before it sticks. --}}
             <div class="p-4 max-h-[65vh] overflow-y-auto">
+                <p x-show="tablesCheckedAt" class="mb-2 text-xs text-gray-500 dark:text-gray-400"><span>{{ __('pos.tables_last_checked') }}</span> <span x-text="tablesCheckedAt ? new Date(tablesCheckedAt).toLocaleTimeString() : ''"></span></p>
                 <template x-if="tablesLoading && tableFloors.length === 0">
                     <p class="text-center text-sm text-gray-400 py-6">{{ __('pos.loading_tables') }}</p>
                 </template>
@@ -2241,7 +2251,8 @@ window.addEventListener('popstate', function() {
                 {{-- Rabta toot jaye to sach: tables "configure nahi" nahi hain, load nahi ho sakeen. --}}
                 <template x-if="!tablesLoading && tablesError">
                     <div class="text-center py-6">
-                        <p class="text-sm font-bold text-amber-600 dark:text-amber-400">{{ __('pos.tables_offline') }}</p>
+                        <p role="status" class="text-sm font-bold text-amber-600 dark:text-amber-400" x-text="tableStatusErrorMessage()"></p>
+                        <p x-show="tableFloors.length" class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ __('pos.tables_cached_warning') }}</p>
                         <button type="button" @click="loadTableStatus()" class="mt-3 px-4 py-2 rounded-xl bg-amber-500 text-white text-sm font-bold">{{ __('pos.tables_offline_retry') }}</button>
                     </div>
                 </template>
@@ -5208,6 +5219,8 @@ function restaurantPos() {
         _deliveryAddressGeneration: 0,
         _deliveryAddressLoad: null,
         showAddrNew: false,
+        addressSaving: false,
+        addressSaveError: '',
         newAddrText: '',
         newAddrLabel: '',
         cart: [],
@@ -5219,6 +5232,7 @@ function restaurantPos() {
         _heldEtag: null,     // Task 1097: ETag from last held-orders poll (If-None-Match fast-path)
         _incomingEtag: null, // Task 1097: ETag from last incoming-orders poll
         _tableEtag: null,    // Task 1109: ETag from last table-status poll (If-None-Match fast-path)
+        _tableRequestSerial: 0,
         // Task 502: Tables page open-order card → boot par isi order ka direct recall.
         bootRecallOrderId: {!! $jsEnc($recallOrderIdForJs ?? null, 'null') !!},
         showTablePicker: false,
@@ -5236,6 +5250,8 @@ function restaurantPos() {
         // Table-status fetch nakaam (net/server down) — tab "no tables configured"
         // dikhana JHOOT hai; picker aur board dono sach batate hain.
         tablesError: false,
+        tablesErrorKind: '',
+        tablesCheckedAt: null,
         // Occupied-timer tick — bumped every 30s so elapsed labels re-render live.
         nowTick: Date.now(),
         showPayModal: false,
@@ -9022,40 +9038,56 @@ function restaurantPos() {
         },
         async saveNewAddress() {
             const text = (this.newAddrText || '').trim();
-            if (!text) return;
+            if (!text || this.addressSaving) return;
+            this.addressSaveError = '';
             const label = (this.newAddrLabel || '').trim();
-            const c = this.selectedCustomer;
-            if (!c || !c.id) {
-                // Walk-in: one-off snapshot only, nothing to persist against.
+            const customer = this.selectedCustomer;
+            const generation = this._deliveryAddressGeneration;
+            const choice = this._deliveryAddressChoiceVersion = (this._deliveryAddressChoiceVersion || 0) + 1;
+            const current = () => this.selectedCustomer === customer
+                && this._deliveryAddressGeneration === generation && this.hasDeliveryPortion();
+
+            // The current order can use a one-off address even when the address
+            // book cannot be saved. A retry must not add another picker option.
+            if (!this.customerAddresses.some(row => row.address === text)) {
                 this.customerAddresses.push({ id: null, label: label || null, address: text });
-                this.selectedDeliveryAddress = text;
+            }
+            this.selectedDeliveryAddress = text;
+            if (!customer?.id) {
                 this.showAddrNew = false; this.newAddrText = ''; this.newAddrLabel = '';
                 return;
             }
-            // The cashier's typed address is valid for this bill even when saving
-            // the reusable address book fails/offline. Keep it visibly as a one-off.
-            const temporary = { id: null, label: label || null, address: text };
-            this.customerAddresses.push(temporary);
-            this.selectedDeliveryAddress = text;
-            this._deliveryAddressChoiceVersion = (this._deliveryAddressChoiceVersion || 0) + 1;
+
+            this.addressSaving = true;
+            const load = this._deliveryAddressLoad;
             try {
-                const res = await fetch('/pos/api/customer-addresses', {
+                const res = await this._fetchWithTimeout('/pos/api/customer-addresses', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
-                    body: JSON.stringify({ customer_id: c.id, address: text, label: label || null }),
+                    body: JSON.stringify({ customer_id: customer.id, address: text, label: label || null }),
                 });
                 const data = await res.json().catch(() => null);
-                if (this.selectedCustomer !== c) return;
-                if (data && data.success && data.address) {
-                    this.customerAddresses = this.customerAddresses.filter(a => !(a.id === null && a.address === text));
-                    this.customerAddresses.push(data.address);
-                    this.selectedDeliveryAddress = data.address.address;
+                if (!current()) return;
+                if (res.ok && data?.success && data.address) {
+                    // Finish any earlier GET before applying the confirmed POST.
+                    // Its older payload cannot then replace the saved option.
+                    await load?.pending;
+                    if (!current()) return;
+                    const saved = data.address;
+                    this.customerAddresses = this.customerAddresses.filter(row =>
+                        row.id !== saved.id && !(row.id === null && row.address === saved.address));
+                    this.customerAddresses.push(saved);
+                    if (this._deliveryAddressChoiceVersion === choice) this.selectedDeliveryAddress = saved.address;
                     this.showAddrNew = false; this.newAddrText = ''; this.newAddrLabel = '';
                     this.showToast(window.TXT.address_saved, 'success');
                 } else {
-                    this.showToast((data && data.message) || window.TXT.could_not_save_address, 'error');
+                    this.addressSaveError = data?.message || window.TXT.could_not_save_address;
                 }
-            } catch (e) { this.showToast(window.TXT.could_not_save_address_conn, 'error'); }
+            } catch (_) {
+                if (current()) this.addressSaveError = window.TXT.could_not_save_address_conn;
+            } finally {
+                this.addressSaving = false;
+            }
         },
         // ZFC (Aug 2026): delete the SELECTED saved address from the sale screen.
         // id=0 = customer's default address (cleared, not row-deleted); walk-in
@@ -9146,26 +9178,50 @@ function restaurantPos() {
                 clearTimeout(timer);
             }
         },
+        tableStatusErrorMessage() {
+            if (this.tablesErrorKind === 'auth') return window.TXT.tables_session_expired;
+            if (this.tablesErrorKind === 'server') return window.TXT.tables_server_error;
+            return window.TXT.tables_offline;
+        },
         async loadTableStatus() {
+            const serial = ++this._tableRequestSerial;
             this.tablesLoading = true;
             try {
                 const hdrs = { 'Accept': 'application/json' };
                 if (this._tableEtag) hdrs['If-None-Match'] = this._tableEtag;
                 const res = await this._fetchWithTimeout('/pos/restaurant/api/table-status', { headers: hdrs });
-                if (res.status === 304) { this.tablesError = false; this.tablesLoading = false; return; }
-                if (!res.ok) { this.tablesError = true; this.tablesLoading = false; return; }
-                const etag = res.headers.get('ETag');
-                if (etag) this._tableEtag = etag;
-                const list = await res.json();
-                const groups = {};
-                (Array.isArray(list) ? list : []).forEach(t => {
-                    const f = t.floor || 'Main';
-                    (groups[f] = groups[f] || []).push(t);
-                });
-                this.tableFloors = Object.keys(groups).map(name => ({ name, tables: groups[name] }));
+                if (serial !== this._tableRequestSerial) return;
+                if (res.status === 304) {
+                    if (!this._tableEtag) throw new Error('Uncached table response');
+                } else if (!res.ok || res.redirected) {
+                    this.tablesError = true;
+                    this.tablesErrorKind = [401, 403, 419].includes(res.status) || res.redirected ? 'auth' : 'server';
+                    return;
+                } else {
+                    const list = await res.json();
+                    if (serial !== this._tableRequestSerial) return;
+                    if (!Array.isArray(list) || list.some(t => !t || !t.id)) throw new Error('Invalid table response');
+                    const groups = new Map();
+                    list.forEach(t => {
+                        const f = t.floor || 'Main';
+                        if (!groups.has(f)) groups.set(f, []);
+                        groups.get(f).push(t);
+                    });
+                    this.tableFloors = Array.from(groups, ([name, tables]) => ({ name, tables }));
+                    // Cache validators belong to the body we actually accepted.
+                    this._tableEtag = res.headers.get('ETag') || null;
+                }
                 this.tablesError = false;
-            } catch (e) { this.tablesError = true; console.error('[tables] status load failed', e); }
-            this.tablesLoading = false;
+                this.tablesErrorKind = '';
+                this.tablesCheckedAt = Date.now();
+            } catch (e) {
+                if (serial === this._tableRequestSerial) {
+                    this.tablesError = true;
+                    this.tablesErrorKind = e instanceof TypeError || e.name === 'AbortError' ? 'network' : 'server';
+                }
+            } finally {
+                if (serial === this._tableRequestSerial) this.tablesLoading = false;
+            }
         },
         // Task 899 / 935: cross-terminal held-orders sync — refreshes this.heldOrders from
         // the server every 25 s. Works BOTH directions: a cancel on Tab B disappears here

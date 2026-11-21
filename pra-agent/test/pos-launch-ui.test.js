@@ -16,3 +16,15 @@ test('pending launch prevents double-click and success reports request acceptanc
 test('manual browser recovery uses only the configured origin and fixed POS path',()=>{
  assert.equal(posBrowserUrl('https://fixture.invalid/another?secret=fixture#fragment'),'https://fixture.invalid/pos/invoice/create');assert.equal(posBrowserUrl('http://127.0.0.1:8000/app'),'http://127.0.0.1:8000/pos/invoice/create');assert.equal(posBrowserUrl('https://fixture:fake@fixture.invalid/path'),'https://fixture.invalid/pos/invoice/create');for(const url of ['javascript:alert(1)','file:///tmp/fixture','broken'])assert.throws(()=>posBrowserUrl(url));
 });
+
+test('both buttons request their own POS slot', async () => {
+  const first = button();
+  const second = button();
+  const slots = [];
+  bindPosLaunch(first, button(), { textContent: '' }, {
+    openPosWindow: async (slot) => { slots.push(slot); return { ok: true }; },
+  }, second);
+  await first.click();
+  await second.click();
+  assert.deepEqual(slots, [1, 2]);
+});

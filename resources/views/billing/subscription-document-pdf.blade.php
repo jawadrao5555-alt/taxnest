@@ -1,18 +1,74 @@
-<!doctype html><html><head><meta charset="utf-8"><style>
-body{font-family:DejaVu Sans,sans-serif;color:#172b2b;font-size:12px}h1{font-size:22px;margin:0}.muted{color:#667}.box{border:1px solid #ccd7d7;border-radius:6px;padding:12px;margin-top:14px}.grid{width:100%;border-collapse:collapse}.grid td,.grid th{border-bottom:1px solid #e2e8e8;padding:7px;text-align:left}.right{text-align:right}.brand{color:#006b61;font-weight:bold}.total{font-size:16px;font-weight:bold}
-</style></head><body>
-@php $purchaseKind = data_get($snapshot, 'kind', 'subscription'); $purchaseLabel = data_get($snapshot, 'purchase.plan.name', data_get($snapshot, 'purchase.label', $invoice->subscription?->pricingPlan?->name ?? 'Purchase')); @endphp
-<div class="brand">TaxNest</div><h1>{{ $kind === 'receipt' ? 'Payment Receipt' : ($purchaseKind === 'subscription' ? 'Subscription Invoice' : 'Add-on Invoice') }}</h1>
-<p class="muted">Document {{ $number }} · PKR · {{ data_get($snapshot, 'review.at', 'Date not recorded') }}</p>
-<div class="box"><strong>{{ data_get($snapshot, 'company.name', $invoice->company?->name ?? 'Company record unavailable') }}</strong><br>Product: {{ data_get($snapshot, 'company.product_type', $invoice->company?->product_type ?? 'Not recorded') }}<br>{{ $invoice->subscription_id ? 'Subscription #'.$invoice->subscription_id : 'Standalone add-on purchase' }}</div>
-<table class="grid box">
-<tr><th>Description</th><th class="right">Amount</th></tr>
-<tr><td>{{ $purchaseLabel }}@if(data_get($snapshot, 'purchase.period.start'))<br><span class="muted">{{ data_get($snapshot, 'purchase.period.start') }} to {{ data_get($snapshot, 'purchase.period.end', 'Period not recorded') }}</span>@endif</td><td class="right">PKR {{ number_format((float) data_get($snapshot, 'amount_due', $invoice->amount), 2) }}</td></tr>
-<tr><td>Verified payment received</td><td class="right">PKR {{ number_format((float) data_get($snapshot, 'verified_received', 0), 2) }}</td></tr>
-<tr><td>Allocated to this invoice</td><td class="right">PKR {{ number_format((float) data_get($snapshot, 'allocated', 0), 2) }}</td></tr>
-<tr><td class="total">Remaining balance</td><td class="right total">PKR {{ number_format((float) data_get($snapshot, 'remaining_balance', 0), 2) }}</td></tr>
-<tr><td>Unallocated excess (evidence only; not an automatic credit/refund)</td><td class="right">PKR {{ number_format((float) data_get($snapshot, 'unallocated_excess', 0), 2) }}</td></tr>
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <style>
+        body { font-family: DejaVu Sans, sans-serif; color: #193430; font-size: 12px; }
+        h1 { font-size: 23px; margin: 4px 0; }
+        .brand { font-size: 18px; font-weight: bold; color: #006b61; }
+        .muted { color: #536961; }
+        .box { border: 1px solid #ccd7d7; padding: 12px; margin: 15px 0; line-height: 1.6; }
+        table { width: 100%; border-collapse: collapse; }
+        td { border-bottom: 1px solid #dde8e4; padding: 8px 4px; }
+        .amount { text-align: right; } .total { font-weight: bold; font-size: 16px; }
+    </style>
+</head>
+<body>
+@php
+    $historical = $historical ?? false;
+    $purchase = $snapshot['purchase'] ?? data_get($invoice->document_snapshot, 'purchase') ?? $invoice->subscription?->purchase_snapshot ?? [];
+    $purchaseKind = $snapshot['kind'] ?? 'subscription';
+    $purchaseLabel = data_get($purchase, 'plan.name') ?? ($purchase['label'] ?? null) ?? $invoice->subscription?->pricingPlan?->name ?? 'Purchase details unavailable';
+    $cycle = data_get($purchase, 'price.cycle') ?? data_get($purchase, 'cycle');
+    if ($purchaseKind === 'subscription') {
+        $cycle ??= $invoice->subscription?->billing_cycle;
+    }
+    $periodStart = data_get($purchase, 'period.start');
+    $periodEnd = data_get($purchase, 'period.end');
+    if ($historical) {
+        $periodStart ??= $invoice->subscription?->start_date?->toDateString();
+        $periodEnd ??= $invoice->subscription?->end_date?->toDateString();
+    }
+    $method = $snapshot['payment_method'] ?? $payment?->payment_method;
+    $reference = $snapshot['transaction_ref'] ?? $payment?->transaction_ref;
+    $confirmedMethod = $historical && blank($method) && filled(($attestation ?? null)?->payment_method);
+    if ($confirmedMethod) {
+        $method = $attestation->payment_method;
+    }
+    if ($historical && blank($reference)) {
+        $reference = ($attestation ?? null)?->reference;
+    }
+    $received = $snapshot['verified_received'] ?? $payment?->amount;
+@endphp
+<div class="brand">TaxNest</div>
+<h1>{{ $kind === 'receipt' ? 'Payment Receipt' : ($purchaseKind === 'subscription' ? 'Subscription Invoice' : 'Add-on Invoice') }}</h1>
+<p class="muted">{{ $historical ? 'Historical payment record' : 'Document' }} {{ $number }}</p>
+<div class="box">
+    <strong>{{ $kind === 'receipt' ? 'Received from' : 'Billed to' }}</strong>
+    {{ data_get($snapshot, 'company.name') ?? $invoice->company?->name ?? 'Company name unavailable' }}<br>
+    Product: {{ data_get($snapshot, 'company.product_type') ?? $invoice->company?->product_type ?? 'Not recorded' }}<br>
+    {{ $purchaseKind === 'subscription' ? 'Package' : 'Purchase' }}: {{ $purchaseLabel }}
+    @if($cycle) · {{ ucwords(str_replace('_', ' ', $cycle)) }} @endif
+    @if($periodStart || $periodEnd)<br>Period: {{ $periodStart ?? 'Date unavailable' }} to {{ $periodEnd ?? 'Date unavailable' }}@endif
+    @if($kind === 'receipt')
+        <br>Payment method: <strong>{{ filled($method) ? ucwords(str_replace('_', ' ', $method)) : 'Not recorded' }}</strong>@if($confirmedMethod) (confirmed by admin)@endif
+        <br>{{ isset($snapshot['payment_date']) ? 'Payment date' : 'Recorded payment date' }}: {{ $snapshot['payment_date'] ?? $payment?->paid_at?->format('d M Y') ?? 'Not recorded' }}
+        <br>Transaction reference: {{ filled($reference) ? $reference : 'Not recorded' }}
+        <br>Invoice: {{ $snapshot['invoice_number'] ?? $invoice->document_number ?? ('Charge #'.$invoice->getKey()) }}
+    @endif
+    @if(data_get($snapshot, 'review.at'))<br>Verified on: {{ data_get($snapshot, 'review.at') }}@endif
+</div>
+<table>
+    @unless($historical)
+        <tr><td>Invoice amount</td><td class="amount">PKR {{ number_format((float) ($snapshot['amount_due'] ?? $invoice->amount), 2) }}</td></tr>
+    @endunless
+    @if($received !== null)
+        <tr class="total"><td>{{ $historical ? 'Recorded payment received' : 'Verified payment received' }}</td><td class="amount">PKR {{ number_format((float) $received, 2) }}</td></tr>
+    @endif
+    @isset($snapshot['allocated'])<tr><td>Allocated to this invoice</td><td class="amount">PKR {{ number_format((float) $snapshot['allocated'], 2) }}</td></tr>@endisset
+    @isset($snapshot['remaining_balance'])<tr><td>Remaining balance</td><td class="amount">PKR {{ number_format((float) $snapshot['remaining_balance'], 2) }}</td></tr>@endisset
+    @isset($snapshot['unallocated_excess'])<tr><td>Unallocated excess (evidence only; not an automatic credit/refund)</td><td class="amount">PKR {{ number_format((float) $snapshot['unallocated_excess'], 2) }}</td></tr>@endisset
 </table>
-@if($kind === 'receipt')<div class="box">Payment method: {{ data_get($snapshot, 'payment_method', 'Not recorded') }}<br>Transaction reference: {{ data_get($snapshot, 'transaction_ref', 'Not recorded') }}<br>Invoice: {{ data_get($snapshot, 'invoice_number', $invoice->document_number) }}</div>@endif
-<p class="muted">This document reflects a verified TaxNest billing record. It is not a shop sales receipt or regulator invoice.</p>
-</body></html>
+<p class="muted">{{ $historical ? 'Source: historical TaxNest payment ledger. The document reference identifies the recorded payment.' : 'Issued by TaxNest for this billing transaction.' }}</p>
+</body>
+</html>

@@ -131,7 +131,7 @@ class RegisteredUserController extends Controller
 
             // Always attaches a trial subscription (even if the trial plan
             // seed row is missing) — no signup may leave a company bare.
-            if (\App\Services\ProspectiveSubscriptionPolicy::available()) \App\Services\TrialSubscriptionService::ensureSelectedTrial($company->id,'di',$selectedPlan->id);
+            if (\App\Services\ProspectiveSubscriptionPolicy::available()) \App\Services\TrialSubscriptionService::ensureSelectedTrial($company->id,'di',$selectedPlan->id, true);
             else \App\Services\TrialSubscriptionService::ensureTrial($company->id, 'di');
 
             $user = User::create([
@@ -162,6 +162,6 @@ class RegisteredUserController extends Controller
         event(new Registered($user));
         $request->session()->forget(\App\Services\AgentReferralService::SESSION_KEY);
 
-        return redirect('/login')->with('success', 'Registration submitted! Your company is pending approval. You have a 3-day free trial with up to 10 invoices.');
+        return redirect('/login')->with('success', 'Registration submitted. Your company and selected package are pending review.');
     }
 }

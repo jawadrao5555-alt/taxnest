@@ -306,7 +306,7 @@ class HealthAuthController extends Controller
             'ntn' => $request->company_ntn,
         ], $company->id, HealthPanel::PRODUCT_TYPE);
 
-        if (\App\Services\ProspectiveSubscriptionPolicy::available()) \App\Services\TrialSubscriptionService::ensureSelectedTrial($company->id,HealthPanel::PRODUCT_TYPE,$selectedPlan->id);
+        if (\App\Services\ProspectiveSubscriptionPolicy::available()) \App\Services\TrialSubscriptionService::ensureSelectedTrial($company->id,HealthPanel::PRODUCT_TYPE,$selectedPlan->id, true);
         else HealthPlatformService::ensureTrial($company->id);
 
         return $user;

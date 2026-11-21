@@ -273,7 +273,7 @@ class FbrPosAuthController extends Controller
                 'ntn' => $request->company_ntn,
             ], $company->id, 'fbrpos');
 
-            if (\App\Services\ProspectiveSubscriptionPolicy::available()) \App\Services\TrialSubscriptionService::ensureSelectedTrial($company->id,'fbrpos',$selectedPlan->id);
+            if (\App\Services\ProspectiveSubscriptionPolicy::available()) \App\Services\TrialSubscriptionService::ensureSelectedTrial($company->id,'fbrpos',$selectedPlan->id, true);
             else $this->startTrial($company->id, 'fbrpos');
 
             return $user;

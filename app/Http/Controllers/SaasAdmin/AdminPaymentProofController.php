@@ -154,12 +154,12 @@ class AdminPaymentProofController extends Controller
 
         // Race-safe: lock the row, bail out if another admin already processed it.
         $result = DB::transaction(function () use ($proof, $plan, $enforcedCycle, $slotsChosen, $verifiedReceived) {
-            $locked = PaymentProof::where('id', $proof->id)->lockForUpdate()->first();
+            $attributedCompany = Company::whereKey($proof->company_id)->lockForUpdate()->first();
+            if (!$attributedCompany) return ['outcome'=>'invalid_distributor_snapshot','message'=>'Company no longer exists.'];
+            $locked = PaymentProof::where('company_id', $attributedCompany->id)->whereKey($proof->id)->lockForUpdate()->first();
             if (!$locked || $locked->status !== 'pending') {
                 return ['outcome' => 'already_processed'];
             }
-            $attributedCompany = Company::whereKey($locked->company_id)->lockForUpdate()->first();
-            if (!$attributedCompany) return ['outcome'=>'invalid_distributor_snapshot','message'=>'Company no longer exists.'];
             $discountSnapshot = $locked->distributor_quote_snapshot;
             $netReceived = $verifiedReceived;
             if ($discountSnapshot) {
@@ -224,17 +224,24 @@ class AdminPaymentProofController extends Controller
                 // never recompute against a later agent allowance or policy.
                 $proofAttrs['distributor_net_amount'] = round($netReceived, 2);
             }
-            if (Schema::hasColumn('payment_proofs', 'franchise_id_at_verification')
-                && $attributedCompany->franchise_id) {
-                $franchise = \App\Models\Franchise::find($attributedCompany->franchise_id);
-                if ($franchise && $franchise->isActive()) {
-                    $proofAttrs['franchise_id_at_verification'] = $franchise->id;
-                    $proofAttrs['franchise_rate_at_verification'] = $franchise->commission_rate;
-                    $proofAttrs['franchise_attribution_conflict'] = (bool) $attributedCompany->agent_id;
+            \App\Services\AdminPackageSettlement::attributeFranchise($attributedCompany, $locked);
+            $locked->update($proofAttrs);
+            $document = \App\Services\VerifiedSubscriptionDocuments::record($locked, $sub, $netReceived);
+            if ($document && Schema::hasTable('signup_package_requests')) {
+                $signup = \App\Models\SignupPackageRequest::where('company_id', $attributedCompany->id)
+                    ->where('status', 'pending')->lockForUpdate()->first();
+                if ($signup) {
+                    $matches = (int) $signup->pricing_plan_id === (int) $sub->pricing_plan_id
+                        && $signup->billing_cycle === $enforcedCycle
+                        && number_format((float) $signup->quoted_amount, 2, '.', '') === number_format($netReceived, 2, '.', '');
+                    $signup->forceFill([
+                        'status' => $matches ? 'approved' : 'rejected',
+                        'rejection_reason' => $matches ? null : 'Superseded by separately verified package payment.',
+                        'reviewer_admin_id' => $locked->verified_by, 'reviewed_at' => $locked->verified_at,
+                        'subscription_invoice_id' => $document->id,
+                    ])->save();
                 }
             }
-            $locked->update($proofAttrs);
-            \App\Services\VerifiedSubscriptionDocuments::record($locked, $sub, $netReceived);
             \App\Services\AgentCommissionService::recordForProof($locked, atomic: true);
             \App\Services\FranchiseCommissionService::recordForProof($locked, atomic: true);
 

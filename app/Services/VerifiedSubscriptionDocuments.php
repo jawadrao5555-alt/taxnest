@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\{DB, Schema};
 /** Documents the existing reviewed assignment; does not grant access or move money. */
 final class VerifiedSubscriptionDocuments
 {
-    public static function record(PaymentProof $proof, Subscription $subscription, float $received): ?SubscriptionInvoice
+    public static function record(PaymentProof $proof, Subscription $subscription, float $received, ?\Carbon\CarbonInterface $paidOn = null, ?SubscriptionInvoice $legacy = null): ?SubscriptionInvoice
     {
         // Keep the existing deploy-before-migrate / minimal legacy-schema path.
         // A partially migrated document schema must fail and roll back approval.
@@ -20,7 +20,7 @@ final class VerifiedSubscriptionDocuments
         }
         return self::recordDocument($proof, $subscription, $received,
             round((float) (($proof->distributor_quote_snapshot)['net_quote'] ?? $subscription->final_price), 2),
-            'subscription', $subscription->purchase_snapshot, $proof->distributor_quote_snapshot);
+            'subscription', $subscription->purchase_snapshot, $proof->distributor_quote_snapshot, $paidOn, $legacy);
     }
 
     public static function recordAddon(
@@ -51,7 +51,9 @@ final class VerifiedSubscriptionDocuments
         float $expected,
         string $kind,
         ?array $purchase,
-        ?array $quote
+        ?array $quote,
+        ?\Carbon\CarbonInterface $paidOn = null,
+        ?SubscriptionInvoice $legacy = null
     ): SubscriptionInvoice {
         $existing = SubscriptionInvoice::where('payment_proof_id', $proof->id)->lockForUpdate()->first();
         if ($existing) {
@@ -79,14 +81,33 @@ final class VerifiedSubscriptionDocuments
             'remaining_balance' => number_format($balance, 2, '.', ''),
             // Evidence only: this is NOT an automatic reusable credit/refund.
             'unallocated_excess' => number_format($excess, 2, '.', '')];
+        if ($paidOn !== null) {
+            $common['payment_date'] = $paidOn->toDateString();
+            $common['payment_origin'] = $proof->admin_settlement_origin ?: 'verified_proof';
+            $common['recorded_subscription'] = [
+                'plan_id' => $subscription?->pricing_plan_id, 'cycle' => $subscription?->billing_cycle,
+                'start' => $subscription?->start_date?->toDateString(), 'end' => $subscription?->end_date?->toDateString(),
+            ];
+        }
         $prefix = $kind === 'subscription' ? 'SUB-' : 'ADD-';
-        $invoice = SubscriptionInvoice::create(['company_id' => $company->id, 'subscription_id' => $subscription?->id,
-            'payment_proof_id' => $proof->id, 'document_number' => $prefix.$suffix, 'amount' => $expected,
-            'status' => $balance > 0 ? 'part_paid' : 'paid', 'due_date' => $when->toDateString(),
-            'paid_at' => $balance > 0 ? null : $when,
-            'document_snapshot' => $common + ['purchase' => $purchase, 'distributor_quote' => $quote]]);
+        if ($legacy) {
+            if ((int) $legacy->company_id !== (int) $company->id || (int) $legacy->subscription_id !== (int) $subscription?->id
+                || $legacy->document_snapshot !== null || $legacy->payment_proof_id || $legacy->paid_at
+                || !in_array($legacy->status, ['pending', 'unpaid'], true) || $legacy->payments()->exists()
+                || round((float) $legacy->amount, 2) !== $received || $received !== $expected) {
+                throw \Illuminate\Validation\ValidationException::withMessages(['payment' => 'The selected charge is not the exact unpaid package amount. Review existing payments.']);
+            }
+            $invoice = $legacy;
+            $invoice->update(['status' => 'paid', 'paid_at' => $paidOn ?? $when]);
+        } else {
+            $invoice = SubscriptionInvoice::create(['company_id' => $company->id, 'subscription_id' => $subscription?->id,
+                'payment_proof_id' => $proof->id, 'document_number' => $prefix.$suffix, 'amount' => $expected,
+                'status' => $balance > 0 ? 'part_paid' : 'paid', 'due_date' => $when->toDateString(),
+                'paid_at' => $balance > 0 ? null : ($paidOn ?? $when),
+                'document_snapshot' => $common + ['purchase' => $purchase, 'distributor_quote' => $quote]]);
+        }
         SubscriptionPayment::create(['subscription_invoice_id' => $invoice->id, 'amount' => $received,
-            'payment_method' => $proof->payment_method, 'transaction_ref' => $proof->reference, 'paid_at' => $when,
+            'payment_method' => $proof->payment_method, 'transaction_ref' => $proof->reference, 'paid_at' => $paidOn ?? $when,
             'receipt_number' => 'RCP-'.$suffix,
             'receipt_snapshot' => $common + ['invoice_number' => $invoice->document_number,
                 'payment_method' => $proof->payment_method, 'transaction_ref' => $proof->reference]]);

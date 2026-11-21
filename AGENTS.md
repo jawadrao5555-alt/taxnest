@@ -60,6 +60,7 @@ stay **production-secret-free** and must **not** merge or deploy; say
 | `docs/ops/cloud-agent-architecture.md` | Non-secret invariants |
 | `docs/architecture/README.md` | **Permanent SaaS reverse-engineering knowledge base** (read before large changes) |
 | `replit.md` | Authoritative product map |
+| `docs/planning/taxnest-improvement-and-erp-queue.md` | Living future improvement/ERP queue; append owner-supplied references, avoid duplicate scope, and mark complete only with verified implementation/release evidence. Planning only; no automatic monitoring or deployment. |
 
 ## Hard safety boundary
 

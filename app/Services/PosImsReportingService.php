@@ -176,14 +176,7 @@ class PosImsReportingService
         $unknown=['state'=>'verification_required','reference'=>null,'error_codes'=>[]];
         if (!is_array($data)) return $unknown;
         $number=FbrPosFiscalResult::fromResponse($data);
-        $codes=[];
-        foreach (['Code','code'] as $key) {
-            if (!isset($data[$key])) continue;
-            if (!is_string($data[$key]) && !is_int($data[$key]) && !(is_float($data[$key]) && is_finite($data[$key]))) return $unknown;
-            $codes[]=trim((string)$data[$key]);
-        }
-        if (count(array_unique($codes))>1) return $unknown;
-        $code=$codes[0] ?? '';
+        $code=FbrPosFiscalResult::code($data) ?? '';
         if ($code==='100' && $number) return ['state'=>$local?'local_accepted':'accepted','reference'=>$number,'error_codes'=>[]];
         // Any acknowledgement evidence makes a conflicting rejection uncertain.
         if ($number || !empty($data['InvoiceNumber']) || !empty($data['FBRInvoiceNumber']) || !empty($data['invoiceNumber'])) return $unknown;

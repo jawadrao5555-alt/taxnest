@@ -810,7 +810,9 @@ class PraDiSandboxTest extends TestCase
     {
         $service=\App\Services\PosImsReportingService::class;
         $this->assertSame('local_accepted',$service::result(['Code'=>' 100 ','InvoiceNumber'=>'LOCAL-IMS-123456'],true)['state']);
+        $this->assertSame('local_accepted',$service::result(['response_code'=>100,'InvoiceNumber'=>'LOCAL-IMS-123456'],true)['state']);
         $this->assertSame('verification_required',$service::result(['Code'=>'100','code'=>'400','InvoiceNumber'=>'LOCAL-IMS-123456'],true)['state']);
+        $this->assertSame('verification_required',$service::result(['Code'=>'100','response_code'=>'400','InvoiceNumber'=>'LOCAL-IMS-123456'],true)['state']);
         $this->imsProfile('sandbox','fiscal_device');$svc=app($service);
         $r=$svc->capture($this->company,$this->bill(),$this->owner->id,'sandbox');
         $svc->prepare($this->company->id,$r->id,$this->imsPayload($r));Http::fake();

@@ -81,6 +81,9 @@
         .qr-code { text-align: center; margin: 3px 0; }
         .qr-code img { width: 64px; height: 64px; }
         .qr-code p { font-size: 9px; margin-top: 1px; color: #000; font-weight: normal; }
+        .fiscal-qr-payment { display: flex; align-items: center; justify-content: center; gap: 5px; margin: 3px 0; break-inside: avoid; }
+        .fiscal-qr-payment .qr-code { flex: 0 0 auto; margin: 0; }
+        .compact-payment { flex: 1 1 auto; text-align: center; font-weight: bold; font-size: 11px; letter-spacing: .3px; color: #000; }
 
         .footer { margin-top: 3px; font-size: 9px; line-height: 1.35; color: #000; font-weight: normal; }
 
@@ -759,24 +762,27 @@
     <div style="font-size:8px; font-weight:normal; color:#000; text-align:center; margin:2px 0; padding:1px 0;">{{ __('pos.receipt_exempt_clarifier') }}</div>
     @endif
 
-    @if(($transaction->order_type ?? '') === 'delivery' || !empty($transaction->delivery_address) || $transaction->rider)
     @php
         // ZFC feedback Jul 2026: riders must see AT A GLANCE cash vs card/online.
         // Owner update (Pizza Master, Jul 2026): boxed method on DELIVERY bills ONLY
         // (mirrors receipt_80mm; keep in sync).
         $rcptPayRaw = strtolower((string) $transaction->payment_method);
         $rcptPayLabel = \App\Support\PosPaymentLabels::upper($transaction->payment_method);
+        $rcptShowDeliveryPayment = (($transaction->order_type ?? '') === 'delivery'
+            || !empty($transaction->delivery_address) || $transaction->rider)
+            && $optionVisible('show_payment');
     @endphp
+    @if($rcptShowDeliveryPayment)
     @if($rcptPayRaw === 'qr_payment')
     {{-- PREPAID marker (Task 291): prominent stamp for riders/customers so no cash is mistakenly collected. --}}
     <div style="border: 3px solid #000; text-align: center; font-weight: bold; font-size: 14px; letter-spacing: 1px; padding: 4px 2px; margin: 4px 0; margin-left: 0.5mm; margin-right: 0.5mm; color: #000;">&#10003; {{ __('pos.rcpt_prepaid_marker') }}</div>
     @endif
-    <div style="border: 2px solid #000; text-align: center; font-weight: bold; font-size: 12px; letter-spacing: 1px; padding: 3px 2px; margin: 3px 0; color: #000;">{{ __('pos.rcpt_payment_banner') }} {{ $rcptPayLabel }}</div>
     @endif
 
     @include('pos.hotel._credit-summary', ['summary' => $hotelCreditSummary, 'creditAmount' => $transaction->total_amount, 'creditReceipt' => true])
     @if($federalFiscal)
         @include('pos.receipts._dual-fiscal', ['fiscalQrSize' => 74])
+        @if($rcptShowDeliveryPayment)<div class="compact-payment">{{ __('pos.rcpt_payment_banner') }} {{ $rcptPayLabel }}</div>@endif
     @elseif($transaction->pra_status === 'submitted' && $transaction->pra_invoice_number)
     @php
         // minVersion 4 (ZFC 13 Aug 2026): same module grid as the local invoice
@@ -786,12 +792,17 @@
             : ($transaction->pra_qr_code ?: '');
     @endphp
     @if($praQr)
-    <div class="qr-code">
-        <img src="{{ $praQr }}" alt="PRA QR">
-        @if($rp['show_verify_line'] ?? true)
-        <p>{{ __('pos.receipt_scan_verify_short') }}</p>
-        @endif
+    <div @class(['fiscal-qr-payment' => $rcptShowDeliveryPayment])>
+        <div class="qr-code">
+            <img src="{{ $praQr }}" alt="PRA QR">
+            @if($rp['show_verify_line'] ?? true)
+            <p>{{ __('pos.receipt_scan_verify_short') }}</p>
+            @endif
+        </div>
+        @if($rcptShowDeliveryPayment)<div class="compact-payment">{{ __('pos.rcpt_payment_banner') }} {{ $rcptPayLabel }}</div>@endif
     </div>
+    @elseif($rcptShowDeliveryPayment)
+    <div class="compact-payment">{{ __('pos.rcpt_payment_banner') }} {{ $rcptPayLabel }}</div>
     @endif
     @elseif($transaction->pra_status === 'offline')
     <div class="local-badge">
@@ -799,6 +810,7 @@
         {{ __('pos.receipt_offline_sync_auto') }}<br>
         {{ $transaction->invoice_number }}
     </div>
+    @if($rcptShowDeliveryPayment)<div class="compact-payment">{{ __('pos.rcpt_payment_banner') }} {{ $rcptPayLabel }}</div>@endif
     @else
     @php
         // Reporting-OFF FINALS vs provisionals (client report Jul 2026 — ZFC):
@@ -853,10 +865,15 @@
     {{-- Bottom SALE RECEIPT / PROVISIONAL badge removed (owner, Jul 2026) — the
          serial badge now prints in the TOP box; only the QR remains down here. --}}
     @if($qrUrl)
-    <div class="qr-code receipt-extra-qr">
-        <img src="{{ $qrUrl }}" alt="Invoice QR" style="width: 64px; height: 64px; margin: 3px auto;">
-        @if($optionVisible('show_qr_caption'))<p style="font-size: 8px; color: #000;">{{ $qrCaption }}</p>@endif
+    <div @class(['fiscal-qr-payment' => $rcptShowDeliveryPayment])>
+        <div class="qr-code receipt-extra-qr">
+            <img src="{{ $qrUrl }}" alt="Invoice QR" style="width: 64px; height: 64px; margin: 3px auto;">
+            @if($optionVisible('show_qr_caption'))<p style="font-size: 8px; color: #000;">{{ $qrCaption }}</p>@endif
+        </div>
+        @if($rcptShowDeliveryPayment)<div class="compact-payment">{{ __('pos.rcpt_payment_banner') }} {{ $rcptPayLabel }}</div>@endif
     </div>
+    @elseif($rcptShowDeliveryPayment)
+    <div class="compact-payment">{{ __('pos.rcpt_payment_banner') }} {{ $rcptPayLabel }}</div>
     @endif
     @endif
 

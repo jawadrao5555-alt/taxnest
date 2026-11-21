@@ -23,6 +23,7 @@ final class PosReceiptOptions
         'show_rate' => 'Rate column', 'show_item_notes' => 'Item comments',
         'show_deal_components' => 'Deal contents', 'show_bill_notes' => 'Bill notes',
         'show_subtotal' => 'Subtotal / menu total line',
+        'show_separators' => 'Dotted separator lines',
         'show_menu_qr' => 'Extra bill / menu QR (not fiscal QR)',
         'show_qr_caption' => 'Extra QR caption', 'show_verify_line' => 'Fiscal QR caption',
         'show_footer' => 'Thank-you / footer text', 'show_developed_by' => 'Developed by line',
@@ -161,6 +162,9 @@ final class PosReceiptOptions
         if (in_array($options['spacing'] ?? '', ['compact', 'roomy'], true)) {
             $pad = $options['spacing'] === 'compact' ? 1 : 4;
             $css .= '.items-table td,.info-table td{padding-top:'.$pad.'px !important;padding-bottom:'.$pad.'px !important;}';
+        }
+        if (! self::visible($options, 'show_separators')) {
+            $css .= '.separator{display:none !important;}.items-table tbody tr{border-bottom:0 !important;}';
         }
 
         return $css;

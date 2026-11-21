@@ -30,7 +30,7 @@ class PosDailyNumberPrintLayoutTest extends TestCase
     private const ORDER_NUMBER = 'ORD-260906-DAILY1';
     private const INVOICE_NUMBER = 'L-000209';
     private const BILL_TOKEN = 3;
-    private const DAILY_DISPLAY = 'L003';
+    private const DAILY_DISPLAY = 'B003';
 
     private const RECEIPT_TEMPLATES = [
         'pos.receipts.receipt_80mm',

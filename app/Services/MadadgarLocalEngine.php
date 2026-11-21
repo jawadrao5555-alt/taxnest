@@ -270,7 +270,7 @@ class MadadgarLocalEngine
              'a' => "Local/provisional bill ko final karne ke liye sale screen par F10 dabayen → bill select karein → Enter (Make Final) → method chunein: Cash (1), Card (2), ya \"Finalize LOCAL — don't send to PRA\" (3 ya L). Cash/Card se promote par PRA fiscal serial milta hai aur monthly quota use hota hai — promote sirf USI mahine ke andar ho sakta hai. /pos/transactions par bhi local bill ke saamne \"Submit to PRA\" button hota hai."],
 
             ['p' => [['provisional'], ['local', 'bill'], ['f9']],
-             'a' => "Provisional (local) bill: sale screen par \"Save Provisional\" button ya F9 — bill L-series par save hota hai, PRA ko report NAHI hota aur quota nahi katta. Dekhne ke liye F10 modal (search bhi hai) ya /pos/local-bills portal. Baad mein F10 se Make Final (promote) kar sakte hain — Cash (1), Card (2), ya Finalize LOCAL (3/L)."],
+             'a' => "Provisional (local) bill: sale screen par \"Save Provisional\" button ya F9 — bill B-series par save hota hai, PRA ko report NAHI hota aur quota nahi katta. Dekhne ke liye F10 modal (search bhi hai) ya /pos/local-bills portal. Baad mein F10 se Make Final (promote) kar sakte hain — Cash (1), Card (2), ya Finalize LOCAL (3/L)."],
 
             ['p' => [['discount']],
              'a' => "Discount BILL level par lagta hai — cart ke neeche % Discount button ya D key (Alt+D har jagah chalta hai). Percentage aur Rs amount dono ho sakte hain, magar discount limit lagti hai (default subtotal ka 50%) — limit se zyada par Manager PIN ka modal khulta hai, PIN dalne par usi bill ke liye override ho jata hai."],

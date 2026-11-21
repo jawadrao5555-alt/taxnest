@@ -5857,7 +5857,7 @@ class PosController extends Controller
                     }
                     if (strlen(\App\Services\PosCustomerPhoneIdentity::searchDigits($term)) >= 3) $match->orWhere(fn ($phoneQuery) => \App\Services\PosCustomerPhoneIdentity::constrain($phoneQuery, 'customer_phone', $term));
                     if (is_numeric($term)) $match->orWhereRaw('CAST(total_amount AS CHAR) LIKE ?', ['%'.$term.'%']);
-                    if (\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions','bill_token') && preg_match('/^(?:[LPE]-?)?0*(\d+)$/iD', $term, $token)) $match->orWhereRaw('CAST(bill_token AS CHAR) LIKE ?', ['%'.$token[1].'%']);
+                    if (\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions','bill_token') && preg_match('/^(?:[BLPE]-?)?0*(\d+)$/iD', $term, $token)) $match->orWhereRaw('CAST(bill_token AS CHAR) LIKE ?', ['%'.$token[1].'%']);
                 });
             })
             ->when(!empty($validated['order_type']), fn ($q) => $q->where('order_type', $validated['order_type']))

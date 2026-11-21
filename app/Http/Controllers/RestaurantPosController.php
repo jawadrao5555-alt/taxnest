@@ -2648,6 +2648,13 @@ class RestaurantPosController extends Controller
                 $w->whereNull('source')->orWhere('source', '!=', 'waiter');
             });
 
+        if (Schema::hasColumn('restaurant_orders', 'held_billing_stream')) {
+            $stream = $txn->pra_status === 'pending' ? 'pra' : 'local';
+            $claim->where(function ($query) use ($stream) {
+                $query->whereNull('held_billing_stream')->orWhere('held_billing_stream', $stream);
+            });
+        }
+
         if (!$onlineConfirmed && Schema::hasColumn('restaurant_orders', 'online_payment_awaited_at')) {
             $claim->whereNull('online_payment_awaited_at');
         }

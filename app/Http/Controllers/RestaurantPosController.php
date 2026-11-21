@@ -159,6 +159,8 @@ class RestaurantPosController extends Controller
         $company = Company::find($companyId);
         $user = Auth::guard('pos')->user();
 
+        $heldBillingScope = $user->posBillingScopeExplicit();
+
         // T006 — `manual` item_type allows cashier-typed cart lines with no product master
         // (Enter-fallback when no product matches search). item_id is null; item_name +
         // unit_price are required and bounded. For product/service, item_id remains required.
@@ -202,6 +204,7 @@ class RestaurantPosController extends Controller
                 ->with(['items', 'table'])
                 ->first();
             if ($existingOrder) {
+                abort_unless($existingOrder->allowsHeldBillingStream($heldBillingScope), 403, __('This order belongs to a different billing stream.'));
                 Log::info('[HOLD] Replayed by hold_uuid — order already held', ['order_id' => $existingOrder->id, 'hold_uuid' => $holdUuid]);
                 return response()->json([
                     'success'           => true,
@@ -233,6 +236,7 @@ class RestaurantPosController extends Controller
                 $originalOrder = RestaurantOrder::where('company_id', $companyId)
                     ->where('pos_transaction_id', $existingTxn->id)
                     ->first();
+                abort_if($originalOrder && !$originalOrder->allowsHeldBillingStream($heldBillingScope), 403, __('This order belongs to a different billing stream.'));
                 Log::info('[HOLD] Replayed by pay_uuid — sale already billed', ['transaction_id' => $existingTxn->id, 'pay_uuid' => $holdPayUuid]);
                 return response()->json([
                     'success' => true,
@@ -521,6 +525,10 @@ class RestaurantPosController extends Controller
                 if (!$oldOrder) {
                     throw \Illuminate\Validation\ValidationException::withMessages(['recalled_order_id' => 'This held order changed or is unavailable. Reload it before saving.']);
                 }
+                if (!$oldOrder->allowsHeldBillingStream($heldBillingScope)) {
+                    DB::rollBack();
+                    return response()->json(['success' => false, 'message' => __('This order belongs to a different billing stream.')], 403);
+                }
                 if ($oldOrder) {
                     $carriedKotCount = (int) ($oldOrder->kot_print_count ?? 0);
                     // Owner batch 26 Aug 2026: recall + re-hold ek NAYA row banata
@@ -660,6 +668,11 @@ class RestaurantPosController extends Controller
             }
             if (Schema::hasColumn('restaurant_orders', 'delivery_collection_mode')) {
                 $orderCreateData['delivery_collection_mode'] = $request->input('delivery_collection_mode');
+            }
+            if (Schema::hasColumn('restaurant_orders', 'held_billing_stream')) {
+                $orderCreateData['held_billing_stream'] = $oldOrder
+                    ? $oldOrder->held_billing_stream
+                    : ($heldBillingScope === 'both' ? null : $heldBillingScope);
             }
             $order = RestaurantOrder::create($orderCreateData);
 
@@ -902,6 +915,7 @@ class RestaurantPosController extends Controller
                     ->with(['items', 'table'])
                     ->first();
                 if ($winner) {
+                    abort_unless($winner->allowsHeldBillingStream($heldBillingScope), 403, __('This order belongs to a different billing stream.'));
                     Log::info('[HOLD] Duplicate-key race resolved — returning winner', ['order_id' => $winner->id, 'hold_uuid' => $holdUuid]);
                     return response()->json([
                         'success'          => true,
@@ -1162,6 +1176,7 @@ class RestaurantPosController extends Controller
             ->with('items')
             ->findOrFail((int) $orderId);
 
+        abort_unless($order->allowsHeldBillingStream(auth('pos')->user()?->posBillingScopeExplicit() ?? 'both'), 403, __('This order belongs to a different billing stream.'));
         \App\Services\PosPromotions::assertHeldCurrent($order, $company);
         $quote = RestaurantOrderPaymentCalculator::calculate($order, $company, $validated['payment_method']);
 
@@ -1243,6 +1258,11 @@ class RestaurantPosController extends Controller
         $order = RestaurantOrder::where('company_id', $companyId)
             ->with('items')
             ->findOrFail($orderId);
+
+        $billingScope = $user?->posBillingScopeExplicit() ?? 'both';
+        if (!$order->allowsHeldBillingStream($billingScope)) {
+            return response()->json(['success' => false, 'message' => __('This order belongs to a different billing stream.')], 403);
+        }
 
         if ($order->status === 'completed') {
             // Task 994 review fix: a same-order retry can land here when the
@@ -1368,7 +1388,6 @@ class RestaurantPosController extends Controller
         // AND reporting-OFF finals. Guards direct POSTs; UI hides the buttons.
         // Task 1186: EXPLICIT scope only — the derived default (visibility)
         // must never block a sale-time write (hold/pay/provisional).
-        $billingScope = auth('pos')->user()?->posBillingScopeExplicit() ?? 'both';
         if ($billingScope === 'pra' && $initialPraStatus !== 'pending') {
             return response()->json(['success' => false, 'message' => __('pos.billing_scope_pra_only')], 403);
         }
@@ -1379,6 +1398,9 @@ class RestaurantPosController extends Controller
         // ── Bill Number Style (owner request 07 Aug 2026) — mirrors storeInvoice ──
         $billTokenFields = [];
         $billStream = $initialPraStatus === 'pending' ? 'pra' : 'local';
+        if (!$order->allowsHeldBillingStream($billStream)) {
+            return response()->json(['success' => false, 'message' => __('This order belongs to a different billing stream.')], 403);
+        }
         $billStyleCol = $billStream === 'pra' ? 'pra_number_style' : 'local_number_style';
         if (\App\Support\PosBillNumberStyle::needsToken($company->{$billStyleCol} ?? 'serial')
             && \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'bill_token')) {
@@ -1418,6 +1440,10 @@ class RestaurantPosController extends Controller
                     'success' => false,
                     'message' => 'This order was already settled or cancelled on another terminal — refresh the table board.',
                 ], 409);
+            }
+            if (!$freshOrder->allowsHeldBillingStream($billStream)) {
+                DB::rollBack();
+                return response()->json(['success' => false, 'message' => __('This order belongs to a different billing stream.')], 403);
             }
             if (!$request->boolean('save_as_provisional')) \App\Services\ProspectiveQuotaGuard::assertPra((int)$companyId);
             // ONLINE-PAYMENT GATE, RE-CHECKED UNDER THE LOCK. The pre-txn check
@@ -1819,6 +1845,10 @@ class RestaurantPosController extends Controller
             ->where('pos_transaction_id', $existingTxn->id)
             ->when(DB::transactionLevel() > 0, fn ($q) => $q->lockForUpdate())
             ->first();
+        $scope = auth('pos')->user()?->posBillingScopeExplicit() ?? 'both';
+        if ($originalOrder && !$originalOrder->allowsHeldBillingStream($scope)) {
+            return response()->json(['success' => false, 'message' => __('This order belongs to a different billing stream.')], 403);
+        }
         // Ghost tidy (best-effort, never blocks the replay): the retry's re-hold
         // may have minted a duplicate 'held' order — cancel it and free its table
         // so it doesn't linger on KDS / the held list / the table board.
@@ -1827,7 +1857,8 @@ class RestaurantPosController extends Controller
                 $ghost = RestaurantOrder::where('company_id', $companyId)
                     ->whereIn('status', ['held', 'preparing', 'ready'])
                     ->find($retryOrderId);
-                if ($ghost) {
+                if ($ghost && $ghost->allowsHeldBillingStream($scope)
+                    && ($ghost->held_billing_stream === null || $ghost->held_billing_stream === $originalOrder?->held_billing_stream)) {
                     $ghost->update(['status' => 'cancelled']);
                     if ($ghost->table_id) {
                         $otherActive = RestaurantOrder::where('company_id', $companyId)

@@ -2186,7 +2186,7 @@ class FbrService
      */
     private function parseFbrPosImsResponse(array $responseData): array
     {
-        $code = (string) ($responseData['Code'] ?? $responseData['code'] ?? '');
+        $code = FbrPosFiscalResult::code($responseData) ?? '';
         $invoiceNumber = FbrPosFiscalResult::fromResponse($responseData);
 
         if ($code === '100' && !empty($invoiceNumber)) {

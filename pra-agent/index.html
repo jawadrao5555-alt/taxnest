@@ -241,7 +241,8 @@
     <div class="btn-row" style="margin-bottom:14px;">
       <button id="installationFolderBtn" class="btn">Agent installation folder</button>
       <button id="installedAppsBtn" class="btn">Windows installed apps / uninstall</button>
-      <button id="openPosBtn" class="btn btn-primary">🖥️ Open POS Screen</button>
+      <button id="openPosBtn" class="btn btn-primary">Open POS 1</button>
+      <button id="openSecondPosBtn" class="btn btn-primary">Open POS 2</button>
       <button id="openPosBrowserBtn" class="btn btn-secondary">Browser mein POS kholein</button>
     </div>
     <p id="posLaunchStatus" role="status" aria-live="polite" style="font-size:13px;color:#fff;line-height:1.5;margin-bottom:12px;"></p>
@@ -764,7 +765,7 @@
   $('posOffline').addEventListener('change', savePosSettings);
   $('installationFolderBtn').addEventListener('click',()=>window.agentAPI.openInstallationFolder());
   $('installedAppsBtn').addEventListener('click',()=>window.agentAPI.openInstalledApps());
-  window.TnPosLaunch.bindPosLaunch($('openPosBtn'), $('openPosBrowserBtn'), $('posLaunchStatus'), window.agentAPI);
+  window.TnPosLaunch.bindPosLaunch($('openPosBtn'), $('openPosBrowserBtn'), $('posLaunchStatus'), window.agentAPI, $('openSecondPosBtn'));
   $('posAskDownload').addEventListener('change', savePosSettings);
   loadPosSettings();
 

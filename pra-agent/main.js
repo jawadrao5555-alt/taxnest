@@ -1656,7 +1656,17 @@ ipcMain.handle('get-lan-status', () => {
   const st = lanInstance().status();
   let core_tls = { running: false };
   try { if (coreLanTls) core_tls = coreLanTls.status(); } catch (e) {}
-  return { ...st, enabled: getLanSettings().enabled, core_tls };
+  const settings = getLanSettings();
+  const journal = coreRuntime?.store?.status();
+  let localStatus = 'awaiting_activation';
+  if (!getPosSettings().offlineMode) localStatus = 'offline_mode_off';
+  else if (coreStartupError || journal?.read_only || journal?.storage_full) localStatus = 'storage_unavailable';
+  else if (coreRuntime && !currentCoreLanScope()) localStatus = 'cashier_login_required';
+  else if (coreRuntime && !settings.coreTlsEnabled) localStatus = 'native_waiter_off';
+  else if (coreRuntime && !core_tls.running) localStatus = 'listener_unavailable';
+  else if (coreRuntime && core_tls.running) localStatus = 'listener_running';
+  return { ...st, enabled: settings.enabled, core_tls, local_status: localStatus,
+    pending_sync: journal ? journal.pending_count : null };
 });
 
 ipcMain.handle('lan-core-pairing-payload', async () => {

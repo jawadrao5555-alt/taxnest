@@ -296,6 +296,7 @@
       <button id="lanForgetBtn" class="btn btn-secondary" style="margin-left:auto;">Saray devices bhool jayein</button>
     </div>
     <div id="lanStatus" style="font-size:12px; color:#c4b5fd; line-height:1.7;"></div>
+    <div id="lanNativeStatus" role="status" style="font-size:12px; color:#c4b5fd; margin-top:8px;"></div>
     <div id="lanDevices" style="margin-top:10px;"></div>
     <button id="lanCorePairBtn" class="btn btn-secondary" style="display:none; margin-top:10px;">Native device ka QR banayein</button>
     <div id="lanCorePairing" style="display:none; margin-top:10px; text-align:center;"></div>
@@ -774,6 +775,17 @@
     if (!st) return;
     const box = $('lanStatus');
     $('lanCorePairBtn').style.display = st.enabled && st.core_tls && st.core_tls.running ? 'inline-block' : 'none';
+    const nativeStatus = {
+      offline_mode_off: 'Offline Mode band hai.',
+      awaiting_activation: 'Offline POS ko activate karne ke liye Agent ko online connect karein.',
+      storage_unavailable: 'Offline sales storage abhi available nahi.',
+      cashier_login_required: 'Offline POS ke liye counter mein authorized cashier ka login chahiye.',
+      native_waiter_off: 'Native Waiter connection band hai.',
+      listener_unavailable: 'Native Waiter listener abhi start nahi hua.',
+      listener_running: 'Native Waiter listener chal raha hai. Tablet ko app ke andar QR se pair karein.',
+    }[st.local_status] || '';
+    const pending = Number.isSafeInteger(st.pending_sync) ? ' Cloud sync pending: ' + st.pending_sync + '.' : '';
+    $('lanNativeStatus').textContent = st.enabled ? nativeStatus + pending : '';
     if (!st.enabled) {
       box.innerHTML = '<span style="color:#c4b5fd;">LAN Mode band hai — sab kuch cloud par chal raha hai.</span>';
       return;

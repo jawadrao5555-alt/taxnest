@@ -1174,37 +1174,9 @@ function waiterApp() {
             if (this.tablesLoading) return;
             this.showTables = true;
             this.tablesLoading = true;
-            const requestSerial = ++this._tableRequestSerial;
             try {
-                const headers = { 'Accept': 'application/json' };
-                if (this._tableEtag) headers['If-None-Match'] = this._tableEtag;
-                const res = await this._fetchWithTimeout('/pos/waiter/api/tables', { headers });
-                if (requestSerial !== this._tableRequestSerial) return;
-                if (res.status !== 304) {
-                    if (!res.ok) {
-                        // Net/server down: purani list ZINDA rakho aur saaf batao ke
-                        // rabta nahi ho raha. List khali karna jhoot tha — waiter ko
-                        // "koi table configure nahi hai" nazar aata tha.
-                        if (!this._tablesFromLocalCore()) this.tablesError = true;
-                    }
-                    else {
-                        const etag = res.headers.get('ETag');
-                        if (etag) this._tableEtag = etag;
-                        this.tables = await res.json();
-                        this.tablesError = false;
-                        this.tablesLocal = false;
-                    }
-                } else {
-                    this.tablesError = false;
-                    this.tablesLocal = false;
-                }
-            } catch (e) {
-                if (requestSerial === this._tableRequestSerial && !this._tablesFromLocalCore()) this.tablesError = true;
+                await this.reloadTablesQuiet();
             } finally {
-                // Release the spinner UNCONDITIONALLY. The serial decides whose DATA
-                // wins, never who owns the loading flag: a background refresh that
-                // starts mid-request bumps the serial, and gating the cleanup on it
-                // left the picker stuck on "Loading…" with no way out.
                 this.tablesLoading = false;
             }
         },
@@ -1221,6 +1193,8 @@ function waiterApp() {
                 const local = window.TaxNestWaiterLocalCore && window.TaxNestWaiterLocalCore.listTables();
                 if (!Array.isArray(local)) return false;
                 this.tables = local;
+                // An ETag describes the cloud list, not the replacement LAN list.
+                this._tableEtag = null;
                 this.tablesError = false;
                 this.tablesLocal = true;
                 return true;
@@ -1426,9 +1400,12 @@ function waiterApp() {
                 const res = await this._fetchWithTimeout('/pos/waiter/api/tables', { headers });
                 if (requestSerial !== this._tableRequestSerial) return;
                 if (res.status !== 304 && res.ok) {
-                    const etag = res.headers.get('ETag');
-                    if (etag) this._tableEtag = etag;
-                    this.tables = await res.json();
+                    const tables = await res.json();
+                    if (requestSerial !== this._tableRequestSerial || !Array.isArray(tables)) return;
+                    this._tableEtag = res.headers.get('ETag');
+                    this.tables = tables;
+                    this.tablesLocal = false;
+                    this.tablesError = false;
                 }
             } catch (e) { /* silent — grid shows "koi khali table nahi" */ }
             finally { this.shiftTablesLoading = false; }
@@ -1645,12 +1622,15 @@ function waiterApp() {
                 if (this._tableEtag) headers['If-None-Match'] = this._tableEtag;
                 const res = await this._fetchWithTimeout('/pos/waiter/api/tables', { headers });
                 if (requestSerial !== this._tableRequestSerial) return;
-                if (res.status === 304) { this.tablesError = false; this.tablesLocal = false; return; }
+                if (res.status === 304 && headers['If-None-Match']) {
+                    this.tablesError = false;
+                    return;
+                }
                 if (!res.ok) { if (!this._tablesFromLocalCore()) this.tablesError = true; return; }
                 const tables = await res.json();
                 if (requestSerial !== this._tableRequestSerial) return;
-                const etag = res.headers.get('ETag');
-                if (etag) this._tableEtag = etag;
+                if (!Array.isArray(tables)) throw new Error('Invalid table list');
+                this._tableEtag = res.headers.get('ETag');
                 this.tables = tables;
                 this.tablesError = false;
                 this.tablesLocal = false;

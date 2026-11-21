@@ -192,3 +192,38 @@ assert.strictEqual(second.customer_phone, null);
 assert.strictEqual(second.kitchen_notes, null, 'second offline order carries no previous kitchen note');
 assert.strictEqual(second.priority, false, 'urgent flag does not leak into the next order');
 console.log('waiter atomic Local Core production hook tests passed');
+const test = require('node:test');
+test('restoring cloud connectivity reloads the table list after a LAN fallback', async () => {
+    const at = layout.indexOf('async reloadTablesQuiet() {');
+    const end = layout.indexOf('        // Buttons-view', at);
+    const reload = new Function('return ({' + layout.slice(at, end) + '}).reloadTablesQuiet;')();
+    const requests = [];
+    const cloudTables = [{ id: 4, status: 'available' }];
+    const responses = [
+        { status: 503, ok: false },
+        { status: 200, ok: true, headers: new Map([['ETag', 'cloud-v1']]), json: async () => cloudTables },
+        { status: 304, ok: false },
+    ];
+    const tablet = {
+        _tableRequestSerial: 0,
+        _tableEtag: 'cloud-v1',
+        async _fetchWithTimeout(url, options) {
+            requests.push(options.headers);
+            return responses.shift();
+        },
+    };
+    const localMethodAt = layout.indexOf('        _tablesFromLocalCore() {');
+    const localMethodEnd = layout.indexOf('        _myOrdersFromLocalCore()', localMethodAt);
+    tablet._tablesFromLocalCore = new Function('window', 'return ({' +
+        layout.slice(localMethodAt, localMethodEnd) + '})._tablesFromLocalCore;')(context.window);
+    await reload.call(tablet);
+    assert.strictEqual(tablet.tablesLocal, true);
+    assert.strictEqual(tablet._tableEtag, null);
+    await reload.call(tablet);
+    assert.strictEqual(requests[1]['If-None-Match'], undefined);
+    assert.deepStrictEqual(tablet.tables, cloudTables);
+    assert.strictEqual(tablet.tablesLocal, false);
+    await reload.call(tablet);
+    assert.strictEqual(requests[2]['If-None-Match'], 'cloud-v1');
+    assert.deepStrictEqual(tablet.tables, cloudTables);
+});

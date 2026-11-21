@@ -7,6 +7,9 @@ use App\Models\Subscription;
 use App\Models\Company;
 use App\Models\PricingPlan;
 use App\Models\AdminAuditLog;
+use App\Models\AdminUser;
+use App\Services\AdminPackageSettlement;
+use App\Services\DistributorDiscountService;
 use App\Services\PlanSellabilityService;
 use App\Services\SubscriptionAssignmentService;
 use App\Services\PlanCompanyCompatibility;
@@ -56,16 +59,67 @@ class AdminSubscriptionController extends Controller
         return view('saas-admin.subscriptions', compact('companiesPage', 'companySubscriptions', 'companies', 'plans', 'assignmentPlans'));
     }
 
+    public function quote(Request $request)
+    {
+        AdminUser::requireBillingAdministrator();
+        $data = $request->validate([
+            'company_id' => 'required|integer',
+            'pricing_plan_id' => 'required|integer',
+            'billing_cycle' => 'required|in:monthly,quarterly,semi_annual,annual,yearly',
+        ]);
+        $company = Company::findOrFail($data['company_id']);
+        $plan = PricingPlan::findOrFail($data['pricing_plan_id']);
+        PlanCompanyCompatibility::assertMatches($company, $plan);
+        if (PlanSellabilityService::isRetired($plan)) {
+            throw \Illuminate\Validation\ValidationException::withMessages(['pricing_plan_id' => PlanSellabilityService::retiredMessage($plan)]);
+        }
+        $cycle = SubscriptionAssignmentService::cycleForPlan($plan, $data['billing_cycle']);
+        $activeId = Subscription::where('company_id', $company->id)->where('active', true)->max('id') ?? 0;
+        $quote = DistributorDiscountService::quote($company, $plan, $cycle, false);
+
+        return response()->json([
+            'amount' => $quote['net_quote'],
+            'is_trial' => (bool) $plan->is_trial,
+            'expected_subscription_id' => (int) $activeId,
+        ])->header('Cache-Control', 'private, no-store');
+    }
+
     public function assign(Request $request)
     {
-        \App\Models\AdminUser::requireBillingAdministrator();
+        $admin = AdminUser::requireBillingAdministrator();
         $request->validate([
+            'assignment_mode' => 'sometimes|required|in:received,unpaid',
             'company_id' => 'required|exists:companies,id',
             'pricing_plan_id' => 'required|exists:pricing_plans,id',
             // Annual-only since 23 Aug 2026 (owner). 'yearly' stays accepted as
             // the legacy spelling of the same thing.
             'billing_cycle' => 'required|in:monthly,quarterly,semi_annual,annual,yearly',
         ]);
+
+        if ($request->input('assignment_mode') === 'received') {
+            $payment = $request->validate([
+                'verified_received_amount' => ['required', 'numeric', 'decimal:0,2', 'gt:0'],
+                'payment_method' => 'required|in:cash,card',
+                'payment_date' => 'required|date_format:Y-m-d|before_or_equal:' . now('Asia/Karachi')->toDateString(),
+                'reference' => 'nullable|string|max:100',
+                'idempotency_key' => 'required|uuid',
+                'expected_subscription_id' => 'required|integer|min:0',
+            ]);
+            $invoice = AdminPackageSettlement::assign(
+                (int) $request->company_id, (int) $request->pricing_plan_id,
+                $request->billing_cycle, $payment, (int) $admin->id
+            );
+            $receipt = $invoice->payments()->whereNotNull('receipt_number')->firstOrFail();
+
+            return redirect()->route('saas.admin.subscriptions')
+                ->with('success', 'Package assigned and payment recorded.')
+                ->with('package_sale_documents', [
+                    'company' => $invoice->company_id,
+                    'invoice' => $invoice->id,
+                    'payment' => $receipt->id,
+                    'receipt_number' => $receipt->receipt_number,
+                ]);
+        }
 
         $plan = PricingPlan::findOrFail($request->pricing_plan_id);
         if (!in_array(SubscriptionAssignmentService::normalizeCycle($request->billing_cycle), SubscriptionAssignmentService::cyclesForPlan($plan), true)) {

@@ -30,6 +30,14 @@ class SubscriptionInvoice extends Model
         });
     }
 
+    /** Retain ambiguous legacy charges while excluding positively identified add-on sales. */
+    public function scopePackageCharge(\Illuminate\Database\Eloquent\Builder $query): \Illuminate\Database\Eloquent\Builder
+    {
+        return $query->where(function ($q) {
+            $q->whereNull('document_snapshot->kind')->orWhereNotIn('document_snapshot->kind', PaymentProof::ADDON_KINDS);
+        });
+    }
+
     public function subscription()
     {
         return $this->belongsTo(Subscription::class);

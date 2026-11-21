@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Builder;
 
 class SubscriptionPayment extends Model
 {
@@ -33,4 +34,28 @@ class SubscriptionPayment extends Model
     {
         return $this->belongsTo(SubscriptionInvoice::class, 'subscription_invoice_id');
     }
+
+    public function scopeDownloadableReceipt(Builder $query): Builder
+    {
+        return $query->where(function (Builder $records) {
+            $records->where(fn (Builder $issued) => $issued->whereNotNull('receipt_number')->whereNotNull('receipt_snapshot'))
+                ->orWhere(fn (Builder $legacy) => $legacy->whereNull('receipt_number')->whereNull('receipt_snapshot')
+                    ->where('amount', '>', 0)->whereNotNull('paid_at'));
+        });
+    }
+
+    public function hasDownloadableReceipt(): bool
+    {
+        if ($this->receipt_number !== null || $this->receipt_snapshot !== null) {
+            return filled($this->receipt_number) && is_array($this->receipt_snapshot);
+        }
+
+        return $this->paid_at !== null && (float) $this->amount > 0;
+    }
+
+    public function receiptDisplayNumber(): string
+    {
+        return $this->receipt_number ?? 'HIST-PMT-'.$this->getKey();
+    }
 }
+

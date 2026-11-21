@@ -90,7 +90,7 @@ class AgentCommissionService
 
     private static function createEarnLine(PaymentProof $proof): void
     {
-        if ($proof->status !== 'verified' || (float) $proof->amount <= 0
+        if ($proof->admin_settlement_origin === 'allocated' || $proof->status !== 'verified' || (float) $proof->amount <= 0
             // Legacy verified proofs predate billing_cycle; retain their
             // historical subscription-lane behaviour. New explicit cycles are
             // annual-only.

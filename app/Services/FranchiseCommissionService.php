@@ -33,7 +33,7 @@ class FranchiseCommissionService
             if ($atomic && \Illuminate\Support\Facades\DB::transactionLevel() < 1) throw new \LogicException('Reviewed commission requires a transaction.');
             if ($atomic && $proof->franchise_id_at_verification && !Schema::hasTable('franchise_commissions')) throw new \LogicException('Franchise commission schema unavailable.');
             if (!Schema::hasTable('franchise_commissions')
-                || $proof->status !== 'verified' || $proof->kind() !== 'subscription'
+                || $proof->admin_settlement_origin === 'allocated' || $proof->status !== 'verified' || $proof->kind() !== 'subscription'
                 || (float) $proof->amount <= 0) {
                 return;
             }

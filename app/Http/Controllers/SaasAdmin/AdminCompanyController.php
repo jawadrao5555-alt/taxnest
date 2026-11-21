@@ -945,6 +945,9 @@ class AdminCompanyController extends Controller
     {
         \App\Models\AdminUser::requireBillingAdministrator();
         $company = Company::findOrFail($id);
+        if ($sale = \App\Models\SignupPackageRequest::forCompanyReview($company)) {
+            return redirect()->route('saas.admin.package-requests.show', $sale);
+        }
         // Flip BOTH status columns: `status` drives the CheckCompanyApproval
         // view-only gate + admin UI badges; `company_status` drives login-time
         // checks (CompanyIsolation) — leaving it 'pending' would strand the company.
@@ -978,7 +981,7 @@ class AdminCompanyController extends Controller
      * approval. Mirrors AdminPaymentProofController::notifyCompany — failure here
      * is non-fatal and NEVER blocks the approval action.
      */
-    private function sendActivationNotification(Company $company): void
+    public function sendActivationNotification(Company $company): void
     {
         try {
             // One catalogue, so a product line can never be missing from a

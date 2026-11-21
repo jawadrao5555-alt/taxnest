@@ -1649,6 +1649,15 @@ Route::prefix('admin')->middleware(['admin.auth'])->group(function () {
 
     Route::get('/dashboard', [AdminDashboardController::class, 'index'])->name('saas.admin.dashboard');
     Route::get('/dashboard/invoices/{product}/{company}/{record}/{action}', [\App\Http\Controllers\SaasAdmin\AdminInvoicePreviewController::class, 'show'])->whereIn('product', ['di', 'pos', 'fbrpos'])->whereNumber(['company', 'record'])->whereIn('action', ['preview', 'download'])->name('saas.admin.invoice.document');
+    Route::prefix('companies/{companyId}/package-receipts')
+        ->where(['companyId' => '[0-9]+'])
+        ->controller(\App\Http\Controllers\SaasAdmin\HistoricalPackageReceiptController::class)
+        ->group(function () {
+            Route::get('/', 'index')->name('saas.admin.companies.package-receipts');
+            Route::post('/terms/{subscriptionId}', 'record')->whereNumber('subscriptionId')->name('saas.admin.companies.package-receipts.record');
+            Route::post('/terms/{subscriptionId}/payments/{paymentId}/attest', 'attest')->whereNumber(['subscriptionId', 'paymentId'])->name('saas.admin.companies.package-receipts.attest');
+            Route::post('/terms/{subscriptionId}/proofs/{proofId}', 'recover')->whereNumber(['subscriptionId', 'proofId'])->name('saas.admin.companies.package-receipts.recover');
+        });
     Route::get('/companies/{company}/billing/invoices/{invoice}', [\App\Http\Controllers\SubscriptionDocumentController::class, 'adminInvoice'])->whereNumber(['company', 'invoice'])->name('saas.admin.billing.documents.invoice');
     Route::get('/companies/{company}/billing/receipts/{payment}', [\App\Http\Controllers\SubscriptionDocumentController::class, 'adminReceipt'])->whereNumber(['company', 'payment'])->name('saas.admin.billing.documents.receipt');
     Route::post('/companies/{company}/billing/adjustments', [\App\Http\Controllers\SaasAdmin\AdminSubscriptionAdjustmentController::class, 'store'])
@@ -1864,7 +1873,15 @@ Route::prefix('admin')->middleware(['admin.auth'])->group(function () {
     Route::post('/sales', [AdminSaleController::class, 'store'])->name('saas.admin.sales.store');
     Route::post('/sales/{id}/toggle', [AdminSaleController::class, 'toggle'])->name('saas.admin.sales.toggle');
     Route::delete('/sales/{id}', [AdminSaleController::class, 'destroy'])->name('saas.admin.sales.destroy');
+    Route::prefix('package-requests')->name('saas.admin.package-requests.')->controller(\App\Http\Controllers\SaasAdmin\SignupPackageRequestController::class)->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::get('/{sale}', 'show')->name('show');
+        Route::post('/{sale}/confirm', 'confirm')->name('confirm');
+        Route::post('/{sale}/reject', 'reject')->name('reject');
+    });
+
     Route::get('/subscriptions', [AdminSubscriptionController::class, 'index'])->name('saas.admin.subscriptions');
+    Route::get('/subscriptions/quote', [AdminSubscriptionController::class, 'quote'])->name('saas.admin.subscriptions.quote');
     Route::post('/subscriptions/assign', [AdminSubscriptionController::class, 'assign'])->name('saas.admin.subscriptions.assign');
 
     // Agents/Partners program (super-admin only, guarded in controller).

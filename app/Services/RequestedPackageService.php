@@ -110,6 +110,21 @@ class RequestedPackageService
             return null;
         }
 
+        if (Schema::hasTable('signup_package_requests')) {
+            $sale = \App\Models\SignupPackageRequest::where('company_id', $company->id)->first();
+            if ($sale) {
+                $cycleLabel = Subscription::getCycleLabel($sale->billing_cycle);
+                $priceLabel = 'Rs ' . number_format((float) $sale->quoted_amount, 2) . ' · ' . $cycleLabel;
+                return [
+                    'name' => $sale->plan_name, 'cycle' => $sale->billing_cycle, 'cycle_label' => $cycleLabel,
+                    'price' => (float) $sale->quoted_amount, 'price_label' => $priceLabel,
+                    'badge' => $sale->plan_name . ' — ' . $priceLabel,
+                    'available' => $sale->status === 'pending',
+                    'note' => $sale->status === 'pending' ? 'Review the quoted amount and record payment to confirm the company.' : 'Package request ' . $sale->status . '.',
+                ];
+            }
+        }
+
         // Never lazy-load: live runs with preventLazyLoading(), and the admin
         // lists that call this per row already eager-load the relation.
         $plan = $company->relationLoaded('requestedPlan')

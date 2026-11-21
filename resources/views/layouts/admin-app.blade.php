@@ -123,6 +123,9 @@
                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
                     Subscriptions
                 </a>
+                @if(auth('admin')->user()?->canManageBilling())
+                <a href="{{ route('saas.admin.package-requests.index') }}" class="block px-3 py-2 text-sm {{ request()->routeIs('saas.admin.package-requests.*') ? 'admin-active-link' : 'text-gray-300' }}">Signup package requests</a>
+                @endif
 
                 @if(auth('admin')->user()?->isSuperAdmin())
                 <a href="{{ route('saas.admin.platform-expenses') }}" class="block px-3 py-2.5 text-sm text-gray-300">Platform expense records</a>

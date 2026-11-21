@@ -297,6 +297,9 @@ class AdminController extends Controller
     public function approveCompany(Company $company)
     {
         \App\Models\AdminUser::requireBillingAdministrator();
+        if ($sale = \App\Models\SignupPackageRequest::forCompanyReview($company)) {
+            return redirect()->route('saas.admin.package-requests.show', $sale);
+        }
         $company->update(['company_status' => 'active', 'status' => 'approved']);
 
         // Owner rule (Jul 2026): approval activates the package the shop picked

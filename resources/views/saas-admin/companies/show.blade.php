@@ -13,6 +13,9 @@
             // map here used to leave a new product line grey and unnamed.
             $erpsVertical = \App\Support\NestErps::verticalOf($company);
         @endphp
+        @if($canManageBilling)
+            <a class="text-sm text-indigo-400 underline" href="{{ route('saas.admin.companies.package-receipts', $company->id) }}">Package receipts</a>
+        @endif
         <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {{ $sc[$company->status] ?? 'bg-gray-800 text-gray-400' }}">{{ $company->status }}</span>
         <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase {{ \App\Support\ProductCatalog::chipClass($company->product_type) }}">{{ \App\Support\ProductCatalog::label($company->product_type, $erpsVertical) }}</span>
         @if(!$company->trashed())

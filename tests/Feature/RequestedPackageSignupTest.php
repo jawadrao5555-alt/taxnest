@@ -429,11 +429,19 @@ class RequestedPackageSignupTest extends TestCase
 
     public function test_signup_pages_carry_the_pick_and_fbr_exposes_an_explicit_package_choice(): void
     {
-        $this->get('/register?plan=Business&cycle=quarterly')
+        $response = $this->get('/register?plan=Business&cycle=quarterly')
             ->assertOk()
             ->assertSee('name="requested_plan" required', false)
-            ->assertSee('value="Business" selected', false)
-            ->assertSee('name="requested_billing_cycle" value="quarterly"', false);
+            ->assertSee('value="Business" selected', false);
+
+        // DI now lets the visitor edit the cycle. Verify the selected option on
+        // the actual submitted control instead of expecting a hidden input.
+        $document = new \DOMDocument();
+        $document->loadHTML($response->getContent(), LIBXML_NOERROR | LIBXML_NOWARNING | LIBXML_NONET);
+        $xpath = new \DOMXPath($document);
+        $selected = $xpath->query('//form//select[@name="requested_billing_cycle" and @required]/option[@selected]');
+        $this->assertCount(1, $selected);
+        $this->assertSame('quarterly', $selected->item(0)->getAttribute('value'));
 
         $this->get('/fbr-pos/register?plan=Business')
             ->assertOk()

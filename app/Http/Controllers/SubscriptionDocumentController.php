@@ -4,9 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Models\SubscriptionInvoice;
 use App\Models\SubscriptionPayment;
+use App\Models\PaymentProof;
 use App\Services\HealthAccessService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 
 final class SubscriptionDocumentController extends Controller
 {
@@ -27,7 +29,7 @@ final class SubscriptionDocumentController extends Controller
     {
         $companyId = (int) app('currentCompanyId');
         $this->authorizeCompanyUser($request);
-        $record = SubscriptionPayment::whereNotNull('receipt_number')->whereNotNull('receipt_snapshot')
+        $record = SubscriptionPayment::downloadableReceipt()
             ->whereHas('invoice', fn ($query) => $query->where('company_id', $companyId))->find($payment);
         if (! $record) {
             return $this->notFound();
@@ -51,7 +53,7 @@ final class SubscriptionDocumentController extends Controller
     public function adminReceipt(int $company, int $payment)
     {
         abort_unless(auth('admin')->user()?->fresh(), 403);
-        $record = SubscriptionPayment::whereNotNull('receipt_number')->whereNotNull('receipt_snapshot')
+        $record = SubscriptionPayment::downloadableReceipt()
             ->whereHas('invoice', fn ($query) => $query->where('company_id', $company))->find($payment);
         if (! $record) {
             return $this->notFound();
@@ -76,14 +78,29 @@ final class SubscriptionDocumentController extends Controller
 
     private function download(string $kind, SubscriptionInvoice $invoice, ?SubscriptionPayment $payment)
     {
-        $invoice->loadMissing(['company', 'subscription.pricingPlan']);
-        $snapshot = $kind === 'receipt' ? $payment?->receipt_snapshot : $invoice->document_snapshot;
+        $invoice->loadMissing(['company', 'subscription' => fn ($query) => $query->where('company_id', $invoice->company_id)->with('pricingPlan')]);
+        $historical = $payment && $payment->receipt_snapshot === null;
+        if ($payment && ! $payment->hasDownloadableReceipt()) {
+            return $this->notFound();
+        }
+        $snapshot = $payment ? ($payment->receipt_snapshot ?? []) : $invoice->document_snapshot;
         abort_unless(is_array($snapshot), 404);
-        $number = $kind === 'receipt' ? $payment->receipt_number : $invoice->document_number;
-        $pdf = Pdf::loadView('billing.subscription-document-pdf', compact('kind', 'invoice', 'payment', 'snapshot', 'number'))
+        $attestation = null;
+        if ($historical && (blank($payment->payment_method) || blank($payment->transaction_ref))
+            && $invoice->subscription_id && Schema::hasColumn('payment_proofs', 'admin_allocated_payment_id')) {
+            $attestation = PaymentProof::subscriptionKind()->where('company_id', $invoice->company_id)
+                ->where('subscription_id', $invoice->subscription_id)->where('admin_settlement_invoice_id', $invoice->id)
+                ->where('admin_allocated_payment_id', $payment->id)->where('admin_settlement_origin', 'allocated')
+                ->where('status', 'verified')->whereNotNull('verified_by')->whereNotNull('verified_at')
+                ->first(['payment_method', 'reference']);
+        }
+        $number = $payment ? $payment->receiptDisplayNumber() : $invoice->document_number;
+        $pdf = Pdf::loadView('billing.subscription-document-pdf', compact('kind', 'invoice', 'payment', 'snapshot', 'number', 'historical', 'attestation'))
             ->setPaper('A4', 'portrait');
 
-        return $pdf->download(strtolower((string) $number).'.pdf')
+        $filename = strtolower((string) $number).'.pdf';
+        $response = request()->boolean('print') ? $pdf->stream($filename) : $pdf->download($filename);
+        return $response
             ->header('Cache-Control', 'private, no-store')
             ->header('X-Content-Type-Options', 'nosniff');
     }
@@ -95,3 +112,4 @@ final class SubscriptionDocumentController extends Controller
             ->header('X-Content-Type-Options', 'nosniff');
     }
 }
+

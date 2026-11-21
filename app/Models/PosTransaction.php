@@ -542,6 +542,7 @@ class PosTransaction extends Model
             }
             $out['wa_phone'] = $wa;
             $out['share_url'] = url('/pos/invoice/share/' . $token);
+            $out['wa_customer_name'] = $this->customer_name;
         } catch (\Throwable $e) {
             // fall through with nulls
         }

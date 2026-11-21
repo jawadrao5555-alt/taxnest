@@ -1779,6 +1779,7 @@ class RestaurantPosController extends Controller
                 'kot_order_id' => $kotPending ? $order->id : null,
                 'wa_phone' => $waShare['wa_phone'],
                 'share_url' => $waShare['share_url'],
+                'wa_customer_name' => $waShare['wa_customer_name'] ?? null,
             ]);
         } catch (\Throwable $e) {
             DB::rollBack();
@@ -1910,6 +1911,7 @@ class RestaurantPosController extends Controller
             'pra_status' => $existingTxn->pra_status,
             'wa_phone' => $waShare['wa_phone'],
             'share_url' => $waShare['share_url'],
+            'wa_customer_name' => $waShare['wa_customer_name'] ?? null,
         ]);
     }
 

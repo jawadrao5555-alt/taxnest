@@ -5893,6 +5893,8 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'wa_bill_btn' => 'WhatsApp Bill',
     'ti_wa_bill' => 'WhatsApp par bill bhejein',
     'wa_msg_receipt' => 'Receipt',
+    'wa_full_bill' => 'Poora bill',
+    'wa_name_and_total' => 'Naam aur grand total',
     'wa_msg_thanks' => 'Shukriya! Phir tashreef layen.',
     'wa_popup_blocked' => 'Browser ne WhatsApp window rok di — green WhatsApp button dabayen.',
     'wa_link_failed' => 'Receipt link nahi ban saka — dobara koshish karein.',

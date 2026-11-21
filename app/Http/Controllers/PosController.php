@@ -4341,6 +4341,7 @@ class PosController extends Controller
                 'kot_order_id' => $settleKotPending ? (int) $request->input('incoming_order_id') : null,
                 'wa_phone' => $waShare['wa_phone'],
                 'share_url' => $waShare['share_url'],
+                'wa_customer_name' => $waShare['wa_customer_name'] ?? null,
                 'message' => $successMessage,
             ]);
         }
@@ -6316,6 +6317,7 @@ class PosController extends Controller
                 'id'             => $id,
                 'wa_phone'       => $waShare['wa_phone'],
                 'share_url'      => $waShare['share_url'],
+                'wa_customer_name' => $waShare['wa_customer_name'] ?? null,
             ]);
         }
 
@@ -6330,6 +6332,7 @@ class PosController extends Controller
                 'id'             => $id,
                 'wa_phone'       => $waShare['wa_phone'],
                 'share_url'      => $waShare['share_url'],
+                'wa_customer_name' => $waShare['wa_customer_name'] ?? null,
             ]);
         }
 
@@ -6349,6 +6352,7 @@ class PosController extends Controller
                     'id'             => $id,
                     'wa_phone'       => $waShare['wa_phone'],
                     'share_url'      => $waShare['share_url'],
+                    'wa_customer_name' => $waShare['wa_customer_name'] ?? null,
                 ]);
             }
 

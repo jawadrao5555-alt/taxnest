@@ -363,6 +363,33 @@ class PosSettingsStaleFormGuardTest extends TestCase
         $this->assertFalse((bool) ($pp['show_phone'] ?? true));
     }
 
+    public function test_public_menu_customer_links_keep_the_slug_and_reject_other_protocols(): void
+    {
+        $company = $this->company();
+        $company->public_profile_settings = ['enabled' => true, 'show_phone' => false];
+        $company->public_profile_slug = 'fictionaltestmenu1234';
+        $company->save();
+        $this->actAsAdmin();
+
+        $menu = ['label' => 'Lunch menu', 'url' => 'https://example.com/lunch.pdf'];
+        $this->post('/pos/public-profile', [
+            'pp_links_present' => '1',
+            'customer_links' => ['menu' => $menu],
+        ])->assertSessionHasNoErrors();
+        $this->assertSame('fictionaltestmenu1234', $this->company()->public_profile_slug);
+        $settings = $this->company()->public_profile_settings;
+        $this->assertTrue($settings['enabled']);
+        $this->assertFalse($settings['show_phone']);
+        $this->assertSame($menu, $settings['customer_links']['menu']);
+        $this->get('/menu/fictionaltestmenu1234')->assertOk()->assertSee($menu['url'])->assertSee('Lunch menu');
+
+        $this->post('/pos/public-profile', [
+            'pp_links_present' => '1',
+            'customer_links' => ['menu' => ['label' => 'Invalid', 'url' => 'ftp://example.com/lunch.pdf']],
+        ])->assertSessionHasErrors('customer_links.menu.url');
+        $this->assertSame($menu, $this->company()->public_profile_settings['customer_links']['menu']);
+    }
+
     // ── /pos/public-profile/menu — the QR menu picker ───────────────────────
 
     /** A POST carrying no menu picker at all must not delete the shop's QR menu. */

@@ -34,6 +34,7 @@ class PublicProfileController extends Controller
         'hours_text' => '',
         'about_text' => '',
         'show_menu' => true,
+        'customer_links' => [],
     ];
 
     public static function settingsFor(Company $company): array
@@ -225,6 +226,17 @@ class PublicProfileController extends Controller
             'hours_text' => 'nullable|string|max:200',
             'about_text' => 'nullable|string|max:600',
         ]);
+        $links = null;
+        if ($request->has('pp_links_present')) {
+            $rules = ['customer_links' => 'nullable|array:whatsapp,menu,website'];
+            foreach (['whatsapp', 'menu', 'website'] as $slot) {
+                $rules["customer_links.$slot"] = 'nullable|array:label,url';
+                $rules["customer_links.$slot.label"] = "nullable|string|max:60|required_with:customer_links.$slot.url";
+                $rules["customer_links.$slot.url"] = "nullable|url:http,https|max:2048|required_with:customer_links.$slot.label";
+            }
+            $validated = $request->validate($rules);
+            $links = array_filter($validated['customer_links'] ?? [], fn ($link) => !empty($link['url']));
+        }
 
         // Stale-form guard (Task 1393 — same shape as the PRA Receipt Settings page,
         // Task 1377). This whole block is a wholesale rewrite driven by checkbox
@@ -240,11 +252,11 @@ class PublicProfileController extends Controller
             ['pp_enabled', 'hours_text', 'about_text'],
             array_map(fn ($k) => 'pp_' . $k, $showKeys)
         ));
-        if (!$ppPresent) {
+        if (!$ppPresent && $links === null) {
             return back()->with('success', 'Public profile settings saved.');
         }
 
-        $enabled = $request->has('pp_enabled');
+        $enabled = $ppPresent && $request->has('pp_enabled');
 
         // First enable ever → mint the permanent random slug (same UPDATE below).
         $also = [];
@@ -255,14 +267,19 @@ class PublicProfileController extends Controller
         // Merged onto the FRESH row under a lock (Company::mergeJsonColumn):
         // defaults + whatever is stored now + this form's values, so keys a
         // future writer adds to the column are never dropped by a stale copy.
-        $company->mergeJsonColumn('public_profile_settings', function (array $current) use ($request, $showKeys, $enabled): array {
+        $company->mergeJsonColumn('public_profile_settings', function (array $current) use ($request, $showKeys, $enabled, $ppPresent, $links): array {
             $settings = array_merge(self::DEFAULT_SETTINGS, $current);
-            $settings['enabled'] = $enabled;
-            foreach ($showKeys as $key) {
-                $settings[$key] = $request->has('pp_' . $key);
+            if ($ppPresent) {
+                $settings['enabled'] = $enabled;
+                foreach ($showKeys as $key) {
+                    $settings[$key] = $request->has('pp_' . $key);
+                }
+                $settings['hours_text'] = trim((string) $request->input('hours_text', ''));
+                $settings['about_text'] = trim((string) $request->input('about_text', ''));
             }
-            $settings['hours_text'] = trim((string) $request->input('hours_text', ''));
-            $settings['about_text'] = trim((string) $request->input('about_text', ''));
+            if ($links !== null) {
+                $settings['customer_links'] = $links;
+            }
             return $settings;
         }, $also);
 

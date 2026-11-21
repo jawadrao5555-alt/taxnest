@@ -7274,7 +7274,8 @@ class PosController extends Controller
         $company = Company::findOrFail($companyId);
         $user = auth('pos')->user();
         abort_if($user->posCustomAllows('reports') === false, 403);
-        $date = \App\Services\PosBusinessDay::current($companyId);
+        $filters = $request->validate(['date' => ['sometimes', 'date_format:Y-m-d']]);
+        $date = $filters['date'] ?? \App\Services\PosBusinessDay::current($companyId);
         $tab = $this->salesReportTab($request, $user);
         $cashier = $user->isPosCashier() ? (int) $user->id : $this->dashboardCashier($request, $user);
         $history = \App\Services\PosFinancialHistory::report($companyId, $date, $date, $tab, $cashier, $user,
@@ -7282,7 +7283,7 @@ class PosController extends Controller
         $presentation = \App\Services\PosReportPresentation::fromHistory($history);
         $showProducts = PosFeatureService::planAllows($company, 'analytics_enabled');
 
-        return response()->view('pos.partials.dashboard-sales-overview', compact('presentation', 'showProducts'))
+        return response()->view('pos.partials.dashboard-sales-overview', compact('presentation', 'showProducts', 'tab'))
             ->header('Cache-Control', 'private, no-store')
             ->header('X-Pos-Report-Fragment', 'sales');
     }
@@ -10587,6 +10588,55 @@ class PosController extends Controller
         ])->header('Cache-Control', 'no-store, private');
     }
 
+    public function updateSavedCustomerAddress(Request $request, int $customer, int $address)
+    {
+        abort_unless(auth('pos')->user()?->isPosAdmin(), 403);
+        $companyId = app('currentCompanyId');
+        $data = $request->validate([
+            'address' => 'required|string|max:500',
+            'label' => 'nullable|string|max:50',
+            'expected_address' => 'required|string',
+            'expected_label' => 'present|nullable|string|max:50',
+        ]);
+
+        return DB::transaction(function () use ($companyId, $customer, $address, $data) {
+            $profile = PosCustomer::where('company_id', $companyId)->lockForUpdate()->findOrFail($customer);
+            $extras = \App\Models\PosCustomerAddress::where('company_id', $companyId)
+                ->where('customer_id', $customer)->lockForUpdate()->get();
+            $extra = $address === 0 ? null : $extras->firstWhere('id', $address);
+            abort_if($address > 0 && !$extra, 404);
+
+            $previous = $extra ? $extra->address : $profile->address;
+            $previousLabel = $extra?->label;
+            abort_if(trim((string) $previous) === '', 404);
+            if (trim($previous) !== trim($data['expected_address'])
+                || trim((string) $previousLabel) !== trim((string) $data['expected_label'])) {
+                return response()->json(['message' => __('pos.customer_contact_changed')], 409);
+            }
+
+            $text = trim($data['address']);
+            $label = $data['label'] ?? null;
+            $normalized = mb_strtolower($text);
+            $duplicate = ($address > 0 && mb_strtolower(trim((string) $profile->address)) === $normalized)
+                || $extras->contains(fn ($row) => (int) $row->id !== $address
+                    && mb_strtolower(trim($row->address)) === $normalized);
+            if ($duplicate) {
+                return response()->json(['message' => __('pos.address_already_saved')], 422);
+            }
+
+            if ($extra) {
+                $extra->update(['address' => $text, 'label' => $label]);
+            } else {
+                $profile->update(['address' => $text]);
+            }
+
+            return response()->json([
+                'success' => true,
+                'address' => ['id' => $address, 'label' => $extra ? $label : 'Default', 'address' => $text],
+            ])->header('Cache-Control', 'private, no-store');
+        }, 3);
+    }
+
     public function apiStoreCustomerAddress(Request $request)
     {
         $companyId = app('currentCompanyId');
@@ -12033,7 +12083,18 @@ class PosController extends Controller
         // The search box filters on the SERVER so any phone/name is findable
         // regardless of page.
         $q = trim((string) $request->query('q', ''));
+        $user = auth('pos')->user();
+        $quietOnly = $request->query('group') === 'gone-quiet';
+        if ($quietOnly) {
+            abort_unless($user?->isPosAdmin(), 403);
+        }
+        $inactiveMap = \App\Services\PosRepeatCustomerAlert::mapFor($companyId);
+
         $query = PosCustomer::where('company_id', $companyId);
+        if ($quietOnly) {
+            $query->whereIntegerInRaw('id', array_keys($inactiveMap));
+        }
+        $totalCount = (clone $query)->count();
         if ($q !== '') {
             $query->where(function ($w) use ($q) {
                 $like = '%' . str_replace(['%', '_'], ['\\%', '\\_'], $q) . '%';
@@ -12048,15 +12109,10 @@ class PosController extends Controller
                     ->orWhere('ntn', 'like', $like);
             });
         }
-        $totalCount = PosCustomer::where('company_id', $companyId)->count();
         // except('rows'): the live-search flag must never leak into the pager
         // links, or clicking page 2 would download the JSON payload.
-        $customers = $query->orderBy('name')->paginate(100)->appends($request->except(['page', 'rows']));
-        $user = auth('pos')->user();
+        $customers = $query->orderBy('name')->orderBy('id')->paginate(100)->appends($request->except(['page', 'rows']));
         $isCashier = ($user->pos_role ?? 'pos_admin') === 'pos_cashier';
-        // Task 1161: khamosh-repeat chip — same cached service as the dashboard
-        // card so the definition never drifts.
-        $inactiveMap = \App\Services\PosRepeatCustomerAlert::mapFor($companyId);
 
         // Live search (owner request, 23 Aug 2026): the box searches the SERVER
         // as the shop types — no Enter, no Search button. Same query, same
@@ -12076,7 +12132,7 @@ class PosController extends Controller
             ]);
         }
 
-        return view('pos.customers', compact('customers', 'isCashier', 'q', 'totalCount', 'inactiveMap'));
+        return view('pos.customers', compact('customers', 'isCashier', 'q', 'totalCount', 'inactiveMap', 'quietOnly'));
     }
 
     public function storeCustomer(Request $request)

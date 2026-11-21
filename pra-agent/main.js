@@ -39,7 +39,7 @@ const { createSaleAcceptance } = require('./src/local-core/sale-acceptance');
 const { createBackup, recoverInterruptedRestore } = require('./src/local-core/backup');
 const { printHtml: printHtmlSilent, getLocalPrinters, setPaperProfiles } = require('./src/printer');
 const { drainLocalKotQueue } = require('./src/local-kot');
-const { openPosWindow, getPosWindowRef, isPosWindowOpen, applyKiosk, openFbrPosWindow } = require('./src/pos-window');
+const { openPosWindow, getPosWindowRef, isPosWindowOpen, applyKiosk, openFbrPosWindow, isSecondaryPosPrintSender } = require('./src/pos-window');
 const {
   DEFAULT_SERVER_URL,
   canonicalAgentServerUrl,
@@ -1697,7 +1697,7 @@ ipcMain.handle('lan-remove-device', (event, id) => {
 // never feed paper to the shop printer.
 ipcMain.handle('pos-print-html', async (event, html, deviceName) => {
   const pw = getPosWindowRef();
-  if (!pw || event.sender !== pw.webContents) {
+  if (event.sender !== pw?.webContents && !isSecondaryPosPrintSender(event)) {
     return { success: false, error: 'unauthorized' };
   }
   if (!html || typeof html !== 'string') {

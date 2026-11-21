@@ -140,6 +140,20 @@ function getPosWindowRef(slotNumber = 1) {
   return win && !win.isDestroyed() ? win : null;
 }
 
+function isSecondaryPosPrintSender(event) {
+  const win = getPosWindowRef(2);
+  if (!win || event.sender !== win.webContents || event.senderFrame !== win.webContents.mainFrame) {
+    return false;
+  }
+  try {
+    const page = new URL(event.senderFrame.url);
+    return page.origin === posSlots[1].origin && page.pathname.startsWith('/pos/')
+      && !/^\/pos\/(?:login|logout)(?:\/|$)/.test(page.pathname);
+  } catch (_) {
+    return false;
+  }
+}
+
 function isPosWindowOpen() {
   return !!getPosWindowRef();
 }
@@ -208,8 +222,7 @@ function openPosWindow(config, opts = {}) {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
-      // The existing desktop bridge is tied to the primary Agent scope.
-      ...(slotNumber === 1 && { preload: path.join(__dirname, 'pos-preload.js') }),
+      preload: path.join(__dirname, slotNumber === 1 ? 'pos-preload.js' : 'pos-print-preload.js'),
       // Keep-alive (v1.5.2): the window keeps living hidden after "close",
       // so timers must NOT be throttled in the background — the sale screen's
       // incoming-orders poll + offline bill queue keep running at full speed.
@@ -218,6 +231,7 @@ function openPosWindow(config, opts = {}) {
   });
 
   slot.window = posWindow;
+  slot.origin = origin;
 
   // Keep our own title — the web app rewrites document.title on every page.
   posWindow.on('page-title-updated', (e) => e.preventDefault());
@@ -351,6 +365,7 @@ function openPosWindow(config, opts = {}) {
 
   posWindow.on('closed', () => {
     slot.window = null;
+    slot.origin = null;
     slot.forceClose = false;
   });
 
@@ -486,4 +501,4 @@ function closeFbrWindow() {
   }
 }
 
-module.exports = { openPosWindow, getPosWindowRef, isPosWindowOpen, applyKiosk, closePosWindow, openFbrPosWindow, closeFbrWindow };
+module.exports = { openPosWindow, getPosWindowRef, isPosWindowOpen, applyKiosk, closePosWindow, openFbrPosWindow, closeFbrWindow, isSecondaryPosPrintSender };

@@ -46,5 +46,6 @@ input:focus-visible,select:focus-visible,button:focus-visible,a:focus-visible{ou
 @if(isset($slot))<section class="hospital-shared-page">{{ $slot }}</section>@else @yield('content') @endif
 <script>window.addEventListener('pageshow',function(event){if(event.persisted)window.location.reload();});</script>
 </main></div>
+<x-software-version />
 @if($showInteractiveSupport ?? true)<footer class="no-print collection-support-dock"><x-madadgar-support product="fbrpos" placement="inline" /></footer>@endif
 </body></html>

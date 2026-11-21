@@ -52,7 +52,7 @@ test('POS windows retain independent sessions and reopen without affecting the o
     },
   };
   vm.runInNewContext(fs.readFileSync(filename, 'utf8'), context, { filename });
-  const { openPosWindow, getPosWindowRef, closePosWindow } = context.module.exports;
+  const { openPosWindow, getPosWindowRef, closePosWindow, isSecondaryPosPrintSender } = context.module.exports;
   const config = { serverUrl: 'http://127.0.0.1:8080' };
   assert.throws(() => openPosWindow(config, { slotNumber: 3 }), /Invalid POS/);
   const first = openPosWindow(config);
@@ -62,7 +62,16 @@ test('POS windows retain independent sessions and reopen without affecting the o
   assert.notEqual(first.webContents.session, second.webContents.session);
   assert.equal(first.options.webPreferences.partition, 'persist:pos');
   assert.equal(second.options.webPreferences.partition, 'persist:pos-2');
-  assert.equal(second.options.webPreferences.preload, undefined);
+  assert.equal(path.basename(second.options.webPreferences.preload), 'pos-print-preload.js');
+  const frame = { url: config.serverUrl + '/pos/invoice/create' };
+  second.webContents.mainFrame = frame;
+  assert.equal(isSecondaryPosPrintSender({ sender: second.webContents, senderFrame: frame }), true);
+  assert.equal(isSecondaryPosPrintSender({ sender: second.webContents, senderFrame: { ...frame } }), false);
+  assert.equal(isSecondaryPosPrintSender({ sender: first.webContents, senderFrame: frame }), false);
+  frame.url = config.serverUrl + '/pos/login';
+  assert.equal(isSecondaryPosPrintSender({ sender: second.webContents, senderFrame: frame }), false);
+  frame.url = 'https://example.invalid/pos/invoice/create';
+  assert.equal(isSecondaryPosPrintSender({ sender: second.webContents, senderFrame: frame }), false);
   assert.equal(second.popup({ url: config.serverUrl + '/pos/receipt' })
     .overrideBrowserWindowOptions.webPreferences.partition, 'persist:pos-2');
   second.close();

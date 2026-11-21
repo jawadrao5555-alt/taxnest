@@ -290,6 +290,18 @@ class AdminPagesSmokeTest extends TestCase
             ->assertSee('id="local-collections"', false);
     }
 
+    public function test_company_usage_compares_the_same_calendar_period_in_each_year(): void
+    {
+        $this->travelTo(\Illuminate\Support\Carbon::parse('2024-02-29 12:00:00', config('app.timezone')));
+        $this->actingAsAdmin()->get('/admin/company-usage?period=two_year&date_from=invalid')
+            ->assertOk()
+            ->assertViewHas('filters', fn (array $filters): bool =>
+                $filters['date_from'] === '2024-01-01'
+                && $filters['date_to'] === '2024-02-29'
+                && $filters['comparison'] === ['date_from' => '2023-01-01', 'date_to' => '2023-02-28']
+            );
+    }
+
     /** /admin/dashboard renders 200 even on a completely empty database. */
     public function test_admin_dashboard_returns_200_with_no_data(): void
     {

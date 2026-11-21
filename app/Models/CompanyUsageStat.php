@@ -95,6 +95,12 @@ class CompanyUsageStat extends Model
             }
             $snapshot->setRelation('company', $company);
             $snapshot->setAttribute('local_collections', $company->isLocalCollectionPilot() ? $localReporter->read($company, $localFilters) : null);
+            if ($company->isLocalCollectionPilot() && isset($localFilters['comparison'])) {
+                $snapshot->setAttribute('local_collections_comparison', $localReporter->read(
+                    $company,
+                    $localFilters['comparison'] + $localFilters
+                ));
+            }
 
             return $snapshot;
         });

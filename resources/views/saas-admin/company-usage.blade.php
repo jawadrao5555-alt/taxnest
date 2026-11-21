@@ -4,7 +4,20 @@
     <p class="mb-4 text-sm text-gray-600 dark:text-gray-300">Billing, terminal and stock figures below cover PRA POS only; a dash means not applicable or unavailable. Staff activity comes from recorded logins and session heartbeats. Opening this page does not count as company activity.</p>
 
     <h2 id="local-collections" class="mb-2 text-lg font-semibold">School / Hospital local collections</h2>
-    <form method="get" class="mb-4 grid sm:grid-cols-4 gap-2"><label>Company ID<input name="company_id" type="number" min="1" value="{{ request('company_id') }}"></label><label>Campus ID (0 = unassigned)<input name="branch_id" type="number" min="0" value="{{ request('branch_id') }}"></label><label>From calendar date<input name="date_from" type="date" value="{{ request('date_from') }}"></label><label>To calendar date<input name="date_to" type="date" value="{{ request('date_to') }}"></label><button>Filter local collections</button></form>
+    <form method="get" class="mb-4 grid sm:grid-cols-3 gap-2">
+        <label>Company ID<input name="company_id" type="number" min="1" value="{{ request('company_id') }}"></label>
+        <label>Campus ID (0 = unassigned)<input name="branch_id" type="number" min="0" value="{{ request('branch_id') }}"></label>
+        <label>Collection period
+            <select name="period">
+                @foreach(['custom' => 'Custom dates', 'daily' => 'Today', 'monthly' => 'Month to date', 'yearly' => 'Year to date', 'two_year' => 'Compare this year and last year'] as $value => $label)
+                    <option value="{{ $value }}" @selected(($filters['period'] ?? 'custom') === $value)>{{ $label }}</option>
+                @endforeach
+            </select>
+        </label>
+        <label>Custom start date<input name="date_from" type="date" value="{{ request('date_from') }}"></label>
+        <label>Custom end date<input name="date_to" type="date" value="{{ request('date_to') }}"></label>
+        <button>Filter local collections</button>
+    </form>
     <p>Local filters below apply only to School/Hospital collections. PRA usage columns remain all-time.</p>
     <div class="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
         <div class="overflow-x-auto">
@@ -35,7 +48,15 @@
                         <td class="px-4 py-3 text-right text-gray-300">{{ $stat->inventory_items ?? '—' }}</td>
                         <td class="px-4 py-3 text-gray-500 dark:text-gray-400 text-xs">{{ $stat->last_activity_at?->diffForHumans() ?? '—' }}</td>
                     </tr>
-                    @if($stat->local_collections)<tr><td colspan="7" class="px-4 py-3">@include('saas-admin.partials.local-collections',['local'=>$stat->local_collections])</td></tr>@endif
+                    @if($stat->local_collections)
+                        <tr><td colspan="7" class="px-4 py-3">
+                            @include('saas-admin.partials.local-collections',['local'=>$stat->local_collections])
+                            @if($stat->local_collections_comparison)
+                                <h3 class="mt-3 font-semibold">Same period last year</h3>
+                                @include('saas-admin.partials.local-collections',['local'=>$stat->local_collections_comparison])
+                            @endif
+                        </td></tr>
+                    @endif
                     @empty
                     <tr><td colspan="7" class="px-4 py-12 text-center text-gray-500 dark:text-gray-400">No usage data yet.</td></tr>
                     @endforelse

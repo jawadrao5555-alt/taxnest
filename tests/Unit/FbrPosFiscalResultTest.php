@@ -19,5 +19,11 @@ final class FbrPosFiscalResultTest extends TestCase
         $this->assertNull(FbrPosFiscalResult::explicitAcknowledgement(
             ['Code' => '100', 'InvoiceNumber' => ['invalid'], 'FBRInvoiceNumber' => $invoice], true, $invoice
         ));
+        $this->assertNull(FbrPosFiscalResult::explicitAcknowledgement(
+            ['Code' => '100', 'response_code' => '500', 'InvoiceNumber' => $invoice], true, $invoice
+        ));
+        $this->assertSame($invoice, FbrPosFiscalResult::explicitAcknowledgement(
+            ['Code' => 100, 'response_code' => '100', 'InvoiceNumber' => $invoice], true, $invoice
+        ));
     }
 }

@@ -7,6 +7,7 @@ final class FbrPosFiscalResult
     /** Extract the existing IMS code aliases without inferring success from a number. */
     public static function code(?array $response): ?string
     {
+        $codes = [];
         foreach (['Code', 'response_code', 'code'] as $key) {
             if (array_key_exists($key, $response ?? []) && $response[$key] !== null) {
                 $value = $response[$key];
@@ -14,10 +15,10 @@ final class FbrPosFiscalResult
                     return null;
                 }
                 $candidate = trim((string) $value);
-                if ($candidate !== '') return $candidate;
+                if ($candidate !== '') $codes[] = $candidate;
             }
         }
-        return null;
+        return count(array_unique($codes)) === 1 ? $codes[0] : null;
     }
 
     /** Pure interpretation only; device/claim/company binding remains the caller's duty. */

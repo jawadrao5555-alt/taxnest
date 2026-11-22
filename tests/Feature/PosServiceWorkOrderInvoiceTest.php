@@ -23,7 +23,7 @@ class PosServiceWorkOrderInvoiceTest extends TestCase
         $this->schema();
     }
 
-    public function test_terminal_work_order_creates_one_fiscal_sale_without_reusing_job_number(): void
+    public function test_terminal_work_order_creates_one_local_sale_without_reusing_job_number(): void
     {
         $company = $this->company('salon', 'Salon A');
         $user = User::create(['name' => 'Cashier', 'email' => 'a@example.test', 'password' => bcrypt('x'), 'company_id' => $company->id]);
@@ -42,7 +42,8 @@ class PosServiceWorkOrderInvoiceTest extends TestCase
         $this->assertNotNull($order->pos_transaction_id);
         $this->assertSame($txn->id, $order->pos_transaction_id);
         $this->assertMatchesRegularExpression('/^SAL-\d{6}$/', $order->job_number);
-        $this->assertTrue(str_starts_with($txn->invoice_number, 'L'));
+        $this->assertNull($txn->pra_status);
+        $this->assertMatchesRegularExpression('/^B\d+$/', $txn->invoice_number);
         $this->assertNotSame($order->job_number, $txn->invoice_number);
         $this->assertStringNotContainsString('SAL-', $txn->invoice_number);
         $this->assertSame(1, PosTransaction::where('company_id', $company->id)->count());

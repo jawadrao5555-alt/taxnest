@@ -231,20 +231,20 @@ class PosImsReportingService
         $result=self::result($response,true);
         // The live IMS component can acknowledge with only FBRInvoiceNumber.
         // Bind that reply shape to this claimed POS and keep central verification separate.
+        $posId = $r->payload['POSID'] ?? null;
+        $posId = is_string($posId) || is_int($posId) ? (string) $posId : '';
         if ($result['state'] === 'verification_required' && $r->environment === 'production'
-            && ($number = ImsNumberOnlyAcknowledgement::number($response, (string)$r->payload['POSID'], $diagnostic, $responseFields))) {
+            && ($number = ImsNumberOnlyAcknowledgement::number($response, $posId, $diagnostic, $responseFields))) {
             $result = ['state'=>'local_accepted','reference'=>$number,'error_codes'=>[]];
         }
 
         $centralStatus = is_array($response) ? ($response['CentralStatus'] ?? null) : null;
         $centralReference = is_array($response) ? FbrPosFiscalResult::number($response['CentralReference'] ?? null) : null;
-        $posId = str_pad((string) ($r->payload['POSID'] ?? ''), 6, '0', STR_PAD_LEFT);
         if ($r->environment === 'production' && $diagnostic === 'response_received'
             && $result['state'] === 'local_accepted'
             && is_string($centralStatus) && in_array($centralStatus, ['confirmed', 'verified'], true)
             && $centralReference && $centralReference === $result['reference']
-            && !empty($r->payload['POSID']) && strlen($posId) === 6 && str_starts_with($centralReference, $posId)
-            && preg_match('/[0-9]/', substr($centralReference, 6))) {
+            && ImsNumberOnlyAcknowledgement::matchesPosId($centralReference, $posId)) {
             $result['state'] = 'accepted';
             $result['central_confirmation'] = ['source' => 'fbr_ims_callback', 'status' => $centralStatus,
                 'reference' => $centralReference];
@@ -253,7 +253,7 @@ class PosImsReportingService
         // Retain only bounded, validated fiscal fields in encrypted evidence.
         // The original code used to discard all callback evidence after classification.
         $evidence=[];
-        foreach (['Code','code'] as $key) {
+        foreach (['Code','code','response_code'] as $key) {
             $value=is_array($response) ? ($response[$key] ?? null) : null;
             if ((is_string($value) || is_int($value) || (is_float($value) && is_finite($value))) && preg_match('/^[A-Za-z0-9_-]{1,12}$/D',trim((string)$value))) $evidence[$key]=trim((string)$value);
         }

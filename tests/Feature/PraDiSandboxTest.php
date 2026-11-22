@@ -818,10 +818,10 @@ class PraDiSandboxTest extends TestCase
         $svc->prepare($this->company->id,$r->id,$this->imsPayload($r));Http::fake();
         $svc->submit($this->company->id,$r->id,$this->owner->id);$claim=$svc->claim($this->company->id,'synthetic-device');
         $r=$svc->callback($this->company->id,$r->id,'synthetic-device',$claim['claim'],[
-            'Code'=>' 100 ','InvoiceNumber'=>'LOCAL-IMS-123456','Token'=>'private-token',
+            'Code'=>' 100 ','response_code'=>100,'InvoiceNumber'=>'LOCAL-IMS-123456','Token'=>'private-token',
             'BuyerCNIC'=>'private-identity','Response'=>'Private buyer details never retained'], 'response_received',['Code:string','InvoiceNumber:string','bad value with spaces']);
         $this->assertSame('local_accepted',$r->state);
-        $this->assertSame(['Code'=>'100','InvoiceNumber'=>'LOCAL-IMS-123456'],$r->attempts[0]['acknowledgement']);
+        $this->assertSame(['Code'=>'100','response_code'=>'100','InvoiceNumber'=>'LOCAL-IMS-123456'],$r->attempts[0]['acknowledgement']);
         $this->assertSame(['Code:string','InvoiceNumber:string'],$r->attempts[0]['response_fields']);
         $this->assertStringNotContainsString('private',json_encode($r->attempts));
         $this->get(route('pos.tax-integrations.ims.show',$r->id))->assertOk()->assertSee('Code: 100')->assertSee('LOCAL-IMS-123456');

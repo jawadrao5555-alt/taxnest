@@ -7,6 +7,17 @@ use PHPUnit\Framework\TestCase;
 
 final class FbrPosFiscalResultTest extends TestCase
 {
+    public function test_ims_reference_binding_preserves_short_and_zero_padded_pos_ids(): void
+    {
+        foreach (['123', '000123'] as $posId) {
+            $this->assertTrue(\App\Services\ImsNumberOnlyAcknowledgement::matchesPosId('000123SYN123', $posId));
+        }
+        foreach (['', '000000', 'ABC123', '1234567'] as $invalid) {
+            $this->assertFalse(\App\Services\ImsNumberOnlyAcknowledgement::matchesPosId('000123SYN123', $invalid));
+        }
+        $this->assertFalse(\App\Services\ImsNumberOnlyAcknowledgement::matchesPosId('000124SYN123', '123'));
+    }
+
     public function test_number_only_acknowledgement_requires_a_recorded_pos_identity(): void
     {
         $fields = ['FBRInvoiceNumber:string'];

@@ -376,6 +376,8 @@ html body { width: auto; max-width: 180mm; margin: 0 auto; padding: 0; }
         // "Daily Token" label or the Bill Serial / local-invoice line. Internal
         // invoice_number stays on the bill for search/returns/reports.
         $rcptIsDailyStyle = \App\Support\PosBillNumberStyle::styleFor($company, $transaction) === 'daily';
+        $rcptShowPosSerial = $optionVisible('show_pos_invoice_number')
+            || ($rcptBillToken === null && !$rcptPraFiscal && !$federalFiscal);
     @endphp
 
     {{-- Order-number early lookup: for fiscal top box (code-style restaurant bills
@@ -425,9 +427,12 @@ html body { width: auto; max-width: 180mm; margin: 0 auto; padding: 0; }
         <span style="font-size:22px; font-weight:bold; color:#000; line-height:1.15;">{{ $rcptBillToken }}</span>
         @elseif($rcptBillToken !== null)
         <span style="font-size:9px; font-weight:700; color:#000;">{{ __('pos.daily_token_label') }}</span><br>
-        <span style="font-size:22px; font-weight:bold; color:#000; line-height:1.15;">{{ $rcptBillToken }}</span><br>
+        <span style="font-size:22px; font-weight:bold; color:#000; line-height:1.15;">{{ $rcptBillToken }}</span>
+        @if($rcptShowPosSerial)
+        <br>
         <span style="font-size:9px; font-weight:600; color:#000;">{{ __('pos.bill_serial_label') }}: {{ $transaction->invoice_number }}</span>
-        @else
+        @endif
+        @elseif($rcptShowPosSerial)
         <span style="font-size:13px; font-weight:bold; color:#000;">{{ $transaction->invoice_number }}</span>
         @endif
         @if($rcptTopProvisional)<br><span style="font-size:9px; color:#000;">{{ __('pos.receipt_provisional_note') }}</span>@endif
@@ -478,23 +483,23 @@ html body { width: auto; max-width: 180mm; margin: 0 auto; padding: 0; }
                 <td class="inv-value">{{ $transaction->pra_invoice_number }}</td>
             </tr>
             @endunless
-            @if($rcptBillToken !== null)
+            @if($rcptShowPosSerial && $rcptBillToken !== null)
             <tr>
                 <td class="inv-label" style="font-size:9px; font-weight:600; color:#000;">{{ __('pos.bill_serial_label') }}:</td>
                 <td class="inv-value" style="font-size:9px; font-weight:600; color:#000;">{{ $transaction->invoice_number }}</td>
             </tr>
-            @else
+            @elseif($rcptShowPosSerial)
             <tr>
                 <td class="inv-label">{{ __('pos.receipt_pos_invoice') }}:</td>
                 <td class="inv-value">{{ $transaction->invoice_number }}</td>
             </tr>
             @endif
-            @elseif($rcptIsLocalStream)
+            @elseif($rcptShowPosSerial && $rcptIsLocalStream)
             <tr>
                 <td class="inv-label">{{ __('pos.receipt_local_invoice') }}:</td>
                 <td class="inv-value">{{ $transaction->invoice_number }}</td>
             </tr>
-            @else
+            @elseif($rcptShowPosSerial)
             <tr>
                 <td class="inv-label">{{ __('pos.receipt_pos_invoice') }}:</td>
                 <td class="inv-value">{{ $transaction->invoice_number }}</td>

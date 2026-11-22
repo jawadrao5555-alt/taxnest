@@ -332,6 +332,38 @@ class PosLocalReceiptQrAndTaxSettingsTest extends TestCase
         }
     }
 
+    public function test_receipts_can_hide_the_pos_reference_when_another_number_remains_visible(): void
+    {
+        $company = $this->makeCompany(menuQr: false, localShowTax: true);
+        $company->local_number_style = 'token';
+        $company->invoice_display_prefs = [
+            ...$company->invoice_display_prefs,
+            'receipt_options' => [
+                'local' => ['show_pos_invoice_number' => 'hide'],
+                'pra' => ['show_pos_invoice_number' => 'hide'],
+            ],
+        ];
+        $fiscalNumber = 'SYNTHETIC-PRA-9911';
+        $this->insertTxnRow();
+        $cases = [
+            [$this->makeTxn($company, ['bill_token' => 42]), '>42<', false],
+            [$this->makeTxn($company, ['invoice_mode' => 'pra', 'pra_status' => 'submitted', 'pra_invoice_number' => $fiscalNumber]), $fiscalNumber, false],
+            [$this->makeTxn($company), '>L-000131<', true],
+        ];
+        QrImage::fake();
+        foreach (self::TEMPLATES as $tpl) {
+            foreach ($cases as [$bill, $visible, $showSerial]) {
+                $html = view($tpl, ['company' => $company, 'transaction' => $bill])->render();
+                $this->assertStringContainsString($visible, $html, $tpl);
+                if (!$showSerial) {
+                    $this->assertStringNotContainsString('>L-000131<', $html, $tpl);
+                    $this->assertStringNotContainsString(': L-000131</span>', $html, $tpl);
+                }
+            }
+        }
+        $this->assertContains($fiscalNumber, QrImage::recorded());
+    }
+
     public function test_advanced_controls_do_not_duplicate_primary_fields_except_for_saved_overrides(): void
     {
         $company = $this->makeCompany(menuQr: false, localShowTax: true);

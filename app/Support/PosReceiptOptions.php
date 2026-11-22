@@ -17,6 +17,7 @@ final class PosReceiptOptions
         'show_logo' => 'Logo', 'show_business_name' => 'Business name',
         'show_address' => 'Address', 'show_mobile' => 'Phone / mobile',
         'show_email' => 'Email', 'show_ntn' => 'NTN', 'show_strn' => 'STRN',
+        'show_pos_invoice_number' => 'POS invoice number when a fiscal or calling number is shown',
         'show_customer_name' => 'Customer name', 'show_customer_phone' => 'Customer phone',
         'show_delivery_address' => 'Delivery address',
         'show_business_activity' => 'Business activity', 'show_website' => 'Website',

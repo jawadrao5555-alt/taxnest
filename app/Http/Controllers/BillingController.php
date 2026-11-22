@@ -40,6 +40,7 @@ class BillingController extends Controller
         $aiPages = null;
         $aiReaderAllowed = false;
         $aiTopupPending = false;
+        $aiCanBuy = in_array((string) auth('web')->user()?->role, ['super_admin', 'company_admin'], true);
 
         $companyId = app()->bound('currentCompanyId') ? app('currentCompanyId') : null;
         $pendingSelection = null;
@@ -157,6 +158,7 @@ class BillingController extends Controller
             'aiPages',
             'aiReaderAllowed',
             'aiTopupPending',
+            'aiCanBuy',
             'billingHistory',
             'billingDocumentRoutes',
             'pendingSelection',

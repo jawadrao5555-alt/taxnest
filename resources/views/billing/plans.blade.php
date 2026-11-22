@@ -144,7 +144,6 @@
                     'iban' => \App\Models\SystemSetting::get('payment_iban', ''),
                     'instructions' => \App\Models\SystemSetting::get('payment_instructions', ''),
                 ];
-                $aiCanBuy = in_array(auth()->user()->role, ['super_admin', 'company_admin'], true);
                 $aiPackList = [];
                 foreach ($aiPages['packs'] as $aiPackPages => $aiPackPrice) {
                     $aiPackList[] = ['pages' => (int) $aiPackPages, 'price' => (int) $aiPackPrice];

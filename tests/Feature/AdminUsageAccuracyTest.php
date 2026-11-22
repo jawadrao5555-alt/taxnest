@@ -173,6 +173,34 @@ class AdminUsageAccuracyTest extends TestCase
         $this->assertSame(3071.0, CompanyUsageStat::refreshForCompany(1)->total_sales_amount);
     }
 
+    public function test_company_usage_filters_products_and_standalone_collection_categories(): void
+    {
+        Schema::table('companies', function (Blueprint $table) {
+            $table->string('pos_type')->nullable();
+            $table->string('business_category')->nullable();
+        });
+        DB::table('companies')->insert([
+            ['id' => 4, 'name' => 'Example School', 'product_type' => 'fbrpos', 'pos_type' => null, 'business_category' => 'education'],
+            ['id' => 5, 'name' => 'Example Hospital', 'product_type' => 'fbrpos', 'pos_type' => 'clinic', 'business_category' => null],
+            ['id' => 6, 'name' => 'Example Mixed', 'product_type' => 'fbrpos', 'pos_type' => 'clinic', 'business_category' => 'education'],
+            ['id' => 7, 'name' => 'Example Legacy ERP', 'product_type' => 'health', 'pos_type' => null, 'business_category' => 'hospital'],
+            ['id' => 8, 'name' => 'Example ERP', 'product_type' => 'erps', 'pos_type' => null, 'business_category' => null],
+        ]);
+        $this->actingAs(AdminUser::create([
+            'name' => 'Example Reviewer', 'email' => 'example-product-review@example.test',
+            'password' => 'local-fixture-password', 'role' => 'super_admin',
+        ]), 'admin');
+        foreach (['pos' => [1, 2], 'school' => [6, 4], 'hospital' => [5], 'erps' => [8, 7]] as $scope => $expected) {
+            $this->get('/admin/company-usage?product_scope='.$scope)
+                ->assertOk()
+                ->assertViewHas('usageStats', fn ($rows) => $rows->pluck('company_id')->all() === $expected);
+        }
+        $this->get('/admin/company-usage?product_scope=hospital&company_id=4')
+            ->assertOk()
+            ->assertViewHas('usageStats', fn ($rows) => $rows->isEmpty());
+        $this->get('/admin/company-usage?product_scope=unknown')->assertSessionHasErrors('product_scope');
+    }
+
     public function test_page_is_paginated_and_does_not_require_a_cached_usage_table(): void
     {
         Schema::drop('company_usage_stats');

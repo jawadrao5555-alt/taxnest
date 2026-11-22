@@ -5,8 +5,12 @@ namespace App\Http\Controllers\SaasAdmin;
 use App\Http\Controllers\Controller;
 use App\Models\Company;
 use App\Models\CompanyUsageStat;
+use App\Support\NestErps;
+use App\Support\ProductCatalog;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class AdminUsageController extends Controller
@@ -14,11 +18,17 @@ class AdminUsageController extends Controller
     public function index(?Request $request = null)
     {
         $request ??= request();
+        $productScopes = [];
+        foreach (ProductCatalog::TYPES as $type) {
+            $productScopes[$type] = ProductCatalog::label($type);
+        }
+        $productScopes += ['school' => 'School POS', 'hospital' => 'Hospital POS'];
         $customDates = ($request->input('period') ?? 'custom') === 'custom';
         $filters = $request->validate([
             'export' => 'nullable|in:local_csv,pra_csv',
             'company_id' => 'required_if:export,local_csv,pra_csv|nullable|integer|min:1',
             'branch_id' => 'nullable|integer|min:0',
+            'product_scope' => ['nullable', Rule::in(array_keys($productScopes))],
             'period' => 'nullable|in:custom,daily,monthly,yearly,two_year',
             'as_of' => 'nullable|date_format:Y-m-d',
             ...($customDates ? [
@@ -55,7 +65,38 @@ class AdminUsageController extends Controller
                 'date_to' => $lastYear->toDateString(),
             ];
         }
-        $companies = Company::when(isset($filters['company_id']), fn($q)=>$q->whereKey($filters['company_id']))->orderBy('name')->orderBy('id')->paginate(50)->withQueryString();
+        $companyQuery = Company::query()
+            ->when(isset($filters['company_id']), fn ($query) => $query->whereKey($filters['company_id']));
+        $scope = $filters['product_scope'] ?? null;
+        if (isset($scope)) {
+            $categories = match ($scope) {
+                'school' => ['education'],
+                'hospital' => ['clinic', 'hospital'],
+                default => [],
+            };
+            $companyQuery->whereIn('product_type', NestErps::storedTypesFor(
+                $categories === [] ? $scope : ProductCatalog::FBRPOS
+            ));
+            if ($categories !== []) {
+                $categoryColumns = array_filter(
+                    ['pos_type', 'business_category'],
+                    fn ($column) => Schema::hasColumn('companies', $column)
+                );
+                $companyQuery->where(function ($query) use ($categories, $categoryColumns) {
+                    $query->whereRaw('1 = 0');
+                    foreach ($categoryColumns as $column) {
+                        $query->orWhereIn($column, $categories);
+                    }
+                });
+                if ($scope === 'hospital') {
+                    // Collection reports already give the School ledger priority for legacy mixed-category rows.
+                    foreach ($categoryColumns as $column) {
+                        $companyQuery->where(fn ($query) => $query->whereNull($column)->orWhere($column, '!=', 'education'));
+                    }
+                }
+            }
+        }
+        $companies = $companyQuery->orderBy('name')->orderBy('id')->paginate(50)->withQueryString();
         $usageStats = CompanyUsageStat::snapshotsForCompanies($companies->getCollection(), $filters);
 
         if (($filters['export'] ?? null) === 'pra_csv') {
@@ -102,6 +143,6 @@ class AdminUsageController extends Controller
             }, 'local-collections-'.$snapshot->company_id.'.csv', ['Content-Type' => 'text/csv', 'Cache-Control' => 'private, no-store']);
         }
 
-        return view('saas-admin.company-usage', compact('usageStats', 'companies', 'filters'));
+        return view('saas-admin.company-usage', compact('usageStats', 'companies', 'filters', 'productScopes'));
     }
 }

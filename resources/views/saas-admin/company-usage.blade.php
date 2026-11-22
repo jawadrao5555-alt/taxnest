@@ -6,6 +6,14 @@
     <h2 id="local-collections" class="mb-2 text-lg font-semibold">School / Hospital local collections</h2>
     <form method="get" class="mb-4 grid sm:grid-cols-3 gap-2">
         <label>Company ID<input name="company_id" type="number" min="1" value="{{ request('company_id') }}"></label>
+        <label>Product or collection category
+            <select name="product_scope">
+                <option value="">All products</option>
+                @foreach($productScopes as $value => $label)
+                    <option value="{{ $value }}" @selected(($filters['product_scope'] ?? null) === $value)>{{ $label }}</option>
+                @endforeach
+            </select>
+        </label>
         <label>Branch or campus ID (0 = unassigned)<input name="branch_id" type="number" min="0" value="{{ request('branch_id') }}"></label>
         <label>Reporting period
             <select name="period">

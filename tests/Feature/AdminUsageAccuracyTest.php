@@ -166,7 +166,9 @@ class AdminUsageAccuracyTest extends TestCase
             '1,11,2024-01-01,2024-02-29,1,1200.00',
             '1,11,2023-01-01,2023-02-28,1,450.00',
         ], explode("\n", trim($csv)));
-        $this->get('/admin/company-usage?company_id=3&export=pra_csv')->assertNotFound();
+        $unsupportedExport = '/admin/company-usage?company_id=3&export=pra_csv';
+        $this->get($unsupportedExport)->assertRedirect('/admin/dashboard');
+        $this->getJson($unsupportedExport)->assertNotFound();
 
         $this->assertSame(3071.0, CompanyUsageStat::refreshForCompany(1)->total_sales_amount);
     }

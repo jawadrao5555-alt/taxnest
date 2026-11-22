@@ -136,19 +136,6 @@
                  aati hai; khatam ho jaye to shop yahan se extra pages khareedti hai.
                  Approve par SIRF pages barhte hain — package ko haath nahi lagta. --}}
             @if($aiPages && $aiReaderAllowed && !$aiPages['unlimited'])
-            @php
-                $aiBank = [
-                    'bank_name' => \App\Models\SystemSetting::get('payment_bank_name', ''),
-                    'account_title' => \App\Models\SystemSetting::get('payment_account_title', ''),
-                    'account_number' => \App\Models\SystemSetting::get('payment_account_number', ''),
-                    'iban' => \App\Models\SystemSetting::get('payment_iban', ''),
-                    'instructions' => \App\Models\SystemSetting::get('payment_instructions', ''),
-                ];
-                $aiPackList = [];
-                foreach ($aiPages['packs'] as $aiPackPages => $aiPackPrice) {
-                    $aiPackList[] = ['pages' => (int) $aiPackPages, 'price' => (int) $aiPackPrice];
-                }
-            @endphp
             <div id="ai-pages" class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6 mb-8"
                  x-data="{ open: false, pack: {{ $aiPackList[1]['pages'] ?? ($aiPackList[0]['pages'] ?? 100) }} }">
                 <div class="flex flex-wrap items-start justify-between gap-4">

@@ -13,18 +13,24 @@ class AdminUsageController extends Controller
     public function index(?Request $request = null)
     {
         $request ??= request();
+        $customDates = ($request->input('period') ?? 'custom') === 'custom';
         $filters = $request->validate([
             'company_id' => 'nullable|integer|min:1',
             'branch_id' => 'nullable|integer|min:0',
             'period' => 'nullable|in:custom,daily,monthly,yearly,two_year',
-            'date_from' => 'exclude_unless:period,custom,null|nullable|date_format:Y-m-d',
-            'date_to' => 'exclude_unless:period,custom,null|nullable|date_format:Y-m-d|after_or_equal:date_from',
+            ...($customDates ? [
+                'date_from' => 'nullable|date_format:Y-m-d',
+                'date_to' => 'nullable|date_format:Y-m-d',
+            ] : []),
         ]);
         if (isset($filters['branch_id']) && !isset($filters['company_id'])) {
             throw ValidationException::withMessages(['branch_id' => 'Choose a company before applying a campus filter.']);
         }
 
         $today = today()->toImmutable();
+        if ($customDates && isset($filters['date_from']) && $filters['date_from'] > ($filters['date_to'] ?? $today->toDateString())) {
+            throw ValidationException::withMessages(['date_from' => 'Start date is after the reporting end date.']);
+        }
         $period = $filters['period'] ?? 'custom';
         $from = match ($period) {
             'daily' => $today,

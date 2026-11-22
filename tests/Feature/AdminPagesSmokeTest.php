@@ -290,6 +290,16 @@ class AdminPagesSmokeTest extends TestCase
             ->assertSee('id="local-collections"', false);
     }
 
+    public function test_company_usage_accepts_legacy_end_only_filter_and_rejects_reversed_dates(): void
+    {
+        $this->actingAsAdmin()->get('/admin/company-usage?date_to=2024-02-29')
+            ->assertOk()->assertViewHas('filters', fn (array $filters): bool =>
+                $filters['date_to'] === '2024-02-29' && !isset($filters['date_from'])
+            );
+        $this->get('/admin/company-usage?period=custom&date_from=2024-03-01&date_to=2024-02-29')
+            ->assertSessionHasErrors('date_from');
+    }
+
     public function test_company_usage_compares_the_same_calendar_period_in_each_year(): void
     {
         $this->travelTo(\Illuminate\Support\Carbon::parse('2024-02-29 12:00:00', config('app.timezone')));

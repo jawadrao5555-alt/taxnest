@@ -6,6 +6,31 @@ const path = require('node:path');
 const test = require('node:test');
 const vm = require('node:vm');
 
+test('the POS 2 preload exposes printing without POS 1 local authority', async () => {
+  const exposed = new Map();
+  const messages = [];
+  const filename = path.join(__dirname, '../src/pos-print-preload.js');
+  vm.runInNewContext(fs.readFileSync(filename, 'utf8'), {
+    require(name) {
+      assert.equal(name, 'electron');
+      return {
+        contextBridge: { exposeInMainWorld: (key, api) => exposed.set(key, api) },
+        ipcRenderer: { invoke: async (...args) => { messages.push(args); } },
+      };
+    },
+  }, { filename });
+
+  assert.deepEqual([...exposed.keys()], ['nestposDesktop']);
+  const bridge = exposed.get('nestposDesktop');
+  assert.deepEqual(Object.keys(bridge).sort(), ['desktop', 'getVersion', 'printHtml']);
+  await bridge.printHtml('<p>Fictional receipt</p>');
+  await bridge.getVersion();
+  assert.deepEqual(messages, [
+    ['pos-print-html', '<p>Fictional receipt</p>', null],
+    ['get-version'],
+  ]);
+});
+
 test('POS windows retain independent sessions and reopen without affecting the other slot', () => {
   const sessions = new Map();
 

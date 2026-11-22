@@ -40,9 +40,6 @@ class BillingController extends Controller
         $aiPages = null;
         $aiReaderAllowed = false;
         $aiTopupPending = false;
-        $aiCanBuy = in_array((string) auth('web')->user()?->role, ['super_admin', 'company_admin'], true);
-        $aiBank = [];
-        $aiPackList = [];
 
         $companyId = app()->bound('currentCompanyId') ? app('currentCompanyId') : null;
         $pendingSelection = null;
@@ -151,19 +148,6 @@ class BillingController extends Controller
             $billingCycles[$cycle]['discount'] = (int) floor($best);
         }
 
-        if ($aiPages && $aiReaderAllowed && !($aiPages['unlimited'] ?? false)) {
-            $aiBank = [
-                'bank_name' => \App\Models\SystemSetting::get('payment_bank_name', ''),
-                'account_title' => \App\Models\SystemSetting::get('payment_account_title', ''),
-                'account_number' => \App\Models\SystemSetting::get('payment_account_number', ''),
-                'iban' => \App\Models\SystemSetting::get('payment_iban', ''),
-                'instructions' => \App\Models\SystemSetting::get('payment_instructions', ''),
-            ];
-            foreach (($aiPages['packs'] ?? []) as $pages => $price) {
-                $aiPackList[] = ['pages' => (int) $pages, 'price' => (int) $price];
-            }
-        }
-
         return view('billing.plans', compact(
             'plans',
             'currentSubscription',
@@ -173,9 +157,6 @@ class BillingController extends Controller
             'aiPages',
             'aiReaderAllowed',
             'aiTopupPending',
-            'aiCanBuy',
-            'aiBank',
-            'aiPackList',
             'billingHistory',
             'billingDocumentRoutes',
             'pendingSelection',

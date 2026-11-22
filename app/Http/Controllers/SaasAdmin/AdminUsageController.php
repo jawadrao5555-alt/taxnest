@@ -27,7 +27,7 @@ class AdminUsageController extends Controller
             ] : []),
         ]);
         if (isset($filters['branch_id']) && !isset($filters['company_id'])) {
-            throw ValidationException::withMessages(['branch_id' => 'Choose a company before applying a campus filter.']);
+            throw ValidationException::withMessages(['branch_id' => 'Choose a company before applying a branch or campus filter.']);
         }
 
         $today = today()->toImmutable();

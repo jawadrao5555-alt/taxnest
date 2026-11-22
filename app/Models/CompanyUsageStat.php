@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -44,13 +45,17 @@ class CompanyUsageStat extends Model
         $ids = $companies->pluck('id');
         $praIds = $companies->filter(fn ($company) => $company->product_type === 'pos')->pluck('id');
         $hasSales = Schema::hasColumns('pos_transactions', ['company_id', 'status', 'total_amount']);
-        $sales = $hasSales && $praIds->isNotEmpty()
+        $salesQuery = $hasSales && $praIds->isNotEmpty()
             ? DB::table('pos_transactions')->whereIn('company_id', $praIds)->where('status', 'completed')
                 ->when(Schema::hasColumn('pos_transactions', 'is_archived'), fn ($query) => $query
                     ->where(fn ($visible) => $visible->where('is_archived', false)->orWhereNull('is_archived')))
                 ->selectRaw('company_id, COUNT(*) as bills, COALESCE(SUM(total_amount), 0) as amount')
-                ->groupBy('company_id')->get()->keyBy('company_id')
-            : collect();
+                ->groupBy('company_id')
+            : null;
+        $sales = self::praSales($salesQuery, $localFilters);
+        $comparison = isset($localFilters['comparison'])
+            ? self::praSales($salesQuery, $localFilters['comparison'] + $localFilters)
+            : null;
 
         $counts = [];
         foreach (['active_terminals' => 'pos_terminals', 'active_users' => 'users', 'inventory_items' => 'inventory_stocks'] as $field => $table) {
@@ -80,15 +85,22 @@ class CompanyUsageStat extends Model
         }
 
         $localReporter=app(\App\Services\Reporting\LocalCollectionReports::class);
-        return $companies->map(function (Company $company) use ($hasSales, $sales, $counts, $lastActivity, $localReporter, $localFilters) {
+        return $companies->map(function (Company $company) use ($sales, $comparison, $counts, $lastActivity, $localReporter, $localFilters) {
             $pra = $company->product_type === 'pos';
-            $sale = $sales->get($company->id);
+            $sale = $sales?->get($company->id);
             $snapshot = new self([
                 'company_id' => $company->id,
-                'total_pos_transactions' => $pra && $hasSales ? (int) ($sale->bills ?? 0) : null,
-                'total_sales_amount' => $pra && $hasSales ? (float) ($sale->amount ?? 0) : null,
+                'total_pos_transactions' => $pra && $sales !== null ? (int) ($sale->bills ?? 0) : null,
+                'total_sales_amount' => $pra && $sales !== null ? (float) ($sale->amount ?? 0) : null,
                 'last_activity_at' => $lastActivity[$company->id] ?? null,
             ]);
+            $previous = $comparison?->get($company->id);
+            $snapshot->setAttribute('pra_comparison', $pra && $comparison !== null
+                ? [
+                    'bills' => (int) ($previous->bills ?? 0),
+                    'amount' => (float) ($previous->amount ?? 0),
+                ]
+                : null);
             foreach ($counts as $field => $values) {
                 $snapshot->setAttribute($field, $values !== null && ($pra || $field === 'active_users')
                     ? (int) ($values[$company->id] ?? 0) : null);
@@ -104,5 +116,30 @@ class CompanyUsageStat extends Model
 
             return $snapshot;
         });
+    }
+
+    private static function praSales(?Builder $salesQuery, array $filters): ?Collection
+    {
+        if ($salesQuery === null) {
+            return null;
+        }
+        $sales = clone $salesQuery;
+        if (isset($filters['date_from']) || isset($filters['date_to'])) {
+            if (!Schema::hasColumn('pos_transactions', 'business_date')) {
+                return null;
+            }
+            $sales->when(isset($filters['date_from']), fn (Builder $query) => $query->where('business_date', '>=', $filters['date_from']))
+                ->when(isset($filters['date_to']), fn (Builder $query) => $query->where('business_date', '<=', $filters['date_to']));
+        }
+        if (isset($filters['branch_id'])) {
+            if (!Schema::hasColumn('pos_transactions', 'branch_id')) {
+                return null;
+            }
+            $branchId = (int) $filters['branch_id'];
+            $sales->where(fn (Builder $query) => $query->where('branch_id', $branchId)
+                ->when($branchId === 0, fn (Builder $unassigned) => $unassigned->orWhereNull('branch_id')));
+        }
+
+        return $sales->get()->keyBy('company_id');
     }
 }

@@ -118,6 +118,45 @@ class AdminUsageAccuracyTest extends TestCase
         $this->assertSame(0, $row->inventory_items);
     }
 
+    public function test_pra_usage_compares_stored_business_dates_for_the_selected_company_and_branch(): void
+    {
+        Schema::table('pos_transactions', function (Blueprint $table) {
+            $table->date('business_date')->nullable();
+            $table->unsignedBigInteger('branch_id')->nullable();
+        });
+        $this->travelTo(now()->setDate(2024, 2, 29)->startOfDay());
+        foreach ([
+            [1, 11, '2024-02-29', 1200, false],
+            [1, 11, '2023-02-28', 450, false],
+            [1, 11, '2023-03-01', 800, false],
+            [1, 11, '2024-02-29', 900, true],
+            [1, 11, null, 100, false],
+            [1, 12, '2024-02-29', 200, false],
+            [2, 11, '2024-02-29', 300, false],
+        ] as [$company, $branch, $date, $amount, $archived]) {
+            DB::table('pos_transactions')->insert([
+                'company_id' => $company, 'branch_id' => $branch, 'business_date' => $date,
+                'status' => 'completed', 'total_amount' => $amount, 'is_archived' => $archived,
+                'created_at' => now()->addDay(),
+            ]);
+        }
+
+        $admin = AdminUser::create([
+            'name' => 'Example Usage Reviewer', 'email' => 'example-usage@example.test',
+            'password' => 'local-fixture-password', 'role' => 'super_admin',
+        ]);
+        $this->actingAs($admin, 'admin')
+            ->get('/admin/company-usage?company_id=1&branch_id=11&period=two_year')
+            ->assertOk()
+            ->assertSee('Last year: 450.00')
+            ->assertViewHas('usageStats', fn ($rows) => $rows->count() === 1
+                && $rows->first()->total_pos_transactions === 1
+                && $rows->first()->total_sales_amount === 1200.0
+                && $rows->first()->pra_comparison === ['bills' => 1, 'amount' => 450.0]);
+
+        $this->assertSame(2750.0, CompanyUsageStat::refreshForCompany(1)->total_sales_amount);
+    }
+
     public function test_page_is_paginated_and_does_not_require_a_cached_usage_table(): void
     {
         Schema::drop('company_usage_stats');

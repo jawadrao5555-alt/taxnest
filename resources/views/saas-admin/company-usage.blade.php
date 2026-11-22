@@ -6,8 +6,8 @@
     <h2 id="local-collections" class="mb-2 text-lg font-semibold">School / Hospital local collections</h2>
     <form method="get" class="mb-4 grid sm:grid-cols-3 gap-2">
         <label>Company ID<input name="company_id" type="number" min="1" value="{{ request('company_id') }}"></label>
-        <label>Campus ID (0 = unassigned)<input name="branch_id" type="number" min="0" value="{{ request('branch_id') }}"></label>
-        <label>Collection period
+        <label>Branch or campus ID (0 = unassigned)<input name="branch_id" type="number" min="0" value="{{ request('branch_id') }}"></label>
+        <label>Reporting period
             <select name="period">
                 @foreach(['custom' => 'Custom dates', 'daily' => 'Today', 'monthly' => 'Month to date', 'yearly' => 'Year to date', 'two_year' => 'Compare this year and last year'] as $value => $label)
                     <option value="{{ $value }}" @selected(($filters['period'] ?? 'custom') === $value)>{{ $label }}</option>
@@ -16,9 +16,16 @@
         </label>
         <label>Custom start date<input name="date_from" type="date" value="{{ request('date_from') }}"></label>
         <label>Custom end date<input name="date_to" type="date" value="{{ request('date_to') }}"></label>
-        <button>Filter local collections</button>
+        <button>Apply filters</button>
     </form>
-    <p>Local filters below apply only to School/Hospital collections. PRA usage columns remain all-time.</p>
+    <p>Dates and branch selection apply to PRA bills and School/Hospital collections. Dated PRA totals use the stored business date. Bills without a business date appear only in all-time totals.</p>
+    @if(isset($filters['date_from']) || isset($filters['date_to']))
+        <p>PRA business dates: {{ $filters['date_from'] ?? 'Earliest' }} to {{ $filters['date_to'] ?? 'Latest' }}.
+            @if(isset($filters['comparison']))
+                Same period last year: {{ $filters['comparison']['date_from'] }} to {{ $filters['comparison']['date_to'] }}.
+            @endif
+        </p>
+    @endif
     <div class="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
         <div class="overflow-x-auto">
             <table class="w-full text-sm table-cards">
@@ -41,8 +48,18 @@
                             @if(auth('admin')->user()?->canManageSensitiveConfiguration())<a class="block text-xs text-indigo-400" href="{{ route('admin.company-ai-usage',$stat->company_id) }}">AI usage / budget</a>@endif
                             <span class="block text-xs text-gray-500">{{ \App\Support\ProductCatalog::label($stat->company->product_type) }}</span>
                         </td>
-                        <td class="px-4 py-3 text-right text-gray-300 font-medium">{{ $stat->total_pos_transactions === null ? '—' : number_format($stat->total_pos_transactions) }}</td>
-                        <td class="px-4 py-3 text-right text-emerald-400 font-medium">{{ $stat->total_sales_amount === null ? '—' : number_format($stat->total_sales_amount, 2) }}</td>
+                        <td class="px-4 py-3 text-right text-gray-300 font-medium">
+                            {{ $stat->total_pos_transactions === null ? '—' : number_format($stat->total_pos_transactions) }}
+                            @if($stat->pra_comparison !== null)
+                                <div class="text-xs text-gray-400">Last year: {{ number_format($stat->pra_comparison['bills']) }}</div>
+                            @endif
+                        </td>
+                        <td class="px-4 py-3 text-right text-emerald-400 font-medium">
+                            {{ $stat->total_sales_amount === null ? '—' : number_format($stat->total_sales_amount, 2) }}
+                            @if($stat->pra_comparison !== null)
+                                <div class="text-xs text-gray-400">Last year: {{ number_format($stat->pra_comparison['amount'], 2) }}</div>
+                            @endif
+                        </td>
                         <td class="px-4 py-3 text-right text-gray-300">{{ $stat->active_terminals ?? '—' }}</td>
                         <td class="px-4 py-3 text-right text-gray-300">{{ $stat->active_users ?? '—' }}</td>
                         <td class="px-4 py-3 text-right text-gray-300">{{ $stat->inventory_items ?? '—' }}</td>

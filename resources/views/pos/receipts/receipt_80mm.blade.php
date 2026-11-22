@@ -355,7 +355,7 @@ html body { width: auto; max-width: 180mm; margin: 0 auto; padding: 0; }
         @if($company->email && $rp['show_email'])<p><!--email_off-->{{ $company->email }}<!--/email_off--></p>@endif
         @if($company->website && $optionVisible('show_website'))<p>{{ $company->website }}</p>@endif
         @if($company->ntn && $rp['show_ntn'])<p><strong>NTN:</strong> {{ $company->ntn }}</p>@endif
-        @if(!empty($company->fbr_registration_no))<p><strong>STRN:</strong> {{ $company->fbr_registration_no }}</p>@endif
+        @if(!empty($company->fbr_registration_no) && $optionVisible('show_strn'))<p><strong>STRN:</strong> {{ $company->fbr_registration_no }}</p>@endif
     </div>
 
     @php
@@ -564,13 +564,13 @@ html body { width: auto; max-width: 180mm; margin: 0 auto; padding: 0; }
         @if($transaction->terminal && $optionVisible('show_terminal'))
         <tr><td class="info-label">{{ __('pos.receipt_terminal') }}:</td><td class="info-value">{{ $transaction->terminal->terminal_name }}</td></tr>
         @endif
-        @if($transaction->customer_name)
+        @if($transaction->customer_name && $optionVisible('show_customer_name'))
         <tr><td class="info-label">{{ __('pos.receipt_customer') }}:</td><td class="info-value">{{ $transaction->customer_name }}</td></tr>
         @endif
-        @if($transaction->customer_phone)
+        @if($transaction->customer_phone && $optionVisible('show_customer_phone'))
         <tr><td class="info-label">{{ __('pos.receipt_phone') }}:</td><td class="info-value">@if($transaction->order_type === 'delivery' || $transaction->delivery_address)<strong>{{ $transaction->customer_phone }}</strong>@else{{ $transaction->customer_phone }}@endif</td></tr>
         @endif
-        @if($transaction->delivery_address)
+        @if($transaction->delivery_address && $optionVisible('show_delivery_address'))
         <tr><td class="info-label">{{ __('pos.receipt_deliver') }}:</td><td class="info-value"><strong>{{ $transaction->delivery_address }}</strong></td></tr>
         @endif
         {{-- Delivery Riders (Jul 2026): assigned rider on delivery receipts (display-only, all branches). --}}

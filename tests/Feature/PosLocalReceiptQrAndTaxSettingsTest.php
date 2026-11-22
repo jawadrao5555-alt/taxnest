@@ -290,6 +290,48 @@ class PosLocalReceiptQrAndTaxSettingsTest extends TestCase
         }
     }
 
+    public function test_contact_and_strn_receipt_controls_are_independent_between_streams(): void
+    {
+        $company = $this->makeCompany(menuQr: false, localShowTax: true);
+        $company->fbr_registration_no = 'SYNTHETIC-STRN';
+        $customer = [
+            'customer_name' => 'Fictional buyer',
+            'customer_phone' => '000-000-0000',
+            'delivery_address' => 'Fictional delivery lane',
+            'order_type' => 'delivery',
+        ];
+        $fields = [
+            'show_strn' => $company->fbr_registration_no,
+            'show_customer_name' => $customer['customer_name'],
+            'show_customer_phone' => $customer['customer_phone'],
+            'show_delivery_address' => $customer['delivery_address'],
+        ];
+        $company->invoice_display_prefs = [
+            ...$company->invoice_display_prefs,
+            'receipt_options' => ['local' => array_fill_keys(array_keys($fields), 'hide')],
+        ];
+        $fiscal = ['invoice_mode' => 'pra', 'pra_status' => 'submitted', 'pra_invoice_number' => 'SYNTHETIC-PRA-9911'];
+        foreach (self::TEMPLATES as $tpl) {
+            $this->insertTxnRow();
+            $local = $this->makeTxn($company, $customer);
+            $pra = $this->makeTxn($company, $fiscal + $customer);
+            QrImage::fake();
+            foreach (self::RENDER_MODES as $mode) {
+                $localHtml = view($tpl, ['company' => $company, 'transaction' => $local] + $mode)->render();
+                $praHtml = view($tpl, ['company' => $company, 'transaction' => $pra] + $mode)->render();
+                foreach ($fields as $value) {
+                    $this->assertStringNotContainsString($value, $localHtml, $tpl);
+                    $this->assertStringContainsString($value, $praHtml, $tpl);
+                }
+            }
+            $this->assertNotEmpty(QrImage::recorded());
+            foreach (QrImage::recorded() as $qr) {
+                $this->assertStringContainsString('SYNTHETIC-PRA-9911', $qr);
+            }
+            QrImage::resetFake();
+        }
+    }
+
     // ── 3. Local tab's own show_tax drives the local bill's tax lines ─────
 
     public function test_local_show_tax_on_prints_rate_and_amount_on_local_bills(): void

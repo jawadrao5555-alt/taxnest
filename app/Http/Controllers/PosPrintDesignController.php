@@ -20,7 +20,14 @@ final class PosPrintDesignController extends Controller
         $company->invoice_display_prefs=PosReceiptOptions::merge($company->invoice_display_prefs ?? [],$request);
         $paper=$data['paper'] ?? ($company->receipt_printer_size==='58mm'?'58mm':'80mm');
         app()->setLocale('en');
-        $bill=new PosTransaction(['company_id'=>$company->id,'invoice_number'=>'PREVIEW-ONLY','invoice_mode'=>'pra','pra_status'=>$data['stream']==='pra'?'pending':null,'payment_method'=>'cash','subtotal'=>500,'tax_rate'=>16,'tax_amount'=>80,'discount_amount'=>0,'total_amount'=>580,'order_type'=>'takeaway','customer_name'=>'Sample customer']);
+        $bill = new PosTransaction([
+            'company_id' => $company->id, 'invoice_number' => 'PREVIEW-ONLY', 'invoice_mode' => 'pra',
+            'pra_status' => $data['stream'] === 'pra' ? 'pending' : null,
+            'payment_method' => 'cash', 'subtotal' => 500, 'tax_rate' => 16,
+            'tax_amount' => 80, 'discount_amount' => 0, 'total_amount' => 580,
+            'order_type' => 'delivery', 'customer_name' => 'Sample customer',
+            'customer_phone' => '000-000-0000', 'delivery_address' => 'Sample delivery address',
+        ]);
         $bill->id=0;$bill->created_at=now();
         $bill->setRelation('company',$company);
         $bill->setRelation('items',collect([new PosTransactionItem(['item_name'=>'Sample full product name with options','item_type'=>'product','quantity'=>2,'unit_price'=>250,'subtotal'=>500,'special_notes'=>'Sample item instruction'])]));

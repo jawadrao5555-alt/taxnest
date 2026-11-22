@@ -16,8 +16,8 @@ class AdminUsageController extends Controller
         $request ??= request();
         $customDates = ($request->input('period') ?? 'custom') === 'custom';
         $filters = $request->validate([
-            'export' => 'nullable|in:local_csv',
-            'company_id' => 'required_if:export,local_csv|nullable|integer|min:1',
+            'export' => 'nullable|in:local_csv,pra_csv',
+            'company_id' => 'required_if:export,local_csv,pra_csv|nullable|integer|min:1',
             'branch_id' => 'nullable|integer|min:0',
             'period' => 'nullable|in:custom,daily,monthly,yearly,two_year',
             'as_of' => 'nullable|date_format:Y-m-d',
@@ -31,7 +31,7 @@ class AdminUsageController extends Controller
         }
 
         $today = today()->toImmutable();
-        $cutoff = ($filters['export'] ?? null) === 'local_csv' && isset($filters['as_of'])
+        $cutoff = isset($filters['export'], $filters['as_of'])
             ? CarbonImmutable::parse($filters['as_of'])
             : $today;
         if ($customDates && isset($filters['date_from']) && $filters['date_from'] > ($filters['date_to'] ?? $today->toDateString())) {
@@ -57,6 +57,31 @@ class AdminUsageController extends Controller
         }
         $companies = Company::when(isset($filters['company_id']), fn($q)=>$q->whereKey($filters['company_id']))->orderBy('name')->orderBy('id')->paginate(50)->withQueryString();
         $usageStats = CompanyUsageStat::snapshotsForCompanies($companies->getCollection(), $filters);
+
+        if (($filters['export'] ?? null) === 'pra_csv') {
+            $snapshot = $usageStats->first();
+            abort_unless($snapshot !== null && $snapshot->total_pos_transactions !== null, 404);
+            $branch = $filters['branch_id'] ?? 'all';
+            $rows = [[
+                $snapshot->company_id, $branch, $filters['date_from'] ?? null, $filters['date_to'] ?? null,
+                $snapshot->total_pos_transactions, number_format($snapshot->total_sales_amount, 2, '.', ''),
+            ]];
+            if ($snapshot->pra_comparison !== null) {
+                $rows[] = [
+                    $snapshot->company_id, $branch, $filters['comparison']['date_from'], $filters['comparison']['date_to'],
+                    $snapshot->pra_comparison['bills'], number_format($snapshot->pra_comparison['amount'], 2, '.', ''),
+                ];
+            }
+
+            return response()->streamDownload(function () use ($rows) {
+                $stream = fopen('php://output', 'wb');
+                fputcsv($stream, ['company_id', 'branch_id', 'business_date_from', 'business_date_to', 'completed_bills', 'total_pkr'], ',', '"', '');
+                foreach ($rows as $row) {
+                    fputcsv($stream, $row, ',', '"', '');
+                }
+                fclose($stream);
+            }, 'pra-bills-'.$snapshot->company_id.'.csv', ['Content-Type' => 'text/csv', 'Cache-Control' => 'private, no-store']);
+        }
 
         if (($filters['export'] ?? null) === 'local_csv') {
             $snapshot = $usageStats->first();

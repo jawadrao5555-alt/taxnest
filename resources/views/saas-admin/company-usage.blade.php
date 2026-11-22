@@ -59,6 +59,14 @@
                             @if($stat->pra_comparison !== null)
                                 <div class="text-xs text-gray-400">Last year: {{ number_format($stat->pra_comparison['amount'], 2) }}</div>
                             @endif
+                            @if($stat->total_pos_transactions !== null)
+                                <a class="block text-xs underline" href="{{ request()->fullUrlWithQuery([
+                                    'export' => 'pra_csv',
+                                    'company_id' => $stat->company_id,
+                                    'as_of' => $filters['date_to'] ?? null,
+                                    'page' => 1,
+                                ]) }}">Download PRA bill totals (CSV)</a>
+                            @endif
                         </td>
                         <td class="px-4 py-3 text-right text-gray-300">{{ $stat->active_terminals ?? '—' }}</td>
                         <td class="px-4 py-3 text-right text-gray-300">{{ $stat->active_users ?? '—' }}</td>

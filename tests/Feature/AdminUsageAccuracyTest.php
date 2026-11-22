@@ -133,6 +133,7 @@ class AdminUsageAccuracyTest extends TestCase
             [1, 11, null, 100, false],
             [1, 12, '2024-02-29', 200, false],
             [2, 11, '2024-02-29', 300, false],
+            [1, 11, '2024-03-01', 321, false],
         ] as [$company, $branch, $date, $amount, $archived]) {
             DB::table('pos_transactions')->insert([
                 'company_id' => $company, 'branch_id' => $branch, 'business_date' => $date,
@@ -149,12 +150,25 @@ class AdminUsageAccuracyTest extends TestCase
             ->get('/admin/company-usage?company_id=1&branch_id=11&period=two_year')
             ->assertOk()
             ->assertSee('Last year: 450.00')
+            ->assertSee('Download PRA bill totals (CSV)')
             ->assertViewHas('usageStats', fn ($rows) => $rows->count() === 1
                 && $rows->first()->total_pos_transactions === 1
                 && $rows->first()->total_sales_amount === 1200.0
                 && $rows->first()->pra_comparison === ['bills' => 1, 'amount' => 450.0]);
 
-        $this->assertSame(2750.0, CompanyUsageStat::refreshForCompany(1)->total_sales_amount);
+        $this->travel(1)->day();
+        $csv = $this->get('/admin/company-usage?company_id=1&branch_id=11&period=two_year&as_of=2024-02-29&export=pra_csv')
+            ->assertOk()
+            ->assertDownload('pra-bills-1.csv')
+            ->streamedContent();
+        $this->assertSame([
+            'company_id,branch_id,business_date_from,business_date_to,completed_bills,total_pkr',
+            '1,11,2024-01-01,2024-02-29,1,1200.00',
+            '1,11,2023-01-01,2023-02-28,1,450.00',
+        ], explode("\n", trim($csv)));
+        $this->get('/admin/company-usage?company_id=3&export=pra_csv')->assertNotFound();
+
+        $this->assertSame(3071.0, CompanyUsageStat::refreshForCompany(1)->total_sales_amount);
     }
 
     public function test_page_is_paginated_and_does_not_require_a_cached_usage_table(): void

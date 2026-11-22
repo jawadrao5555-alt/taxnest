@@ -10,6 +10,8 @@ Implementation draft based on main after production release #422 (`fe05426c`). T
 
 ## Implementation order
 
+The admin payment proof queue renders the feature add-on approval form independently of subscription quotes. Subscription review keeps a saved short cycle selected when the catalogue no longer offers it. The fictional route tests cover both queue layouts and approval against the original DI quote.
+
 1. Reconcile the three source contracts against deployed code. Pin implementation, tests and live evidence for each delivered requirement. Prioritize company overview and usage as read-only views and validate permission and export scope.
 2. Verify existing period selection and quotes on fictional tenants. Fill verified gaps in selectors, admin assignment, entitlement and renewal, then verify cutover with legacy monthly terms and pending proofs. Use approved rates and an explicit rollout decision for shared periods and monthly retirement.
 3. Complete lifecycle decisions and financial flows. Keep #422's Cash/Card receipts and historical reprints tied to the original collection. Add only missing cases for partial payment, credit, refund/reversal, discounts/referrals and commission, with the established approval path for commercial rules.

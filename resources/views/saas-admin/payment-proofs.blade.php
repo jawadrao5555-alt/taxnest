@@ -221,10 +221,6 @@
                                             <p class="text-[11px] text-gray-500 pt-1">
                                                 Billing: {{ ucfirst($paCycleSel) }} — kept exactly as the shop requested and paid for.
                                             </p>
-                                            @if($validFrozenQuote && !in_array($reqCycleSel, \App\Services\SubscriptionAssignmentService::cyclesForPlan($proof->pricingPlan), true))
-                                                <input type="hidden" name="billing_cycle" value="{{ $reqCycleSel }}">
-                                                <p class="text-xs text-amber-300">Frozen quote: {{ \App\Models\Subscription::getCycleLabel($reqCycleSel) }}. Original terms retained.</p>
-                                            @endif
                                             <div>
                                                 <label class="block text-[11px] text-gray-400 mb-1">Amount verified in bank/receipt (PKR)</label>
                                                 <input type="number" name="verified_received_amount" value="{{ old('verified_received_amount', $proof->amount) }}" step="0.01" min="0.01" required class="w-full bg-gray-900 border border-gray-700 rounded-lg text-white text-xs px-2 py-2">
@@ -400,14 +396,14 @@
                                                 @endforeach
                                             </select>
                                             <select name="billing_cycle" x-model="cycle" required class="w-full bg-gray-900 border border-gray-700 rounded-lg text-white text-xs px-2 py-2">
-                                                <option value="annual">Annual</option>
+                                                <option value="annual" @selected($reqCycleSel === 'annual')>Annual</option>
                                                 @if($proof->pricingPlan)
                                                     @foreach(\App\Services\SubscriptionAssignmentService::cyclesForPlan($proof->pricingPlan) as $cycleKey)
-                                                        @if($cycleKey !== 'annual')<option value="{{ $cycleKey }}">{{ \App\Models\Subscription::getCycleLabel($cycleKey) }}</option>@endif
+                                                        @if($cycleKey !== 'annual')<option value="{{ $cycleKey }}" @selected($reqCycleSel === $cycleKey)>{{ \App\Models\Subscription::getCycleLabel($cycleKey) }}</option>@endif
                                                     @endforeach
                                                 @endif
                                                 @if($validFrozenQuote && !in_array($reqCycleSel, \App\Services\SubscriptionAssignmentService::cyclesForPlan($proof->pricingPlan), true))
-                                                    <option value="{{ $reqCycleSel }}">{{ \App\Models\Subscription::getCycleLabel($reqCycleSel) }} (frozen quote)</option>
+                                                    <option value="{{ $reqCycleSel }}" selected>{{ \App\Models\Subscription::getCycleLabel($reqCycleSel) }} (frozen quote)</option>
                                                 @endif
                                             </select>
                                             <div>

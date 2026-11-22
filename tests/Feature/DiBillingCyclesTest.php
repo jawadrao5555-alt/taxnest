@@ -66,10 +66,16 @@ class DiBillingCyclesTest extends TestCase
         $proof = \App\Models\PaymentProof::create(['company_id' => $company->id, 'pricing_plan_id' => $plan->id,
             'billing_cycle' => 'quarterly', 'amount' => 2970, 'status' => 'pending', 'proof_path' => 'synthetic-cycle-proof',
             'distributor_quote_snapshot' => $quote]);
-        $plan->update(['price_quarterly' => 9999, 'invoice_limit' => 500]);
+        $plan->update(['price_quarterly' => null, 'invoice_limit' => 500]);
         $admin = \App\Models\AdminUser::create(['name' => 'Synthetic cycle reviewer', 'email' => 'cycle-review@example.test',
             'password' => bcrypt('SyntheticOnly123!'), 'role' => 'super_admin']);
         $input = ['pricing_plan_id' => $plan->id, 'billing_cycle' => 'quarterly', 'verified_received_amount' => 2970];
+        $this->withoutVite();
+        $this->actingAs($admin, 'admin')
+            ->get(route('saas.admin.payment-proofs', ['company_id' => $company->id]))
+            ->assertOk()
+            ->assertSee('value="quarterly" selected', false)
+            ->assertSee('(frozen quote)');
         $this->actingAs($admin, 'admin')->post(route('saas.admin.payment-proofs.approve', $proof->id), $input)->assertSessionHas('success');
         $sub = Subscription::findOrFail($proof->fresh()->subscription_id);
         $this->assertEquals(2970, $sub->final_price);

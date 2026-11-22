@@ -135,8 +135,11 @@
             {{-- AI Reader page top-up (Sep 2026). Monthly allowance package ke sath
                  aati hai; khatam ho jaye to shop yahan se extra pages khareedti hai.
                  Approve par SIRF pages barhte hain — package ko haath nahi lagta. --}}
+            @php
+                $showAiPagesTopup = $aiPages && $aiReaderAllowed && !($aiPages['unlimited'] ?? false);
+            @endphp
             @includeWhen(
-                $aiPages && $aiReaderAllowed && !($aiPages['unlimited'] ?? false),
+                $showAiPagesTopup,
                 'billing._ai-pages-topup'
             )
 

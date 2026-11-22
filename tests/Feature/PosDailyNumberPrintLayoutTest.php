@@ -30,7 +30,7 @@ class PosDailyNumberPrintLayoutTest extends TestCase
     private const ORDER_NUMBER = 'ORD-260906-DAILY1';
     private const INVOICE_NUMBER = 'L-000209';
     private const BILL_TOKEN = 3;
-    private const DAILY_DISPLAY = 'B003';
+    private const DAILY_DISPLAY = 'L003';
 
     private const RECEIPT_TEMPLATES = [
         'pos.receipts.receipt_80mm',
@@ -221,6 +221,17 @@ class PosDailyNumberPrintLayoutTest extends TestCase
             $this->assertStringNotContainsString(__('pos.receipt_local_invoice'), $body, "no Local Invoice print row ({$template})");
             $this->assertStringNotContainsString(self::INVOICE_NUMBER, $body, "invoice_number not printed on daily slip ({$template})");
         }
+    }
+
+    public function test_new_local_daily_receipt_and_paid_kot_share_the_b_number(): void
+    {
+        $company = $this->makeCompany();
+        $txn = $this->makeTxn($company, ['invoice_number' => 'B210']);
+        foreach (self::RECEIPT_TEMPLATES as $template) {
+            $this->assertStringContainsString('B003', $this->renderReceiptBody($template, $company, $txn));
+        }
+        $this->insertTxn(['invoice_number' => 'B210']);
+        $this->assertStringContainsString('B003', $this->renderKotBody($company, $this->makePaidOrder()));
     }
 
     public function test_token_style_receipts_still_print_label_and_bill_serial(): void

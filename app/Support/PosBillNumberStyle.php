@@ -2,6 +2,8 @@
 
 namespace App\Support;
 
+use App\Services\PosLocalSeries;
+
 /**
  * Bill Number Style — bill par CHHAPNE wala bara number kaunsa hai.
  *
@@ -30,7 +32,7 @@ namespace App\Support;
 class PosBillNumberStyle
 {
     /** Local bill ki shakal: B + 3 hindse (PosLocalSeries jaisi hi). */
-    public const DAILY_PREFIX = 'B';
+    public const DAILY_PREFIX = PosLocalSeries::PREFIX;
     public const DAILY_PAD = 3;
 
     /**
@@ -76,7 +78,12 @@ class PosBillNumberStyle
                 return (string) $token;
             }
             if ($style === 'daily') {
-                return self::DAILY_PREFIX . str_pad((string) $token, self::DAILY_PAD, '0', STR_PAD_LEFT);
+                $serial = (string) ($transaction->invoice_number ?? '');
+                $prefix = str_starts_with($serial, PosLocalSeries::PREFIX) && PosLocalSeries::isSeriesSerial($serial)
+                    ? self::DAILY_PREFIX
+                    : PosLocalSeries::LEGACY_PREFIX;
+
+                return $prefix . str_pad((string) $token, self::DAILY_PAD, '0', STR_PAD_LEFT);
             }
         } catch (\Throwable $e) {
             return null;

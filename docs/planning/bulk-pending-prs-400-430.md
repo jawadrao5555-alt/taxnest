@@ -21,6 +21,9 @@ The seven open source PRs in the inclusive range were checked against GitHub. Th
 
 ## Integration and closure
 
+- #423 / #264 checkout, `c0584f84`. The selected billing-cycle PHP block now ends before receipt markup. The [DI browser step](https://github.com/jawadrao5555-alt/taxnest/actions/runs/45006927203/job/137160479530) passed the actual quarterly selection and receipt-form journey at desktop and 390px. Further lifecycle and commercial acceptance follows the billing register.
+- #428, same application revision. Six local Node tests across the POS slot, launch UI and offline snapshot test files passed. The slot test verifies distinct Electron session partitions, a slot-specific print bridge, and independent reopen behavior using a window double. The [Windows pairing](https://github.com/jawadrao5555-alt/taxnest/actions/runs/45006927150) and [update recovery](https://github.com/jawadrao5555-alt/taxnest/actions/runs/45006927181) workflows passed. POS 2 independent offline cashier operation and physical device evidence remain open.
+
 1. Reconcile each source against current main. Carry forward scoped code and acceptance criteria, including the complete source registers. Link baseline releases when a requirement already shipped.
 2. Review Admin and Live Ops, Billing and Lifecycle, and POS and Agent in independent checkpoints within this PR. Exercise the combined sequence from held order and KOT through payment, numbering, receipt, Day Close and reconnect. Verify billing quotes, payment receipts, access, reversal and legacy terms together.
 3. Maintain per-source acceptance evidence for the final reviewed revision. After production deployment, record the deployed SHA and successful verification for each requirement. Include real device or fiscal verification wherever the source contract requires it.

@@ -28,6 +28,8 @@ The seven open source PRs in the inclusive range were checked against GitHub. Th
 - #425 per-stream receipt visibility. STRN, customer name, phone and delivery address now have individual settings on the 58mm and 80mm receipt templates. Inherited values retain the legacy rendering on both widths. The synthetic preview includes delivery details, and the render regression checks that Local settings leave PRA details and the fiscal QR intact. Device printing, scan readability and the remaining receipt controls are still open.
 - #425 receipt settings cleanup. Primary Local and PRA display settings no longer repeat in Advanced unless a company has a saved override. Existing overrides remain visible and editable, and omitted fields keep their saved values.
 
+- #427 bulk menu save. A stale or out-of-company product selection now rejects the whole update before removing pins. Valid replacements are committed together under a company row lock.
+
 1. Reconcile each source against current main. Carry forward scoped code and acceptance criteria, including the complete source registers. Link baseline releases when a requirement already shipped.
 2. Review Admin and Live Ops, Billing and Lifecycle, and POS and Agent in independent checkpoints within this PR. Exercise the combined sequence from held order and KOT through payment, numbering, receipt, Day Close and reconnect. Verify billing quotes, payment receipts, access, reversal and legacy terms together.
 3. Maintain per-source acceptance evidence for the final reviewed revision. After production deployment, record the deployed SHA and successful verification for each requirement. Include real device or fiscal verification wherever the source contract requires it.

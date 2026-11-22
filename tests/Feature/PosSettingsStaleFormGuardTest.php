@@ -437,6 +437,26 @@ class PosSettingsStaleFormGuardTest extends TestCase
             'A POST that carries the picker still rewrites the menu, marker or not');
     }
 
+    public function test_bulk_menu_save_preserves_current_menu_when_a_selected_item_belongs_to_another_shop(): void
+    {
+        $this->seedMenu([1, 2, 3]);
+        $otherCompanyId = $this->companyId + 1;
+        DB::table('pos_products')->insert([
+            'id' => 4, 'company_id' => $otherCompanyId, 'name' => 'Example Soup',
+        ]);
+        $this->actAsAdmin();
+
+        $this->post('/pos/public-profile/menu', [
+            '_token' => csrf_token(),
+            'pm_present' => 1,
+            'menu_product_ids' => [2, 4],
+        ])->assertSessionHasErrors('menu_product_ids');
+
+        $items = DB::table('pos_menu_items')->where('company_id', $this->companyId)
+            ->orderBy('sort_order')->pluck('pos_product_id')->map(fn ($id) => (int) $id)->all();
+        $this->assertSame([1, 2, 3], $items);
+    }
+
     // ── helpers ─────────────────────────────────────────────────────────────
 
     /** Give the shop some products and pin them all to the public menu. */

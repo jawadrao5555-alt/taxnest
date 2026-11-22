@@ -29,11 +29,12 @@ class LocalCollectionReportsTest extends TestCase
     public function test_company_usage_csv_matches_the_filtered_current_and_comparison_snapshots(): void
     {
         $this->travelTo(\Illuminate\Support\Carbon::parse('2024-02-29 12:00:00', 'UTC'));
-        foreach ([[2, 11, 1200, '2024-02-29'], [2, 11, 450, '2023-02-28'], [2, 12, 9200, '2024-02-29'], [3, 31, 3400, '2024-02-29']] as [$company, $branch, $amount, $date]) {
+        foreach ([[2, 11, 1200, '2024-02-29'], [2, 11, 450, '2023-02-28'], [2, 11, 7300, '2024-03-01'], [2, 12, 9200, '2024-02-29'], [3, 31, 3400, '2024-02-29']] as [$company, $branch, $amount, $date]) {
             DB::table('hospital_invoices')->insert(['company_id' => $company, 'branch_id' => $branch, 'total_paisa' => $amount, 'created_at' => $date]);
         }
+        $this->travel(1)->day();
         $request = \Illuminate\Http\Request::create('/admin/company-usage', 'GET', [
-            'company_id' => 2, 'branch_id' => 11, 'period' => 'two_year', 'export' => 'local_csv',
+            'company_id' => 2, 'branch_id' => 11, 'period' => 'two_year', 'export' => 'local_csv', 'as_of' => '2024-02-29',
         ]);
         $response = app(\App\Http\Controllers\SaasAdmin\AdminUsageController::class)->index($request);
         $csv = \Illuminate\Testing\TestResponse::fromBaseResponse($response)->streamedContent();

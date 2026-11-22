@@ -5,6 +5,7 @@ namespace App\Http\Controllers\SaasAdmin;
 use App\Http\Controllers\Controller;
 use App\Models\Company;
 use App\Models\CompanyUsageStat;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 
@@ -19,6 +20,7 @@ class AdminUsageController extends Controller
             'company_id' => 'required_if:export,local_csv|nullable|integer|min:1',
             'branch_id' => 'nullable|integer|min:0',
             'period' => 'nullable|in:custom,daily,monthly,yearly,two_year',
+            'as_of' => 'nullable|date_format:Y-m-d',
             ...($customDates ? [
                 'date_from' => 'nullable|date_format:Y-m-d',
                 'date_to' => 'nullable|date_format:Y-m-d',
@@ -29,22 +31,25 @@ class AdminUsageController extends Controller
         }
 
         $today = today()->toImmutable();
+        $cutoff = ($filters['export'] ?? null) === 'local_csv' && isset($filters['as_of'])
+            ? CarbonImmutable::parse($filters['as_of'])
+            : $today;
         if ($customDates && isset($filters['date_from']) && $filters['date_from'] > ($filters['date_to'] ?? $today->toDateString())) {
             throw ValidationException::withMessages(['date_from' => 'Start date is after the reporting end date.']);
         }
         $period = $filters['period'] ?? 'custom';
         $from = match ($period) {
-            'daily' => $today,
-            'monthly' => $today->startOfMonth(),
-            'yearly', 'two_year' => $today->startOfYear(),
+            'daily' => $cutoff,
+            'monthly' => $cutoff->startOfMonth(),
+            'yearly', 'two_year' => $cutoff->startOfYear(),
             default => null,
         };
         if ($from) {
             $filters['date_from'] = $from->toDateString();
-            $filters['date_to'] = $today->toDateString();
+            $filters['date_to'] = $cutoff->toDateString();
         }
         if ($period === 'two_year') {
-            $lastYear = $today->subYearNoOverflow();
+            $lastYear = $cutoff->subYearNoOverflow();
             $filters['comparison'] = [
                 'date_from' => $lastYear->startOfYear()->toDateString(),
                 'date_to' => $lastYear->toDateString(),

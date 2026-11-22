@@ -50,7 +50,14 @@
                     </tr>
                     @if($stat->local_collections)
                         <tr><td colspan="7" class="px-4 py-3">
-                            <a href="{{ request()->fullUrlWithQuery(['export' => 'local_csv', 'company_id' => $stat->company_id, 'page' => 1]) }}">Download this company's local collection totals (CSV)</a>
+                            <a href="{{ request()->fullUrlWithQuery([
+                                'export' => 'local_csv',
+                                'company_id' => $stat->company_id,
+                                'date_from' => $stat->local_collections['period']['from'],
+                                'date_to' => $stat->local_collections['period']['to'],
+                                'as_of' => $stat->local_collections['period']['to'],
+                                'page' => 1,
+                            ]) }}">Download this company's local collection totals (CSV)</a>
                             @include('saas-admin.partials.local-collections',['local'=>$stat->local_collections])
                             @if($stat->local_collections_comparison)
                                 <h3 class="mt-3 font-semibold">Same period last year</h3>

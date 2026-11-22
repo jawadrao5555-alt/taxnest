@@ -7,6 +7,17 @@ use PHPUnit\Framework\TestCase;
 
 final class FbrPosFiscalResultTest extends TestCase
 {
+    public function test_number_only_acknowledgement_requires_a_recorded_pos_identity(): void
+    {
+        $fields = ['FBRInvoiceNumber:string'];
+        $this->assertNull(\App\Services\ImsNumberOnlyAcknowledgement::number(
+            ['FBRInvoiceNumber' => '000000TEST123'], '', 'response_received', $fields
+        ));
+        $this->assertSame('000123TEST456', \App\Services\ImsNumberOnlyAcknowledgement::number(
+            ['FBRInvoiceNumber' => '000123TEST456'], '123', 'response_received', $fields
+        ));
+    }
+
     public function test_legacy_number_must_agree_with_the_structured_invoice_number(): void
     {
         $response = ['Code' => 100, 'InvoiceNumber' => 'TEST-123456'];

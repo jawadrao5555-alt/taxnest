@@ -7,6 +7,7 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
@@ -26,7 +27,7 @@ class ReportsController extends Controller
     /** Daily Sales Report — totals grouped by day. */
     public function dailyReport(Request $request)
     {
-        [$from, $to, $companyId, $branchId] = $this->parseFilters($request);
+        [$from, $to, $companyId, $branchId, $period] = $this->parseFilters($request);
 
         $rows = DB::table('fbr_pos_transactions')
             ->whereBetween(DB::raw('DATE(created_at)'), [$from, $to])
@@ -62,7 +63,7 @@ class ReportsController extends Controller
 
         return $this->respond($request, 'admin.reports.daily', [
             'rows' => $rows, 'totals' => $totals, 'from' => $from, 'to' => $to,
-            'companyId' => $companyId, 'branchId' => $branchId,
+            'companyId' => $companyId, 'branchId' => $branchId, 'period' => $period,
             'title' => $title, 'headers' => $headers, 'excelRows' => $excelRows,
         ]);
     }
@@ -70,7 +71,7 @@ class ReportsController extends Controller
     /** Product Performance Report — totals grouped by item_name. */
     public function productReport(Request $request)
     {
-        [$from, $to, $companyId, $branchId] = $this->parseFilters($request);
+        [$from, $to, $companyId, $branchId, $period] = $this->parseFilters($request);
 
         $rows = DB::table('fbr_pos_transaction_items as i')
             ->join('fbr_pos_transactions as t', 't.id', '=', 'i.transaction_id')
@@ -107,7 +108,7 @@ class ReportsController extends Controller
 
         return $this->respond($request, 'admin.reports.products', [
             'rows' => $rows, 'totals' => $totals, 'from' => $from, 'to' => $to,
-            'companyId' => $companyId, 'branchId' => $branchId,
+            'companyId' => $companyId, 'branchId' => $branchId, 'period' => $period,
             'title' => $title, 'headers' => $headers, 'excelRows' => $excelRows,
         ]);
     }
@@ -115,7 +116,7 @@ class ReportsController extends Controller
     /** FBR Compliance Report — submitted vs failed vs pending. */
     public function fbrComplianceReport(Request $request)
     {
-        [$from, $to, $companyId, $branchId] = $this->parseFilters($request);
+        [$from, $to, $companyId, $branchId, $period] = $this->parseFilters($request);
 
         $statusBreakdown = DB::table('fbr_pos_transactions')
             ->whereBetween(DB::raw('DATE(created_at)'), [$from, $to])
@@ -145,7 +146,7 @@ class ReportsController extends Controller
 
         return $this->respond($request, 'admin.reports.fbr', [
             'rows' => $rows, 'totals' => $totals, 'from' => $from, 'to' => $to,
-            'companyId' => $companyId, 'branchId' => $branchId,
+            'companyId' => $companyId, 'branchId' => $branchId, 'period' => $period,
             'title' => $title, 'headers' => $headers, 'excelRows' => $excelRows,
         ]);
     }
@@ -155,15 +156,30 @@ class ReportsController extends Controller
     // ────────────────────────────────────────────────────────────────
     private function parseFilters(Request $request): array
     {
-        $to = $request->input('date_to')
-            ? Carbon::parse($request->input('date_to'))->toDateString()
-            : Carbon::today()->toDateString();
-        $from = $request->input('date_from')
-            ? Carbon::parse($request->input('date_from'))->toDateString()
-            : Carbon::parse($to)->subDays(30)->toDateString();
-        $companyId = $request->input('company_id');
-        $branchId = $request->input('branch_id');
-        return [$from, $to, $companyId, $branchId];
+        $customDates = ($request->input('period') ?? 'custom') === 'custom';
+        $filters = $request->validate([
+            'period' => 'nullable|in:custom,daily,monthly,yearly',
+            'company_id' => 'nullable|integer|min:0',
+            'branch_id' => 'nullable|integer|min:0',
+            ...($customDates ? [
+                'date_from' => 'nullable|date_format:Y-m-d',
+                'date_to' => 'nullable|date_format:Y-m-d',
+            ] : []),
+        ]);
+        $period = $filters['period'] ?? 'custom';
+        $today = today()->toImmutable();
+        $to = $filters['date_to'] ?? $today->toDateString();
+        $from = match ($period) {
+            'daily' => $to,
+            'monthly' => $today->startOfMonth()->toDateString(),
+            'yearly' => $today->startOfYear()->toDateString(),
+            default => $filters['date_from'] ?? Carbon::parse($to)->subDays(30)->toDateString(),
+        };
+        if ($from > $to) {
+            throw ValidationException::withMessages(['date_from' => 'Start date is after the reporting end date.']);
+        }
+
+        return [$from, $to, $filters['company_id'] ?? null, $filters['branch_id'] ?? null, $period];
     }
 
     private function respond(Request $request, string $view, array $data)

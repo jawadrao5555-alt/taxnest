@@ -14139,7 +14139,11 @@ function restaurantPos() {
                 if (!data || !data.url) throw new Error('no share url');
                 const msg = this.waBillMessage(bill.pra_invoice_number || bill.invoice_number, bill.total_amount, data.url);
                 const link = 'https://wa.me/' + bill.wa_phone + '?text=' + encodeURIComponent(msg);
-                if (w) { w.location = link; } else { window.open(link, '_blank'); }
+                if (w) {
+                    w.location = link;
+                } else if (!window.open(link, '_blank')) {
+                    this.showToast(window.TXT.wa_popup_blocked, 'error');
+                }
             } catch (e) {
                 console.error('waShareReprint', e);
                 if (w) { try { w.close(); } catch (e2) {} }

@@ -48,9 +48,12 @@ final class FbrPosFiscalResult
             if (!$number) return null;
             $numbers[] = $number;
         }
-        if (!$numbers) {
-            $legacy = $response['Response'] ?? null;
-            return is_string($legacy) && preg_match('/^(?:[0-9]{6}|[A-Z][A-Z-]*-[0-9]{3,}$)/', trim($legacy)) ? self::number($legacy) : null;
+        $legacy = $response['Response'] ?? null;
+        if (is_string($legacy) && preg_match('/^(?:[0-9]{6}|[A-Z][A-Z-]*-[0-9]{3,}$)/', trim($legacy))) {
+            $legacyNumber = self::number($legacy);
+            if ($legacyNumber !== null) {
+                $numbers[] = $legacyNumber;
+            }
         }
         return count(array_unique($numbers)) === 1 ? $numbers[0] : null;
     }

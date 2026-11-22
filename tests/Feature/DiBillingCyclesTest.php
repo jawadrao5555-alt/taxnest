@@ -97,7 +97,7 @@ class DiBillingCyclesTest extends TestCase
         $this->actingAs($owner)->get('/billing/plans')->assertOk()->assertSee('Select period &amp; upload renewal receipt', false);
         $this->post('/billing/subscribe', ['plan_id' => $plan->id, 'billing_cycle' => 'quarterly'])
             ->assertSessionHasNoErrors()->assertRedirect('/billing/plans');
-        $this->get('/billing/plans')->assertOk()->assertSee('value="quarterly"', false)->assertSee('Quarterly package total');
+        $this->get('/billing/plans')->assertOk()->assertSee('value="quarterly"', false)->assertSee('Quarterly package total: PKR 2,970.00')->assertSee('Monthly equivalent: PKR 990.00');
         $this->assertSame('quarterly', session(\App\Services\PendingSubscriptionSelection::key($company->id))['quote']['cycle']);
         $this->assertSame($before, $sub->fresh()->getAttributes());
         $this->assertSame(1, Subscription::where('company_id', $company->id)->count());

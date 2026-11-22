@@ -15,7 +15,8 @@ class AdminUsageController extends Controller
         $request ??= request();
         $customDates = ($request->input('period') ?? 'custom') === 'custom';
         $filters = $request->validate([
-            'company_id' => 'nullable|integer|min:1',
+            'export' => 'nullable|in:local_csv',
+            'company_id' => 'required_if:export,local_csv|nullable|integer|min:1',
             'branch_id' => 'nullable|integer|min:0',
             'period' => 'nullable|in:custom,daily,monthly,yearly,two_year',
             ...($customDates ? [
@@ -51,6 +52,25 @@ class AdminUsageController extends Controller
         }
         $companies = Company::when(isset($filters['company_id']), fn($q)=>$q->whereKey($filters['company_id']))->orderBy('name')->orderBy('id')->paginate(50)->withQueryString();
         $usageStats = CompanyUsageStat::snapshotsForCompanies($companies->getCollection(), $filters);
+
+        if (($filters['export'] ?? null) === 'local_csv') {
+            $snapshot = $usageStats->first();
+            abort_unless($snapshot?->local_collections, 404);
+            return response()->streamDownload(function () use ($snapshot) {
+                $stream = fopen('php://output', 'wb');
+                fputcsv($stream, ['company_id', 'campus_id', 'from', 'to', 'coverage', 'principal_paisa', 'received_paisa', 'outstanding_paisa', 'closing_cash_paisa'], ',', '"', '');
+                foreach ([$snapshot->local_collections, $snapshot->local_collections_comparison] as $local) {
+                    if ($local === null) continue;
+                    fputcsv($stream, [
+                        $local['company']['id'], $local['filters']['branch_id'] ?? 'all',
+                        $local['period']['from'], $local['period']['to'], $local['coverage']['status'],
+                        $local['billing']['principal_paisa'] ?? null, $local['payments']['collected_paisa'] ?? null,
+                        $local['balances']['outstanding_paisa'] ?? null, $local['closings']['cash_paisa'] ?? null,
+                    ], ',', '"', '');
+                }
+                fclose($stream);
+            }, 'local-collections-'.$snapshot->company_id.'.csv', ['Content-Type' => 'text/csv', 'Cache-Control' => 'private, no-store']);
+        }
 
         return view('saas-admin.company-usage', compact('usageStats', 'companies', 'filters'));
     }

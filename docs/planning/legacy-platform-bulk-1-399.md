@@ -17,6 +17,8 @@ Audit baseline [`eb7477f9`](https://github.com/jawadrao5555-alt/taxnest/commit/e
 
 ## Delivery checkpoints
 
+- #395 Company Usage. The company-specific School/Hospital CSV uses the displayed ledger snapshots and the selected campus and dates. A two-year comparison includes both periods. Amounts are integer paisa, and an unavailable balance or closing cash is blank. The fictional regression covers campus and company exclusion, leap day, prior-year dates, and zero versus unavailable. Other platform reports and exports retain their separate acceptance requirements.
+
 1. Reconcile released billing and onboarding behavior with #423 and #417 in #430. Record already delivered results and route implementation gaps to their existing owner.
 2. Complete Active Admin and Company Usage acceptance with daily, monthly, yearly, two-year comparison and custom-date ranges, consistent totals/exports and proper scopes. Verify Live Ops and diagnostics on applicable existing products, including per-stream evidence retention.
 3. Verify security, franchise boundaries, mobile/accessibility, downloads and public onboarding. Keep restricted audit records private and use fictional test data. Treat the linked #395 acceptance register as the complete source checklist and close its source only after all applicable rows, including those verified by the fiscal draft, are recorded.

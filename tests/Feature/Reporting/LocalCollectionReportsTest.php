@@ -26,6 +26,25 @@ class LocalCollectionReportsTest extends TestCase
         DB::table('branches')->insert([['id'=>11,'company_id'=>2],['id'=>12,'company_id'=>2],['id'=>31,'company_id'=>3]]);
     }
     private function report(int $id,array $filters=[]): array { return app(LocalCollectionReports::class)->read(Company::findOrFail($id),$filters); }
+    public function test_company_usage_csv_matches_the_filtered_current_and_comparison_snapshots(): void
+    {
+        $this->travelTo(\Illuminate\Support\Carbon::parse('2024-02-29 12:00:00', 'UTC'));
+        foreach ([[2, 11, 1200, '2024-02-29'], [2, 11, 450, '2023-02-28'], [2, 12, 9200, '2024-02-29'], [3, 31, 3400, '2024-02-29']] as [$company, $branch, $amount, $date]) {
+            DB::table('hospital_invoices')->insert(['company_id' => $company, 'branch_id' => $branch, 'total_paisa' => $amount, 'created_at' => $date]);
+        }
+        $request = \Illuminate\Http\Request::create('/admin/company-usage', 'GET', [
+            'company_id' => 2, 'branch_id' => 11, 'period' => 'two_year', 'export' => 'local_csv',
+        ]);
+        $response = app(\App\Http\Controllers\SaasAdmin\AdminUsageController::class)->index($request);
+        $csv = \Illuminate\Testing\TestResponse::fromBaseResponse($response)->streamedContent();
+        $rows = array_map(fn ($line) => str_getcsv($line, ',', '"', ''), explode("\n", trim($csv)));
+        $this->assertCount(3, $rows);
+        $this->assertSame(['2', '11', '2024-01-01', '2024-02-29'], array_slice($rows[1], 0, 4));
+        $this->assertSame(['1200', '0', '1650', ''], array_slice($rows[1], 5));
+        $this->assertSame(['2', '11', '2023-01-01', '2023-02-28'], array_slice($rows[2], 0, 4));
+        $this->assertSame(['450', '0', '450', ''], array_slice($rows[2], 5));
+    }
+
     public function test_hospital_principal_receipts_asof_balances_and_closing_are_separate(): void {
         DB::table('hospital_invoices')->insert([['id'=>1,'company_id'=>2,'branch_id'=>11,'total_paisa'=>100000,'created_at'=>'2026-11-01 10:00:00'],['id'=>2,'company_id'=>2,'branch_id'=>12,'total_paisa'=>90000,'created_at'=>'2026-11-01 10:00:00']]);
         DB::table('hospital_payments')->insert([['company_id'=>2,'branch_id'=>11,'invoice_id'=>1,'amount_paisa'=>40000,'payment_method'=>'cash','collected_at'=>'2026-11-01 11:00:00'],['company_id'=>2,'branch_id'=>11,'invoice_id'=>1,'amount_paisa'=>20000,'payment_method'=>'bank','collected_at'=>'2026-11-02 11:00:00'],['company_id'=>2,'branch_id'=>11,'invoice_id'=>1,'amount_paisa'=>40000,'payment_method'=>'card','collected_at'=>'2026-11-03 11:00:00'],['company_id'=>3,'branch_id'=>31,'invoice_id'=>1,'amount_paisa'=>12345,'payment_method'=>'cash','collected_at'=>'2026-11-02 11:00:00']]);

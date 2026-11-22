@@ -2,7 +2,7 @@
     <label class="block text-xs font-bold text-slate-700 dark:text-slate-200">
         Period
         <select name="period" class="block rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white text-sm shadow-sm">
-            @foreach(['custom' => 'Custom dates', 'daily' => 'Today', 'monthly' => 'Month to date', 'yearly' => 'Year to date'] as $value => $label)
+            @foreach(['custom' => 'Custom dates', 'daily' => 'Today', 'monthly' => 'Month to date', 'yearly' => 'Year to date', 'two_year' => 'Compare with last year'] as $value => $label)
                 <option value="{{ $value }}" @selected($period === $value)>{{ $label }}</option>
             @endforeach
         </select>
@@ -28,3 +28,4 @@
         <p role="alert" class="w-full text-sm text-red-700 dark:text-red-300">{{ $errors->first() }}</p>
     @endif
 </form>
+@include('admin.reports._year-comparison')

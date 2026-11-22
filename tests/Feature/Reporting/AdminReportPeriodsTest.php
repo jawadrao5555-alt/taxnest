@@ -44,6 +44,10 @@ class AdminReportPeriodsTest extends TestCase
             [4, 3, 8, '2028-02-29 00:00:00', 400],
             [5, 9, 7, '2028-02-29 00:00:00', 800],
             [6, 3, 7, '2028-03-01 00:00:00', 60],
+            [7, 3, 7, '2027-02-28 23:59:59', 90],
+            [8, 3, 7, '2027-03-01 00:00:00', 900],
+            [9, 3, 8, '2027-02-28 00:00:00', 800],
+            [10, 9, 7, '2027-02-28 00:00:00', 700],
         ] as [$id, $company, $branch, $when, $amount]) {
             DB::table('fbr_pos_transactions')->insert([
                 'id' => $id, 'company_id' => $company, 'branch_id' => $branch, 'status' => 'completed',
@@ -80,5 +84,27 @@ class AdminReportPeriodsTest extends TestCase
         $this->getJson($url.'&date_from=2028-02-30')->assertUnprocessable()->assertJsonValidationErrors('date_from');
         $this->getJson($url.'&date_from=2028-02-29&date_to=2028-02-01')->assertUnprocessable()->assertJsonValidationErrors('date_from');
         $this->getJson($url.'&period=unsupported')->assertUnprocessable()->assertJsonValidationErrors('period');
+    }
+
+    public function test_year_comparison_uses_the_same_scope_and_keeps_the_export_cutoff(): void
+    {
+        $query = '?period=two_year&company_id=3&branch_id=7';
+        foreach (['daily' => ['total', 300, 90], 'products' => ['gross', 300, 90], 'fbr' => ['total_count', 3, 1]] as $report => [$metric, $current, $prior]) {
+            $url = '/admin/reports/'.$report.$query;
+            $result = $this->getJson($url.'&export=json')->assertOk()
+                ->assertJsonPath('from', '2028-01-01')->assertJsonPath('to', '2028-02-29')
+                ->assertJsonPath('comparison.from', '2027-01-01')->assertJsonPath('comparison.to', '2027-02-28');
+            $this->assertEquals($current, $result->json('totals.'.$metric));
+            $this->assertEquals($prior, $result->json('comparison.totals.'.$metric));
+            $summary = view('admin.reports._year-comparison', $result->json())->render();
+            $this->assertStringContainsString('2027-01-01 to 2027-02-28', $summary);
+            $buttons = view('admin.reports._export-buttons', $result->json() + ['route' => '/admin/reports/'.$report])->render();
+            $this->assertSame(3, substr_count($buttons, 'comparison_as_of=2028-02-29'));
+            $this->travel(1)->days();
+            $pinned = $this->getJson($url.'&export=json&comparison_as_of=2028-02-29')->assertOk();
+            $this->assertSame($result->json('comparison'), $pinned->json('comparison'));
+            $this->assertSame($result->json('totals'), $pinned->json('totals'));
+            $this->travel(-1)->days();
+        }
     }
 }

@@ -24,6 +24,8 @@
         @if($branchId ?? false) · Branch: #{{ $branchId }}@endif
     </div>
 
+    @include('admin.reports._year-comparison')
+
     <table>
         <thead>
             <tr>

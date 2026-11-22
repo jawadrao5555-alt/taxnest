@@ -332,6 +332,22 @@ class PosLocalReceiptQrAndTaxSettingsTest extends TestCase
         }
     }
 
+    public function test_advanced_controls_do_not_duplicate_primary_fields_except_for_saved_overrides(): void
+    {
+        $company = $this->makeCompany(menuQr: false, localShowTax: true);
+        $company->invoice_display_prefs = [
+            ...$company->invoice_display_prefs,
+            'receipt_options' => ['pra' => ['show_address' => 'hide']],
+        ];
+        $pra = view('pos.partials.receipt-optional-controls', ['company' => $company, 'stream' => 'pra'])->render();
+        $local = view('pos.partials.receipt-optional-controls', ['company' => $company, 'stream' => 'local'])->render();
+        $this->assertStringContainsString('name="receipt_options_pra[show_address]"', $pra);
+        $this->assertStringContainsString('Saved override', $pra);
+        $this->assertStringNotContainsString('name="receipt_options_pra[show_ntn]"', $pra);
+        $this->assertStringNotContainsString('name="receipt_options_local[show_address]"', $local);
+        $this->assertStringContainsString('name="receipt_options_local[show_customer_phone]"', $local);
+    }
+
     // ── 3. Local tab's own show_tax drives the local bill's tax lines ─────
 
     public function test_local_show_tax_on_prints_rate_and_amount_on_local_bills(): void

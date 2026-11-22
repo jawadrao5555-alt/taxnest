@@ -1,10 +1,21 @@
-@php $optional = \App\Support\PosReceiptOptions::saved($company, $stream); @endphp
+@php
+    $optional = \App\Support\PosReceiptOptions::saved($company, $stream);
+    $covered = \App\Support\PosReceiptOptions::LEGACY_DISPLAY_CONTROLS;
+    if ($stream === 'local') {
+        // Only the PRA tab has a primary fiscal-caption checkbox.
+        $covered = array_diff($covered, ['show_verify_line']);
+    }
+@endphp
 <details class="rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 p-4" data-receipt-options="{{ $stream }}">
     <summary class="font-semibold cursor-pointer">{{ $stream === 'pra' ? 'Fiscal' : 'Local' }} receipt: optional details and layout</summary>
     <p class="text-sm text-gray-700 dark:text-gray-200 my-3">Keep current preserves your existing design. Changes apply only after Save. Invoice identity, fiscal QR, amounts, payment settlement and KOT routing stay intact.</p>
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
     @foreach(\App\Support\PosReceiptOptions::VISIBILITY as $key => $label)
+        @continue(in_array($key, $covered, true) && !in_array($optional[$key] ?? null, ['show', 'hide'], true))
         <label class="block text-sm text-gray-900 dark:text-gray-100">{{ $label }}
+            @if(in_array($key, $covered, true))
+                <span class="block text-xs text-gray-500 dark:text-gray-400">Saved override. Choose Keep current to use the checkbox on the receipt tab.</span>
+            @endif
             <select name="receipt_options_{{ $stream }}[{{ $key }}]" class="mt-1 w-full rounded-lg border-gray-400 bg-white text-gray-900 dark:bg-gray-800 dark:text-white">
                 @foreach(['inherit' => 'Keep current', 'show' => 'Show', 'hide' => 'Hide'] as $value => $text)
                 <option value="{{ $value }}" @selected(old('receipt_options_'.$stream.'.'.$key, $optional[$key] ?? 'inherit') === $value)>{{ $text }}</option>

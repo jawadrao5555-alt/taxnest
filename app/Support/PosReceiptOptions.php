@@ -8,6 +8,11 @@ use Illuminate\Http\Request;
 /** Optional presentation overrides. Absent/inherit never changes a legacy design. */
 final class PosReceiptOptions
 {
+    public const LEGACY_DISPLAY_CONTROLS = [
+        'show_business_name', 'show_address', 'show_mobile', 'show_email', 'show_ntn',
+        'show_cashier', 'show_footer', 'show_developed_by', 'show_verify_line',
+    ];
+
     public const VISIBILITY = [
         'show_logo' => 'Logo', 'show_business_name' => 'Business name',
         'show_address' => 'Address', 'show_mobile' => 'Phone / mobile',

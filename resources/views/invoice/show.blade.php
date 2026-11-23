@@ -818,7 +818,10 @@
                             <tr>
                                 <td class="px-2 py-2 text-xs text-gray-500 dark:text-gray-400">{{ $index + 1 }}</td>
                                 <td class="px-2 py-2 text-xs font-mono text-gray-700 dark:text-gray-300">{{ $item->hs_code }}</td>
-                                <td class="px-2 py-2 text-xs text-gray-700 dark:text-gray-300 max-w-[200px] truncate" title="{{ $item->description }}">{{ $item->description }}</td>
+                                <td class="px-2 py-2 text-xs text-gray-700 dark:text-gray-300 max-w-[200px]">
+                                    <div class="truncate" title="{{ $item->description }}">{{ $item->description }}</div>
+                                    @include('invoice.partials.packing-description')
+                                </td>
                                 <td class="px-2 py-2 text-xs text-gray-700 dark:text-gray-300 text-right">{{ $item->quantity }}</td>
                                 <td class="px-2 py-2 text-xs text-gray-700 dark:text-gray-300 text-right whitespace-nowrap">{{ number_format($item->price, $item->selling_snapshot ? 6 : 2) }}</td>
                                 <td class="px-2 py-2 text-xs text-gray-700 dark:text-gray-300 text-right whitespace-nowrap">{{ number_format($item->tax, 2) }}</td>

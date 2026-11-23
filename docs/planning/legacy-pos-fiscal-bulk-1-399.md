@@ -15,6 +15,8 @@ Audit baseline [`eb7477f9`](https://github.com/jawadrao5555-alt/taxnest/commit/e
 
 ## Delivery checkpoints
 
+- #266. DI invoice detail and PDF show the saved selling-pack quantity and label alongside the existing fiscal base-unit line. Fictional coverage checks an original invoice and a linked partial return after the live packing definition is replaced.
+
 - #373. A rejection code paired with a malformed explicit invoice number leaves the claim awaiting verification. Fictional regression cases cover false, zero, empty-array and blank number fields and a number in the legacy response field. Physical and regulator verification remain open.
 
 - #266 and #394, application verification on `1978139b`. [Desktop and 390px checks](https://github.com/jawadrao5555-alt/taxnest/actions/runs/44995376238/job/137125167152) exercised packing creation and a two-bag sale with 50 stored base units, School partial payments and lost-response recovery, and rejection of incomplete IMS settings for School and Hospital. The disposable Hospital demo also passed startup with ten demo logins and fiscal reporting OFF. Physical output and regulator acceptance remain open.

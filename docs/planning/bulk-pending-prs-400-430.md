@@ -21,6 +21,8 @@ The seven open source PRs in the inclusive range were checked against GitHub. Th
 
 ## Integration and closure
 
+- #428 desktop reconnect. If a cashier signs in again while an earlier pairing confirmation is still open, the Agent checks the current session when the earlier confirmation finishes. The stale confirmation cannot refresh the primary POS offline scope. Fictional regressions cover both PRA and FBR POS. Physical reconnect and independent POS 2 offline billing remain open.
+
 - #428. The desktop window enforces the POS 1 boundary for offline snapshots and automatic Agent pairing, including when POS 2 is opened with shared options. The fictional desktop regression checks both session partitions. POS 2 still needs independent offline cashier authority and physical reconnect acceptance.
 
 - #423 / #264 checkout, `c0584f84`. The selected billing-cycle PHP block now ends before receipt markup. The [DI browser step](https://github.com/jawadrao5555-alt/taxnest/actions/runs/45006927203/job/137160479530) passed the actual quarterly selection and receipt-form journey at desktop and 390px. Further lifecycle and commercial acceptance follows the billing register.

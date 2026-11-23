@@ -74,8 +74,10 @@ for(const panel of ['pos','fbrpos']) test(panel+' login hook rearms and invalida
   wc.getURL=()=>url;wc.session={};const win={webContents:wc,isDestroyed:()=>false};let calls=0,current,finish;
   wireCompanyLogin(win,origin,panel,async(_s,_o,isCurrent)=>{calls++;current=isCurrent;return new Promise(r=>{finish=r;});});
   wc.emit('did-finish-load');assert.equal(calls,1);assert.equal(current(),true);
-  url=origin+prefix+'login';wc.emit('did-navigate',{},url);assert.equal(current(),false);finish(true);
-  await new Promise(r=>setImmediate(r));url=origin+prefix+'dashboard';wc.emit('did-finish-load');assert.equal(calls,2);
+  url=origin+prefix+'login';wc.emit('did-navigate',{},url);assert.equal(current(),false);
+  url=origin+prefix+'dashboard';wc.emit('did-finish-load');assert.equal(calls,1);
+  finish(true);
+  await new Promise(r=>setImmediate(r));assert.equal(calls,2);assert.equal(current(),true);
   finish(true);await new Promise(r=>setImmediate(r));wc.emit('did-finish-load');assert.equal(calls,2);
 });
 

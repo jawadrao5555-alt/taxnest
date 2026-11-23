@@ -926,7 +926,7 @@ function openPos(slotNumber = 1) {
       },
       onLoggedIn: async (ses, origin, isCurrent) => {
         const configured = await autoConfigureAgent(ses, origin, 'pos', isCurrent);
-        await refreshTrustedPosScope(ses, origin);
+        if (isCurrent()) await refreshTrustedPosScope(ses, origin);
         return configured;
       },
       // Keep-alive (v1.5.2): POS window hides on close and must only REALLY

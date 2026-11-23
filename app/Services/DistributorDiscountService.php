@@ -66,7 +66,7 @@ class DistributorDiscountService
         ];
     }
 
-    public static function validateSnapshot(array $s, Company $company, PricingPlan $plan, string $cycle): ?string
+    public static function validateSnapshot(array $s, Company $company, PricingPlan $plan, string $cycle, bool $checkBranchCapacity = false): ?string
     {
         if (($s['version'] ?? null) !== self::VERSION) return 'Unsupported distributor quote version.';
         if ((int)($s['company_id'] ?? 0) !== $company->id || (int)($s['plan_id'] ?? 0) !== $plan->id) return 'Distributor quote does not belong to this company/package.';
@@ -78,7 +78,7 @@ class DistributorDiscountService
         }
         if (($s['product_type'] ?? null) !== ($plan->product_type ?? 'di') || ($s['cycle'] ?? null) !== $cycle || !in_array($cycle, SubscriptionAssignmentService::cyclesForPlan($quotedPlan, true), true)) return 'Distributor quote product or billing cycle is inconsistent.';
         $quotedSlots = $s['pricing_snapshot']['extra_branch_slots'] ?? null;
-        if ($quotedSlots !== null && (int) $quotedSlots !== BranchAddonService::billableSlots($company, $quotedPlan)) {
+        if ($checkBranchCapacity && $quotedSlots !== null && (int) $quotedSlots !== BranchAddonService::billableSlots($company, $quotedPlan)) {
             return 'Paid branch slots changed after this quote. Review a fresh quote before approving payment.';
         }
         if ($cycle !== 'annual' && ((float) ($s['discount_percent'] ?? 0) !== 0.0 || (float) ($s['discount_amount'] ?? 0) !== 0.0)) return 'Distributor discounts apply only to annual purchases.';

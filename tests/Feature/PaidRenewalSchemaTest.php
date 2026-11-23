@@ -105,6 +105,7 @@ class PaidRenewalSchemaTest extends TestCase
             'proof_path' => 'synthetic-branch-renewal', 'status' => 'pending', 'distributor_quote_snapshot' => $quote,
         ]);
         $company->update(['extra_branch_slots' => 2]);
+        $this->assertNull(DistributorDiscountService::validateSnapshot($quote, $company, $plan, 'semi_annual'));
         $input = [
             'pricing_plan_id' => $plan->id, 'billing_cycle' => 'semi_annual',
             'verified_received_amount' => $quote['net_quote'],

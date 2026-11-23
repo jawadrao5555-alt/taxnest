@@ -109,7 +109,9 @@ class AdminPaymentProofController extends Controller
         $company = Company::findOrFail($proof->company_id);
         $reviewPlan = $plan;
         if (is_array($persistedQuote)) {
-            $error = \App\Services\DistributorDiscountService::validateSnapshot($persistedQuote, $company, $plan, $requestedCycle);
+            $error = \App\Services\DistributorDiscountService::validateSnapshot(
+                $persistedQuote, $company, $plan, $requestedCycle, checkBranchCapacity: true
+            );
             if ($error) return back()->with('error', 'Cannot approve: ' . $error);
             if (is_array($persistedQuote['plan_snapshot'] ?? null)) {
                 $reviewPlan = new PricingPlan;
@@ -164,7 +166,7 @@ class AdminPaymentProofController extends Controller
             $netReceived = $verifiedReceived;
             if ($discountSnapshot) {
                 $snapshotError = \App\Services\DistributorDiscountService::validateSnapshot(
-                    $discountSnapshot, $attributedCompany, $plan, $enforcedCycle
+                    $discountSnapshot, $attributedCompany, $plan, $enforcedCycle, checkBranchCapacity: true
                 );
                 if ($snapshotError) return ['outcome'=>'invalid_distributor_snapshot','message'=>$snapshotError];
                 $expectedNet = round((float) $discountSnapshot['net_quote'], 2);

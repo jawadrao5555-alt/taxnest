@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\{AdminAuditLog, AdminUser, Company, PaymentProof, PricingPlan, Subscription, SubscriptionInvoice};
+use App\Services\DistributorDiscountService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\{Http, Mail};
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -70,5 +71,51 @@ class PaidRenewalSchemaTest extends TestCase
             ->where('action', 'Payment proof approved')->sole();
         $this->assertSame('2029-02-28', $event->metadata['period_end']);
         $this->travelBack();
+    }
+
+    public function test_half_year_quote_cannot_renew_after_paid_branch_capacity_changes(): void
+    {
+        Mail::fake();
+        Http::preventStrayRequests();
+        config(['billing.shared_configured_cycles' => true]);
+        $admin = AdminUser::create([
+            'name' => 'Fictional reviewer', 'email' => 'branch-reviewer@example.test',
+            'password' => bcrypt('SyntheticOnly123!'), 'role' => 'super_admin',
+        ]);
+        $company = Company::create([
+            'name' => 'Fictional POS shop', 'ntn' => 'RCBRANCH1', 'product_type' => 'pos',
+            'email' => 'branch-renewal@example.test', 'status' => 'approved', 'company_status' => 'active',
+            'extra_branch_slots' => 1,
+        ]);
+        $plan = PricingPlan::create([
+            'name' => 'Business', 'product_type' => 'pos', 'price' => 20000,
+            'price_semi_annual' => 10500, 'branch_limit' => 2, 'is_trial' => false,
+        ]);
+        $existing = Subscription::create([
+            'company_id' => $company->id, 'pricing_plan_id' => $plan->id, 'active' => true,
+            'billing_cycle' => 'semi_annual', 'final_price' => 15500,
+            'start_date' => now()->subMonth()->toDateString(), 'end_date' => now()->addMonths(5)->toDateString(),
+        ]);
+        $quote = DistributorDiscountService::quote($company, $plan, 'semi_annual');
+        $this->assertEquals(5000, $quote['undiscounted_addon_amount']);
+        $this->assertEquals(15500, $quote['net_quote']);
+        $proof = PaymentProof::create([
+            'company_id' => $company->id, 'pricing_plan_id' => $plan->id,
+            'billing_cycle' => 'semi_annual', 'amount' => $quote['net_quote'],
+            'proof_path' => 'synthetic-branch-renewal', 'status' => 'pending', 'distributor_quote_snapshot' => $quote,
+        ]);
+        $company->update(['extra_branch_slots' => 2]);
+        $input = [
+            'pricing_plan_id' => $plan->id, 'billing_cycle' => 'semi_annual',
+            'verified_received_amount' => $quote['net_quote'],
+        ];
+
+        $this->actingAs($admin, 'admin')->post(route('saas.admin.payment-proofs.approve', $proof->id), $input)
+            ->assertRedirect()->assertSessionHas('error', 'Cannot approve: Paid branch slots changed after this quote. Review a fresh quote before approving payment.');
+        $this->assertSame('pending', $proof->fresh()->status);
+        $this->assertEquals($quote, $proof->fresh()->distributor_quote_snapshot);
+        $this->assertDatabaseHas('subscriptions', ['id' => $existing->id, 'active' => true]);
+        $this->assertDatabaseMissing('subscription_invoices', ['payment_proof_id' => $proof->id]);
+        $this->assertEquals(2, $company->fresh()->extra_branch_slots);
     }
 }

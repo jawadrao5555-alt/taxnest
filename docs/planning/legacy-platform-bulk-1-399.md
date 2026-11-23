@@ -17,6 +17,8 @@ Audit baseline [`eb7477f9`](https://github.com/jawadrao5555-alt/taxnest/commit/e
 
 ## Delivery checkpoints
 
+- #316 / #374. A saved quote with a recorded paid branch count requires a fresh review if the billable count changes. The fictional half-year renewal regression asserts that the saved proof and active subscription survive a refused approval and no invoice is created. Shared catalogue rates and federal add-on activation remain open.
+
 - #319. The diagnostic export regression checks DI branch requests when retained rows lack a branch key. The export reports the scope as unavailable, without widening to company rows.
 
 - #316 / #374. The real-schema annual renewal regression now exercises DI, PRA POS, FBR POS and ERP. It checks the original paid term and price, leap-day extension, one linked invoice and payment, and idempotent repeat approval. The matrix uses fictional prices. Commercial rate and monthly-plan rollout decisions remain with the owner.

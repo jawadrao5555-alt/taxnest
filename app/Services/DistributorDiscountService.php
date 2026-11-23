@@ -77,6 +77,10 @@ class DistributorDiscountService
             if ((int) $quotedPlan->id !== (int) $plan->id || $quotedPlan->product_type !== $plan->product_type) return 'Frozen plan identity is inconsistent.';
         }
         if (($s['product_type'] ?? null) !== ($plan->product_type ?? 'di') || ($s['cycle'] ?? null) !== $cycle || !in_array($cycle, SubscriptionAssignmentService::cyclesForPlan($quotedPlan, true), true)) return 'Distributor quote product or billing cycle is inconsistent.';
+        $quotedSlots = $s['pricing_snapshot']['extra_branch_slots'] ?? null;
+        if ($quotedSlots !== null && (int) $quotedSlots !== BranchAddonService::billableSlots($company, $quotedPlan)) {
+            return 'Paid branch slots changed after this quote. Review a fresh quote before approving payment.';
+        }
         if ($cycle !== 'annual' && ((float) ($s['discount_percent'] ?? 0) !== 0.0 || (float) ($s['discount_amount'] ?? 0) !== 0.0)) return 'Distributor discounts apply only to annual purchases.';
         $snapshotAgent = ($s['agent_id'] ?? null) === null ? null : (int)$s['agent_id'];
         $companyAgent = $company->agent_id === null ? null : (int)$company->agent_id;

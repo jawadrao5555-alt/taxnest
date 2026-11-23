@@ -457,6 +457,22 @@ class PosSettingsStaleFormGuardTest extends TestCase
         $this->assertSame([1, 2, 3], $items);
     }
 
+    public function test_bulk_menu_save_rejects_a_product_deactivated_since_the_picker_opened(): void
+    {
+        $this->seedMenu([1, 2, 3]);
+        DB::table('pos_products')->where('id', 2)->update(['is_active' => false]);
+        $this->actAsAdmin();
+
+        $this->post('/pos/public-profile/menu', [
+            'pm_present' => '1',
+            'menu_product_ids' => [2, 3],
+        ])->assertSessionHasErrors('menu_product_ids');
+
+        $items = DB::table('pos_menu_items')->where('company_id', $this->companyId)
+            ->orderBy('sort_order')->pluck('pos_product_id')->map(fn ($id) => (int) $id)->all();
+        $this->assertSame([1, 2, 3], $items);
+    }
+
     // ── helpers ─────────────────────────────────────────────────────────────
 
     /** Give the shop some products and pin them all to the public menu. */

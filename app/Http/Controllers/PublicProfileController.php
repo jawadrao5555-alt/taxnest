@@ -331,7 +331,11 @@ class PublicProfileController extends Controller
             Company::whereKey($company->id)->lockForUpdate()->firstOrFail();
 
             $matched = PosProduct::where('company_id', $company->id)
+                ->where('is_active', true)
                 ->whereIn('id', $ids)
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->pluck('id')
                 ->count();
             if ($matched !== $ids->count()) {
                 throw ValidationException::withMessages([

@@ -29,7 +29,7 @@ The seven open source PRs in the inclusive range were checked against GitHub. Th
 - #425 receipt settings cleanup. Primary Local and PRA display settings no longer repeat in Advanced unless a company has a saved override. Existing overrides remain visible and editable, and omitted fields keep their saved values.
 - #425 optional POS reference. The 58mm and 80mm receipt templates can omit the supplemental POS number when a confirmed fiscal or calling number remains visible. The sales record, offline fallback, and sole printed receipt identifier stay available.
 
-- #427 bulk menu save. A stale or out-of-company product selection now rejects the whole update before removing pins. Valid replacements are committed together under a company row lock.
+- #427 bulk menu save. A missing, newly inactive or out-of-company product selection rejects the whole update before removing pins. The fictional stale-picker case keeps the original pin order. Valid replacements are committed together under a company row lock.
 
 1. Reconcile each source against current main. Carry forward scoped code and acceptance criteria, including the complete source registers. Link baseline releases when a requirement already shipped.
 2. Review Admin and Live Ops, Billing and Lifecycle, and POS and Agent in independent checkpoints within this PR. Exercise the combined sequence from held order and KOT through payment, numbering, receipt, Day Close and reconnect. Verify billing quotes, payment receipts, access, reversal and legacy terms together.

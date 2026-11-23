@@ -1,7 +1,7 @@
 <x-admin-layout>
 <div class="p-4 sm:p-6 max-w-7xl mx-auto">
     <h1 class="text-2xl font-bold text-white mb-6">Company Usage Monitoring</h1>
-    <p class="mb-4 text-sm text-gray-600 dark:text-gray-300">Billing, terminal and stock figures below cover PRA POS only; a dash means not applicable or unavailable. Staff activity comes from recorded logins and session heartbeats. Opening this page does not count as company activity.</p>
+    <p class="mb-4 text-sm text-gray-600 dark:text-gray-300">Bill totals cover PRA POS and standalone FBR POS shops. Terminal and stock figures cover PRA POS. A dash means unavailable or not applicable. Staff activity comes from recorded logins and session heartbeats. Opening this page does not count as company activity.</p>
 
     <h2 id="local-collections" class="mb-2 text-lg font-semibold">School / Hospital local collections</h2>
     <form method="get" class="mb-4 grid sm:grid-cols-3 gap-2">
@@ -26,9 +26,9 @@
         <label>Custom end date<input name="date_to" type="date" value="{{ request('date_to') }}"></label>
         <button>Apply filters</button>
     </form>
-    <p>Dates and branch selection apply to PRA bills and School/Hospital collections. Dated PRA totals use the stored business date. Bills without a business date appear only in all-time totals.</p>
+    <p>Dates and branch selection apply to PRA and FBR POS bills and School/Hospital collections. Dated bill totals use the stored business date. Bills without a business date appear only in all-time totals.</p>
     @if(isset($filters['date_from']) || isset($filters['date_to']))
-        <p>PRA business dates: {{ $filters['date_from'] ?? 'Earliest' }} to {{ $filters['date_to'] ?? 'Latest' }}.
+        <p>Bill business dates: {{ $filters['date_from'] ?? 'Earliest' }} to {{ $filters['date_to'] ?? 'Latest' }}.
             @if(isset($filters['comparison']))
                 Same period last year: {{ $filters['comparison']['date_from'] }} to {{ $filters['comparison']['date_to'] }}.
             @endif
@@ -40,8 +40,8 @@
                 <thead>
                     <tr class="text-left text-xs text-gray-500 dark:text-gray-400 uppercase border-b border-gray-800 bg-gray-800/50">
                         <th class="px-4 py-3">Company</th>
-                        <th class="px-4 py-3 text-right">Completed PRA Bills</th>
-                        <th class="px-4 py-3 text-right">PRA Bill Total (PKR)</th>
+                        <th class="px-4 py-3 text-right">Completed POS Bills</th>
+                        <th class="px-4 py-3 text-right">POS Bill Total (PKR)</th>
                         <th class="px-4 py-3 text-right">Terminals</th>
                         <th class="px-4 py-3 text-right">Users</th>
                         <th class="px-4 py-3 text-right">Inventory Items</th>
@@ -50,6 +50,12 @@
                 </thead>
                 <tbody class="divide-y divide-gray-800">
                     @forelse($usageStats as $stat)
+                    @php
+                        $bills = $stat->fbr_sales['bills'] ?? $stat->total_pos_transactions;
+                        $amount = $stat->fbr_sales['amount'] ?? $stat->total_sales_amount;
+                        $prior = $stat->fbr_comparison ?? $stat->pra_comparison;
+                        $isFbr = $stat->fbr_sales !== null;
+                    @endphp
                     <tr class="hover:bg-gray-800/50 {{ $loop->even ? 'bg-gray-800/20' : '' }}">
                         <td class="px-4 py-3 text-white font-medium">
                             <a href="{{ route('saas.admin.companies.show', $stat->company_id) }}" class="hover:text-indigo-400 transition">{{ $stat->company->name ?? 'Unknown' }}</a>
@@ -57,23 +63,23 @@
                             <span class="block text-xs text-gray-500">{{ \App\Support\ProductCatalog::label($stat->company->product_type) }}</span>
                         </td>
                         <td class="px-4 py-3 text-right text-gray-300 font-medium">
-                            {{ $stat->total_pos_transactions === null ? '—' : number_format($stat->total_pos_transactions) }}
-                            @if($stat->pra_comparison !== null)
-                                <div class="text-xs text-gray-400">Last year: {{ number_format($stat->pra_comparison['bills']) }}</div>
+                            {{ $bills === null ? '—' : number_format($bills) }}
+                            @if($prior !== null)
+                                <div class="text-xs text-gray-400">Last year: {{ number_format($prior['bills']) }}</div>
                             @endif
                         </td>
                         <td class="px-4 py-3 text-right text-emerald-400 font-medium">
-                            {{ $stat->total_sales_amount === null ? '—' : number_format($stat->total_sales_amount, 2) }}
-                            @if($stat->pra_comparison !== null)
-                                <div class="text-xs text-gray-400">Last year: {{ number_format($stat->pra_comparison['amount'], 2) }}</div>
+                            {{ $amount === null ? '—' : number_format($amount, 2) }}
+                            @if($prior !== null)
+                                <div class="text-xs text-gray-400">Last year: {{ number_format($prior['amount'], 2) }}</div>
                             @endif
-                            @if($stat->total_pos_transactions !== null)
+                            @if($bills !== null)
                                 <a class="block text-xs underline" href="{{ request()->fullUrlWithQuery([
-                                    'export' => 'pra_csv',
+                                    'export' => $isFbr ? 'fbr_csv' : 'pra_csv',
                                     'company_id' => $stat->company_id,
                                     'as_of' => $filters['date_to'] ?? null,
                                     'page' => 1,
-                                ]) }}">Download PRA bill totals (CSV)</a>
+                                ]) }}">Download {{ $isFbr ? 'FBR POS' : 'PRA' }} bill totals (CSV)</a>
                             @endif
                         </td>
                         <td class="px-4 py-3 text-right text-gray-300">{{ $stat->active_terminals ?? '—' }}</td>

@@ -17,6 +17,8 @@ Audit baseline [`eb7477f9`](https://github.com/jawadrao5555-alt/taxnest/commit/e
 
 ## Delivery checkpoints
 
+- #395 Company Usage adds standalone FBR POS shop bill totals and CSV for the selected company, branch and stored business dates. The two-year export retains the displayed cutoff. School and Hospital continue to use their own collection ledgers. The fictional regression covers branch and tenant exclusion, voided bills, leap-day comparison and legacy bills without a business date.
+
 - #395 Company Usage. The company-specific School/Hospital CSV uses the displayed ledger snapshots and the selected campus and dates. A two-year comparison includes both periods. Amounts are integer paisa, and an unavailable balance or closing cash is blank. The fictional regression covers campus and company exclusion, leap day, prior-year dates, and zero versus unavailable. Other platform reports and exports retain their separate acceptance requirements.
 - #395 Admin Reports. Daily Sales, Product Performance and FBR Compliance share Today, Month to date, Year to date, same-period prior-year comparison and validated Custom dates. Exports use the displayed company, branch and cutoff date, with the comparison included in PDF, Excel and JSON. These reports cover standalone FBR POS. Other product reports retain their own acceptance requirements.
 - #395 Company Usage CSV uses the date cutoff shown on the page, including when an administrator downloads the comparison after midnight. The fictional regression includes the next day's invoice and checks its exclusion.

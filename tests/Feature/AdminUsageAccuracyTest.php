@@ -173,6 +173,65 @@ class AdminUsageAccuracyTest extends TestCase
         $this->assertSame(3071.0, CompanyUsageStat::refreshForCompany(1)->total_sales_amount);
     }
 
+    public function test_fbr_pos_usage_and_csv_share_completed_shop_bills_and_business_dates(): void
+    {
+        Schema::table('companies', fn (Blueprint $table) => $table->string('pos_type')->nullable());
+        DB::table('companies')->insert([
+            ['id' => 4, 'name' => 'Example FBR Shop', 'product_type' => 'fbrpos', 'pos_type' => null],
+            ['id' => 5, 'name' => 'Example FBR Neighbor', 'product_type' => 'fbrpos', 'pos_type' => null],
+            ['id' => 6, 'name' => 'Example School', 'product_type' => 'fbrpos', 'pos_type' => 'education'],
+        ]);
+        Schema::create('fbr_pos_transactions', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('company_id');
+            $table->unsignedBigInteger('branch_id')->nullable();
+            $table->string('status');
+            $table->date('business_date')->nullable();
+            $table->decimal('total_amount', 15, 2);
+            $table->timestamps();
+        });
+        $this->travelTo(now()->setDate(2024, 2, 29)->startOfDay());
+        foreach ([
+            [4, 11, '2024-02-29', 'completed', 1200],
+            [4, 11, '2023-02-28', 'completed', 450],
+            [4, 11, '2024-03-01', 'completed', 900],
+            [4, 11, '2024-02-29', 'voided', 800],
+            [4, 11, null, 'completed', 100],
+            [4, 12, '2024-02-29', 'completed', 200],
+            [5, 11, '2024-02-29', 'completed', 300],
+            [6, 11, '2024-02-29', 'completed', 400],
+        ] as [$company, $branch, $day, $status, $amount]) {
+            DB::table('fbr_pos_transactions')->insert([
+                'company_id' => $company, 'branch_id' => $branch, 'status' => $status,
+                'business_date' => $day, 'total_amount' => $amount, 'created_at' => now()->addDay(),
+            ]);
+        }
+
+        $this->actingAs(AdminUser::create([
+            'name' => 'Example FBR Usage Reviewer', 'email' => 'example-fbr-review@example.test',
+            'password' => 'local-fixture-password', 'role' => 'super_admin',
+        ]), 'admin');
+        $url = '/admin/company-usage?product_scope=fbrpos&company_id=4&branch_id=11&period=two_year';
+        $this->get($url)->assertOk()->assertSee('Download FBR POS bill totals (CSV)')
+            ->assertSee('Last year: 450.00')
+            ->assertViewHas('usageStats', fn ($rows) => $rows->count() === 1
+                && $rows->first()->fbr_sales === ['bills' => 1, 'amount' => 1200.0]
+                && $rows->first()->fbr_comparison === ['bills' => 1, 'amount' => 450.0]);
+
+        $this->travel(1)->day();
+        $csv = $this->get($url.'&as_of=2024-02-29&export=fbr_csv')->assertOk()
+            ->assertDownload('fbr-bills-4.csv')->streamedContent();
+        $this->assertSame([
+            'company_id,branch_id,business_date_from,business_date_to,completed_bills,total_pkr',
+            '4,11,2024-01-01,2024-02-29,1,1200.00',
+            '4,11,2023-01-01,2023-02-28,1,450.00',
+        ], explode("\n", trim($csv)));
+
+        $this->assertSame(['bills' => 5, 'amount' => 2850.0], CompanyUsageStat::refreshForCompany(4)->fbr_sales);
+        $this->getJson('/admin/company-usage?company_id=6&export=fbr_csv')->assertNotFound();
+        $this->getJson('/admin/company-usage?company_id=1&export=fbr_csv')->assertNotFound();
+    }
+
     public function test_company_usage_filters_products_and_standalone_collection_categories(): void
     {
         Schema::table('companies', function (Blueprint $table) {

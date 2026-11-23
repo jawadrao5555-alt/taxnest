@@ -89,7 +89,7 @@ class PaidRenewalSchemaTest extends TestCase
         ]);
         $plan = PricingPlan::create([
             'name' => 'Business', 'product_type' => 'pos', 'price' => 20000,
-            'price_semi_annual' => 10500, 'branch_limit' => 2, 'is_trial' => false,
+            'price_semi_annual' => 10500, 'invoice_limit' => 1000, 'branch_limit' => 2, 'is_trial' => false,
         ]);
         $existing = Subscription::create([
             'company_id' => $company->id, 'pricing_plan_id' => $plan->id, 'active' => true,

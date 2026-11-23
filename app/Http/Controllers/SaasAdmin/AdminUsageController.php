@@ -25,8 +25,8 @@ class AdminUsageController extends Controller
         $productScopes += ['school' => 'School POS', 'hospital' => 'Hospital POS'];
         $customDates = ($request->input('period') ?? 'custom') === 'custom';
         $filters = $request->validate([
-            'export' => 'nullable|in:local_csv,pra_csv,fbr_csv',
-            'company_id' => 'required_if:export,local_csv,pra_csv,fbr_csv|nullable|integer|min:1',
+            'export' => 'nullable|in:local_csv,pra_csv,fbr_csv,di_csv',
+            'company_id' => 'required_if:export,local_csv,pra_csv,fbr_csv,di_csv|nullable|integer|min:1',
             'branch_id' => 'nullable|integer|min:0',
             'product_scope' => ['nullable', Rule::in(array_keys($productScopes))],
             'period' => 'nullable|in:custom,daily,monthly,yearly,two_year',
@@ -99,18 +99,24 @@ class AdminUsageController extends Controller
         $companies = $companyQuery->orderBy('name')->orderBy('id')->paginate(50)->withQueryString();
         $usageStats = CompanyUsageStat::snapshotsForCompanies($companies->getCollection(), $filters);
 
-        if (in_array($filters['export'] ?? null, ['pra_csv', 'fbr_csv'], true)) {
+        if (in_array($filters['export'] ?? null, ['pra_csv', 'fbr_csv', 'di_csv'], true)) {
             $snapshot = $usageStats->first();
-            $fbr = $filters['export'] === 'fbr_csv';
-            $totals = $fbr ? $snapshot?->fbr_sales : (
-                $snapshot?->total_pos_transactions === null ? null : [
-                    'bills' => $snapshot->total_pos_transactions,
-                    'amount' => $snapshot->total_sales_amount,
-                ]
-            );
+            abort_if($snapshot === null, 404);
+            [$totals, $comparison, $filename, $headers] = match ($filters['export']) {
+                'di_csv' => [
+                    $snapshot->di_documents, $snapshot->di_comparison, 'di-production-'.$snapshot->company_id.'.csv',
+                    ['company_id', 'branch_id', 'invoice_date_from', 'invoice_date_to', 'reported_documents', 'net_document_value_pkr'],
+                ],
+                'fbr_csv' => [$snapshot->fbr_sales, $snapshot->fbr_comparison, 'fbr-bills-'.$snapshot->company_id.'.csv', null],
+                'pra_csv' => [
+                    $snapshot->total_pos_transactions === null ? null : [
+                        'bills' => $snapshot->total_pos_transactions, 'amount' => $snapshot->total_sales_amount,
+                    ],
+                    $snapshot->pra_comparison, 'pra-bills-'.$snapshot->company_id.'.csv', null,
+                ],
+            };
             abort_if($totals === null, 404);
-            $comparison = $fbr ? $snapshot->fbr_comparison : $snapshot->pra_comparison;
-            $filename = ($fbr ? 'fbr' : 'pra').'-bills-'.$snapshot->company_id.'.csv';
+            $headers ??= ['company_id', 'branch_id', 'business_date_from', 'business_date_to', 'completed_bills', 'total_pkr'];
             $branch = $filters['branch_id'] ?? 'all';
             $rows = [[
                 $snapshot->company_id, $branch, $filters['date_from'] ?? null, $filters['date_to'] ?? null,
@@ -123,9 +129,9 @@ class AdminUsageController extends Controller
                 ];
             }
 
-            return response()->streamDownload(function () use ($rows) {
+            return response()->streamDownload(function () use ($rows, $headers) {
                 $stream = fopen('php://output', 'wb');
-                fputcsv($stream, ['company_id', 'branch_id', 'business_date_from', 'business_date_to', 'completed_bills', 'total_pkr'], ',', '"', '');
+                fputcsv($stream, $headers, ',', '"', '');
                 foreach ($rows as $row) {
                     fputcsv($stream, $row, ',', '"', '');
                 }

@@ -232,6 +232,64 @@ class AdminUsageAccuracyTest extends TestCase
         $this->getJson('/admin/company-usage?company_id=1&export=fbr_csv')->assertNotFound();
     }
 
+    public function test_di_usage_exports_only_stored_production_documents_for_the_selected_company_and_branch(): void
+    {
+        Schema::create('invoices', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('company_id');
+            $table->unsignedBigInteger('branch_id')->nullable();
+            $table->date('invoice_date')->nullable();
+            $table->string('status');
+            $table->string('fbr_status');
+            $table->string('fbr_invoice_number')->nullable();
+            $table->string('fiscal_submission_environment')->nullable();
+            $table->string('document_type')->nullable();
+            $table->decimal('total_amount', 15, 2);
+        });
+        DB::table('companies')->insert(['id' => 4, 'name' => 'Fictional Neighbor DI', 'product_type' => 'di']);
+        $this->travelTo(now()->setDate(2024, 2, 29)->startOfDay());
+        foreach ([
+            [3, 11, '2024-02-29', 'locked', 'production', 'EXAMPLE-01', 'production', 'Sale Invoice', 700],
+            [3, 11, '2024-02-29', 'locked', 'production', 'EXAMPLE-02', 'production', 'Credit Note', 180],
+            [3, 11, '2023-02-28', 'locked', 'production', 'EXAMPLE-03', null, null, 200],
+            [3, 11, '2024-03-01', 'locked', 'production', 'EXAMPLE-04', 'production', 'Sale Invoice', 400],
+            [3, 11, '2024-02-29', 'locked', 'sandbox', 'EXAMPLE-05', 'sandbox', 'Sale Invoice', 900],
+            [3, 11, '2024-02-29', 'locked', 'production', 'EXAMPLE-06', 'sandbox', 'Sale Invoice', 999],
+            [3, 11, '2024-02-29', 'locked', 'production', ' ', 'production', 'Sale Invoice', 700],
+            [3, 11, '2024-02-29', 'draft', 'production', 'EXAMPLE-08', 'production', 'Sale Invoice', 800],
+            [3, 12, '2024-02-29', 'locked', 'production', 'EXAMPLE-09', 'production', 'Sale Invoice', 300],
+            [4, 11, '2024-02-29', 'locked', 'production', 'EXAMPLE-10', 'production', 'Sale Invoice', 600],
+        ] as [$company, $branch, $date, $status, $fbrStatus, $number, $environment, $type, $amount]) {
+            DB::table('invoices')->insert([
+                'company_id' => $company, 'branch_id' => $branch, 'invoice_date' => $date, 'status' => $status,
+                'fbr_status' => $fbrStatus, 'fbr_invoice_number' => $number, 'fiscal_submission_environment' => $environment,
+                'document_type' => $type, 'total_amount' => $amount,
+            ]);
+        }
+
+        $this->actingAs(AdminUser::create([
+            'name' => 'Example DI Usage Reviewer', 'email' => 'example-di-review@example.test',
+            'password' => 'local-fixture-password', 'role' => 'super_admin',
+        ]), 'admin');
+        $url = '/admin/company-usage?product_scope=di&company_id=3&branch_id=11&period=two_year';
+        $this->get($url)->assertOk()
+            ->assertSee('Net document value after credit notes: PKR 520.00')
+            ->assertSee('Download DI production document totals (CSV)')
+            ->assertViewHas('usageStats', fn ($rows) => $rows->count() === 1
+                && $rows->first()->di_documents === ['bills' => 2, 'amount' => 520.0]
+                && $rows->first()->di_comparison === ['bills' => 1, 'amount' => 200.0]);
+
+        $this->travel(1)->day();
+        $csv = $this->get($url.'&export=di_csv&as_of=2024-02-29')->assertOk()
+            ->assertDownload('di-production-3.csv')->streamedContent();
+        $this->assertSame([
+            'company_id,branch_id,invoice_date_from,invoice_date_to,reported_documents,net_document_value_pkr',
+            '3,11,2024-01-01,2024-02-29,2,520.00',
+            '3,11,2023-01-01,2023-02-28,1,200.00',
+        ], explode("\n", trim($csv)));
+        $this->getJson('/admin/company-usage?export=di_csv&company_id=1')->assertNotFound();
+    }
+
     public function test_company_usage_filters_products_and_standalone_collection_categories(): void
     {
         Schema::table('companies', function (Blueprint $table) {

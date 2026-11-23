@@ -17,6 +17,8 @@ Audit baseline [`eb7477f9`](https://github.com/jawadrao5555-alt/taxnest/commit/e
 
 ## Delivery checkpoints
 
+- #395 A10 Company Usage adds DI document counts and net value based on saved production status and a recorded FBR reference. The view and CSV use the same company, branch, invoice-date range and prior-year cutoff. Credit notes reduce invoice value. A synthetic regression covers credit notes, legacy production evidence, sandbox and inconsistent flags, draft and missing references, adjacent dates and tenant/branch isolation.
+
 - #395 Company Usage adds standalone FBR POS shop bill totals and CSV for the selected company, branch and stored business dates. The two-year export retains the displayed cutoff. School and Hospital continue to use their own collection ledgers. The fictional regression covers branch and tenant exclusion, voided bills, leap-day comparison and legacy bills without a business date.
 
 - #395 Company Usage. The company-specific School/Hospital CSV uses the displayed ledger snapshots and the selected campus and dates. A two-year comparison includes both periods. Amounts are integer paisa, and an unavailable balance or closing cash is blank. The fictional regression covers campus and company exclusion, leap day, prior-year dates, and zero versus unavailable. Other platform reports and exports retain their separate acceptance requirements.

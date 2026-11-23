@@ -26,9 +26,9 @@
         <label>Custom end date<input name="date_to" type="date" value="{{ request('date_to') }}"></label>
         <button>Apply filters</button>
     </form>
-    <p>Dates and branch selection apply to PRA and FBR POS bills and School/Hospital collections. Dated bill totals use the stored business date. Bills without a business date appear only in all-time totals.</p>
+    <p>Dates and branch selection apply to POS bills, DI documents, and School/Hospital collections. POS bills use their stored business date and DI documents use their invoice date. Records missing those dates appear only in all-time totals.</p>
     @if(isset($filters['date_from']) || isset($filters['date_to']))
-        <p>Bill business dates: {{ $filters['date_from'] ?? 'Earliest' }} to {{ $filters['date_to'] ?? 'Latest' }}.
+        <p>Reporting dates: {{ $filters['date_from'] ?? 'Earliest' }} to {{ $filters['date_to'] ?? 'Latest' }}.
             @if(isset($filters['comparison']))
                 Same period last year: {{ $filters['comparison']['date_from'] }} to {{ $filters['comparison']['date_to'] }}.
             @endif
@@ -87,6 +87,21 @@
                         <td class="px-4 py-3 text-right text-gray-300">{{ $stat->inventory_items ?? '—' }}</td>
                         <td class="px-4 py-3 text-gray-500 dark:text-gray-400 text-xs">{{ $stat->last_activity_at?->diffForHumans() ?? '—' }}</td>
                     </tr>
+                    @if($stat->di_documents !== null)
+                        <tr><td colspan="7" class="px-4 py-3">
+                            <p>DI documents with a stored production FBR reference: {{ number_format($stat->di_documents['bills']) }}</p>
+                            <p>Net document value after credit notes: PKR {{ number_format($stat->di_documents['amount'], 2) }}</p>
+                            @if($stat->di_comparison !== null)
+                                <p>Same period last year: {{ number_format($stat->di_comparison['bills']) }} documents, PKR {{ number_format($stat->di_comparison['amount'], 2) }}</p>
+                            @endif
+                            <a class="underline" href="{{ request()->fullUrlWithQuery([
+                                'export' => 'di_csv',
+                                'company_id' => $stat->company_id,
+                                'as_of' => $filters['date_to'] ?? null,
+                                'page' => 1,
+                            ]) }}">Download DI production document totals (CSV)</a>
+                        </td></tr>
+                    @endif
                     @if($stat->local_collections)
                         <tr><td colspan="7" class="px-4 py-3">
                             <a href="{{ request()->fullUrlWithQuery([

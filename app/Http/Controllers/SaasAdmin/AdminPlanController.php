@@ -155,8 +155,9 @@ class AdminPlanController extends Controller
         // Legacy forms and annual-only edits must not overwrite retired rates.
         // Shared rates need an explicit separate choice; availability remains
         // controlled by the deployment policy, so preparation does not sell them.
-        $fields = $productType === 'di' ? ['price_quarterly', 'price_semi_annual']
-            : ($request->boolean('configure_shared_cycle_rates') ? ['price_monthly', 'price_quarterly', 'price_semi_annual'] : []);
+        $fields = $request->boolean('configure_shared_cycle_rates')
+            ? ['price_monthly', 'price_quarterly', 'price_semi_annual']
+            : ($productType === 'di' ? ['price_quarterly', 'price_semi_annual'] : []);
         return array_intersect_key($data, array_flip($fields));
     }
 

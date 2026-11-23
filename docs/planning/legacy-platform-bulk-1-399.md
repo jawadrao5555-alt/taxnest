@@ -17,6 +17,8 @@ Audit baseline [`eb7477f9`](https://github.com/jawadrao5555-alt/taxnest/commit/e
 
 ## Delivery checkpoints
 
+- #374. Billing administrators can explicitly prepare a DI monthly checkout rate. The plan editor offers a 5% increase from an existing configured six-month rate, with an explicit save. Plans without a configured six-month rate need their approved amount entered manually. This does not update saved quotes or purchased terms. Verify the final commercial amounts and rollout separately.
+
 - #316 / #374. New PRA add-on payment proofs retain the exact subscription ID in the server quote. A replacement term cannot receive the old add-on even if its plan and date match. The fictional regression keeps the stale proof pending without granting the add-on. Previously filed proofs retain their existing review checks.
 
 - #374. Checkout shows the saved payable amount in the period selector and receipt form after a catalogue change. Only the matching saved package can display a saved period that is no longer available to new quotes. Fictional monthly checkout coverage exercises both cases and verifies the unchanged proof snapshot.

@@ -107,7 +107,7 @@
                     </select>
                 </div>
                 <input type="number" name="price" placeholder="Price (PKR — DI = stored monthly base, POS/FBR POS = annual)" step="1" required class="bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500">
-                <label class="block text-xs text-gray-400"><input type="checkbox" name="configure_shared_cycle_rates" value="1"> Update configured POS/FBR/ERP period rates (unchecked preserves stored rates; does not enable selling)</label>
+                <label class="block text-xs text-gray-400"><input type="checkbox" name="configure_shared_cycle_rates" value="1"> Set configured period rates, including the DI monthly checkout rate</label>
                 @foreach(['price_monthly' => 'Monthly total', 'price_quarterly' => 'Quarterly total', 'price_semi_annual' => 'Six-month total'] as $field => $label)
                     <input type="number" name="{{ $field }}" aria-label="{{ $label }}" placeholder="{{ $label }} (blank = unavailable)" step="0.01" min="0" class="bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2">
                 @endforeach

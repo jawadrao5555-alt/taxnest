@@ -33,6 +33,8 @@ test('the POS 2 preload exposes printing without POS 1 local authority', async (
 
 test('POS windows retain independent sessions and reopen without affecting the other slot', () => {
   const sessions = new Map();
+  const offlinePartitions = [];
+  const loginPartitions = [];
 
   class Window extends EventEmitter {
     constructor(options) {
@@ -71,8 +73,12 @@ test('POS windows retain independent sessions and reopen without affecting the o
     URL,
     require(name) {
       if (name === 'electron') return { BrowserWindow: Window, Notification: { isSupported: () => false } };
-      if (name === './company-login-hook') return { wireCompanyLogin() {} };
-      if (name === './offline-snapshot') return {};
+      if (name === './company-login-hook') return {
+        wireCompanyLogin(win) { loginPartitions.push(win.webContents.session); },
+      };
+      if (name === './offline-snapshot') return {
+        registerOfflineInterception(session) { offlinePartitions.push(session); },
+      };
       return require(name);
     },
   };
@@ -80,11 +86,14 @@ test('POS windows retain independent sessions and reopen without affecting the o
   const { openPosWindow, getPosWindowRef, closePosWindow, isSecondaryPosPrintSender } = context.module.exports;
   const config = { serverUrl: 'http://127.0.0.1:8080' };
   assert.throws(() => openPosWindow(config, { slotNumber: 3 }), /Invalid POS/);
-  const first = openPosWindow(config);
-  const second = openPosWindow(config, { slotNumber: 2 });
+  const primaryOptions = { isOfflineEnabled: () => true, onLoggedIn() {} };
+  const first = openPosWindow(config, primaryOptions);
+  const second = openPosWindow(config, { ...primaryOptions, slotNumber: 2 });
   assert.equal(getPosWindowRef(), first);
   assert.equal(getPosWindowRef(2), second);
   assert.notEqual(first.webContents.session, second.webContents.session);
+  assert.deepEqual(offlinePartitions, [first.webContents.session]);
+  assert.deepEqual(loginPartitions, [first.webContents.session]);
   assert.equal(first.options.webPreferences.partition, 'persist:pos');
   assert.equal(second.options.webPreferences.partition, 'persist:pos-2');
   assert.equal(path.basename(second.options.webPreferences.preload), 'pos-print-preload.js');

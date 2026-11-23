@@ -203,7 +203,7 @@ function openPosWindow(config, opts = {}) {
   const onKioskToggleCb = typeof opts.onKioskToggle === 'function' ? opts.onKioskToggle : null;
   let kioskOn = !!opts.kiosk;
   const isOfflineEnabled =
-    typeof opts.isOfflineEnabled === 'function' ? opts.isOfflineEnabled : () => false;
+    slotNumber === 1 && typeof opts.isOfflineEnabled === 'function' ? opts.isOfflineEnabled : () => false;
 
   const posWindow = new BrowserWindow({
     width: 1366,
@@ -270,7 +270,9 @@ function openPosWindow(config, opts = {}) {
   // Agent AUTO-CONFIG (v1.5.0): once the cashier is logged in (any authed
   // /pos/ page loaded), let main.js pull the company's agent credentials
   // with the session cookie — zero manual agent setup on shop PCs.
-  wireCompanyLogin(posWindow, origin, 'pos', opts.onLoggedIn);
+  if (slotNumber === 1) {
+    wireCompanyLogin(posWindow, origin, 'pos', opts.onLoggedIn);
+  }
 
   // Offline Mode (Beta): register the passthrough-first https interception on
   // the persist:pos partition BEFORE the first load, and snapshot the sale

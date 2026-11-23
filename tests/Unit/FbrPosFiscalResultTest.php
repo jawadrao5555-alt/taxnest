@@ -3,10 +3,30 @@
 namespace Tests\Unit;
 
 use App\Services\FbrPosFiscalResult;
+use App\Services\PosImsReportingService;
 use PHPUnit\Framework\TestCase;
 
 final class FbrPosFiscalResultTest extends TestCase
 {
+    public function test_malformed_invoice_fields_do_not_make_an_ims_rejection_replayable(): void
+    {
+        foreach (['InvoiceNumber', 'FBRInvoiceNumber', 'invoiceNumber'] as $field) {
+            foreach ([false, [], 0, '0', '  '] as $value) {
+                $result = PosImsReportingService::result(['Code' => '102', $field => $value], true);
+                $this->assertSame('verification_required', $result['state']);
+                $this->assertNull($result['reference']);
+            }
+        }
+
+        foreach ([null, ''] as $value) {
+            $result = PosImsReportingService::result(['Code' => '102', 'InvoiceNumber' => $value], true);
+            $this->assertSame('rejected', $result['state']);
+        }
+        $this->assertSame('verification_required', PosImsReportingService::result([
+            'Code' => '102', 'Response' => 'TEST-123456',
+        ], true)['state']);
+    }
+
     public function test_ims_reference_binding_preserves_short_and_zero_padded_pos_ids(): void
     {
         foreach (['123', '000123'] as $posId) {

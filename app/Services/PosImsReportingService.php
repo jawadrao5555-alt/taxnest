@@ -179,7 +179,7 @@ class PosImsReportingService
         $code=FbrPosFiscalResult::code($data) ?? '';
         if ($code==='100' && $number) return ['state'=>$local?'local_accepted':'accepted','reference'=>$number,'error_codes'=>[]];
         // Any acknowledgement evidence makes a conflicting rejection uncertain.
-        if ($number || !empty($data['InvoiceNumber']) || !empty($data['FBRInvoiceNumber']) || !empty($data['invoiceNumber'])) return $unknown;
+        if (FbrPosFiscalResult::hasInvoiceEvidence($data)) return $unknown;
         if (preg_match('/^[0-9]{3}$/',$code) && $code !== '100') return ['state'=>'rejected','reference'=>null,'error_codes'=>[$code]];
         return $unknown;
     }

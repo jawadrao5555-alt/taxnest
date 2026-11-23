@@ -4,6 +4,8 @@ namespace App\Services;
 
 final class FbrPosFiscalResult
 {
+    private const INVOICE_FIELDS = ['InvoiceNumber', 'FBRInvoiceNumber', 'invoiceNumber'];
+
     /** Extract the existing IMS code aliases without inferring success from a number. */
     public static function code(?array $response): ?string
     {
@@ -41,7 +43,7 @@ final class FbrPosFiscalResult
     {
         if (!$response) return null;
         $numbers = [];
-        foreach (['InvoiceNumber', 'FBRInvoiceNumber', 'invoiceNumber'] as $key) {
+        foreach (self::INVOICE_FIELDS as $key) {
             $value = $response[$key] ?? null;
             if ($value === null || (is_string($value) && trim($value) === '')) continue;
             $number = self::number($value);
@@ -56,5 +58,18 @@ final class FbrPosFiscalResult
             }
         }
         return count(array_unique($numbers)) === 1 ? $numbers[0] : null;
+    }
+
+    /** A malformed explicit invoice field cannot establish a replayable rejection. */
+    public static function hasInvoiceEvidence(array $response): bool
+    {
+        foreach (self::INVOICE_FIELDS as $key) {
+            $value = $response[$key] ?? null;
+            if ($value !== null && $value !== '') {
+                return true;
+            }
+        }
+
+        return self::fromResponse($response) !== null;
     }
 }

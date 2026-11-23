@@ -68,6 +68,8 @@ class SharedPackageCheckoutTest extends TestCase
         $this->assertDatabaseCount('payment_proofs', 0);
         $this->assertSame([], Storage::disk('local')->allFiles());
 
+        // The route test disables session middleware, so clear the previous response's flash data.
+        session()->forget('errors');
         $plan->forceFill(['erps_vertical' => null])->save();
         $submit()->assertSessionHasNoErrors();
         $this->assertDatabaseHas('payment_proofs', [

@@ -857,6 +857,29 @@ class PraDiSandboxTest extends TestCase
         }
     }
 
+    public function test_ims_transport_failure_cannot_accept_or_reject_the_claim_from_a_body(): void
+    {
+        foreach ([
+            ['http_error', ['Code' => '100', 'InvoiceNumber' => '054321FK6N1234567']],
+            ['transport_timeout', ['Code' => '102']],
+        ] as [$diagnostic, $body]) {
+            Http::fake();
+            $this->imsProfile('production', 'fiscal_device');
+            $service = app(\App\Services\PosImsReportingService::class);
+            $record = $service->capture($this->company, $this->bill(), $this->owner->id, 'production');
+            $service->prepare($this->company->id, $record->id, $this->imsPayload($record));
+            $service->submit($this->company->id, $record->id, $this->owner->id);
+            $claim = $service->claim($this->company->id, 'synthetic-device')['claim'];
+
+            $result = $service->callback($this->company->id, $record->id, 'synthetic-device', $claim, $body, $diagnostic);
+            $this->assertSame('verification_required', $result->state);
+            $this->assertNull($result->fiscal_number);
+            $this->assertSame($diagnostic, $result->attempts[0]['diagnostic']);
+            $this->assertSame($body, $result->attempts[0]['acknowledgement']);
+            Http::assertNothingSent();
+        }
+    }
+
     public function test_ims_central_callback_requires_matching_production_reference_and_is_idempotent(): void
     {
         Http::fake();

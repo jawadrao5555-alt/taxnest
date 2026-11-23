@@ -230,7 +230,9 @@ class PosImsReportingService
     {
         $r=PosImsSubmission::where('company_id',$companyId)->findOrFail($id);
         abort_unless($r->connection_mode==='fiscal_device' && $r->device_uid===$deviceUid,403);
-        $result=self::result($response,true);
+        // Older agents omit this field. An explicit transport failure cannot
+        // establish acceptance or rejection, even when the envelope carries a body.
+        $result = self::result($diagnostic === null || $diagnostic === 'response_received' ? $response : null, true);
         // The live IMS component can acknowledge with only FBRInvoiceNumber.
         // Bind that reply shape to this claimed POS and keep central verification separate.
         $posId = $r->payload['POSID'] ?? null;

@@ -78,6 +78,44 @@ class SharedPackageCheckoutTest extends TestCase
         $this->assertDatabaseCount('subscription_payments', 0);
     }
 
+    public function test_checkout_displays_and_submits_the_same_saved_monthly_price_after_catalogue_changes(): void
+    {
+        Mail::fake();
+        Storage::fake('local');
+        $this->withoutMiddleware();
+        view()->share('errors', new \Illuminate\Support\ViewErrorBag);
+        config(['billing.shared_configured_cycles' => true]);
+        $company = Company::create(['name' => 'Fictional monthly shop', 'ntn' => 'MONTHLYQA', 'product_type' => 'pos']);
+        $plan = PricingPlan::create([
+            'name' => 'Business', 'product_type' => 'pos', 'price' => 24000,
+            'price_monthly' => 2200, 'invoice_limit' => 1000, 'is_public' => true,
+        ]);
+        $admin = User::create([
+            'name' => 'Fictional owner', 'email' => 'monthly-owner@example.test',
+            'password' => 'unused', 'role' => 'company_admin', 'company_id' => $company->id,
+        ]);
+        $this->actingAs($admin, 'pos');
+        app()->instance('currentCompanyId', $company->id);
+        app()->instance('currentBranchGuard', 'pos');
+        app()->instance('currentBranchId', null);
+        $this->post(route('pos.package-checkout.select'), [
+            'plan_id' => $plan->id, 'billing_cycle' => 'monthly',
+        ])->assertRedirect();
+
+        $plan->update(['price_monthly' => 2600]);
+        $page = route('pos.package-checkout', ['plan_id' => $plan->id]);
+        $this->get($page)->assertOk()->assertSee('Monthly · PKR 2,200.00')->assertDontSee('2,600.00');
+        config(['billing.disable_fresh_monthly' => true]);
+        $this->get($page)->assertOk()->assertSee('Monthly · PKR 2,200.00');
+        $this->post(route('pos.payment-proof.store'), [
+            'pricing_plan_id' => $plan->id, 'billing_cycle' => 'monthly', 'amount' => 2200,
+            'payment_method' => 'bank', 'proof' => UploadedFile::fake()->create('fictional.pdf', 2, 'application/pdf'),
+        ])->assertSessionHasNoErrors();
+        $proof = PaymentProof::where('company_id', $company->id)->sole();
+        $this->assertSame('monthly', $proof->billing_cycle);
+        $this->assertEquals(2200, $proof->distributor_quote_snapshot['net_quote']);
+    }
+
     public function test_checkout_rejects_cashier_wrong_product_and_unconfigured_period(): void
     {
         $this->withoutMiddleware();

@@ -8,15 +8,22 @@
         @endif
         <section class="grid grid-cols-1 sm:grid-cols-2 gap-4" aria-label="Available packages">
         @foreach($plans as $plan)
+            @php
+                $cycles = \App\Services\SubscriptionAssignmentService::cyclesForPlan($plan);
+                $savedQuote = $selectedPlan?->id === $plan->id ? $quote : null;
+                if ($savedQuote && !in_array($savedQuote['cycle'], $cycles, true)) {
+                    $cycles[] = $savedQuote['cycle'];
+                }
+            @endphp
             <form method="POST" action="{{ route($checkoutRoute.'.select') }}" class="rounded-xl border p-4 space-y-3" data-checkout-plan="{{ $plan->id }}">
                 @csrf
                 <h2 class="font-bold">{{ $plan->name }}</h2>
                 <input type="hidden" name="plan_id" value="{{ $plan->id }}">
                 <label for="checkout-cycle-{{ $plan->id }}">Billing period and payable total</label>
                 <select id="checkout-cycle-{{ $plan->id }}" name="billing_cycle" class="block w-full rounded-lg dark:bg-gray-800">
-                    @foreach(\App\Services\SubscriptionAssignmentService::cyclesForPlan($plan) as $cycle)
-                        @php($price = \App\Services\DistributorDiscountService::quote($company, $plan, $cycle))
-                        <option value="{{ $cycle }}" @selected(($quote['cycle'] ?? request('billing_cycle', 'annual')) === $cycle)>{{ \App\Models\Subscription::getCycleLabel($cycle) }} · PKR {{ number_format($price['net_quote'], 2) }}</option>
+                    @foreach($cycles as $cycle)
+                        @php($price = ($savedQuote['cycle'] ?? null) === $cycle ? $savedQuote : \App\Services\DistributorDiscountService::quote($company, $plan, $cycle))
+                        <option value="{{ $cycle }}" @selected(($savedQuote['cycle'] ?? request('billing_cycle', 'annual')) === $cycle)>{{ \App\Models\Subscription::getCycleLabel($cycle) }} · PKR {{ number_format($price['net_quote'], 2) }}</option>
                     @endforeach
                 </select>
                 <button type="submit" class="rounded-lg bg-blue-700 text-white p-2">Select period and review quote</button>

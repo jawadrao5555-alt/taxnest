@@ -17,6 +17,8 @@ Audit baseline [`eb7477f9`](https://github.com/jawadrao5555-alt/taxnest/commit/e
 
 ## Delivery checkpoints
 
+- #374. Checkout shows the saved payable amount in the period selector and receipt form after a catalogue change. Only the matching saved package can display a saved period that is no longer available to new quotes. Fictional monthly checkout coverage exercises both cases and verifies the unchanged proof snapshot.
+
 - #316 / #374. A saved quote with a recorded paid branch count requires a fresh review if the billable count changes. The fictional half-year renewal regression asserts that the saved proof and active subscription survive a refused approval and no invoice is created. Shared catalogue rates and federal add-on activation remain open.
 
 - #319. The diagnostic export regression checks DI branch requests when retained rows lack a branch key. The export reports the scope as unavailable, without widening to company rows.

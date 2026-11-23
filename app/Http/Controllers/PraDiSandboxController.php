@@ -71,7 +71,10 @@ class PraDiSandboxController extends Controller
         $tokenRule = ['nullable', 'string', 'max:8192', 'regex:/^[\x21-\x7E]+$/'];
         Validator::make($tokens, ['sandbox_token' => $tokenRule, 'production_token' => $tokenRule])->validate();
         DB::transaction(function () use ($company, $data, $tokens) {
-            Company::whereKey($company->id)->lockForUpdate()->firstOrFail();
+            $company = Company::whereKey($company->id)->lockForUpdate()->firstOrFail();
+            if ($data['enabled']) {
+                abort_unless(\App\Services\PosFederalAddonAccess::allows($company, 'federal_di'), 403, 'DI setup requires an active paid add-on.');
+            }
             $profile = PosDiSandboxProfile::firstOrNew(['company_id' => $company->id]);
             $environment = $data['environment'] ?? $profile->environment ?? 'sandbox';
             foreach (['sandbox','production'] as $env) {

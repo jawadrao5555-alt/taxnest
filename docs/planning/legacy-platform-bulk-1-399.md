@@ -17,6 +17,8 @@ Audit baseline [`eb7477f9`](https://github.com/jawadrao5555-alt/taxnest/commit/e
 
 ## Delivery checkpoints
 
+- PRA POS federal add-on. A configured DI or IMS offer can be selected on authenticated billing. A reviewed, fully paid quote grants one channel for the bound subscription. Tax Integrations shows payment/setup/expiry status and setup and new dispatch enforce the grant. Existing configured channels are preserved. The approved annual amounts and policy effective date are explicit deployment settings and remain unset by default. Direct customer channel replacement remains blocked for owner review.
+
 - #374. Billing administrators can explicitly prepare a DI monthly checkout rate. The plan editor offers a 5% increase from an existing configured six-month rate, with an explicit save. Plans without a configured six-month rate need their approved amount entered manually. This does not update saved quotes or purchased terms. Verify the final commercial amounts and rollout separately.
 
 - #316 / #374. New PRA add-on payment proofs retain the exact subscription ID in the server quote. A replacement term cannot receive the old add-on even if its plan and date match. The fictional regression keeps the stale proof pending without granting the add-on. Previously filed proofs retain their existing review checks.

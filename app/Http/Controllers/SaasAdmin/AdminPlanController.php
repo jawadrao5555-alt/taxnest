@@ -52,7 +52,7 @@ class AdminPlanController extends Controller
         // silently until the next deploy gate run (Task 1455).
         $ladderWarnings = PlanLadderGuard::allCurrentProblems();
 
-        $posAddons = PosAddonPricingService::catalog();
+        $posAddons = array_intersect_key(PosAddonPricingService::catalog(), PosAddonPricingService::ADDONS);
 
         return view('saas-admin.plans', compact('diPlans', 'posPlans', 'fbrposPlans', 'erpsPlans', 'erpsVerticals', 'ladderWarnings', 'posAddons'));
     }

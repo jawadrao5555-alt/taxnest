@@ -55,7 +55,11 @@ class PosTaxIntegrationController extends Controller
             abort_unless($port>=1024 && $port<=65535,422,'Use the designated local FBR IMS port.');
         }
         DB::transaction(function() use($c,$data,$tokens){
-            Company::whereKey($c->id)->lockForUpdate()->firstOrFail();$p=PosImsProfile::firstOrNew(['company_id'=>$c->id]);
+            $c = Company::whereKey($c->id)->lockForUpdate()->firstOrFail();
+            if ($data['enabled']) {
+                abort_unless(\App\Services\PosFederalAddonAccess::allows($c, 'federal_ims'), 403, 'IMS setup requires an active paid add-on.');
+            }
+            $p=PosImsProfile::firstOrNew(['company_id'=>$c->id]);
             foreach(['sandbox','production'] as $env) {
                 foreach(['pos_id','url'] as $field) if(array_key_exists($env.'_'.$field,$data))$p->{$env.'_'.$field}=$data[$env.'_'.$field];
                 if(is_string($tokens[$env.'_token'] ?? null) && $tokens[$env.'_token']!=='')$p->{$env.'_token'}=$tokens[$env.'_token'];

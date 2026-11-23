@@ -159,7 +159,7 @@ class PaymentProof extends Model
 
         return array_values(array_unique(array_filter(
             $decoded,
-            fn ($code) => is_string($code) && isset(\App\Services\PosAddonPricingService::ADDONS[$code])
+            fn ($code) => is_string($code) && isset(\App\Services\PosAddonPricingService::definitions()[$code])
         )));
     }
 
@@ -178,7 +178,7 @@ class PaymentProof extends Model
         $cycle = \App\Services\PosAddonPricingService::normalizeCycle($snapshot['cycle'] ?? null);
         $codes = array_values(array_unique(array_filter(
             $snapshot['codes'] ?? [],
-            fn ($code) => is_string($code) && isset(\App\Services\PosAddonPricingService::ADDONS[$code])
+            fn ($code) => is_string($code) && isset(\App\Services\PosAddonPricingService::definitions()[$code])
         )));
         $lines = is_array($snapshot['lines'] ?? null) ? $snapshot['lines'] : [];
         $safeLines = [];

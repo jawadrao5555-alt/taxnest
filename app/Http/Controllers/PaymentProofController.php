@@ -277,7 +277,7 @@ class PaymentProofController extends Controller
 
         $validated = $request->validate([
             'addon_codes' => 'required|array|min:1',
-            'addon_codes.*' => 'required|string|in:' . implode(',', array_keys(\App\Services\PosAddonPricingService::ADDONS)),
+            'addon_codes.*' => 'required|string|in:' . implode(',', array_keys(\App\Services\PosAddonPricingService::definitions())),
             'addon_cycle' => 'required|in:' . implode(',', \App\Services\PosAddonPricingService::CYCLES),
             'payment_method' => 'nullable|in:bank,jazzcash,easypaisa,other',
             'reference' => 'nullable|string|max:120',
@@ -327,6 +327,10 @@ class PaymentProofController extends Controller
             \App\Services\PosAddonService::flushCache();
             $purchasable = \App\Services\PosAddonService::purchasableCodes($lockedCompany);
             $codes = array_values(array_intersect($validated['addon_codes'], $purchasable));
+            $federalCodes = array_intersect($validated['addon_codes'], \App\Services\PosFederalAddonAccess::CODES);
+            if (array_diff($federalCodes, $codes) || !\App\Services\PosFederalAddonAccess::selectionAllowed($lockedCompany, $codes)) {
+                return ['status' => 'federal_unavailable'];
+            }
             if (empty($codes)) {
                 return ['status' => 'nothing_to_buy'];
             }
@@ -337,6 +341,11 @@ class PaymentProofController extends Controller
                 $lockedCompany,
                 $eligibility['subscription']
             );
+            foreach ($federalCodes as $code) {
+                if (($quote['lines'][$code] ?? 0) <= 0 || !PaymentProof::addonQuoteSnapshotColumnExists()) {
+                    return ['status' => 'federal_unavailable'];
+                }
+            }
             $quote['subscription_id'] = (int) $eligibility['subscription']->id;
             $proofData = [
                 'company_id' => $lockedCompany->id,
@@ -370,6 +379,11 @@ class PaymentProofController extends Controller
             ];
         });
 
+        if ($outcome['status'] === 'federal_unavailable') {
+            Storage::disk('local')->delete($path);
+            return back()->with('error', 'Select one available federal add-on. Changing an existing DI or IMS channel requires review.')
+                ->with('payment_proof', 'error');
+        }
         if ($outcome['status'] === 'pending') {
             return back()->with('success', __('pos.addons_already_pending'))
                 ->with('payment_proof', 'pending');
@@ -527,7 +541,7 @@ class PaymentProofController extends Controller
                 return;
             }
 
-            $catalog = \App\Services\PosAddonPricingService::ADDONS;
+            $catalog = \App\Services\PosAddonPricingService::definitions();
             $lines = [];
             foreach ($quote['codes'] as $code) {
                 $lines[] = '  - ' . ($catalog[$code]['label'] ?? $code)

@@ -611,6 +611,14 @@ class AdminPaymentProofController extends Controller
                 $quote = \App\Services\PosAddonService::quote($codes, $cycle, $company, $sub);
             }
 
+            if (array_intersect($quote['codes'], \App\Services\PosFederalAddonAccess::CODES)
+                && (!$snapshot || empty($snapshot['subscription_id'])
+                    || !\App\Services\PosFederalAddonAccess::hasPaidPackage($company)
+                    || !\App\Services\PosFederalAddonAccess::selectionAllowed($company, $quote['codes'])
+                    || $verifiedReceived < $quote['total'])) {
+                return ['outcome' => 'federal_review_required'];
+            }
+
             \App\Services\PosAddonService::activate(
                 $company,
                 $quote['codes'],
@@ -653,6 +661,7 @@ class AdminPaymentProofController extends Controller
                 'no_expiry' => 'This shop has no dated active package to attach the add-on to. Renew or fix the package first — an add-on must always expire with it.',
                 'subscription_changed' => 'This shop’s package changed after it submitted this add-on request. Reject this proof and ask the shop to submit a fresh request against its current package.',
                 'no_codes' => 'This payment proof no longer contains a valid feature selection. Reject it and ask the shop to submit a fresh request.',
+                'federal_review_required' => 'A federal add-on requires a valid paid term, one eligible channel and full payment of the saved quote.',
                 default => 'This payment proof was already processed.',
             });
         }
@@ -675,7 +684,7 @@ class AdminPaymentProofController extends Controller
         $this->notifyCompany($proof->fresh(['company', 'pricingPlan']), 'approved');
 
         $labels = array_map(
-            fn ($code) => \App\Services\PosAddonPricingService::ADDONS[$code]['label'] ?? $code,
+            fn ($code) => \App\Services\PosAddonPricingService::definitions()[$code]['label'] ?? $code,
             $quote['codes']
         );
 
@@ -909,7 +918,7 @@ class AdminPaymentProofController extends Controller
             if ($proof->isPosAddon()) {
                 $codes = $proof->addonCodeList();
                 $labels = array_map(
-                    fn ($code) => \App\Services\PosAddonPricingService::ADDONS[$code]['label'] ?? $code,
+                    fn ($code) => \App\Services\PosAddonPricingService::definitions()[$code]['label'] ?? $code,
                     $codes
                 );
                 $featureList = $labels ? implode(', ', $labels) : 'the requested features';

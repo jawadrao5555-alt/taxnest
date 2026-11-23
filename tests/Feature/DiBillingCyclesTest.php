@@ -75,7 +75,8 @@ class DiBillingCyclesTest extends TestCase
             ->get(route('saas.admin.payment-proofs', ['company_id' => $company->id]))
             ->assertOk()
             ->assertSee('value="quarterly" selected', false)
-            ->assertSee('(frozen quote)');
+            ->assertSee('(frozen quote)')
+            ->assertSee('Saved quote PKR 2,970.00');
         $this->actingAs($admin, 'admin')->post(route('saas.admin.payment-proofs.approve', $proof->id), $input)->assertSessionHas('success');
         $sub = Subscription::findOrFail($proof->fresh()->subscription_id);
         $this->assertEquals(2970, $sub->final_price);

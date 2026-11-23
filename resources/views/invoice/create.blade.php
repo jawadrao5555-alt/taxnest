@@ -365,6 +365,8 @@
                                 </div>
                             </div>
 
+                            @include('invoice.partials.dsi-reference-picker')
+
                             <div x-show="item.schedule_hint" x-cloak class="mb-3 px-3 py-2 bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-200 dark:border-indigo-700 rounded-lg">
                                 <p class="text-xs text-indigo-700 dark:text-indigo-300" x-text="item.schedule_hint"></p>
                             </div>

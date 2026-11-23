@@ -78,6 +78,25 @@ class AdminReportPeriodsTest extends TestCase
         }
     }
 
+    public function test_pdf_summary_labels_aggregates_that_do_not_match_detail_columns(): void
+    {
+        foreach ([
+            'products' => ['Units Sold', 'Gross'],
+            'fbr' => ['Submitted Count', 'Compliance Pct'],
+        ] as $report => $labels) {
+            $url = '/admin/reports/'.$report.'?company_id=3&branch_id=7&period=daily';
+            $data = $this->getJson($url.'&export=json')->assertOk()->json();
+            $html = view('admin.reports.pdf-template', $data)->render();
+
+            foreach ($labels as $label) {
+                $this->assertStringContainsString('<td>'.$label.'</td>', $html);
+            }
+            $this->assertStringContainsString('Report totals', $html);
+            $this->assertStringNotContainsString('<tfoot>', $html);
+            $this->get($url.'&export=pdf')->assertOk()->assertHeader('Content-Type', 'application/pdf');
+        }
+    }
+
     public function test_custom_dates_and_periods_are_validated(): void
     {
         $url = '/admin/reports/daily?export=json';

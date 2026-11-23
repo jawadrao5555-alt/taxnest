@@ -17,6 +17,8 @@ Audit baseline [`eb7477f9`](https://github.com/jawadrao5555-alt/taxnest/commit/e
 
 ## Delivery checkpoints
 
+- #375 / #395 A16. PRA, Hotel and FBR POS Caller ID setup share localized install instructions that keep Play Protect enabled. If Android blocks Caller ID Plus, the instructions direct users to support and identify the standard SIM Caller ID app. Physical Android installation remains open.
+
 - #395 / #374 ERP payment proof submission now checks the same vertical compatibility as package selection and approval. A fictional route test checks that an unregistered vertical is rejected before a file or proof is saved, and that legacy Healthcare packages with no stored vertical still enter review.
 
 - #395 Admin Reports PDF exports label each aggregate in a report totals table. Product quantities and FBR submission metrics no longer appear under unrelated detail column headings. The fictional regression covers the rendered export template and both PDF download routes.

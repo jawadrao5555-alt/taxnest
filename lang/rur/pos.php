@@ -5821,13 +5821,13 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     // Protect waqti tor par band karne ke qadam ke liye hain.
     'caller_id_download_hint' => 'Shop ke Android phone par install karein aur apne admin login se sign in karein. Yeh build normal (SIM) calls pakadti hai aur bina Play Protect ki rukawat install ho jati hai.',
     'caller_id_plus_title' => 'WhatsApp calls bhi chahiyen?',
-    'caller_id_plus_intro' => 'Normal app sirf SIM calls pakadti hai. WhatsApp calls ke liye alag build hai, aur us ki install Play Protect rok deti hai — is liye do minute ke liye scan band karein, install karein, phir dobara ON kar dein.',
-    'caller_id_plus_step1' => 'Play Store kholein → apni profile photo → Play Protect → settings (gear) → "Scan apps with Play Protect" OFF kar dein.',
-    'caller_id_plus_step2' => 'Neeche wali WhatsApp wali APK download kar ke Install karein ("unknown apps" ka sawal aaye to Allow from this source chunein).',
-    'caller_id_plus_step3' => 'Install hote hi Play Protect dobara ON kar dein.',
+    'caller_id_plus_intro' => 'Standard app SIM calls ke liye hai. Caller ID Plus WhatsApp caller alerts bhi deta hai.',
+    'caller_id_plus_step1' => 'Install karte waqt Google Play Protect ON rakhein.',
+    'caller_id_plus_step2' => 'Caller ID Plus TaxNest se download karein aur Android ki installation hidayat follow karein.',
+    'caller_id_plus_step3' => 'Agar Android install rok de to TaxNest support se rabta karein. SIM calls ke liye standard Caller ID app use karein.',
     'caller_id_plus_step4' => 'App kholein, sign in karein, notification access dein, phir "Test ring" dabayein — sale screen par popup aana chahiye.',
     'caller_id_plus_download' => 'WhatsApp wali APK download karein',
-    'caller_id_plus_warn' => 'Play Protect band karna sirf install ke waqt ka qadam hai — foran wapas ON kar dein.',
+    'caller_id_plus_warn' => 'Caller ID Plus tabhi install karein jab Android Play Protect ON hone par ijazat de.',
     'caller_id_plan_locked' => 'Sirf Unlimited package mein — call aate hi customer ka naam sale screen par.',
     'caller_plan_locked_api' => 'Caller ID aap ke package mein shamil nahi. Caller ID app istemal karne ke liye Unlimited par upgrade karein.',
     // Caller ID v2 (Task 1101)

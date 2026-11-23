@@ -32,9 +32,16 @@ final class PosFederalAddonAccess
         if (!Schema::hasTable((new $model)->getTable())) return false;
         $profiles = $model::where('company_id', $company->id);
         $cutoff = config('pra_di_sandbox.paid_addon_policy_starts_at');
-        return $cutoff
-            ? $profiles->where('created_at', '<', $cutoff)->exists()
-            : $profiles->where('enabled', true)->exists();
+        if (!$cutoff) return $profiles->where('enabled', true)->exists();
+
+        return $profiles->where('created_at', '<', $cutoff)
+            ->where(function ($configured) use ($code) {
+                $configured->where('enabled', true)
+                    ->orWhereNotNull('sandbox_token')->orWhereNotNull('production_token');
+                if ($code === 'federal_ims') {
+                    $configured->orWhere(fn ($agent) => $agent->whereNotNull('device_uid')->whereNotNull('local_ims_url'));
+                }
+            })->exists();
     }
 
     private static function grants(Company $company)

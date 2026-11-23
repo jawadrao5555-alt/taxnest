@@ -597,7 +597,8 @@ class AdminPaymentProofController extends Controller
                 $currentUntil = $sub->end_date instanceof \DateTimeInterface
                     ? $sub->end_date->format('Y-m-d')
                     : (string) $sub->end_date;
-                if ($snapshot['until'] !== $currentUntil) {
+                if ($snapshot['until'] !== $currentUntil
+                    || (isset($snapshot['subscription_id']) && (int) $snapshot['subscription_id'] !== (int) $sub->id)) {
                     return ['outcome' => 'subscription_changed'];
                 }
 

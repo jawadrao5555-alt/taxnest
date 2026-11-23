@@ -1018,6 +1018,25 @@ class PosPaidAddonFlowTest extends TestCase
         $this->assertEquals($quotedAmount, (float) $proof->fresh()->amount);
     }
 
+    public function test_pending_addon_cannot_be_approved_against_a_replacement_with_the_same_plan_and_expiry(): void
+    {
+        $company = $this->makeShop($this->makePlan('Business'));
+        $original = Subscription::where('company_id', $company->id)->sole();
+        $this->buy($company, ['caller_id'])->assertSessionHasNoErrors();
+        $proof = PaymentProof::where('company_id', $company->id)->sole();
+        $this->assertSame((int) $original->id, $proof->addonQuoteSnapshot()['subscription_id'] ?? null);
+
+        $replacement = $original->replicate();
+        $original->update(['active' => false]);
+        $replacement->save();
+
+        $this->approve($proof)->assertSessionHas('error', function (string $error): bool {
+            return str_contains($error, 'package changed');
+        });
+        $this->assertSame('pending', $proof->fresh()->status);
+        $this->assertDatabaseMissing('pos_addons', ['company_id' => $company->id]);
+    }
+
     public function test_pending_addon_approval_uses_the_frozen_purchased_plan_after_catalogue_gate_edit(): void
     {
         $plan = $this->makePlan('Business');

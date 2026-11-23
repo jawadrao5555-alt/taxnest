@@ -334,8 +334,10 @@ class PaymentProofController extends Controller
             $quote = \App\Services\PosAddonService::quote(
                 $codes,
                 $validated['addon_cycle'],
-                $lockedCompany
+                $lockedCompany,
+                $eligibility['subscription']
             );
+            $quote['subscription_id'] = (int) $eligibility['subscription']->id;
             $proofData = [
                 'company_id' => $lockedCompany->id,
                 // Context only — approval never reads it for pricing.

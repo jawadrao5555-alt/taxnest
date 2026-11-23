@@ -868,14 +868,18 @@ class PraDiSandboxTest extends TestCase
         $claim = $svc->claim($this->company->id, 'synthetic-device')['claim'];
         $reply = ['Code' => '100', 'InvoiceNumber' => '054321FK6N1234567', 'CentralStatus' => 'verified'];
         $callback = fn (array $response) => $svc->callback($this->company->id, $record->id, 'synthetic-device',
-            $claim, $response, 'response_received');
+            $claim, $response, 'response_received', ['InvoiceNumber:string', 'invalid field']);
 
         $local = $callback($reply + ['CentralReference' => '054321FK6N7654321']);
         $this->assertSame('local_accepted', $local->state);
         $verified = $callback($reply + ['CentralReference' => $reply['InvoiceNumber']]);
         $this->assertSame('accepted', $verified->state);
         $this->assertSame($reply['InvoiceNumber'], $verified->fiscal_number);
-        $this->assertSame('fbr_ims_callback', collect($verified->attempts)->last()['central_confirmation']['source']);
+        $attempt = collect($verified->attempts)->last();
+        $this->assertSame('fbr_ims_callback', $attempt['central_confirmation']['source']);
+        $this->assertSame('response_received', $attempt['diagnostic']);
+        $this->assertSame(['Code' => '100', 'InvoiceNumber' => $reply['InvoiceNumber']], $attempt['acknowledgement']);
+        $this->assertSame(['InvoiceNumber:string'], $attempt['response_fields']);
         $this->assertSame($verified->attempts, $callback($reply + ['CentralReference' => $reply['InvoiceNumber']])->attempts);
         Http::assertNothingSent();
     }

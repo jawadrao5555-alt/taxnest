@@ -185,7 +185,12 @@ class PosImsReportingService
     }
     private function complete(int $companyId,int $id,array $result,?string $claim=null,?string $diagnostic=null): PosImsSubmission
     {
-        return DB::transaction(function() use($companyId,$id,$result,$claim,$diagnostic){
+        $evidence = array_intersect_key($result, array_flip(['central_confirmation', 'acknowledgement']));
+        if (!empty($result['response_fields'])) $evidence['response_fields'] = $result['response_fields'];
+        if (in_array($diagnostic, ['invalid_endpoint', 'response_received', 'unrecognized_response', 'transport_timeout', 'http_error', 'invalid_json_result', 'unconfirmed_soap_or_transport'], true)) {
+            $evidence['diagnostic'] = $diagnostic;
+        }
+        return DB::transaction(function() use($companyId,$id,$result,$claim,$evidence){
             $r=$this->locked($companyId,$id);
             if ($claim !== null) abort_unless(is_string($r->agent_claim) && hash_equals($r->agent_claim,$claim),409);
             // A later authenticated callback may promote the same local reference exactly once.
@@ -193,17 +198,14 @@ class PosImsReportingService
                 && $r->fiscal_number === $result['reference']) {
                 $attempts = $r->attempts ?? [];
                 $attempts[] = ['at' => now()->toIso8601String(), 'state' => 'accepted', 'error_codes' => [],
-                    'previous_state' => 'local_accepted', 'central_confirmation' => $result['central_confirmation']];
+                    'previous_state' => 'local_accepted'] + $evidence;
                 $r->fill(['state' => 'accepted', 'attempts' => $attempts])->save();
                 return $r;
             }
             // Replayed callbacks are idempotent and never overwrite terminal evidence.
             if ($r->state !== 'submitting') return $r;
             $a=$r->attempts;$a[array_key_last($a)]['state']=$result['state'];$a[array_key_last($a)]['error_codes']=$result['error_codes'];
-            if ($diagnostic !== null && in_array($diagnostic,['invalid_endpoint','response_received','unrecognized_response','transport_timeout','http_error','invalid_json_result','unconfirmed_soap_or_transport'],true)) $a[array_key_last($a)]['diagnostic']=$diagnostic;
-            if (!empty($result['response_fields'])) $a[array_key_last($a)]['response_fields']=$result['response_fields'];
-            if (isset($result['central_confirmation'])) $a[array_key_last($a)]['central_confirmation']=$result['central_confirmation'];
-            if (isset($result['acknowledgement'])) $a[array_key_last($a)]['acknowledgement']=$result['acknowledgement'];
+            $a[array_key_last($a)] = array_replace($a[array_key_last($a)], $evidence);
             $r->fill(['state'=>$result['state'],'fiscal_number'=>$result['reference'],'attempts'=>$a])->save();return $r;
         });
     }

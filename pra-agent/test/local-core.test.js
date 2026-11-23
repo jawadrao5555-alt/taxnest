@@ -254,8 +254,8 @@ function fakeSafeStorage() {
         let store = new EventStore(options);
         const owner = {};
         const scope = { company_id: '1', branch_id: '2', device_id: 'device-1', user_id: '3' };
-        const accept = () => createSaleAcceptance({
-            isAuthorized: (context) => context === owner, storeProvider: () => store, scopeProvider: () => scope,
+        const accept = (sessionScope = scope) => createSaleAcceptance({
+            isAuthorized: (context) => context === owner, storeProvider: () => store, scopeProvider: () => sessionScope,
         });
         const sale = (uuid) => ({
             scope, offline_uuid: uuid, occurred_at_ms: 1700000000000, payment_method: 'cash',
@@ -270,6 +270,12 @@ function fakeSafeStorage() {
         assert.strictEqual(accept()(owner, sale('offline-uuid-00000001')).status, 'duplicate');
         store.close();
         store = new EventStore(options);
+        for (const sessionScope of [{ ...scope, user_id: '4' }, { ...scope, branch_id: '5' }]) {
+            assert.deepStrictEqual(accept(sessionScope)(owner, {
+                ...sale('offline-uuid-00000001'), scope: sessionScope,
+            }), { ok: false, error: 'idempotency_conflict' });
+        }
+        assert.deepStrictEqual(accept()(owner, sale('offline-uuid-00000001')).receipt, first.receipt);
         assert.match(accept()(owner, sale('offline-uuid-00000002')).receipt.local_bill_number, /^DL-[A-F0-9]{8}-000002$/);
         assert.strictEqual(fs.readFileSync(path.join(root, 'events.ndjson')).includes(Buffer.from('Tea')), false);
         assert.strictEqual(accept()({}, sale('offline-uuid-00000003')).error, 'unauthorized');

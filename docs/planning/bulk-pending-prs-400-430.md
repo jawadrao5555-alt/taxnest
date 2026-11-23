@@ -21,6 +21,8 @@ The seven open source PRs in the inclusive range were checked against GitHub. Th
 
 ## Integration and closure
 
+- #428 offline sale recovery. A repeated local sale returns its stored receipt only to the original authenticated company, branch, device and cashier. Fictional tests cover a restarted journal, a genuine replay and separate cashier/branch scope. POS 2 independent native authority and physical reconnect remain open.
+
 - #428 desktop reconnect. If a cashier signs in again while an earlier pairing confirmation is still open, the Agent checks the current session when the earlier confirmation finishes. The stale confirmation cannot refresh the primary POS offline scope. Fictional regressions cover both PRA and FBR POS. Physical reconnect and independent POS 2 offline billing remain open.
 
 - #428. The desktop window enforces the POS 1 boundary for offline snapshots and automatic Agent pairing, including when POS 2 is opened with shared options. The fictional desktop regression checks both session partitions. POS 2 still needs independent offline cashier authority and physical reconnect acceptance.

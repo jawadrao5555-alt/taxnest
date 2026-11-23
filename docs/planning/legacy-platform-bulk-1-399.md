@@ -17,6 +17,8 @@ Audit baseline [`eb7477f9`](https://github.com/jawadrao5555-alt/taxnest/commit/e
 
 ## Delivery checkpoints
 
+- #395 / #374 ERP payment proof submission now checks the same vertical compatibility as package selection and approval. A fictional route test checks that an unregistered vertical is rejected before a file or proof is saved, and that legacy Healthcare packages with no stored vertical still enter review.
+
 - #395 Admin Reports PDF exports label each aggregate in a report totals table. Product quantities and FBR submission metrics no longer appear under unrelated detail column headings. The fictional regression covers the rendered export template and both PDF download routes.
 
 - #395 A10 Company Usage adds DI document counts and net value based on saved production status and a recorded FBR reference. The view and CSV use the same company, branch, invoice-date range and prior-year cutoff. Credit notes reduce invoice value. A synthetic regression covers credit notes, legacy production evidence, sandbox and inconsistent flags, draft and missing references, adjacent dates and tenant/branch isolation.

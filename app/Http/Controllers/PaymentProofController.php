@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\PaymentProof;
+use App\Services\PlanCompanyCompatibility;
+use App\Support\NestErps;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
@@ -73,7 +75,9 @@ class PaymentProofController extends Controller
         // The selected package must be a real, non-trial plan for THIS account's
         // product line — a company can never request a plan from another panel.
         $plan = \App\Models\PricingPlan::find($validated['pricing_plan_id']);
-        if (!$plan || $plan->is_trial || \App\Services\PlanCompanyCompatibility::productKey($plan->product_type) !== \App\Services\PlanCompanyCompatibility::productKey($productType)) {
+        if (!$plan || $plan->is_trial
+            || PlanCompanyCompatibility::productKey($plan->product_type) !== PlanCompanyCompatibility::productKey($productType)
+            || (NestErps::isProductType($productType) && !PlanCompanyCompatibility::matches($company, $plan))) {
             return back()
                 ->withErrors(['pricing_plan_id' => 'Please select a valid package for your account.'])
                 ->withInput()

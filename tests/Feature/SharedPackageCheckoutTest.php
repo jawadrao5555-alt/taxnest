@@ -44,6 +44,38 @@ class SharedPackageCheckoutTest extends TestCase
         $this->assertDatabaseCount('subscription_payments',0);
     }
 
+    public function test_erp_proof_upload_respects_the_same_vertical_rules_as_checkout(): void
+    {
+        Mail::fake();
+        Storage::fake('local');
+        $this->withoutMiddleware();
+        $company = Company::create(['name' => 'Fictional ERP shop', 'ntn' => 'ERPQA001', 'product_type' => 'erps']);
+        $owner = User::create([
+            'name' => 'Fictional owner', 'email' => 'erp-proof-owner@example.test',
+            'password' => 'unused', 'role' => 'company_admin', 'company_id' => $company->id,
+        ]);
+        $plan = PricingPlan::create([
+            'name' => 'Starter', 'product_type' => 'erps', 'invoice_limit' => 100, 'price' => 14999, 'is_public' => true,
+        ]);
+        $plan->forceFill(['erps_vertical' => 'unregistered-example'])->save();
+        $this->actingAs($owner, 'health');
+        $submit = fn () => $this->post(route('health.payment-proof.store'), [
+            'pricing_plan_id' => $plan->id, 'billing_cycle' => 'annual', 'amount' => 14999,
+            'payment_method' => 'bank', 'proof' => UploadedFile::fake()->create('fictional.pdf', 2, 'application/pdf'),
+        ]);
+
+        $submit()->assertSessionHasErrors('pricing_plan_id');
+        $this->assertDatabaseCount('payment_proofs', 0);
+        $this->assertSame([], Storage::disk('local')->allFiles());
+
+        $plan->forceFill(['erps_vertical' => null])->save();
+        $submit()->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('payment_proofs', [
+            'company_id' => $company->id, 'pricing_plan_id' => $plan->id, 'status' => 'pending',
+        ]);
+        $this->assertDatabaseCount('subscription_payments', 0);
+    }
+
     public function test_checkout_rejects_cashier_wrong_product_and_unconfigured_period(): void
     {
         $this->withoutMiddleware();

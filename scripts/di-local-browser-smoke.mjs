@@ -14,6 +14,48 @@ try {
  await page.locator('button[type=submit]').click();await page.waitForLoadState('networkidle');
  await page.goto(base+'/invoice/create');
  await page.waitForFunction(()=>window.Alpine && document.querySelector('form[x-data]')?._x_dataStack);
+ if (mode === 'financial') {
+  const picker = page.locator('details').filter({has: page.getByText('Search FBR tax references', {exact: true})}).first();
+  await picker.locator('summary').click();
+  const type = picker.getByLabel('Reference type');
+  const search = picker.getByRole('searchbox');
+  const results = picker.getByRole('list', {name: 'Tax reference results'});
+
+  await search.fill('01012100');
+  const hsCode = results.getByRole('listitem').filter({hasText: '0101.2100'});
+  await hsCode.getByRole('button', {name: 'Use', exact: true}).click();
+  await picker.getByText(/Selected 0101\.2100/).waitFor();
+  assert.equal(await page.locator('[name="items[0][hs_code]"]').inputValue(), '0101.2100');
+
+  await type.selectOption('rate');
+  await search.fill('18% along with rupees 60');
+  const mixedRate = results.getByRole('listitem').filter({hasText: '18% along with rupees 60 per kilogram'});
+  await mixedRate.getByText('Reference only').waitFor();
+  assert.equal(await mixedRate.getByRole('button', {name: 'Use', exact: true}).count(), 0);
+
+  await type.selectOption('sale_type');
+  await search.fill('Goods at Reduced Rate');
+  await results.getByRole('listitem').filter({hasText: 'Goods at Reduced Rate'})
+    .getByRole('button', {name: 'Use', exact: true}).click();
+  assert.equal(await page.locator('[name="items[0][schedule_type]"]').inputValue(), 'reduced');
+
+  await type.selectOption('sro');
+  await search.fill('EIGHTH SCHEDULE Table 1');
+  await results.getByRole('listitem').filter({hasText: 'EIGHTH SCHEDULE Table 1'})
+    .getByRole('button', {name: 'Use', exact: true}).click();
+  assert.equal(await page.locator('[name="items[0][sro_schedule_no]"]').inputValue(), 'EIGHTH SCHEDULE Table 1');
+
+  await type.selectOption('serial');
+  await search.fill('70');
+  const serial = results.getByRole('listitem').filter({has: page.getByText('70', {exact: true})});
+  await serial.getByRole('button', {name: 'Use', exact: true}).click();
+  assert.equal(await page.locator('[name="items[0][serial_no]"]').inputValue(), '70');
+
+  // The financial fixture below verifies a different item.
+  await page.locator('[name="items[0][serial_no]"]').fill('');
+  await page.locator('[name="items[0][sro_schedule_no]"]').fill('');
+  await picker.locator('summary').click();
+ }
  await page.locator('input[name=buyer_name]').fill('Synthetic Buyer');
  await page.locator('[name=buyer_address]').fill('Synthetic local address');
  await page.locator('[name=buyer_ntn]').fill('1234567');

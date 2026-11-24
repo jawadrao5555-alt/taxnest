@@ -976,9 +976,15 @@ class PraDiSandboxTest extends TestCase
         $this->assertNull($svc->template($r)['TotalTaxCharged']);
         $p=$this->imsPayload($r);$this->assertSame(1,$p['PaymentMode']);
         $svc->prepare($this->company->id,$r->id,$p);
-        Http::fake(fn()=>Http::response(['Code'=>'100','InvoiceNumber'=>'TEST-IMS-123456'],200));
+        Http::fake(fn () => Http::response([
+            'response_code' => '100', 'InvoiceNumber' => 'TEST-IMS-123456',
+            'detail' => 'Fictional provider diagnostic excluded from retained evidence',
+        ], 200));
         $r=$svc->submit($this->company->id,$r->id,$this->owner->id);
         $this->assertSame('accepted',$r->state);
+        $this->assertSame([
+            'response_code' => '100', 'InvoiceNumber' => 'TEST-IMS-123456',
+        ], $r->attempts[0]['acknowledgement']);
         Http::assertSent(fn($req)=>$req->url()===\App\Services\PosTaxIntegrationEndpoints::url('ims','sandbox') && $req->hasHeader('Authorization','Bearer synthetic-ims-sandbox') && !isset($req['scenarioId']));
         $this->get('/pos/tax-integrations/fbr-pos/'.$r->id.'/receipt?width=58')->assertOk()->assertSee('SANDBOX TEST COPY')->assertSee('TEST-IMS-123456')->assertSee('TEST-PRA-ONLY');
         $this->assertEquals($before,DB::table('pos_transactions')->where('id',$bill)->first());

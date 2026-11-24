@@ -167,7 +167,11 @@ class PosImsReportingService
             $p=PosImsProfile::where('company_id',$companyId)->firstOrFail();
             $url=PosTaxIntegrationEndpoints::checked('ims',$r->environment,$p->{$r->environment.'_url'});
             $res=Http::withToken($token)->acceptJson()->connectTimeout(10)->timeout(45)->withoutRedirecting()->post($url,$r->payload);
-            $result=$res->successful() ? self::result($res->json()) : $unknown;
+            $response = $res->successful() ? $res->json() : null;
+            $result = self::result($response);
+            if ($evidence = self::acknowledgementEvidence($response)) {
+                $result['acknowledgement'] = $evidence;
+            }
         } catch (\Throwable $e) { $result=$unknown; }
         return $this->complete($companyId,$id,$result);
     }
@@ -254,8 +258,13 @@ class PosImsReportingService
                 'reference' => $centralReference];
         }
 
-        // Retain only bounded, validated fiscal fields in encrypted evidence.
-        // The original code used to discard all callback evidence after classification.
+        $result['acknowledgement'] = self::acknowledgementEvidence($response);
+        $result['response_fields']=array_values(array_filter(array_slice($responseFields,0,16),fn($field)=>is_string($field) && strlen($field)<=100 && preg_match('/^[A-Za-z0-9_.]+:(string|number|boolean|object|array|null)$/D',$field)));
+        return $this->complete($companyId,$id,$result,$claim,$diagnostic);
+    }
+    /** Keep only recognized, bounded fiscal fields in the encrypted attempt record. */
+    private static function acknowledgementEvidence($response): array
+    {
         $evidence=[];
         foreach (['Code','code','response_code'] as $key) {
             $value=is_array($response) ? ($response[$key] ?? null) : null;
@@ -266,10 +275,9 @@ class PosImsReportingService
             if ($key==='Response' && (!is_string($value) || !preg_match('/^(?:[0-9]{6}|[A-Z][A-Z-]*-[0-9]{3,}$)/',trim($value)))) continue;
             if ($number=FbrPosFiscalResult::number($value)) $evidence[$key]=$number;
         }
-        $result['acknowledgement']=$evidence;
-        $result['response_fields']=array_values(array_filter(array_slice($responseFields,0,16),fn($field)=>is_string($field) && strlen($field)<=100 && preg_match('/^[A-Za-z0-9_.]+:(string|number|boolean|object|array|null)$/D',$field)));
-        return $this->complete($companyId,$id,$result,$claim,$diagnostic);
+        return $evidence;
     }
+
     /** Record independently checked portal evidence; NEVER dispatch an invoice. */
     public function reconcilePortal(int $companyId,int $id,int $actor,array $evidence): PosImsSubmission
     {

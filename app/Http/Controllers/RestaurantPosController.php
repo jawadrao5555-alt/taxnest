@@ -2284,7 +2284,8 @@ class RestaurantPosController extends Controller
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
 
-        $order = RestaurantOrder::where('company_id', $companyId)
+        $stream = auth('pos')->user()?->posBillingScopeExplicit() ?? 'both';
+        $order = $this->ordersForBillingStream($companyId, $stream)
             ->whereNotIn('status', ['cancelled'])
             ->with(['items', 'table', 'creator'])
             ->findOrFail($orderId);
@@ -2318,7 +2319,8 @@ class RestaurantPosController extends Controller
             return response()->json(['success' => false, 'message' => __('pos.online_mark_failed')], 503);
         }
 
-        $order = RestaurantOrder::where('company_id', $companyId)
+        $stream = auth('pos')->user()?->posBillingScopeExplicit() ?? 'both';
+        $order = $this->ordersForBillingStream($companyId, $stream)
             ->whereIn('status', ['held', 'preparing', 'ready'])
             ->find($orderId);
 

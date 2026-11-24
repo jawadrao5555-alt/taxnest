@@ -21,6 +21,8 @@ The seven open source PRs in the inclusive range were checked against GitHub. Th
 
 ## Integration and closure
 
+- #428 cashier-stream checks also cover the direct proof bill and online-payment marker. Fictional coverage verifies the other stream cannot set a marker or read the proof bill, while the matching stream can set the marker.
+
 - #428 held-order polling and table lookup use the signed-in cashier's billing stream. The polling cache key also follows the stream. Fictional coverage checks Local, PRA, unrestricted and unclassified legacy orders plus the tenant boundary.
 
 - #428 offline sale recovery. A repeated local sale returns its stored receipt only to the original authenticated company, branch, device and cashier. Fictional tests cover a restarted journal, a genuine replay and separate cashier/branch scope. POS 2 independent native authority and physical reconnect remain open.

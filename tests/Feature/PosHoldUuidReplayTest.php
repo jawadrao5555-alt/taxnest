@@ -122,6 +122,7 @@ class PosHoldUuidReplayTest extends TestCase
             // Task 1001: hold_uuid idempotency key.
             $table->string('hold_uuid', 64)->nullable()->unique();
             $table->string('held_billing_stream', 5)->nullable();
+            $table->timestamp('online_payment_awaited_at')->nullable();
             $table->timestamps();
         });
 
@@ -279,6 +280,30 @@ class PosHoldUuidReplayTest extends TestCase
 
         Auth::guard('pos')->setUser($owner);
         $this->assertEqualsCanonicalizing([$local, $pra, $legacy], array_column($controller->getOrdersByTable($table)->getData(true), 'id'));
+    }
+
+    public function test_proof_bill_and_online_payment_marker_respect_the_held_order_stream(): void
+    {
+        $company = $this->makeCompany();
+        $cashier = $this->makeCashier($company);
+        $cashier->forceFill(['pos_role' => 'pos_cashier', 'pos_billing_scope' => 'local'])->save();
+        $order = DB::table('restaurant_orders')->insertGetId([
+            'company_id' => $company->id, 'order_number' => 'FICTIONAL-PRA', 'held_billing_stream' => 'pra',
+        ]);
+
+        $controller = app(RestaurantPosController::class);
+        $set = Request::create('/pos/restaurant/orders/'.$order.'/online-payment', 'POST', ['awaited' => '1']);
+        $this->assertSame(404, $controller->markOnlinePayment($set, $order)->getStatusCode());
+        $this->assertNull(RestaurantOrder::findOrFail($order)->online_payment_awaited_at);
+
+        $praCashier = $this->makeCashier($company);
+        $praCashier->forceFill(['pos_role' => 'pos_cashier', 'pos_billing_scope' => 'pra'])->save();
+        $this->assertSame(200, $controller->markOnlinePayment($set, $order)->getStatusCode());
+        $this->assertNotNull(RestaurantOrder::findOrFail($order)->online_payment_awaited_at);
+
+        Auth::guard('pos')->setUser($cashier);
+        $this->expectException(\Illuminate\Database\Eloquent\ModelNotFoundException::class);
+        $controller->proofBill($order, Request::create('/pos/proof-bill'));
     }
 
     // ── 1. SEQUENTIAL REPLAY ─────────────────────────────────────────────

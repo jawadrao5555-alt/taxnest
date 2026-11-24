@@ -41,7 +41,6 @@
             applying: false,
             feedback: '',
             live: false,
-            isOpen: false,
             loading: false,
             liveStatus: '',
             officialOptions: {},

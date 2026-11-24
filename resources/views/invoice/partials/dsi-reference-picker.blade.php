@@ -1,6 +1,6 @@
 <details class="mb-3 rounded-lg border border-gray-200 dark:border-gray-700"
-    x-data="dsiReferencePicker()" @toggle="isOpen = $el.open"
-    x-effect="queueLookup(isOpen && live ? [invoice_date, referenceBranchId, item.hs_code, item.schedule_type, item.tax_rate, item.sro_schedule_no] : null)">
+    x-data="dsiReferencePicker()"
+    x-effect="queueLookup(live ? [invoice_date, referenceBranchId, item.hs_code, item.schedule_type, item.tax_rate, item.sro_schedule_no] : null)">
     <summary class="cursor-pointer px-3 py-2 text-sm font-medium text-emerald-700 dark:text-emerald-300">
         Search FBR tax references
     </summary>

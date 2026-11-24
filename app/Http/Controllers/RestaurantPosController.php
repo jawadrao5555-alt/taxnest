@@ -2120,6 +2120,9 @@ class RestaurantPosController extends Controller
     public function listHeldOrders(\Illuminate\Http\Request $request)
     {
         $companyId = app('currentCompanyId');
+        $stream = auth('pos')->user()?->posBillingScopeExplicit() ?? 'both';
+        $visibleOrders = $this->ordersForBillingStream($companyId, $stream)
+            ->whereIn('status', ['held', 'preparing', 'ready']);
 
         // ── Fast-path: If-None-Match ETag (Task 1097) ────────────────────────
         // A composite fingerprint across both orders AND items covers every
@@ -2129,16 +2132,15 @@ class RestaurantPosController extends Controller
         //   • KOT stamp (kot_printed_at bumped by a raw query-builder update
         //     that does NOT touch updated_at)     → different MAX(kot_printed_at).
         //   • New item added same second           → different MAX(id) on items.
-        $etag = $this->heldOrdersEtag($companyId);
+        $etag = $this->heldOrdersEtag($visibleOrders->toBase(), $companyId, $stream);
+        $headers = ['ETag' => $etag, 'Cache-Control' => 'private, no-cache'];
         if ($request->header('If-None-Match') === $etag) {
-            return response('', 304)->header('ETag', $etag);
+            return response('', 304, $headers);
         }
 
         // creator: the held-orders window prints the staff name on every row
         // (owner batch 26 Aug 2026). Eager-loaded — live throws on lazy loads.
-        $orders = RestaurantOrder::where('company_id', $companyId)
-            ->whereIn('status', ['held', 'preparing', 'ready'])
-            ->with(['table', 'items', 'creator:id,name'])
+        $orders = $visibleOrders->with(['table', 'items', 'creator:id,name'])
             ->orderBy('created_at', 'desc')
             ->get();
 
@@ -2206,7 +2208,17 @@ class RestaurantPosController extends Controller
             ];
         })->values();
 
-        return response()->json($json)->header('ETag', $etag);
+        return response()->json($json, 200, $headers);
+    }
+
+    private function ordersForBillingStream(int $companyId, string $stream): \Illuminate\Database\Eloquent\Builder
+    {
+        $orders = RestaurantOrder::where('company_id', $companyId);
+        if ($stream !== 'both' && Schema::hasColumn('restaurant_orders', 'held_billing_stream')) {
+            $orders->where(fn ($query) => $query->whereNull('held_billing_stream')
+                ->orWhere('held_billing_stream', $stream));
+        }
+        return $orders;
     }
 
     /**
@@ -2228,22 +2240,12 @@ class RestaurantPosController extends Controller
      * query per table, much cheaper than the full eager-load they replace when
      * nothing has changed.
      */
-    private function heldOrdersEtag(int $companyId): string
+    private function heldOrdersEtag(\Illuminate\Database\Query\Builder $visibleOrders, int $companyId, string $stream): string
     {
-        $DB = \Illuminate\Support\Facades\DB::class;
+        $orderRows = (clone $visibleOrders)->orderBy('id')->get(['id', 'status', 'updated_at']);
 
-        $orderRows = $DB::table('restaurant_orders')
-            ->where('company_id', $companyId)
-            ->whereIn('status', ['held', 'preparing', 'ready'])
-            ->orderBy('id')
-            ->get(['id', 'status', 'updated_at']);
-
-        $itemRows = $DB::table('restaurant_order_items')
-            ->whereIn('order_id', function ($q) use ($companyId) {
-                $q->select('id')->from('restaurant_orders')
-                    ->where('company_id', $companyId)
-                    ->whereIn('status', ['held', 'preparing', 'ready']);
-            })
+        $itemRows = DB::table('restaurant_order_items')
+            ->whereIn('order_id', (clone $visibleOrders)->select('id'))
             ->orderBy('id')
             ->get(['id', 'updated_at', 'kot_printed_at']);
 
@@ -2252,14 +2254,15 @@ class RestaurantPosController extends Controller
             . '|'
             . $itemRows->map(fn($r) => $r->id . ':' . ($r->updated_at ?? '') . ':' . ($r->kot_printed_at ?? ''))->join(',');
 
-        return '"held-' . $companyId . '-' . md5($payload) . '"';
+        return '"held-' . $companyId . '-' . $stream . '-' . md5($payload) . '"';
     }
 
     public function getOrdersByTable($tableId)
     {
         $companyId = app('currentCompanyId');
+        $stream = auth('pos')->user()?->posBillingScopeExplicit() ?? 'both';
 
-        $orders = RestaurantOrder::where('company_id', $companyId)
+        $orders = $this->ordersForBillingStream($companyId, $stream)
             ->where('table_id', $tableId)
             ->whereNotIn('status', ['completed', 'cancelled'])
             ->with('items')

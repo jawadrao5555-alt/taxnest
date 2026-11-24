@@ -236,6 +236,51 @@ class PosHoldUuidReplayTest extends TestCase
         $this->hold($payload);
     }
 
+    public function test_held_order_views_and_etag_follow_the_current_cashier_stream(): void
+    {
+        $company = $this->makeCompany();
+        $owner = $this->makeCashier($company);
+        $table = DB::table('restaurant_tables')->insertGetId([
+            'company_id' => $company->id, 'table_number' => 'Fictional table',
+        ]);
+        $local = DB::table('restaurant_orders')->insertGetId([
+            'company_id' => $company->id, 'table_id' => $table,
+            'order_number' => 'LOCAL-TEST', 'held_billing_stream' => 'local',
+        ]);
+        $pra = DB::table('restaurant_orders')->insertGetId([
+            'company_id' => $company->id, 'table_id' => $table,
+            'order_number' => 'PRA-TEST', 'held_billing_stream' => 'pra',
+        ]);
+        $legacy = DB::table('restaurant_orders')->insertGetId([
+            'company_id' => $company->id, 'table_id' => $table, 'order_number' => 'LEGACY-TEST',
+        ]);
+        DB::table('restaurant_orders')->insert([
+            'company_id' => $company->id + 1, 'table_id' => $table, 'order_number' => 'OTHER-TENANT',
+        ]);
+
+        $controller = app(RestaurantPosController::class);
+        $request = Request::create('/pos/restaurant/api/held-orders');
+        $this->assertEqualsCanonicalizing([$local, $pra, $legacy], array_column($controller->listHeldOrders($request)->getData(true), 'id'));
+
+        $localCashier = $this->makeCashier($company);
+        $localCashier->forceFill(['pos_role' => 'pos_cashier', 'pos_billing_scope' => 'local'])->save();
+        $localResponse = $controller->listHeldOrders($request);
+        $this->assertEqualsCanonicalizing([$local, $legacy], array_column($localResponse->getData(true), 'id'));
+        $this->assertEqualsCanonicalizing([$local, $legacy], array_column($controller->getOrdersByTable($table)->getData(true), 'id'));
+
+        $request->headers->set('If-None-Match', $localResponse->headers->get('ETag'));
+        $this->assertSame(304, $controller->listHeldOrders($request)->getStatusCode());
+
+        $praCashier = $this->makeCashier($company);
+        $praCashier->forceFill(['pos_role' => 'pos_cashier', 'pos_billing_scope' => 'pra'])->save();
+        $praResponse = $controller->listHeldOrders($request);
+        $this->assertSame(200, $praResponse->getStatusCode());
+        $this->assertEqualsCanonicalizing([$pra, $legacy], array_column($praResponse->getData(true), 'id'));
+
+        Auth::guard('pos')->setUser($owner);
+        $this->assertEqualsCanonicalizing([$local, $pra, $legacy], array_column($controller->getOrdersByTable($table)->getData(true), 'id'));
+    }
+
     // ── 1. SEQUENTIAL REPLAY ─────────────────────────────────────────────
 
     /** First hold succeeds and stores hold_uuid. Second hold with the SAME

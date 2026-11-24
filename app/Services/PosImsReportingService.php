@@ -148,7 +148,7 @@ class PosImsReportingService
     }
     public function submit(int $companyId,int $id,int $actor): PosImsSubmission
     {
-        [$r,$token]=DB::transaction(function() use($companyId,$id,$actor){
+        [$r,$token,$url]=DB::transaction(function() use($companyId,$id,$actor){
             Company::whereKey($companyId)->lockForUpdate()->firstOrFail();
             $r=$this->locked($companyId,$id);$p=$this->activeRecord($r);
             self::preventOtherFederalRecord($companyId,$r->source_transaction_id,$r->environment,'ims');
@@ -157,15 +157,17 @@ class PosImsReportingService
             abort_unless(hash_equals($r->payload_hash,hash('sha256',json_encode($r->payload,JSON_THROW_ON_ERROR))),409);
             $token=(string)$p->{$r->environment.'_token'};
             if ($r->connection_mode==='cloud' && $token==='') throw ValidationException::withMessages(['token'=>'Configure the selected IMS token.']);
+            // Resolve the endpoint alongside its token before recording a dispatch attempt.
+            $url = $r->connection_mode === 'cloud'
+                ? PosTaxIntegrationEndpoints::checked('ims', $r->environment, $p->{$r->environment.'_url'})
+                : null;
             $state=$r->connection_mode==='fiscal_device' ? 'queued_agent':'submitting';
             $attempts=$r->attempts ?? []; $attempts[]=['actor_id'=>$actor,'at'=>now()->toIso8601String(),'state'=>$state,'environment'=>$r->environment,'hash'=>$r->payload_hash,'payload'=>$r->payload];
-            $r->fill(['state'=>$state,'attempted_at'=>now(),'attempts'=>$attempts])->save();return [$r,$token];
+            $r->fill(['state'=>$state,'attempted_at'=>now(),'attempts'=>$attempts])->save();return [$r,$token,$url];
         });
         if ($r->state==='queued_agent') return $r;
         $unknown=['state'=>'verification_required','reference'=>null,'error_codes'=>[]];
         try {
-            $p=PosImsProfile::where('company_id',$companyId)->firstOrFail();
-            $url=PosTaxIntegrationEndpoints::checked('ims',$r->environment,$p->{$r->environment.'_url'});
             $res=Http::withToken($token)->acceptJson()->connectTimeout(10)->timeout(45)->withoutRedirecting()->post($url,$r->payload);
             $response = $res->successful() ? $res->json() : null;
             $result = self::result($response);

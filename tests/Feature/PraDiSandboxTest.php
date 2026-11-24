@@ -967,6 +967,31 @@ class PraDiSandboxTest extends TestCase
         Http::assertNothingSent();
     }
 
+    public function test_ims_invalid_saved_endpoint_leaves_the_prepared_draft_recoverable(): void
+    {
+        $profile = $this->imsProfile();
+        $service = app(\App\Services\PosImsReportingService::class);
+        $record = $service->capture($this->company, $this->bill(), $this->owner->id, 'sandbox');
+        $service->prepare($this->company->id, $record->id, $this->imsPayload($record));
+        $profile->update(['sandbox_url' => 'invalid saved fixture']);
+        Http::fake(fn () => Http::response(['Code' => '100', 'InvoiceNumber' => 'SYNTHETIC-IMS-123456']));
+
+        try {
+            $service->submit($this->company->id, $record->id, $this->owner->id);
+            $this->fail('Invalid saved endpoint was accepted.');
+        } catch (ValidationException $error) {
+            $this->assertArrayHasKey('sandbox_url', $error->errors());
+        }
+
+        $this->assertSame('draft', $record->fresh()->state);
+        $this->assertNull($record->fresh()->attempted_at);
+        Http::assertNothingSent();
+
+        $profile->update(['sandbox_url' => null]);
+        $this->assertSame('accepted', $service->submit($this->company->id, $record->id, $this->owner->id)->state);
+        Http::assertSentCount(1);
+    }
+
     public function test_ims_evidence_preserves_source_and_uses_only_ims_environment_credentials(): void
     {
         $this->imsProfile();$svc=app(\App\Services\PosImsReportingService::class);$bill=$this->bill('credit');

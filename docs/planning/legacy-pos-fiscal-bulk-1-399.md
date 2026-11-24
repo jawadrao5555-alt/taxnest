@@ -15,6 +15,8 @@ Audit baseline [`eb7477f9`](https://github.com/jawadrao5555-alt/taxnest/commit/e
 
 ## Delivery checkpoints
 
+- #373 cloud IMS validates and captures the official endpoint with its token before recording a dispatch. An invalid saved endpoint leaves the prepared draft available after setup correction. The regression uses fictional settings and fake transport.
+
 - #266. DI invoice detail and PDF show the saved selling-pack quantity and label alongside the existing fiscal base-unit line. Fictional coverage checks an original invoice and a linked partial return after the live packing definition is replaced.
 
 - #373. A rejection code paired with a malformed explicit invoice number leaves the claim awaiting verification. Fictional regression cases cover false, zero, empty-array and blank number fields and a number in the legacy response field. Physical and regulator verification remain open.

@@ -14,6 +14,71 @@ try {
  await page.locator('button[type=submit]').click();await page.waitForLoadState('networkidle');
  await page.goto(base+'/invoice/create');
  await page.waitForFunction(()=>window.Alpine && document.querySelector('form[x-data]')?._x_dataStack);
+ if (mode === 'financial') {
+  const picker = page.locator('details').filter({has: page.getByText('Search FBR tax references', {exact: true})}).first();
+  await picker.locator('summary').click();
+  const type = picker.getByLabel('Reference type');
+  const search = picker.getByRole('searchbox');
+  const results = picker.getByRole('list', {name: 'Tax reference results'});
+
+  await search.fill('01012100');
+  const hsCode = results.getByRole('listitem').filter({hasText: '0101.2100'});
+  await hsCode.getByRole('button', {name: 'Use', exact: true}).click();
+  await picker.getByText(/Selected 0101\.2100/).waitFor();
+  assert.equal(await page.locator('[name="items[0][hs_code]"]').inputValue(), '0101.2100');
+
+  await type.selectOption('rate');
+  await search.fill('18% along with rupees 60');
+  const mixedRate = results.getByRole('listitem').filter({hasText: '18% along with rupees 60 per kilogram'});
+  await mixedRate.getByText('Reference only').waitFor();
+  assert.equal(await mixedRate.getByRole('button', {name: 'Use', exact: true}).count(), 0);
+
+  await type.selectOption('sale_type');
+  await search.fill('Goods at Reduced Rate');
+  await results.getByRole('listitem').filter({hasText: 'Goods at Reduced Rate'})
+    .getByRole('button', {name: 'Use', exact: true}).click();
+  assert.equal(await page.locator('[name="items[0][schedule_type]"]').inputValue(), 'reduced');
+
+  await type.selectOption('sro');
+  await search.fill('EIGHTH SCHEDULE Table 1');
+  await results.getByRole('listitem').filter({hasText: 'EIGHTH SCHEDULE Table 1'})
+    .getByRole('button', {name: 'Use', exact: true}).click();
+  assert.equal(await page.locator('[name="items[0][sro_schedule_no]"]').inputValue(), 'EIGHTH SCHEDULE Table 1');
+
+  await type.selectOption('serial');
+  await search.fill('70');
+  const serial = results.getByRole('listitem').filter({has: page.getByText('70', {exact: true})});
+  await serial.getByRole('button', {name: 'Use', exact: true}).click();
+  assert.equal(await page.locator('[name="items[0][serial_no]"]').inputValue(), '70');
+
+  await page.route('**/invoice/fbr-reference-options?*', route => {
+   const params = new URL(route.request().url()).searchParams;
+   assert.equal(params.get('hs'), '0101.2100');
+   const changed = params.get('invoice_date') === '2026-08-02';
+   return route.fulfill({json: {province: 'Punjab', options: {
+    rates: [{id: 1, label: changed ? '7%' : '5%'}], schedules: [], serials: [], units: [],
+   }}});
+  });
+  await type.selectOption('rate');
+  await picker.getByLabel('Use FBR options for this invoice').check();
+  await results.getByText('5%', {exact: true}).waitFor();
+  const date = page.locator('input[name="invoice_date"]');
+  const originalDate = await date.inputValue();
+  await date.fill('2026-08-02');
+  await results.getByText('7%', {exact: true}).waitFor();
+  assert.equal(await results.getByText('5%', {exact: true}).count(), 0);
+  await results.getByRole('button', {name: 'Use', exact: true}).click();
+  assert.equal(await page.locator('[name="items[0][tax_rate]"]').inputValue(), '7');
+  assert.equal(await page.locator('[name="items[0][fbr_reference_checked]"]').inputValue(), '1');
+  await picker.getByLabel('Use FBR options for this invoice').uncheck();
+  await page.unroute('**/invoice/fbr-reference-options?*');
+  await date.fill(originalDate);
+
+  // The financial fixture below verifies a different item.
+  await page.locator('[name="items[0][serial_no]"]').fill('');
+  await page.locator('[name="items[0][sro_schedule_no]"]').fill('');
+  await picker.locator('summary').click();
+ }
  await page.locator('input[name=buyer_name]').fill('Synthetic Buyer');
  await page.locator('[name=buyer_address]').fill('Synthetic local address');
  await page.locator('[name=buyer_ntn]').fill('1234567');
@@ -39,6 +104,13 @@ try {
  await page.getByRole('button',{name:/Create Invoice/i}).first().click();
  await page.waitForURL(url=>url.pathname==='/invoices');
  await assert.doesNotReject(()=>page.getByRole('main').getByText('Invoice created successfully.',{exact:true}).waitFor({state:'visible'}));
+ if (mode === 'financial') {
+  const edit = page.locator('a[href^="/invoice/"][href$="/edit"]').first();
+  await edit.waitFor();
+  await page.goto(base + await edit.getAttribute('href'));
+  await page.waitForFunction(() => window.Alpine && document.querySelector('form[x-data]')?._x_dataStack);
+  assert.equal(await item('fbr_reference_checked').inputValue(), '1');
+ }
  assert.deepEqual(errors,[]);
  console.log('DI '+mode+' real form interaction and draft save passed.');
 } finally {await browser.close();}

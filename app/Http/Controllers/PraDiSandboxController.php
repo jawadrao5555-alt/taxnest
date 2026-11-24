@@ -72,7 +72,9 @@ class PraDiSandboxController extends Controller
         Validator::make($tokens, ['sandbox_token' => $tokenRule, 'production_token' => $tokenRule])->validate();
         DB::transaction(function () use ($company, $data, $tokens) {
             $company = Company::whereKey($company->id)->lockForUpdate()->firstOrFail();
-            if ($data['enabled']) {
+            $writesToken = array_filter($tokens, fn ($token) => is_string($token) && $token !== '') !== [];
+            // Evaluate access before a credential can turn an empty legacy row into a configured profile.
+            if ($data['enabled'] || $writesToken) {
                 abort_unless(\App\Services\PosFederalAddonAccess::allows($company, 'federal_di'), 403, 'DI setup requires an active paid add-on.');
             }
             $profile = PosDiSandboxProfile::firstOrNew(['company_id' => $company->id]);

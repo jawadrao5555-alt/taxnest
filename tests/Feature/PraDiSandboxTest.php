@@ -978,6 +978,29 @@ class PraDiSandboxTest extends TestCase
         $this->assertNull($empty->fresh()->sandbox_token);
         $this->assertDatabaseCount('pos_ims_profiles', 0);
 
+        // Saving credentials with reporting off must not qualify an empty
+        // pre-cutover profile for legacy access on the next request.
+        $this->withSession(['_token' => 'cutover-csrf'])->post('/pos/di-sandbox/setup', array_replace($di, ['enabled' => 0]))
+            ->assertForbidden();
+        $this->assertNull($empty->fresh()->sandbox_token);
+
+        $emptyIms = \App\Models\PosImsProfile::create([
+            'company_id' => $this->company->id, 'enabled' => false, 'updated_by' => $this->owner->id,
+        ]);
+        $emptyIms->forceFill(['created_at' => now()->subDay()])->save();
+        $imsSetup = $this->withSession(['_token' => 'cutover-csrf']);
+        $imsSetup->post('/pos/tax-integrations/fbr-pos/setup', array_replace($ims, ['enabled' => 0]))
+            ->assertForbidden();
+        $this->assertNull($emptyIms->fresh()->sandbox_token);
+
+        unset($ims['sandbox_token']);
+        $imsSetup->post('/pos/tax-integrations/fbr-pos/setup', array_replace($ims, [
+            'enabled' => 0, 'connection_mode' => 'fiscal_device', 'device_uid' => 'fictional-device',
+            'local_ims_url' => 'http://127.0.0.1:8524/api/IMSFiscal/GetInvoiceNumberByModel',
+        ]))->assertForbidden();
+        $this->assertNull($emptyIms->fresh()->device_uid);
+        $this->assertNull($emptyIms->fresh()->local_ims_url);
+
         $empty->update(['sandbox_token' => 'fictional-legacy-token']);
         unset($di['sandbox_token']);
         $this->withSession(['_token' => 'cutover-csrf'])->post('/pos/di-sandbox/setup', $di)

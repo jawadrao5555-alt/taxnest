@@ -1034,40 +1034,54 @@ class PosPaidAddonFlowTest extends TestCase
         $this->assertSame('locked', PosFederalAddonAccess::state($company, 'federal_ims'));
     }
 
-    public function test_federal_addon_locks_other_channel_and_requires_full_payment_for_the_exact_term(): void
+    public static function federalAddonChannels(): array
+    {
+        return [
+            'DI purchase leaves IMS locked' => ['federal_di', 'federal_ims'],
+            'IMS purchase leaves DI locked' => ['federal_ims', 'federal_di'],
+        ];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('federalAddonChannels')]
+    public function test_federal_addon_locks_other_channel_and_requires_full_payment_for_the_exact_term(
+        string $selected,
+        string $unselected,
+    ): void
     {
         config([
             'pra_di_sandbox.paid_addon_policy_starts_at' => now()->toDateTimeString(),
-            'pra_di_sandbox.paid_addon_annual_rates' => ['federal_di' => 12000, 'federal_ims' => 13000],
+            'pra_di_sandbox.paid_addon_annual_rates' => [$selected => 12000, $unselected => 13000],
         ]);
         $plan = $this->makePlan('Business');
         $company = $this->makeShop($plan);
         $other = $this->makeShop($plan);
-        $this->assertSame('locked', PosFederalAddonAccess::state($company, 'federal_di'));
-        $this->buy($company, ['federal_di', 'federal_ims'])->assertSessionHas('error');
+        $this->assertSame('locked', PosFederalAddonAccess::state($company, $selected));
+        $this->buy($company, [$selected, $unselected])->assertSessionHas('error');
         $this->assertDatabaseCount('payment_proofs', 0);
         session()->forget('error');
 
-        $this->buy($company, ['federal_di'])->assertSessionHasNoErrors();
+        $this->buy($company, [$selected])->assertSessionHasNoErrors();
         $proof = PaymentProof::where('company_id', $company->id)->sole();
         $this->assertEquals(12000, $proof->amount);
-        $this->assertSame('pending', PosFederalAddonAccess::state($company, 'federal_di'));
-        $this->assertFalse(PosFederalAddonAccess::allows($other, 'federal_di'));
+        $this->assertSame('pending', PosFederalAddonAccess::state($company, $selected));
+        $this->assertFalse(PosFederalAddonAccess::allows($other, $selected));
 
-        config(['pra_di_sandbox.paid_addon_annual_rates.federal_di' => 16000]);
+        config(['pra_di_sandbox.paid_addon_annual_rates.'.$selected => 16000]);
         $this->approve($proof, ['verified_received_amount' => 11999])->assertSessionHas('error');
         $this->assertDatabaseCount('pos_addons', 0);
         session()->forget('error');
         $this->approve($proof)->assertSessionHasNoErrors();
-        $this->assertSame('paid', PosFederalAddonAccess::state($company, 'federal_di'));
-        $this->assertFalse(PosFederalAddonAccess::allows($company, 'federal_ims'));
-        $this->assertFalse(PosFederalAddonAccess::selectionAllowed($company, ['federal_ims']));
+        $this->assertSame('paid', PosFederalAddonAccess::state($company, $selected));
+        $this->assertSame('Setup required', PosFederalAddonAccess::display($company, $selected, false));
+        $this->assertFalse(PosFederalAddonAccess::allows($other, $selected));
+        $this->assertFalse(PosFederalAddonAccess::allows($company, $unselected));
+        $this->assertFalse(PosFederalAddonAccess::selectionAllowed($company, [$unselected]));
         $this->approve($proof);
         $this->assertDatabaseCount('pos_addons', 1);
 
         $this->travel(13)->months();
-        $this->assertSame('expired', PosFederalAddonAccess::state($company, 'federal_di'));
-        $this->assertFalse(PosFederalAddonAccess::allows($company, 'federal_di'));
+        $this->assertSame('expired', PosFederalAddonAccess::state($company, $selected));
+        $this->assertFalse(PosFederalAddonAccess::allows($company, $selected));
         $this->travelBack();
     }
 

@@ -4,12 +4,17 @@ namespace App\Http\Controllers;
 
 use App\Models\Company;
 use App\Models\HealthDepartment;
+use App\Models\PricingPlan;
+use App\Models\Subscription;
+use App\Models\SystemSetting;
 use App\Services\HealthAccessService;
 use App\Services\HealthModuleService;
 use App\Services\HealthPlatformService;
 use App\Services\HealthScopeService;
+use App\Services\SubscriptionAssignmentService;
 use App\Services\SubscriptionBillingHistory;
 use App\Support\HealthPanel;
+use App\Support\NestErps;
 use App\Support\PosLocale;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -39,14 +44,34 @@ class HealthController extends Controller
      * Public hub for the Nest ERPS line (/nest-erps, and /healthcare which is
      * kept working for saved links).
      *
-     * Guest route on purpose: it is where a signed-out visitor (and the logout
-     * redirect) lands. The page lists the line's verticals and asks for an
-     * enquiry — it publishes no prices, because Nest ERPS is quoted per
-     * organisation until the owner sets public rates.
+     * Guests can compare public Healthcare plans after the approved catalogue
+     * is applied. Custom ERP enquiries and registration use their existing paths.
      */
     public function landing()
     {
+        $publicPlans = collect();
+        if (SystemSetting::get(SystemSetting::APPROVED_BILLING_RATE_CARD_APPLIED) === '1') {
+            $publicPlans = PricingPlan::query()
+                ->whereIn('product_type', NestErps::PRODUCT_TYPES)
+                ->where(fn ($query) => $query->whereNull(NestErps::VERTICAL_COLUMN)
+                    ->orWhere(NestErps::VERTICAL_COLUMN, NestErps::HEALTH))
+                ->where('is_public', true)
+                ->where('is_trial', false)
+                ->whereIn('name', ['Clinic', 'Hospital'])
+                ->where('price', '>', 0)
+                ->orderBy('price')
+                ->get()
+                ->map(fn (PricingPlan $plan) => [
+                    'name' => $plan->name,
+                    'periods' => collect(SubscriptionAssignmentService::cyclesForPlan($plan))
+                        ->mapWithKeys(fn (string $cycle) => [
+                            Subscription::getCycleLabel($cycle) => SubscriptionAssignmentService::computePrice($plan, $cycle)['final_price'],
+                        ]),
+                ]);
+        }
+
         return view('health.landing', [
+            'publicPlans' => $publicPlans,
             'modules' => HealthModuleService::MODULES,
             'moduleMeta' => HealthModuleService::MODULE_META,
         ]);

@@ -96,6 +96,31 @@ final class ApprovedBillingRateCardTest extends TestCase
         $this->assertSame(1999, AiPageCreditService::packPrice(500));
     }
 
+    public function test_public_prices_follow_the_applied_catalogue_and_preserve_healthcare_signup_gate(): void
+    {
+        $this->withoutVite();
+        $this->prepareCatalogue();
+        config(['billing.shared_configured_cycles' => true, 'health.registration_open' => false]);
+
+        $this->get('/healthcare')->assertOk()->assertDontSee('Healthcare package prices');
+        $this->artisan('billing:approved-rate-card')->assertSuccessful();
+        $this->get('/healthcare')->assertOk()->assertDontSee('Healthcare package prices');
+
+        $this->artisan('billing:approved-rate-card --apply')->assertSuccessful();
+        $this->get('/digital-invoice')->assertOk()->assertSee('10,394')->assertSee('17,990');
+        $this->get('/pos')->assertOk()->assertSee('10,499.00')->assertSee('29,999');
+        $this->get('/fbr-pos-landing')->assertOk()->assertSee('14,699.00')->assertSee('27,999');
+        $this->get('/healthcare')->assertOk()
+            ->assertSee('Healthcare package prices')
+            ->assertSee('13,124.00')
+            ->assertSee('31,499.00')
+            ->assertSee('59,999.00')
+            ->assertDontSee('/health/register');
+
+        config(['billing.shared_configured_cycles' => false]);
+        $this->get('/healthcare')->assertOk()->assertSee('59,999.00')->assertDontSee('31,499.00');
+    }
+
     private function prepareCatalogue(): void
     {
         foreach (self::EXPECTED as [$product, $name]) {

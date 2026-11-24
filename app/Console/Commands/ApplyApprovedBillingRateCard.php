@@ -88,6 +88,7 @@ final class ApplyApprovedBillingRateCard extends Command
                 }
                 PosAddonPricingService::save($addonRates);
                 SystemSetting::set('di_ai_500_page_pack_price', '2099', 'DI AI Reader price per 500 purchased pages');
+                SystemSetting::set(SystemSetting::APPROVED_BILLING_RATE_CARD_APPLIED, '1', 'Owner-approved November 2026 rate card applied');
             }
 
             $this->info($apply ? 'Approved catalogue saved.' : 'Preview only. Use --apply to save prices.');

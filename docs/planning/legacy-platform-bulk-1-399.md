@@ -66,7 +66,8 @@ The owner approved the 24 November 2026 rate card for the ten named DI, PRA POS,
 1. Run `php artisan billing:approved-rate-card` to preview the current and approved values. Resolve any missing or ambiguous catalogue row before saving.
 2. Run `php artisan billing:approved-rate-card --apply` through the authorized operator process at cutover. It updates the ten catalogue rows, annual Caller ID and Rider Live Tracking rates, and the 500-page AI Reader pack. It does not edit subscriptions, payment proofs, or fiscal integrations.
 3. Set `BILLING_SHARED_CONFIGURED_CYCLES=true` and `BILLING_DISABLE_FRESH_MONTHLY=false` in the existing configuration. Set `PRA_POS_DI_ADDON_ANNUAL_PRICE=12000`, `PRA_POS_IMS_ADDON_ANNUAL_PRICE=18000`, and `PRA_POS_FEDERAL_ADDON_POLICY_STARTS_AT` to the authorized effective time including the timezone. The command does not set those environment values.
-4. Check fresh quotes and renewal terms with the approved catalogue, including applicable discounts and the existing PKR 10,000 annual extra-branch rate. Existing pending checkout and AI top-up quotes use their frozen amounts. Existing reviewed activation and fiscal credentials still govern the selected federal channel.
+4. Check the public DI, PRA POS, FBR POS and Healthcare pricing pages against checkout. The approved catalogue apply publishes public Clinic and Hospital plans on the Healthcare page without opening registration.
+5. Check fresh quotes and renewal terms with the approved catalogue, including applicable discounts and the existing PKR 10,000 annual extra-branch rate. Existing pending checkout and AI top-up quotes use their frozen amounts. Existing reviewed activation and fiscal credentials still govern the selected federal channel.
 
 
 ## Future and paused scope reviewed

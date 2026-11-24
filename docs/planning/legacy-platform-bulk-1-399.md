@@ -21,7 +21,7 @@ Audit baseline [`eb7477f9`](https://github.com/jawadrao5555-alt/taxnest/commit/e
 
 - Federal add-on rollout honors the configured cutover instant. A fictional case covers the last second before cutover and the cutoff itself using a UTC configuration value.
 
-- PRA POS federal add-on. A configured DI or IMS offer can be selected on authenticated billing. A reviewed, fully paid quote grants one channel for the bound subscription. Tax Integrations shows payment/setup/expiry status and setup and new dispatch enforce the grant. Existing configured channels are preserved. The approved annual amounts and policy effective date are explicit deployment settings and remain unset by default. Direct customer channel replacement remains blocked for owner review.
+- PRA POS federal add-on. A configured DI or IMS offer can be selected on authenticated billing. A reviewed, fully paid quote grants one channel for the bound subscription. Tax Integrations shows payment/setup/expiry status and setup and new dispatch enforce the grant. Existing configured channels are preserved. The owner approved PKR 12,000/year for DI and PKR 18,000/year for IMS on 24 November. The approved cutover remains an explicit deployment setting. Direct customer channel replacement remains blocked for owner review.
 
 - PRA POS paid cutover checks credentials and local IMS connections before writing them. Empty pre-cutover profiles cannot become grandfathered through a disabled setup save. A previously configured DI profile still uses its saved token after cutover. The feature test uses fictional settings and makes no fiscal request.
 
@@ -35,7 +35,7 @@ Audit baseline [`eb7477f9`](https://github.com/jawadrao5555-alt/taxnest/commit/e
 
 - #319. The diagnostic export regression checks DI branch requests when retained rows lack a branch key. The export reports the scope as unavailable, without widening to company rows.
 
-- #316 / #374. The real-schema annual renewal regression now exercises DI, PRA POS, FBR POS and ERP. It checks the original paid term and price, leap-day extension, one linked invoice and payment, and idempotent repeat approval. The matrix uses fictional prices. Commercial rate and monthly-plan rollout decisions remain with the owner.
+- #316 / #374. The real-schema annual renewal regression now exercises DI, PRA POS, FBR POS and ERP. It checks the original paid term and price, leap-day extension, one linked invoice and payment, and idempotent repeat approval. The matrix uses fictional prices. The owner approved the new rate card and monthly availability. Verify activation through the configured rollout controls.
 
 - #375 / #395 A16. PRA, Hotel and FBR POS Caller ID setup share localized install instructions that keep Play Protect enabled. If Android blocks Caller ID Plus, the instructions direct users to support and identify the standard SIM Caller ID app. Physical Android installation and tutorial narration, visuals and captions are tracked in [#441](https://github.com/jawadrao5555-alt/taxnest/pull/441).
 
@@ -58,6 +58,16 @@ Audit baseline [`eb7477f9`](https://github.com/jawadrao5555-alt/taxnest/commit/e
 2. Complete Active Admin and Company Usage acceptance with daily, monthly, yearly, two-year comparison and custom-date ranges, consistent totals/exports and proper scopes. Verify Live Ops and diagnostics on applicable existing products, including per-stream evidence retention.
 3. Verify security, franchise boundaries, mobile/accessibility, downloads and public onboarding. Keep restricted audit records private and use fictional test data. Treat the linked #395 acceptance register as the complete source checklist and close its source only after all applicable rows, including those verified by the fiscal draft, are recorded.
 4. Reconcile #301 B01, B06–B08 and existing-product Q3–Q6 evidence here. Include B02–B05 and the remaining Q1/Q2 evidence from the fiscal draft in the same master. Carry unresolved requirements into their designated implementation checkpoint.
+
+## Approved pricing cutover
+
+The owner approved the 24 November 2026 rate card for the ten named DI, PRA POS, FBR POS and Healthcare plans. Apply only at the owner-authorized cutover. School Basic, Hospital Basic and standalone Lab ERP remain separate quotes.
+
+1. Run `php artisan billing:approved-rate-card` to preview the current and approved values. Resolve any missing or ambiguous catalogue row before saving.
+2. Run `php artisan billing:approved-rate-card --apply` through the authorized operator process at cutover. It updates the ten catalogue rows, annual Caller ID and Rider Live Tracking rates, and the 500-page AI Reader pack. It does not edit subscriptions, payment proofs, or fiscal integrations.
+3. Set `BILLING_SHARED_CONFIGURED_CYCLES=true` and `BILLING_DISABLE_FRESH_MONTHLY=false` in the existing configuration. Set `PRA_POS_DI_ADDON_ANNUAL_PRICE=12000`, `PRA_POS_IMS_ADDON_ANNUAL_PRICE=18000`, and `PRA_POS_FEDERAL_ADDON_POLICY_STARTS_AT` to the authorized effective time including the timezone. The command does not set those environment values.
+4. Check fresh quotes and renewal terms with the approved catalogue, including applicable discounts and the existing PKR 10,000 annual extra-branch rate. Existing pending checkout and AI top-up quotes use their frozen amounts. Existing reviewed activation and fiscal credentials still govern the selected federal channel.
+
 
 ## Future and paused scope reviewed
 

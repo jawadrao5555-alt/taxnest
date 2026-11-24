@@ -142,7 +142,12 @@ class PaymentProof extends Model
 
         $pages = (int) ($this->addon_quote_snapshot['pages'] ?? 0);
 
-        return \App\Services\AiPageCreditService::packPrice($pages) === null ? 0 : $pages;
+        return array_key_exists($pages, \App\Services\AiPageCreditService::PACKS) ? $pages : 0;
+    }
+
+    public function aiPagesQuotedPrice(): float
+    {
+        return round((float) ($this->addon_quote_snapshot['price'] ?? $this->amount), 2);
     }
 
     /** Feature codes requested on a pos_addon proof (JSON column → clean list). */

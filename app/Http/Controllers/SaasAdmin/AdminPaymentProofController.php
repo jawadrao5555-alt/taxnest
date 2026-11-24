@@ -447,8 +447,7 @@ class AdminPaymentProofController extends Controller
         }
 
         $verifiedReceived = round((float) $request->input('verified_received_amount'), 2);
-        $expected = (float) \App\Services\AiPageCreditService::packPrice($pages);
-        $result = DB::transaction(function () use ($proof, $pages, $verifiedReceived, $expected) {
+        $result = DB::transaction(function () use ($proof, $pages, $verifiedReceived) {
             $locked = PaymentProof::where('id', $proof->id)->lockForUpdate()->first();
             if (!$locked || $locked->status !== 'pending') {
                 return null;
@@ -477,6 +476,7 @@ class AdminPaymentProofController extends Controller
                 'reject_reason' => null,
             ]);
             $locked->refresh();
+            $expected = $locked->aiPagesQuotedPrice();
             \App\Services\VerifiedSubscriptionDocuments::recordAddon(
                 $locked,
                 \App\Services\PlanLimitService::getActiveSubscription($company->id),
@@ -486,7 +486,7 @@ class AdminPaymentProofController extends Controller
                 ['label' => 'AI Reader page top-up', 'pages' => $pages]
             );
 
-            return ['company' => $company, 'before' => $before, 'after' => $before + $pages];
+            return ['company' => $company, 'before' => $before, 'after' => $before + $pages, 'quoted_total' => $expected];
         });
 
         if (!$result) {
@@ -500,7 +500,7 @@ class AdminPaymentProofController extends Controller
             'balance_after' => $result['after'],
             'amount_claimed' => $proof->amount,
             'verified_received_amount' => $verifiedReceived,
-            'quoted_total' => $expected,
+            'quoted_total' => $result['quoted_total'],
         ]);
 
         $this->notifyCompany($proof->fresh(['company', 'pricingPlan']), 'approved');

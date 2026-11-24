@@ -239,7 +239,7 @@
                                     <div x-show="panel === 'approve'" x-cloak class="mt-3 text-left bg-gray-800/60 border border-gray-700 rounded-lg p-3 space-y-2 min-w-[240px] max-w-[300px]">
                                         @php
                                             $aiQty = $proof->aiPagesRequested();
-                                            $aiQuoted = \App\Services\AiPageCreditService::packPrice($aiQty) ?? 0;
+                                            $aiQuoted = $proof->aiPagesQuotedPrice();
                                             $aiPaid = $proof->amount !== null ? (float) $proof->amount : null;
                                             $aiShort = $aiPaid !== null ? max(0, $aiQuoted - $aiPaid) : 0;
                                             $aiBalance = \App\Services\AiPageCreditService::purchasedBalance($proof->company_id);

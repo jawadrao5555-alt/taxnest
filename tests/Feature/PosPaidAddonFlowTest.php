@@ -1019,6 +1019,21 @@ class PosPaidAddonFlowTest extends TestCase
         $this->assertEquals($quotedAmount, (float) $proof->fresh()->amount);
     }
 
+    public function test_federal_addon_cutover_starts_at_the_configured_time(): void
+    {
+        $company = $this->makeShop($this->makePlan('Business'));
+        $cutoff = now()->addHour()->startOfMinute();
+        config(['pra_di_sandbox.paid_addon_policy_starts_at' => $cutoff->copy()->utc()->toIso8601String()]);
+
+        $this->travelTo($cutoff->copy()->subSecond());
+        $this->assertSame('legacy', PosFederalAddonAccess::state($company, 'federal_di'));
+        $this->assertSame('legacy', PosFederalAddonAccess::state($company, 'federal_ims'));
+
+        $this->travelTo($cutoff);
+        $this->assertSame('locked', PosFederalAddonAccess::state($company, 'federal_di'));
+        $this->assertSame('locked', PosFederalAddonAccess::state($company, 'federal_ims'));
+    }
+
     public function test_federal_addon_locks_other_channel_and_requires_full_payment_for_the_exact_term(): void
     {
         config([

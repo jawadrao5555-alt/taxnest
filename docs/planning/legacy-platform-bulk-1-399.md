@@ -17,6 +17,8 @@ Audit baseline [`eb7477f9`](https://github.com/jawadrao5555-alt/taxnest/commit/e
 
 ## Delivery checkpoints
 
+- Federal add-on rollout honors the configured cutover instant. A fictional case covers the last second before cutover and the cutoff itself using a UTC configuration value.
+
 - PRA POS federal add-on. A configured DI or IMS offer can be selected on authenticated billing. A reviewed, fully paid quote grants one channel for the bound subscription. Tax Integrations shows payment/setup/expiry status and setup and new dispatch enforce the grant. Existing configured channels are preserved. The approved annual amounts and policy effective date are explicit deployment settings and remain unset by default. Direct customer channel replacement remains blocked for owner review.
 
 - PRA POS paid cutover checks credentials and local IMS connections before writing them. Empty pre-cutover profiles cannot become grandfathered through a disabled setup save. A previously configured DI profile still uses its saved token after cutover. The feature test uses fictional settings and makes no fiscal request.

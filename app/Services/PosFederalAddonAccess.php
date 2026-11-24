@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\{Company, PaymentProof, PosAddon, PosDiSandboxProfile, PosImsProfile};
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Schema;
 
 final class PosFederalAddonAccess
@@ -31,7 +32,7 @@ final class PosFederalAddonAccess
         $model = $code === 'federal_di' ? PosDiSandboxProfile::class : PosImsProfile::class;
         if (!Schema::hasTable((new $model)->getTable())) return false;
         $profiles = $model::where('company_id', $company->id);
-        $cutoff = config('pra_di_sandbox.paid_addon_policy_starts_at');
+        $cutoff = self::policyCutoff();
         if (!$cutoff) return $profiles->where('enabled', true)->exists();
 
         return $profiles->where('created_at', '<', $cutoff)
@@ -44,6 +45,28 @@ final class PosFederalAddonAccess
             })->exists();
     }
 
+    private static function policyCutoff(): ?Carbon
+    {
+        $value = config('pra_di_sandbox.paid_addon_policy_starts_at');
+        if (!is_string($value) || !preg_match('/^\d{4}-\d{2}-\d{2}(?:$|[T ])/', trim($value))) {
+            return null;
+        }
+
+        try {
+            return Carbon::parse(trim($value), config('app.timezone'))->setTimezone(config('app.timezone'));
+        } catch (\Carbon\Exceptions\InvalidFormatException) {
+            return null;
+        }
+    }
+
+    private static function policyActive(): bool
+    {
+        if (!filled(config('pra_di_sandbox.paid_addon_policy_starts_at'))) return false;
+
+        $cutoff = self::policyCutoff();
+        return $cutoff === null || now()->gte($cutoff);
+    }
+
     private static function grants(Company $company)
     {
         return PosAddon::where('company_id', $company->id)->whereIn('addon_code', self::CODES);
@@ -52,7 +75,7 @@ final class PosFederalAddonAccess
     public static function state(Company $company, string $code): string
     {
         if (!PosAddonService::tableExists()) {
-            return config('pra_di_sandbox.paid_addon_policy_starts_at') ? 'locked' : 'legacy';
+            return self::policyActive() ? 'locked' : 'legacy';
         }
         $grants = self::grants($company)->get();
         $grant = $grants->firstWhere('addon_code', $code);
@@ -72,7 +95,7 @@ final class PosFederalAddonAccess
         $pending = Schema::hasTable('payment_proofs') ? array_intersect(PosAddonService::pendingCodes($company), self::CODES) : [];
         if (in_array($code, $pending, true)) return 'pending';
         if ($grant) return 'expired';
-        if ($pending || $grants->isNotEmpty() || config('pra_di_sandbox.paid_addon_policy_starts_at')) return 'locked';
+        if ($pending || $grants->isNotEmpty() || self::policyActive()) return 'locked';
         return 'legacy';
     }
 

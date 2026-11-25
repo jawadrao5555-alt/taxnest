@@ -238,6 +238,36 @@ class PraOperationsEvidenceTest extends TestCase
         } finally { DB::disableQueryLog(); }
     }
 
+    public function test_seven_day_collection_can_select_one_retained_agent_stream(): void
+    {
+        config(['app.timezone' => 'UTC']);
+        $this->upload(array_map(fn ($sequence) => $this->sample($sequence), range(1, 4)));
+        $this->upload([$this->sample(1)], ['stream_id' => '22222222-2222-4222-8222-222222222222']);
+        $this->upload([$this->sample(1)], [], 2);
+        $streamId = (int) DB::table('pra_diagnostic_streams')->min('id');
+        $foreignId = (int) DB::table('pra_diagnostic_streams')->where('company_id', 2)->value('id');
+        foreach (['2026-11-01 18:59:59', '2026-11-01 19:00:00', '2026-11-08 18:59:59', '2026-11-08 19:00:00'] as $i => $at) {
+            DB::table('pra_diagnostic_samples')->where('diagnostic_stream_id', $streamId)
+                ->where('sequence', $i + 1)->update(['received_at' => $at]);
+        }
+        $args = ['date_to' => '2026-11-08', 'diagnostic_stream_id' => $streamId, 'limit' => 1];
+        $report = $this->read('agent_collection', $args);
+        $this->assertSame($streamId, $report['diagnostic_stream_id']);
+        $this->assertSame(2, $report['observed']['matching_samples']);
+        $this->assertSame([1, 0, 0, 0, 0, 0, 1], array_column($report['received_days'], 'samples'));
+        $this->assertSame([$streamId], array_column($report['streams'], 'id'));
+        $this->assertSame([2], array_column($report['samples'], 'sequence'));
+        $this->assertTrue($report['pagination']['has_more']);
+        $next = $this->read('agent_collection', $args + ['after_id' => $report['pagination']['next_after_id']]);
+        $this->assertSame([3], array_column($next['samples'], 'sequence'));
+        $this->assertFalse($next['pagination']['has_more']);
+        $this->assertFalse($report['seven_day_complete_record_proven']);
+        $this->assertStringNotContainsString('PRIVATE', json_encode($report));
+
+        $this->expectException(ValidationException::class);
+        $this->read('agent_collection', ['diagnostic_stream_id' => $foreignId]);
+    }
+
     public function test_daily_coverage_clock_skew_and_empty_days_are_not_invented_as_complete(): void
     {
         config(['app.timezone'=>'UTC']);

@@ -99,6 +99,8 @@ class AdminActionPostsSmokeTest extends TestCase
             $table->timestamps();
         });
 
+        (require database_path('migrations/2027_01_01_000006_add_franchise_session_generation.php'))->up();
+
         Schema::create('pricing_plans', function (Blueprint $table) {
             $table->id();
             $table->string('name');
@@ -624,12 +626,15 @@ class AdminActionPostsSmokeTest extends TestCase
             ->post("/admin/franchises/{$id}/toggle")
             ->assertRedirect('/admin/franchises');
         $this->assertSame('suspended', DB::table('franchises')->where('id', $id)->value('status'));
+        $suspendedGeneration = DB::table('franchises')->where('id', $id)->value('session_generation');
+        $this->assertNotNull($suspendedGeneration);
 
         $this->actingAsAdmin()
             ->from('/admin/franchises')
             ->post("/admin/franchises/{$id}/toggle")
             ->assertRedirect('/admin/franchises');
         $this->assertSame('active', DB::table('franchises')->where('id', $id)->value('status'));
+        $this->assertNotSame($suspendedGeneration, DB::table('franchises')->where('id', $id)->value('session_generation'));
     }
 
     // ── Payment proof approve / reject ──────────────────────────────────

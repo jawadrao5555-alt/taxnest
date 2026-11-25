@@ -810,16 +810,18 @@ class PraDiSandboxTest extends TestCase
     {
         $service=\App\Services\PosImsReportingService::class;
         $this->assertSame('local_accepted',$service::result(['Code'=>' 100 ','InvoiceNumber'=>'LOCAL-IMS-123456'],true)['state']);
+        $this->assertSame('local_accepted',$service::result(['response_code'=>100,'InvoiceNumber'=>'LOCAL-IMS-123456'],true)['state']);
         $this->assertSame('verification_required',$service::result(['Code'=>'100','code'=>'400','InvoiceNumber'=>'LOCAL-IMS-123456'],true)['state']);
+        $this->assertSame('verification_required',$service::result(['Code'=>'100','response_code'=>'400','InvoiceNumber'=>'LOCAL-IMS-123456'],true)['state']);
         $this->imsProfile('sandbox','fiscal_device');$svc=app($service);
         $r=$svc->capture($this->company,$this->bill(),$this->owner->id,'sandbox');
         $svc->prepare($this->company->id,$r->id,$this->imsPayload($r));Http::fake();
         $svc->submit($this->company->id,$r->id,$this->owner->id);$claim=$svc->claim($this->company->id,'synthetic-device');
         $r=$svc->callback($this->company->id,$r->id,'synthetic-device',$claim['claim'],[
-            'Code'=>' 100 ','InvoiceNumber'=>'LOCAL-IMS-123456','Token'=>'private-token',
+            'Code'=>' 100 ','response_code'=>100,'InvoiceNumber'=>'LOCAL-IMS-123456','Token'=>'private-token',
             'BuyerCNIC'=>'private-identity','Response'=>'Private buyer details never retained'], 'response_received',['Code:string','InvoiceNumber:string','bad value with spaces']);
         $this->assertSame('local_accepted',$r->state);
-        $this->assertSame(['Code'=>'100','InvoiceNumber'=>'LOCAL-IMS-123456'],$r->attempts[0]['acknowledgement']);
+        $this->assertSame(['Code'=>'100','response_code'=>'100','InvoiceNumber'=>'LOCAL-IMS-123456'],$r->attempts[0]['acknowledgement']);
         $this->assertSame(['Code:string','InvoiceNumber:string'],$r->attempts[0]['response_fields']);
         $this->assertStringNotContainsString('private',json_encode($r->attempts));
         $this->get(route('pos.tax-integrations.ims.show',$r->id))->assertOk()->assertSee('Code: 100')->assertSee('LOCAL-IMS-123456');
@@ -855,6 +857,29 @@ class PraDiSandboxTest extends TestCase
         }
     }
 
+    public function test_ims_transport_failure_cannot_accept_or_reject_the_claim_from_a_body(): void
+    {
+        foreach ([
+            ['http_error', ['Code' => '100', 'InvoiceNumber' => '054321FK6N1234567']],
+            ['transport_timeout', ['Code' => '102']],
+        ] as [$diagnostic, $body]) {
+            Http::fake();
+            $this->imsProfile('production', 'fiscal_device');
+            $service = app(\App\Services\PosImsReportingService::class);
+            $record = $service->capture($this->company, $this->bill(), $this->owner->id, 'production');
+            $service->prepare($this->company->id, $record->id, $this->imsPayload($record));
+            $service->submit($this->company->id, $record->id, $this->owner->id);
+            $claim = $service->claim($this->company->id, 'synthetic-device')['claim'];
+
+            $result = $service->callback($this->company->id, $record->id, 'synthetic-device', $claim, $body, $diagnostic);
+            $this->assertSame('verification_required', $result->state);
+            $this->assertNull($result->fiscal_number);
+            $this->assertSame($diagnostic, $result->attempts[0]['diagnostic']);
+            $this->assertSame($body, $result->attempts[0]['acknowledgement']);
+            Http::assertNothingSent();
+        }
+    }
+
     public function test_ims_central_callback_requires_matching_production_reference_and_is_idempotent(): void
     {
         Http::fake();
@@ -866,14 +891,18 @@ class PraDiSandboxTest extends TestCase
         $claim = $svc->claim($this->company->id, 'synthetic-device')['claim'];
         $reply = ['Code' => '100', 'InvoiceNumber' => '054321FK6N1234567', 'CentralStatus' => 'verified'];
         $callback = fn (array $response) => $svc->callback($this->company->id, $record->id, 'synthetic-device',
-            $claim, $response, 'response_received');
+            $claim, $response, 'response_received', ['InvoiceNumber:string', 'invalid field']);
 
         $local = $callback($reply + ['CentralReference' => '054321FK6N7654321']);
         $this->assertSame('local_accepted', $local->state);
         $verified = $callback($reply + ['CentralReference' => $reply['InvoiceNumber']]);
         $this->assertSame('accepted', $verified->state);
         $this->assertSame($reply['InvoiceNumber'], $verified->fiscal_number);
-        $this->assertSame('fbr_ims_callback', collect($verified->attempts)->last()['central_confirmation']['source']);
+        $attempt = collect($verified->attempts)->last();
+        $this->assertSame('fbr_ims_callback', $attempt['central_confirmation']['source']);
+        $this->assertSame('response_received', $attempt['diagnostic']);
+        $this->assertSame(['Code' => '100', 'InvoiceNumber' => $reply['InvoiceNumber']], $attempt['acknowledgement']);
+        $this->assertSame(['InvoiceNumber:string'], $attempt['response_fields']);
         $this->assertSame($verified->attempts, $callback($reply + ['CentralReference' => $reply['InvoiceNumber']])->attempts);
         Http::assertNothingSent();
     }
@@ -938,6 +967,31 @@ class PraDiSandboxTest extends TestCase
         Http::assertNothingSent();
     }
 
+    public function test_ims_invalid_saved_endpoint_leaves_the_prepared_draft_recoverable(): void
+    {
+        $profile = $this->imsProfile();
+        $service = app(\App\Services\PosImsReportingService::class);
+        $record = $service->capture($this->company, $this->bill(), $this->owner->id, 'sandbox');
+        $service->prepare($this->company->id, $record->id, $this->imsPayload($record));
+        $profile->update(['sandbox_url' => 'invalid saved fixture']);
+        Http::fake(fn () => Http::response(['Code' => '100', 'InvoiceNumber' => 'SYNTHETIC-IMS-123456']));
+
+        try {
+            $service->submit($this->company->id, $record->id, $this->owner->id);
+            $this->fail('Invalid saved endpoint was accepted.');
+        } catch (ValidationException $error) {
+            $this->assertArrayHasKey('sandbox_url', $error->errors());
+        }
+
+        $this->assertSame('draft', $record->fresh()->state);
+        $this->assertNull($record->fresh()->attempted_at);
+        Http::assertNothingSent();
+
+        $profile->update(['sandbox_url' => null]);
+        $this->assertSame('accepted', $service->submit($this->company->id, $record->id, $this->owner->id)->state);
+        Http::assertSentCount(1);
+    }
+
     public function test_ims_evidence_preserves_source_and_uses_only_ims_environment_credentials(): void
     {
         $this->imsProfile();$svc=app(\App\Services\PosImsReportingService::class);$bill=$this->bill('credit');
@@ -947,9 +1001,15 @@ class PraDiSandboxTest extends TestCase
         $this->assertNull($svc->template($r)['TotalTaxCharged']);
         $p=$this->imsPayload($r);$this->assertSame(1,$p['PaymentMode']);
         $svc->prepare($this->company->id,$r->id,$p);
-        Http::fake(fn()=>Http::response(['Code'=>'100','InvoiceNumber'=>'TEST-IMS-123456'],200));
+        Http::fake(fn () => Http::response([
+            'response_code' => '100', 'InvoiceNumber' => 'TEST-IMS-123456',
+            'detail' => 'Fictional provider diagnostic excluded from retained evidence',
+        ], 200));
         $r=$svc->submit($this->company->id,$r->id,$this->owner->id);
         $this->assertSame('accepted',$r->state);
+        $this->assertSame([
+            'response_code' => '100', 'InvoiceNumber' => 'TEST-IMS-123456',
+        ], $r->attempts[0]['acknowledgement']);
         Http::assertSent(fn($req)=>$req->url()===\App\Services\PosTaxIntegrationEndpoints::url('ims','sandbox') && $req->hasHeader('Authorization','Bearer synthetic-ims-sandbox') && !isset($req['scenarioId']));
         $this->get('/pos/tax-integrations/fbr-pos/'.$r->id.'/receipt?width=58')->assertOk()->assertSee('SANDBOX TEST COPY')->assertSee('TEST-IMS-123456')->assertSee('TEST-PRA-ONLY');
         $this->assertEquals($before,DB::table('pos_transactions')->where('id',$bill)->first());

@@ -127,7 +127,7 @@
             @foreach($invoice->items as $index => $item)
             <tr>
                 <td>{{ $index + 1 }}</td>
-                <td>{{ $item->description }}</td>
+                <td>{{ $item->description }}@include('invoice.partials.packing-description')</td>
                 <td style="font-family: monospace; font-size: 11px;">{{ $item->hs_code }}</td>
                 <td class="text-right">{{ $item->quantity }}</td>
                 <td class="text-right">PKR {{ number_format($item->price, $item->selling_snapshot ? 6 : 2) }}</td>

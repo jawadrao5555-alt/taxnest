@@ -310,7 +310,7 @@
             <tr>
                 <td class="ac">{{ $index + 1 }}</td>
                 <td class="code">{{ $item->hs_code }}</td>
-                <td class="product">{{ $item->description }}</td>
+                <td class="product">{{ $item->description }}@include('invoice.partials.packing-description')</td>
                 <td class="ac" style="font-size: 9px;">{{ $item->default_uom ?? 'PCS' }}</td>
                 <td class="ar">{{ number_format($item->quantity, $item->quantity == intval($item->quantity) ? 0 : (round($item->quantity, 2) == $item->quantity ? 2 : 4)) }}</td>
                 <td class="ar">{{ number_format($item->price, $item->selling_snapshot ? 6 : 2) }}</td>

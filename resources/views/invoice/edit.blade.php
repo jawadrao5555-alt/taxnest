@@ -529,10 +529,13 @@
                     window.invoiceFormInstance = this;
                     // Pre-selected branch decides the supplier province → services (SN019) default rate.
                     const branchSel = document.getElementById('branch_id_select');
+                    this.referenceBranchId = branchSel?.value || '';
                     if (branchSel && branchSel.value) defaultTaxRates.services = branchServicesRates[branchSel.value] ?? companyServicesRate;
                 },
                 // Branch change → supplier province change → services default rate change (SN019).
+                referenceBranchId: '',
                 onBranchChange(branchId) {
+                    this.referenceBranchId = branchId;
                     const rate = branchServicesRates[branchId] ?? companyServicesRate;
                     defaultTaxRates.services = rate;
                     this.items.forEach((item, idx) => {
@@ -570,6 +573,7 @@
                         'tax' => $i->tax,
                         'schedule_type' => $scheduleType,
                         'sro_schedule_no' => $i->sro_schedule_no ?? '',
+                        'fbr_reference_checked' => (bool) $i->fbr_reference_checked,
                         'serial_no' => $i->serial_no ?? '',
                         'mrp' => $i->mrp ?? '',
                         'mrpManual' => true,

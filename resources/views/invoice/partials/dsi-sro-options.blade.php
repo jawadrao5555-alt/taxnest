@@ -32,20 +32,86 @@
             ['Numbers, pieces, units', 'Numbers, pieces, units'],
         ]);
 
+        const officialCategories = { rate: 'rates', sro: 'schedules', serial: 'serials', uom: 'units' };
+        const endpoint = @js(route('invoice.fbr-reference-options', [], false));
+
         return () => ({
             category: 'hs',
             query: '',
             applying: false,
             feedback: '',
+            live: false,
+            loading: false,
+            liveStatus: '',
+            officialOptions: {},
+            lookupKey: '',
+            lookupContext: null,
+            timer: null,
+            requestNumber: 0,
+
+            get isOfficialCategory() {
+                return Object.hasOwn(officialCategories, this.category);
+            },
+
+            queueLookup(context) {
+                // Keep the Alpine effect dependent on form inputs only.
+                queueMicrotask(() => this.scheduleLookup(context));
+            },
+
+            scheduleLookup(context, retry = false) {
+                const key = JSON.stringify(context);
+                if (!retry && this.lookupKey === key) return;
+                this.lookupKey = key;
+                this.lookupContext = context;
+                clearTimeout(this.timer);
+                const request = ++this.requestNumber;
+                this.officialOptions = {};
+                this.feedback = '';
+                this.loading = Boolean(context?.[0]);
+                this.liveStatus = this.loading ? 'Looking up FBR options…' : '';
+                if (this.loading) this.timer = setTimeout(() => this.loadOptions(context, request), 350);
+            },
+
+            retryLookup() {
+                if (this.lookupContext) this.scheduleLookup(this.lookupContext, true);
+            },
+
+            async loadOptions([date, branch, hs, schedule, rate, sro], request) {
+                const params = new URLSearchParams({ invoice_date: date, schedule_type: schedule });
+                if (branch) params.set('branch_id', branch);
+                if (/^\d{4}\.?\d{4}$/.test(hs)) params.set('hs', hs);
+                if (rate !== null && rate !== undefined && rate !== '') params.set('tax_rate', rate);
+                if (sro) params.set('sro', sro);
+                try {
+                    const response = await fetch(endpoint + '?' + params, { headers: { Accept: 'application/json' } });
+                    if (!response.ok) throw new Error('Lookup unavailable');
+                    const data = await response.json();
+                    if (this.requestNumber !== request) return;
+                    this.officialOptions = data.options;
+                    const incomplete = Object.values(data.options).some(rows => rows === null);
+                    this.liveStatus = incomplete
+                        ? 'Some FBR options could not be verified for ' + data.province + '.'
+                        : '';
+                } catch {
+                    if (this.requestNumber === request) this.liveStatus = 'FBR options are unavailable. Your draft values are intact.';
+                } finally {
+                    if (this.requestNumber === request) this.loading = false;
+                }
+            },
 
             get results() {
                 const query = this.query.trim().toLowerCase();
                 if (this.category === 'hs' && !query) return [];
 
+                const official = this.live && this.isOfficialCategory;
+                const values = official
+                    ? (this.officialOptions[officialCategories[this.category]] ?? []).map(row => row.label)
+                    : catalogs[this.category];
                 const entries = [];
                 const seen = new Set();
-                for (const value of catalogs[this.category]) {
-                    const percentage = this.category === 'rate' && typeof value === 'number'
+                for (const value of values) {
+                    const parsed = official && this.category === 'rate' ? String(value).match(/^([0-9]+(?:\.[0-9]+)?)\s*%$/) : null;
+                    const percentage = parsed ? Number(parsed[1]) : this.category === 'rate' && typeof value === 'number'
                         ? Number((value * 100).toFixed(4)) : null;
                     const label = percentage === null ? String(value).replace(/:-$/, '') : percentage + '%';
                     const matches = label.toLowerCase().includes(query)
@@ -53,7 +119,7 @@
                             && label.split(':')[0].replace('.', '').startsWith(query));
                     if (!matches || seen.has(label)) continue;
                     seen.add(label);
-                    entries.push({ category: this.category, value, label, percentage });
+                    entries.push({ category: this.category, value, label, percentage, official });
                     if (entries.length === 25) break;
                 }
                 return entries;
@@ -95,6 +161,10 @@
                             break;
                         }
                         case 'rate':
+                            if (entry.official && Number(item.tax_rate) !== entry.percentage) {
+                                item.sro_schedule_no = '';
+                                item.serial_no = '';
+                            }
                             item.tax_rate = entry.percentage;
                             callbacks.calculate();
                             break;
@@ -111,6 +181,7 @@
                             item.default_uom = units.get(entry.value);
                             break;
                     }
+                    if (entry.official) item.fbr_reference_checked = true;
                     this.feedback = 'Selected ' + entry.label + '. Check the complete invoice line before submission.';
                 } finally {
                     this.applying = false;

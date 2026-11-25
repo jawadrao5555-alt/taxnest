@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class InvoiceItem extends Model
 {
     protected $fillable = [
+        'fbr_reference_checked',
         'inventory_snapshot',
         'st_withheld_amount',
         'invoice_id',
@@ -30,6 +31,7 @@ class InvoiceItem extends Model
     ];
 
     protected $casts = [
+        'fbr_reference_checked' => 'boolean',
         'inventory_snapshot' => 'array',
         'selling_snapshot' => 'array',
         'st_withheld_amount' => 'float',

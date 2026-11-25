@@ -6,7 +6,7 @@ assert.ok(['financial','withholding'].includes(mode));
 const base=assertLocalOnlyBaseUrl('http://127.0.0.1:5919');
 const {browser}=await launchLocalBrowser();
 try {
- const page=await browser.newPage(); const errors=[];
+ const page=await browser.newPage({serviceWorkers: 'block'}); const errors=[];
  page.on('pageerror',e=>errors.push(e.message));
  await page.route('**/*',route=>new URL(route.request().url()).hostname==='127.0.0.1' ? route.continue() : route.abort());
  await page.goto(base+'/login');
@@ -51,6 +51,32 @@ try {
   await serial.getByRole('button', {name: 'Use', exact: true}).click();
   assert.equal(await page.locator('[name="items[0][serial_no]"]').inputValue(), '70');
 
+  const isReferenceLookup = url => url.pathname === '/invoice/fbr-reference-options';
+  await page.route(isReferenceLookup, route => {
+   const params = new URL(route.request().url()).searchParams;
+   assert.equal(params.get('hs'), '0101.2100');
+   const changed = params.get('invoice_date') === '2026-08-02';
+   return route.fulfill({json: {province: 'Punjab', options: {
+    rates: [{id: 1, label: changed ? '7%' : '5%'}], schedules: [], serials: [], units: [],
+   }}});
+  });
+  await type.selectOption('rate');
+  const referenceRequest = page.waitForRequest(request => isReferenceLookup(new URL(request.url())));
+  await picker.getByLabel('Use FBR options for this invoice').check();
+  await referenceRequest;
+  await results.getByText('5%', {exact: true}).waitFor();
+  const date = page.locator('input[name="invoice_date"]');
+  const originalDate = await date.inputValue();
+  await date.fill('2026-08-02');
+  await results.getByText('7%', {exact: true}).waitFor();
+  assert.equal(await results.getByText('5%', {exact: true}).count(), 0);
+  await results.getByRole('button', {name: 'Use', exact: true}).click();
+  assert.equal(await page.locator('[name="items[0][tax_rate]"]').inputValue(), '7');
+  assert.equal(await page.locator('[name="items[0][fbr_reference_checked]"]').inputValue(), '1');
+  await picker.getByLabel('Use FBR options for this invoice').uncheck();
+  await page.unroute(isReferenceLookup);
+  await date.fill(originalDate);
+
   // The financial fixture below verifies a different item.
   await page.locator('[name="items[0][serial_no]"]').fill('');
   await page.locator('[name="items[0][sro_schedule_no]"]').fill('');
@@ -81,6 +107,13 @@ try {
  await page.getByRole('button',{name:/Create Invoice/i}).first().click();
  await page.waitForURL(url=>url.pathname==='/invoices');
  await assert.doesNotReject(()=>page.getByRole('main').getByText('Invoice created successfully.',{exact:true}).waitFor({state:'visible'}));
+ if (mode === 'financial') {
+  const edit = page.locator('a[href^="/invoice/"][href$="/edit"]').first();
+  await edit.waitFor();
+  await page.goto(base + await edit.getAttribute('href'));
+  await page.waitForFunction(() => window.Alpine && document.querySelector('form[x-data]')?._x_dataStack);
+  assert.equal(await item('fbr_reference_checked').inputValue(), '1');
+ }
  assert.deepEqual(errors,[]);
  console.log('DI '+mode+' real form interaction and draft save passed.');
 } finally {await browser.close();}

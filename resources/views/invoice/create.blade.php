@@ -771,7 +771,9 @@
                 },
 
                 // Branch change → supplier province change → services default rate change (SN019).
+                referenceBranchId: '',
                 onBranchChange(branchId) {
+                    this.referenceBranchId = branchId;
                     const rate = branchServicesRates[branchId] ?? companyServicesRate;
                     defaultTaxRates.services = rate;
                     this.items.forEach((item, idx) => {
@@ -787,6 +789,7 @@
                     window.invoiceFormInstance = this;
                     // old('branch_id') may pre-select a branch on a validation bounce — sync services default rate.
                     const branchSel = document.getElementById('branch_id_select');
+                    this.referenceBranchId = branchSel?.value || '';
                     if (branchSel && branchSel.value) defaultTaxRates.services = branchServicesRates[branchSel.value] ?? companyServicesRate;
                     this.submitting = false; // safety reset on (re)mount
                     if (aiPrefill && Array.isArray(aiPrefill.items) && aiPrefill.items.length) {
@@ -825,6 +828,7 @@
                             tax: it.tax ?? 0,
                             schedule_type: it.schedule_type || 'standard',
                             sro_schedule_no: it.sro_schedule_no || '',
+                            fbr_reference_checked: Number(it.fbr_reference_checked || 0),
                             serial_no: it.serial_no || '',
                             // AI-read printed MRP (3rd Schedule): mrpManual=true
                             // so the price->MRP auto-sync never overwrites it.

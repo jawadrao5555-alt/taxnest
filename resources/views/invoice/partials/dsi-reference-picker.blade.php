@@ -1,9 +1,20 @@
 <details class="mb-3 rounded-lg border border-gray-200 dark:border-gray-700"
-    x-data="dsiReferencePicker()">
+    x-data="dsiReferencePicker()"
+    x-effect="queueLookup(live ? [invoice_date, referenceBranchId, item.hs_code, item.schedule_type, item.tax_rate, item.sro_schedule_no] : null)">
     <summary class="cursor-pointer px-3 py-2 text-sm font-medium text-emerald-700 dark:text-emerald-300">
         Search FBR tax references
     </summary>
+    <input type="hidden" :name="'items[' + index + '][fbr_reference_checked]'" :value="item.fbr_reference_checked ? '1' : '0'">
     <div class="space-y-2 px-3 pb-3">
+        <label class="block text-xs font-medium">
+            <input type="checkbox" x-model="live"> Use FBR options for this invoice
+        </label>
+        <label class="block text-xs font-medium" x-show="live || item.fbr_reference_checked">
+            <input type="checkbox" x-model="item.fbr_reference_checked"> Check this line against FBR references before submission
+        </label>
+        <p x-show="live && liveStatus" x-text="liveStatus" role="status" class="text-xs text-gray-600 dark:text-gray-300"></p>
+        <button type="button" x-show="live && liveStatus && !loading" @click="retryLookup()"
+            class="text-xs text-emerald-700 underline">Retry reference lookup</button>
         <div class="grid gap-2 sm:grid-cols-2">
             <label class="text-xs font-medium">
                 Reference type
@@ -23,7 +34,7 @@
                     class="mt-1 block w-full rounded-lg border-gray-300 text-sm dark:bg-gray-700">
             </label>
         </div>
-        <p class="text-xs text-gray-600 dark:text-gray-300">
+        <p x-show="!live || !isOfficialCategory" class="text-xs text-gray-600 dark:text-gray-300">
             These workbook entries are independent. Use Validate FBR Payload to check your selections before submission.
         </p>
         <p x-show="category === 'hs' && item.product_id" class="text-xs text-gray-600 dark:text-gray-300">
@@ -42,7 +53,7 @@
                 </li>
             </template>
         </ul>
-        <p x-show="results.length === 0" class="text-xs text-gray-600 dark:text-gray-300"
+        <p x-show="results.length === 0 && !loading && (!live || !isOfficialCategory || !liveStatus)" class="text-xs text-gray-600 dark:text-gray-300"
             x-text="category === 'hs' && !query.trim() ? 'Enter an HS code or description to search.' : 'No matching references.'"></p>
         <p x-show="results.length === 25" class="text-xs text-gray-600 dark:text-gray-300">Showing up to 25 results. Narrow the search for more specific matches.</p>
         <p x-show="feedback" x-text="feedback" class="text-xs text-gray-600 dark:text-gray-300" aria-live="polite"></p>

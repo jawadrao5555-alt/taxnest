@@ -1283,7 +1283,7 @@
                     <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                 </div>
                 <div>
-                    <h3 class="text-sm font-bold text-white">FBR Production Successful</h3>
+                    <h3 class="text-sm font-bold text-white" id="modalFbrTitle">FBR submission successful</h3>
                     <p class="text-emerald-200 text-xs" id="modalFbrNumber"></p>
                 </div>
             </div>
@@ -1567,6 +1567,10 @@ function handleFbrResponse(data) {
 let _whtAction = 'print';
 
 function openFbrSuccessModal(data) {
+    const environment = data.fiscal_submission_environment;
+    document.getElementById('modalFbrTitle').textContent = environment === 'sandbox'
+        ? 'FBR Sandbox acknowledgement'
+        : (environment === 'production' ? 'FBR Production acknowledgement' : 'FBR submission successful');
     _fbrPdfUrl = data.pdf_url || '/invoice/{{ $invoice->id }}/pdf';
     _lastFbrNumber = data.fbr_invoice_number || '';
     document.getElementById('modalFbrNumber').textContent = 'FBR #: ' + _lastFbrNumber;

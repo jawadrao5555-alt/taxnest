@@ -22,11 +22,13 @@ test('the POS 2 preload exposes printing without POS 1 local authority', async (
 
   assert.deepEqual([...exposed.keys()], ['nestposDesktop']);
   const bridge = exposed.get('nestposDesktop');
-  assert.deepEqual(Object.keys(bridge).sort(), ['desktop', 'getVersion', 'printHtml']);
+  assert.deepEqual(Object.keys(bridge).sort(), ['acceptImmediateSale', 'desktop', 'getVersion', 'printHtml']);
   await bridge.printHtml('<p>Fictional receipt</p>');
+  await bridge.acceptImmediateSale({ offline_uuid: 'fictional-sale-id' });
   await bridge.getVersion();
   assert.deepEqual(messages, [
     ['pos-print-html', '<p>Fictional receipt</p>', null],
+    ['local-core-accept-immediate-sale', { offline_uuid: 'fictional-sale-id' }],
     ['get-version'],
   ]);
 });
@@ -116,4 +118,54 @@ test('POS windows retain independent sessions and reopen without affecting the o
   closePosWindow();
   assert.equal(getPosWindowRef(), null);
   assert.equal(getPosWindowRef(2), null);
+});
+
+test('secondary cashier uses its own active lease and drops delayed replies across logout', async () => {
+  const { secondarySaleSession } = require('../src/secondary-sale-session');
+  const origin = 'https://fictional.example';
+  const win = new EventEmitter();
+  const contents = new EventEmitter();
+  let currentUrl = origin + '/pos/invoice/create';
+  win.webContents = contents;
+  win.isDestroyed = () => false;
+  contents.getURL = () => currentUrl;
+  let runtime = { companyId: '10', deviceUid: 'fictional-device' };
+  const scope = { company_id: '10', device_id: runtime.deviceUid, branch_id: '2', user_id: '8' };
+  const data = { ...scope, success: true, immediate_sale_allowed: true, lease: {
+    lease_id: 1, token: 'fictional', expires_at: new Date(Date.now() + 60000).toISOString(), scope,
+  } };
+  const response = { ok: true, json: async () => data };
+  contents.session = { fetch: async (url, options) => {
+    assert.equal(url, origin + '/pos/desktop/local-core-scope');
+    assert.equal(options.headers['X-NestPOS-Device-Uid'], runtime.deviceUid);
+    return response;
+  } };
+  const session = secondarySaleSession(win, origin, () => runtime);
+  await session.refresh();
+  assert.deepEqual(session.scope(), scope);
+  runtime = { ...runtime };
+  assert.equal(session.scope(), null);
+  await session.refresh();
+  data.immediate_sale_allowed = false;
+  await session.refresh();
+  assert.equal(session.scope(), null);
+  data.immediate_sale_allowed = true;
+  data.company_id = '99';
+  await session.refresh();
+  assert.equal(session.scope(), null);
+  data.company_id = '10';
+  data.lease.expires_at = new Date(0).toISOString();
+  await session.refresh();
+  assert.equal(session.scope(), null);
+  data.lease.expires_at = new Date(Date.now() + 60000).toISOString();
+  await session.refresh();
+  let finish;
+  contents.session.fetch = () => new Promise(resolve => { finish = resolve; });
+  const pending = session.refresh();
+  currentUrl = origin + '/pos/logout';
+  contents.emit('did-start-navigation', {}, currentUrl, false, true);
+  currentUrl = origin + '/pos/invoice/create';
+  finish(response);
+  await pending;
+  assert.equal(session.scope(), null);
 });

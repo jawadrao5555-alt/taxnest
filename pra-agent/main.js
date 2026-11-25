@@ -440,6 +440,8 @@ let coreTimer = null;
 let coreStartupError = null;
 let coreBackupTelemetry = { last_success_at: null, last_failure_code: null, last_failure_at: null, backup_count: 0, backup_bytes: 0 };
 let trustedPosScope = null;
+let secondaryCashier = null;
+const { secondarySaleSession } = require('./src/secondary-sale-session');
 let trustedScopeGeneration = 0;
 let lastPositiveCoreHeartbeat = null;
 function clearTrustedPosScope() { trustedScopeGeneration++; trustedPosScope = null; }
@@ -651,6 +653,7 @@ function openLocalCoreRuntime(config) {
       // completed print or retry a possible kitchen slip on inspection error.
       console.log('[local-kot] interrupted print inspection failed:', e && e.code || 'unknown');
     }
+    if (secondaryCashier) void secondaryCashier.refresh();
     scheduleLocalKotDrain(LOCAL_KOT_DRAIN_MS);
     if (runtime.interruptedKotOrders.length) {
       console.log('[local-kot] uncertain kitchen print outcomes:', runtime.interruptedKotOrders.length);
@@ -909,11 +912,20 @@ function openPos(slotNumber = 1) {
     const s = getPosSettings();
     if (slotNumber === 2) {
       // A second login must not replace the single paired Agent or Local Core scope.
-      openPosWindow(posConfig, {
+      const win = openPosWindow(posConfig, {
         slotNumber,
         shouldAskDownloadLocation: () => getPosSettings().askDownloadLocation,
         isQuitting: () => isQuitting,
       });
+      if (!win.secondarySaleSession) {
+        const origin = new URL(posConfig.serverUrl).origin;
+        win.secondarySaleSession = secondarySaleSession(win, origin, () => {
+          const config = getMigratedAgentConfig();
+          return coreRuntime && config && String(config.companyId) === coreRuntime.companyId &&
+            new URL(config.serverUrl).origin === origin && getPosSettings().offlineMode ? coreRuntime : null;
+        });
+      }
+      secondaryCashier = win.secondarySaleSession;
       return true;
     }
     openPosWindow(posConfig, {
@@ -1575,7 +1587,18 @@ const acceptCoreSaleFromPos = createSaleAcceptance({
   },
   onAccepted: () => scheduleCoreSync(0),
 });
+const acceptSecondarySale = createSaleAcceptance({
+  isAuthorized: isSecondaryPosPrintSender,
+  storeProvider: () => coreRuntime && getPosSettings().offlineMode ? coreRuntime.store : null,
+  scopeProvider: () => secondaryCashier?.scope(),
+  onAccepted: () => scheduleCoreSync(0),
+});
 ipcMain.handle('local-core-accept-immediate-sale', (event, input) => {
+  if (isSecondaryPosPrintSender(event)) {
+    const scope = secondaryCashier?.scope();
+    if (!scope) return { ok: false, error: 'trusted_scope_unavailable' };
+    return acceptSecondarySale(event, { ...input, scope: { ...input?.scope, device_id: scope.device_id } });
+  }
   if (!trustedPosScope || trustedPosScope.webContents !== event.sender) return { ok: false, error: 'trusted_scope_unavailable' };
   const supplied = input && input.scope;
   if (!supplied || String(supplied.company_id) !== trustedPosScope.company_id ||

@@ -46,6 +46,7 @@ class PosController extends Controller
         if (!$branch) return response()->json(['success' => false, 'error' => 'branch_unavailable'], 422);
         $response = [
             'success' => true,
+            'immediate_sale_allowed' => $user->isPosAdmin() || $user->isPosCashier(),
             'company_id' => (string) app('currentCompanyId'),
             'branch_id' => (string) $branch,
             'user_id' => (string) $user->id,

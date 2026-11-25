@@ -314,6 +314,20 @@
                 </div>
             </div>
 
+            <fieldset class="my-4 grid gap-2">
+                <legend class="font-semibold">{{ __('pos.qr_customer_links') }}</legend>
+                <input type="hidden" name="pp_links_present" value="1">
+                @foreach(['whatsapp' => 'qr_whatsapp_link', 'menu' => 'qr_menu_card_link', 'website' => 'qr_other_link'] as $slot => $label)
+                    <div class="grid gap-2 sm:grid-cols-2">
+                        <label>{{ __('pos.' . $label) }}
+                            <input name="customer_links[{{ $slot }}][label]" maxlength="60" value="{{ old('customer_links.' . $slot . '.label', $ppSettings['customer_links'][$slot]['label'] ?? '') }}" class="block w-full rounded-lg">
+                        </label>
+                        <label>URL
+                            <input type="url" name="customer_links[{{ $slot }}][url]" maxlength="2048" value="{{ old('customer_links.' . $slot . '.url', $ppSettings['customer_links'][$slot]['url'] ?? '') }}" class="block w-full rounded-lg">
+                        </label>
+                    </div>
+                @endforeach
+            </fieldset>
             <div class="flex items-center justify-end gap-3">
                 <button type="submit" class="px-6 py-2.5 bg-purple-600 text-white text-sm font-semibold rounded-lg hover:bg-purple-700 transition shadow-sm">{{ __('pos.save_public_profile') }}</button>
             </div>
@@ -328,7 +342,14 @@
 
         {{-- Menu builder --}}
         <form method="POST" action="{{ route('pos.public-profile.menu') }}" class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-6"
-            x-data="{ selected: {{ json_encode(array_map('intval', array_values($ppSelectedIds ?? []))) ?: '[]' }} }">
+            x-data="{ selected: {{ json_encode(array_map('intval', array_values($ppSelectedIds ?? []))) ?: '[]' }},
+                search: '',
+                matches(row) { return row.dataset.menuProduct.toLocaleLowerCase().includes(this.search.trim().toLocaleLowerCase()) },
+                matchingRows() { return Array.from(this.$refs.menuRows.querySelectorAll('[data-menu-product]')).filter(row => this.matches(row)) },
+                setMatching(checked) {
+                    const ids = this.matchingRows().map(row => Number(row.querySelector('input').value));
+                    this.selected = checked ? [...new Set([...this.selected, ...ids])].slice(0, 300) : this.selected.filter(id => !ids.includes(id));
+                } }">
             @csrf
             {{-- Stale-form marker (Task 1393). Unticked checkboxes send NOTHING, so a
                  POST with no menu_product_ids[] is indistinguishable from an outdated
@@ -347,14 +368,22 @@
             @if(($ppProducts ?? collect())->isEmpty())
             <p class="text-sm text-gray-500 dark:text-gray-400">{{ \App\Support\PosVocabulary::t('no_active_products') }}</p>
             @else
-            <div class="max-h-96 overflow-y-auto rounded-lg border border-gray-200 dark:border-gray-700 divide-y divide-gray-100 dark:divide-gray-800">
+            <div class="mb-2 flex flex-wrap items-center gap-2" x-cloak>
+                <input type="search" x-model="search" aria-label="{{ __('pos.qr_search_products') }}" placeholder="{{ __('pos.qr_search_products') }}" class="rounded-lg">
+                <button type="button" @click="setMatching(true)" class="rounded-lg border px-3 py-2">{{ __('pos.qr_select_all_matching') }}</button>
+                <button type="button" @click="setMatching(false)" class="rounded-lg border px-3 py-2">{{ __('pos.qr_clear_matching') }}</button>
+                <span class="text-xs">{{ __('pos.qr_selection_limit') }}</span>
+            </div>
+            <div x-ref="menuRows" class="max-h-96 overflow-y-auto rounded-lg border border-gray-200 dark:border-gray-700 divide-y divide-gray-100 dark:divide-gray-800">
                 @foreach(($ppProducts ?? collect())->groupBy(fn ($p) => trim((string) $p->category) !== '' ? $p->category : __('pos.uncategorized')) as $cat => $prods)
                 <div>
                     <div class="px-4 py-2 bg-gray-50 dark:bg-gray-800 text-[11px] font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400 sticky top-0">{{ $cat }}</div>
                     @foreach($prods as $p)
-                    <label class="flex items-center gap-3 px-4 py-2.5 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/60 transition">
+                    <label data-menu-product="{{ $p->name }} {{ $cat }}" x-show="matches($el)" class="flex items-center gap-3 px-4 py-2.5 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/60 transition">
                         <input type="checkbox" name="menu_product_ids[]" value="{{ $p->id }}"
                             {{ in_array((int) $p->id, $ppSelectedIds ?? [], true) ? 'checked' : '' }}
+                            :checked="selected.includes({{ (int) $p->id }})"
+                            :disabled="selected.length >= 300 && !selected.includes({{ (int) $p->id }})"
                             @change="$event.target.checked ? selected.push({{ (int) $p->id }}) : selected = selected.filter(i => i !== {{ (int) $p->id }})"
                             class="rounded border-gray-300 text-purple-600 focus:ring-purple-500">
                         <span class="flex-1 text-sm text-gray-800 dark:text-gray-200 min-w-0 truncate">{{ $p->name }}</span>

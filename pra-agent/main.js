@@ -39,7 +39,7 @@ const { createSaleAcceptance } = require('./src/local-core/sale-acceptance');
 const { createBackup, recoverInterruptedRestore } = require('./src/local-core/backup');
 const { printHtml: printHtmlSilent, getLocalPrinters, setPaperProfiles } = require('./src/printer');
 const { drainLocalKotQueue } = require('./src/local-kot');
-const { openPosWindow, getPosWindowRef, isPosWindowOpen, applyKiosk, openFbrPosWindow } = require('./src/pos-window');
+const { openPosWindow, getPosWindowRef, isPosWindowOpen, applyKiosk, openFbrPosWindow, isSecondaryPosPrintSender } = require('./src/pos-window');
 const {
   DEFAULT_SERVER_URL,
   canonicalAgentServerUrl,
@@ -440,6 +440,8 @@ let coreTimer = null;
 let coreStartupError = null;
 let coreBackupTelemetry = { last_success_at: null, last_failure_code: null, last_failure_at: null, backup_count: 0, backup_bytes: 0 };
 let trustedPosScope = null;
+let secondaryCashier = null;
+const { secondarySaleSession } = require('./src/secondary-sale-session');
 let trustedScopeGeneration = 0;
 let lastPositiveCoreHeartbeat = null;
 function clearTrustedPosScope() { trustedScopeGeneration++; trustedPosScope = null; }
@@ -651,6 +653,7 @@ function openLocalCoreRuntime(config) {
       // completed print or retry a possible kitchen slip on inspection error.
       console.log('[local-kot] interrupted print inspection failed:', e && e.code || 'unknown');
     }
+    if (secondaryCashier) void secondaryCashier.refresh();
     scheduleLocalKotDrain(LOCAL_KOT_DRAIN_MS);
     if (runtime.interruptedKotOrders.length) {
       console.log('[local-kot] uncertain kitchen print outcomes:', runtime.interruptedKotOrders.length);
@@ -901,12 +904,30 @@ async function applyLanSettings() {
   return srv.status();
 }
 
-function openPos() {
+function openPos(slotNumber = 1) {
   try {
     const config = getMigratedAgentConfig();
     const posConfig =
       config && config.serverUrl ? config : { serverUrl: DEFAULT_SERVER_URL };
     const s = getPosSettings();
+    if (slotNumber === 2) {
+      // A second login must not replace the single paired Agent or Local Core scope.
+      const win = openPosWindow(posConfig, {
+        slotNumber,
+        shouldAskDownloadLocation: () => getPosSettings().askDownloadLocation,
+        isQuitting: () => isQuitting,
+      });
+      if (!win.secondarySaleSession) {
+        const origin = new URL(posConfig.serverUrl).origin;
+        win.secondarySaleSession = secondarySaleSession(win, origin, () => {
+          const config = getMigratedAgentConfig();
+          return coreRuntime && config && String(config.companyId) === coreRuntime.companyId &&
+            new URL(config.serverUrl).origin === origin && getPosSettings().offlineMode ? coreRuntime : null;
+        });
+      }
+      secondaryCashier = win.secondarySaleSession;
+      return true;
+    }
     openPosWindow(posConfig, {
       kiosk: s.kiosk,
       isOfflineEnabled: () => getPosSettings().offlineMode,
@@ -917,7 +938,7 @@ function openPos() {
       },
       onLoggedIn: async (ses, origin, isCurrent) => {
         const configured = await autoConfigureAgent(ses, origin, 'pos', isCurrent);
-        await refreshTrustedPosScope(ses, origin);
+        if (isCurrent()) await refreshTrustedPosScope(ses, origin);
         return configured;
       },
       // Keep-alive (v1.5.2): POS window hides on close and must only REALLY
@@ -1101,8 +1122,12 @@ function buildTrayMenu() {
   const posSettings = getPosSettings();
   const contextMenu = Menu.buildFromTemplate([
     {
-      label: '🖥️ Open POS Screen',
+      label: 'Open POS 1',
       click: () => openPos(),
+    },
+    {
+      label: 'Open POS 2',
+      click: () => openPos(2),
     },
     {
       label: 'Open FBR POS Screen',
@@ -1517,7 +1542,9 @@ ipcMain.handle('save-pos-settings', (event, s) => {
 ipcMain.handle('open-installation-folder', async () => { await shell.openPath(path.dirname(process.execPath)); return {ok:true}; });
 ipcMain.handle('open-installed-apps', async () => { if(process.platform!=='win32') return {ok:false}; await shell.openExternal('ms-settings:appsfeatures'); return {ok:true}; });
 
-ipcMain.handle('open-pos-window', () => ({ ok: openPos() }));
+ipcMain.handle('open-pos-window', (_event, slotNumber = 1) => ({
+  ok: (slotNumber === 1 || slotNumber === 2) && openPos(slotNumber),
+}));
 
 // Explicit owner/cashier click only; no renderer-supplied destination.
 ipcMain.handle('open-pos-browser', async () => {
@@ -1560,7 +1587,18 @@ const acceptCoreSaleFromPos = createSaleAcceptance({
   },
   onAccepted: () => scheduleCoreSync(0),
 });
+const acceptSecondarySale = createSaleAcceptance({
+  isAuthorized: isSecondaryPosPrintSender,
+  storeProvider: () => coreRuntime && getPosSettings().offlineMode ? coreRuntime.store : null,
+  scopeProvider: () => secondaryCashier?.scope(),
+  onAccepted: () => scheduleCoreSync(0),
+});
 ipcMain.handle('local-core-accept-immediate-sale', (event, input) => {
+  if (isSecondaryPosPrintSender(event)) {
+    const scope = secondaryCashier?.scope();
+    if (!scope) return { ok: false, error: 'trusted_scope_unavailable' };
+    return acceptSecondarySale(event, { ...input, scope: { ...input?.scope, device_id: scope.device_id } });
+  }
   if (!trustedPosScope || trustedPosScope.webContents !== event.sender) return { ok: false, error: 'trusted_scope_unavailable' };
   const supplied = input && input.scope;
   if (!supplied || String(supplied.company_id) !== trustedPosScope.company_id ||
@@ -1641,7 +1679,17 @@ ipcMain.handle('get-lan-status', () => {
   const st = lanInstance().status();
   let core_tls = { running: false };
   try { if (coreLanTls) core_tls = coreLanTls.status(); } catch (e) {}
-  return { ...st, enabled: getLanSettings().enabled, core_tls };
+  const settings = getLanSettings();
+  const journal = coreRuntime?.store?.status();
+  let localStatus = 'awaiting_activation';
+  if (!getPosSettings().offlineMode) localStatus = 'offline_mode_off';
+  else if (coreStartupError || journal?.read_only || journal?.storage_full) localStatus = 'storage_unavailable';
+  else if (coreRuntime && !currentCoreLanScope()) localStatus = 'cashier_login_required';
+  else if (coreRuntime && !settings.coreTlsEnabled) localStatus = 'native_waiter_off';
+  else if (coreRuntime && !core_tls.running) localStatus = 'listener_unavailable';
+  else if (coreRuntime && core_tls.running) localStatus = 'listener_running';
+  return { ...st, enabled: settings.enabled, core_tls, local_status: localStatus,
+    pending_sync: journal ? journal.pending_count : null };
 });
 
 ipcMain.handle('lan-core-pairing-payload', async () => {
@@ -1682,7 +1730,7 @@ ipcMain.handle('lan-remove-device', (event, id) => {
 // never feed paper to the shop printer.
 ipcMain.handle('pos-print-html', async (event, html, deviceName) => {
   const pw = getPosWindowRef();
-  if (!pw || event.sender !== pw.webContents) {
+  if (event.sender !== pw?.webContents && !isSecondaryPosPrintSender(event)) {
     return { success: false, error: 'unauthorized' };
   }
   if (!html || typeof html !== 'string') {

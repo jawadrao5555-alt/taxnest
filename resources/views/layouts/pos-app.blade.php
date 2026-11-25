@@ -81,6 +81,14 @@
     // per-company opt-out were retired — restaurant behavior is driven by feature flags.
     // Per-cashier toggle (owner rule Jul 2026): layout badge shows THIS user's effective state.
     $praEnabledLayout = $companyLayout && $posUserLayout && $posUserLayout->praReportingEnabled($companyLayout);
+    $desktopBillingScope = str_contains(request()->userAgent() ?? '', 'NestPOSDesktop/')
+        ? $posUserLayout?->posBillingScopeExplicit()
+        : null;
+    $desktopReportingStatus = match ($desktopBillingScope) {
+        'pra' => $praEnabledLayout ? 'on' : 'conflict',
+        'local' => $praEnabledLayout ? 'conflict' : 'off',
+        default => null,
+    };
     $inventoryEnabledLayout = \App\Services\PosFeatureService::moduleAvailable($companyLayout, 'inventory');
     $companyName = $companyLayout->name ?? 'My Business';
     $userName = $posUserLayout->name ?? 'User';
@@ -376,6 +384,15 @@
             [data-hotel-back-front-desk] { background-color: hsl(var(--accent-h), var(--accent-s), 32%) !important; }
 
             .topnav-bar { background: var(--nav-bg, linear-gradient(135deg, #1e1b4b 0%, #312e81 40%, #4c1d95 100%)); }
+            .topnav-bar[data-desktop-reporting="on"] { background: #1e3a8a; }
+            .topnav-bar[data-desktop-reporting="off"] { background: #334155; }
+            .desktop-reporting-status { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; font-size: 11px; font-weight: 700; color: white; }
+            .desktop-reporting-light { width: 8px; height: 8px; border-radius: 50%; background: #fbbf24; }
+            [data-desktop-reporting="on"] .desktop-reporting-light { background: #6ee7b7; }
+            [data-desktop-reporting="off"] .desktop-reporting-light { background: #fca5a5; }
+            @media (prefers-reduced-motion: no-preference) {
+                [data-desktop-reporting="on"] .desktop-reporting-light { animation: statusPulse 2s ease-in-out infinite; }
+            }
             .nav-pill { transition: all 0.15s ease; }
             .nav-pill:hover { background: var(--pill-hover); }
             .nav-pill.active { background: var(--pill-active); box-shadow: 0 0 0 1px rgba(255,255,255,0.1); }
@@ -626,7 +643,7 @@
         <x-pwa-init />
         <div class="flex flex-col h-full" x-data="{ profileOpen: false, mobileMenuOpen: false, themeOpen: false, currentTheme: '{{ $posTheme }}', guidedOn: {{ ($companyLayout->pos_guided_flow_enabled ?? true) ? 'true' : 'false' }} }" @keydown.escape.window="profileOpen = false; mobileMenuOpen = false; themeOpen = false">
 
-            <header data-tn-topnav="pra" @if(request()->routeIs('pos.invoice.create', 'pos.v2.invoice.create')) data-tn-sale-header @endif class="topnav-bar flex-shrink-0 relative z-50 {{ is_array(session('impersonation')) ? 'tn-impersonated-header' : '' }}" style="z-index: 140;">
+            <header data-tn-topnav="pra" @if($desktopReportingStatus) data-desktop-reporting="{{ $desktopReportingStatus }}" @endif @if(request()->routeIs('pos.invoice.create', 'pos.v2.invoice.create')) data-tn-sale-header @endif class="topnav-bar flex-shrink-0 relative z-50 {{ is_array(session('impersonation')) ? 'tn-impersonated-header' : '' }}" style="z-index: 140;">
                 <div class="tn-impersonation-header-row flex items-center justify-between px-3 sm:px-5 h-12">
 
                     <div class="tn-impersonation-header-left flex items-center gap-3 flex-shrink-0">
@@ -639,6 +656,17 @@
                                 <span class="text-[9px] text-white ml-1 hidden lg:inline font-medium">Enterprise</span>
                             </div>
                         </a>
+
+                        @if($desktopReportingStatus)
+                        <span class="desktop-reporting-status">
+                            <span class="desktop-reporting-light" aria-hidden="true"></span>
+                            {{ match ($desktopReportingStatus) {
+                                'on' => __('PRA Reporting ON'),
+                                'off' => __('PRA Reporting OFF'),
+                                default => __('Check billing settings'),
+                            } }}
+                        </span>
+                        @endif
 
                         {{-- Admin impersonation marker sits IN the bar (26 Aug 2026):
                              as a floating pill it covered the nav underneath it. --}}

@@ -341,19 +341,19 @@ class PosLocalSeriesResetTest extends TestCase
         $this->assertSame(3, $status['count']);
         $this->assertSame('2026-07-15', $status['from']);
         $this->assertSame('2026-08-19', $status['to']);
-        $this->assertSame('L005', $status['next']);
-        $this->assertSame('L005', $status['next_after']);
+        $this->assertSame('B005', $status['next']);
+        $this->assertSame('B005', $status['next_after']);
     }
 
     public function test_status_is_silent_when_nothing_blocks_the_series(): void
     {
         $cid = $this->makeCompany();
-        $this->makeBill($cid, 'L001', ['is_archived' => false]);
+        $this->makeBill($cid, 'B001', ['is_archived' => false]);
 
         $status = $this->seriesStatus($cid);
 
         $this->assertSame(0, $status['count']);
-        $this->assertSame('L002', $status['next']);
+        $this->assertSame('B002', $status['next']);
     }
 
     // ── 2/3/4. the clear itself ──────────────────────────────────────────────
@@ -376,7 +376,7 @@ class PosLocalSeriesResetTest extends TestCase
 
         $res = $this->clear($this->makeUser($cid));
 
-        $res->assertStatus(200)->assertJson(['success' => true, 'deleted' => 2, 'next_number' => 'L007']);
+        $res->assertStatus(200)->assertJson(['success' => true, 'deleted' => 2, 'next_number' => 'B007']);
         $this->assertSame(
             ['L003', 'L004', 'L005', 'L006', 'LOCAL-2026-00007'],
             $this->numbers($cid)
@@ -403,12 +403,12 @@ class PosLocalSeriesResetTest extends TestCase
         $this->clear($this->makeUser($cid))->assertStatus(200);
 
         // Retail sale screen takes L-004 …
-        $this->assertSame('L004', $this->nextRetail($cid));
+        $this->assertSame('B004', $this->nextRetail($cid));
         $this->makeBill($cid, 'L004', ['is_archived' => false]);
         // … and the restaurant dine-in pay path continues the SAME series.
-        $this->assertSame('L005', $this->nextRestaurant($cid));
+        $this->assertSame('B005', $this->nextRestaurant($cid));
         $this->makeBill($cid, 'L005', ['is_archived' => false]);
-        $this->assertSame('L006', $this->nextRetail($cid));
+        $this->assertSame('B006', $this->nextRetail($cid));
     }
 
     public function test_day_after_delete_policy_close_never_reuses_old_numbers(): void
@@ -420,13 +420,13 @@ class PosLocalSeriesResetTest extends TestCase
 
         // Next trading day under the delete policy: newly allocated references
         // are later removed, but the durable counter must still remember them.
-        $this->assertSame('L003', $this->nextRetail($cid));
+        $this->assertSame('B003', $this->nextRetail($cid));
         $b1 = $this->makeBill($cid, 'L003', ['is_archived' => false]);
-        $this->assertSame('L004', $this->nextRetail($cid));
+        $this->assertSame('B004', $this->nextRetail($cid));
         $b2 = $this->makeBill($cid, 'L004', ['is_archived' => false]);
         DB::table('pos_transactions')->whereIn('id', [$b1, $b2])->delete();
 
-        $this->assertSame('L005', $this->nextRetail($cid));
+        $this->assertSame('B005', $this->nextRetail($cid));
     }
 
     public function test_clear_with_nothing_to_remove_is_a_harmless_noop(): void
@@ -436,7 +436,7 @@ class PosLocalSeriesResetTest extends TestCase
 
         $this->clear($this->makeUser($cid))
             ->assertStatus(200)
-            ->assertJson(['success' => true, 'deleted' => 0, 'next_number' => 'L002']);
+            ->assertJson(['success' => true, 'deleted' => 0, 'next_number' => 'B002']);
 
         $this->assertSame(['L001'], $this->numbers($cid));
         $this->assertSame(0, DB::table('pos_local_series_resets')->count());
@@ -465,7 +465,7 @@ class PosLocalSeriesResetTest extends TestCase
         $res->assertStatus(200)->assertJson([
             'success' => true,
             'deleted' => 3,
-            'next_number' => 'L006',
+            'next_number' => 'B006',
             'rider_held' => 2,
         ]);
         // …and the reason is spelled out from the lang file, never hardcoded.
@@ -484,7 +484,7 @@ class PosLocalSeriesResetTest extends TestCase
 
         $res = $this->clear($this->makeUser($cid));
 
-        $res->assertStatus(200)->assertJson(['deleted' => 2, 'next_number' => 'L003', 'rider_held' => 0]);
+        $res->assertStatus(200)->assertJson(['deleted' => 2, 'next_number' => 'B003', 'rider_held' => 0]);
         $this->assertNull($res->json('rider_held_message'), 'nothing was kept — the card must stay quiet');
     }
 
@@ -506,7 +506,7 @@ class PosLocalSeriesResetTest extends TestCase
 
         $res = $this->clear($this->makeUser($cid));
 
-        $res->assertStatus(200)->assertJson(['deleted' => 3, 'rider_held' => 1, 'next_number' => 'L005']);
+        $res->assertStatus(200)->assertJson(['deleted' => 3, 'rider_held' => 1, 'next_number' => 'B005']);
         $this->assertSame(['L-ABC', 'L004'], $this->numbers($cid));
     }
 
@@ -524,7 +524,7 @@ class PosLocalSeriesResetTest extends TestCase
 
         $res = $this->clear($this->makeUser($cid));
 
-        $res->assertStatus(200)->assertJson(['deleted' => 0, 'next_number' => 'L003', 'rider_held' => 2]);
+        $res->assertStatus(200)->assertJson(['deleted' => 0, 'next_number' => 'B003', 'rider_held' => 2]);
         $this->assertSame(
             trans('pos.local_series_rider_kept', ['count' => 2], 'en'),
             $res->json('rider_held_message')
@@ -660,11 +660,11 @@ class PosLocalSeriesResetTest extends TestCase
 
         $status = $this->seriesStatus($cid);
         $this->assertSame(1, $status['count'], 'only the real L-001 holds a number');
-        $this->assertSame('L002', $status['next_after']);
+        $this->assertSame('B002', $status['next_after']);
 
         $this->clear($this->makeUser($cid))->assertStatus(200)->assertJson([
             'deleted' => 1,
-            'next_number' => 'L002',
+            'next_number' => 'B002',
         ]);
 
         $this->assertSame(['L-001-extra', 'L-ABC'], $this->numbers($cid), 'stray L-* bills must survive');
@@ -672,7 +672,7 @@ class PosLocalSeriesResetTest extends TestCase
         $this->assertSame(2, DB::table('pos_transaction_items')->count());
         $this->assertSame(2, DB::table('pos_payments')->count());
         // The deleted real serial remains consumed by the durable counter.
-        $this->assertSame('L002', $this->nextRetail($cid));
+        $this->assertSame('B002', $this->nextRetail($cid));
     }
 
     /**
@@ -723,7 +723,7 @@ class PosLocalSeriesResetTest extends TestCase
         $user = $this->makeUser($cid);
 
         $this->clear($user)->assertStatus(200)->assertJson(['deleted' => 2]);
-        $this->clear($user)->assertStatus(200)->assertJson(['deleted' => 0, 'next_number' => 'L003']);
+        $this->clear($user)->assertStatus(200)->assertJson(['deleted' => 0, 'next_number' => 'B003']);
 
         $this->assertSame(1, DB::table('pos_local_series_resets')->count(), 'a replay must not add a ledger row');
         $this->assertSame(2, DB::table('pos_customer_spend_snapshots')->count(), 'spend history must not be duplicated');
@@ -775,7 +775,7 @@ class PosLocalSeriesResetTest extends TestCase
 
         $after = $this->seriesStatus($cid);
         $this->assertTrue($after['can_reset']);
-        $this->assertSame('L015', $after['next'], 'Clear itself never resets numbering');
+        $this->assertSame('B015', $after['next'], 'Clear itself never resets numbering');
     }
 
     public function test_a_brand_new_company_is_never_offered_a_pointless_reset(): void
@@ -792,11 +792,11 @@ class PosLocalSeriesResetTest extends TestCase
 
         $this->resetNumbering($this->makeUser($cid))
             ->assertStatus(200)
-            ->assertJson(['success' => true, 'next_number' => 'L001']);
+            ->assertJson(['success' => true, 'next_number' => 'B001']);
 
-        $this->assertSame('L001', $this->nextPreview($cid));
-        $this->assertSame('L001', $this->nextRetail($cid));
-        $this->assertSame('L002', $this->nextRestaurant($cid));
+        $this->assertSame('B001', $this->nextPreview($cid));
+        $this->assertSame('B001', $this->nextRetail($cid));
+        $this->assertSame('B002', $this->nextRestaurant($cid));
     }
 
     public function test_reset_refuses_while_a_live_bill_still_holds_a_reference(): void
@@ -805,7 +805,7 @@ class PosLocalSeriesResetTest extends TestCase
         $this->makeBill($cid, 'L014', ['is_archived' => false]);
 
         $this->resetNumbering($this->makeUser($cid))->assertStatus(409);
-        $this->assertSame('L015', $this->nextPreview($cid));
+        $this->assertSame('B015', $this->nextPreview($cid));
     }
 
     public function test_reset_refuses_while_an_archived_bill_still_holds_a_reference(): void
@@ -814,7 +814,7 @@ class PosLocalSeriesResetTest extends TestCase
         $this->makeBill($cid, 'L014');
 
         $this->resetNumbering($this->makeUser($cid))->assertStatus(409);
-        $this->assertSame('L015', $this->nextPreview($cid));
+        $this->assertSame('B015', $this->nextPreview($cid));
     }
 
     public function test_cashier_cannot_reset_numbering_even_by_hitting_the_url(): void
@@ -824,7 +824,7 @@ class PosLocalSeriesResetTest extends TestCase
         $this->clear($this->makeUser($cid))->assertStatus(200);
 
         $this->resetNumbering($this->makeUser($cid, 'pos_cashier'))->assertStatus(403);
-        $this->assertSame('L015', $this->nextPreview($cid));
+        $this->assertSame('B015', $this->nextPreview($cid));
     }
 
     public function test_reset_never_reaches_another_companys_series(): void
@@ -837,8 +837,8 @@ class PosLocalSeriesResetTest extends TestCase
 
         $this->resetNumbering($this->makeUser($mine))->assertStatus(200);
 
-        $this->assertSame('L001', $this->nextPreview($mine));
-        $this->assertSame('L051', $this->nextPreview($theirs));
+        $this->assertSame('B001', $this->nextPreview($mine));
+        $this->assertSame('B051', $this->nextPreview($theirs));
     }
 
     // ── 8. one rule behind screen + both printers (Task 1373) ────────────────
@@ -848,23 +848,23 @@ class PosLocalSeriesResetTest extends TestCase
     {
         $cid = $this->makeCompany();
 
-        $this->assertSame('L001', $this->nextPreview($cid));
-        $this->assertSame('L001', $this->nextRetail($cid));
+        $this->assertSame('B001', $this->nextPreview($cid));
+        $this->assertSame('B001', $this->nextRetail($cid));
         $this->makeBill($cid, 'L001', ['is_archived' => false]);
-        $this->assertSame('L002', $this->nextPreview($cid));
-        $this->assertSame('L002', $this->nextRestaurant($cid));
-        $this->makeBill($cid, 'L002', ['is_archived' => false]);
+        $this->assertSame('B002', $this->nextPreview($cid));
+        $this->assertSame('B002', $this->nextRestaurant($cid));
+        $this->makeBill($cid, 'B002', ['is_archived' => false]);
 
         // Legacy + stray formats reserve nothing at all.
         $this->makeBill($cid, 'LOCAL-2026-00003', ['is_archived' => false]);
         $this->makeBill($cid, 'L-ABC', ['is_archived' => false]);
         $this->makeBill($cid, 'L-003-extra', ['is_archived' => false]);
-        $this->assertSame('L003', $this->nextPreview($cid));
+        $this->assertSame('B003', $this->nextPreview($cid));
 
         // Past the pad width the series just grows (L-1000), still in step.
         DB::table('pos_local_series_counters')->where('company_id', $cid)->update(['last_number' => 999]);
-        $this->assertSame('L1000', $this->nextPreview($cid));
-        $this->assertSame('L1000', $this->nextRetail($cid));
+        $this->assertSame('B1000', $this->nextPreview($cid));
+        $this->assertSame('B1000', $this->nextRetail($cid));
     }
 
     /**
@@ -879,12 +879,12 @@ class PosLocalSeriesResetTest extends TestCase
         $this->makeBill($cid, 'L003', ['is_archived' => false]); // live, survives
 
         $promised = $this->seriesStatus($cid)['next_after'];
-        $this->assertSame('L004', $promised);
+        $this->assertSame('B004', $promised);
 
         $this->clear($this->makeUser($cid))->assertStatus(200);
 
         $this->assertSame($promised, $this->nextRetail($cid));
-        $this->assertSame('L005', $this->nextRestaurant($cid));
+        $this->assertSame('B005', $this->nextRestaurant($cid));
     }
 
     /** A rolled-back sale must roll its counter reservation back too. */
@@ -893,11 +893,11 @@ class PosLocalSeriesResetTest extends TestCase
         $cid = $this->makeCompany();
 
         DB::beginTransaction();
-        $this->assertSame('L001', $this->nextRetail($cid));
-        $this->assertSame('L002', $this->nextPreview($cid));
+        $this->assertSame('B001', $this->nextRetail($cid));
+        $this->assertSame('B002', $this->nextPreview($cid));
         DB::rollBack();
 
-        $this->assertSame('L001', $this->nextPreview($cid));
+        $this->assertSame('B001', $this->nextPreview($cid));
         $this->assertSame(0, DB::table('pos_local_series_counters')->where('company_id', $cid)->count());
     }
 
@@ -911,10 +911,23 @@ class PosLocalSeriesResetTest extends TestCase
         $cid = $this->makeCompany();
         $this->makeBill($cid, 'L-016');
 
-        $this->assertSame('L017', $this->nextPreview($cid));
-        $this->assertSame('L017', $this->nextRetail($cid));
+        $this->assertSame('B017', $this->nextPreview($cid));
+        $this->assertSame('B017', $this->nextRetail($cid));
         $this->assertSame(16, \App\Services\PosLocalSeries::serialOf('L-016'));
         $this->assertSame(16, \App\Services\PosLocalSeries::serialOf('L016'));
+    }
+
+    public function test_current_b_and_legacy_l_rows_share_one_high_water_mark(): void
+    {
+        $cid = $this->makeCompany();
+        $this->makeBill($cid, 'L041', ['is_archived' => false]);
+        $this->makeBill($cid, 'B042', ['is_archived' => false]);
+
+        $this->assertSame('B043', $this->nextPreview($cid));
+        $this->assertSame('B043', $this->nextRetail($cid));
+        $this->assertSame(41, \App\Services\PosLocalSeries::serialOf('L041'));
+        $this->assertSame(42, \App\Services\PosLocalSeries::serialOf('B042'));
+        $this->assertNull(\App\Services\PosLocalSeries::serialOf('LOCAL-2026-00043'));
     }
 
     /** The production migration discovers legacy rows without a prefilled counter. */
@@ -934,8 +947,8 @@ class PosLocalSeriesResetTest extends TestCase
             832,
             (int) DB::table('pos_local_series_counters')->where('company_id', $cid)->value('last_number')
         );
-        $this->assertSame('L833', $this->nextPreview($cid));
-        $this->assertSame('L833', $this->nextRetail($cid));
+        $this->assertSame('B833', $this->nextPreview($cid));
+        $this->assertSame('B833', $this->nextRetail($cid));
     }
 
     // ── company isolation ────────────────────────────────────────────────────

@@ -605,7 +605,7 @@ class Company extends Model
 
         $prefs = $this->posReceiptPrefs($isPra ? 'pra' : 'local');
         $options = \App\Support\PosReceiptOptions::forBill($this, $transaction);
-        foreach (['show_business_name', 'show_address', 'show_mobile', 'show_email', 'show_ntn', 'show_cashier', 'show_footer', 'show_developed_by', 'show_verify_line'] as $key) {
+        foreach (\App\Support\PosReceiptOptions::LEGACY_DISPLAY_CONTROLS as $key) {
             $prefs[$key] = \App\Support\PosReceiptOptions::visible($options, $key, (bool) ($prefs[$key] ?? true));
         }
         return $prefs;

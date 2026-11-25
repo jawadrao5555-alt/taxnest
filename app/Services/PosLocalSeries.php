@@ -7,10 +7,10 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * PRA POS local bill series "L-NNN" — the ONE place the numbering rule lives
+ * PRA POS local bill series "B-NNN" — the ONE place the numbering rule lives
  * (Task 1373).
  *
- * Vendor-requested short format: L001 (per-company, 3-digit pad, grows
+ * Vendor-requested short format: B001 (per-company, 3-digit pad, grows
  * naturally past 999). Distinct from the fiscal serials so cashiers can spot
  * non-PRA bills at a glance in lists / receipts / PDFs.
  *
@@ -19,17 +19,17 @@ use Illuminate\Support\Facades\Schema;
  * it is read, searched or counted — it still reserves its number.
  *
  * Owner rule (22 Aug 2026) — MONOTONIC, never smallest-free: once a company has
- * reached L-832, every later local bill is L-833 or higher even if older local
+ * reached L-832, every later local bill is B833 or higher even if older local
  * rows are archived, promoted to fiscal, or permanently cleared. Existing bills
  * are NEVER renumbered.
  *
  * The durable high-water mark lives in pos_local_series_counters. Existing rows
  * (including archived ones) are also inspected as a safety floor so imported or
  * legacy data can only move the sequence forward, never backward.
- *   - legacy "LOCAL-YYYY-NNNNN" bills are NOT part of this series (the coarse
+ *   - legacy "LOCAL-YYYY-NNNNN" bills are NOT part of this series (the legacy
  *     `like 'L%'` prefilter would otherwise match them and corrupt the
- *     counter), and neither is any other stray "L-…" text: ONLY an exact
- *     /^L-\d+$/ serial reserves a number. preg_match keeps that contract
+ *     counter), and neither is any other stray B/L text: only exact current
+ *     B numbers or legacy L numbers reserve a slot. preg_match keeps that contract
  *     identical on MySQL and sqlite, where REGEXP support differs.
  *
  * Three callers must agree byte-for-byte or the screen promises one number and
@@ -76,13 +76,16 @@ class PosLocalSeries
         return true;
     }
 
-    /** Serial prefix. Any other prefix (e.g. legacy "LOCAL-") is not this series. */
-    public const PREFIX = 'L';
+    /** Prefix for every newly issued local bill. */
+    public const PREFIX = 'B';
 
-    /** Dashed spelling issued before the dash was dropped. */
+    /** Prefix used by local bills issued before the B-series cutover. */
+    public const LEGACY_PREFIX = 'L';
+
+    /** Dashed L spelling issued before the dash was dropped. */
     public const LEGACY_DASHED_PREFIX = 'L-';
 
-    /** Zero-pad width; longer numbers simply grow past it (L1000). */
+    /** Zero-pad width; longer numbers simply grow past it (B1000). */
     public const PAD = 3;
 
     /**
@@ -161,16 +164,19 @@ class PosLocalSeries
     public static function filter($query)
     {
         return $query
-            ->where('invoice_number', 'like', self::PREFIX . '%')
+            ->where(function ($series) {
+                $series->where('invoice_number', 'like', self::PREFIX . '%')
+                    ->orWhere('invoice_number', 'like', self::LEGACY_PREFIX . '%');
+            })
             ->where('invoice_number', 'not like', 'LOCAL-%');
     }
 
     /** The number an invoice reserves, or null when it is not an L-series serial. */
     public static function serialOf($invoiceNumber): ?int
     {
-        // "L001" (current) and "L-001" (issued before the dash was dropped) are
-        // the same slot; "LOCAL-2026-00001" and any other stray L-text are not.
-        return preg_match('/^' . preg_quote(self::PREFIX, '/') . '-?(\d+)$/', (string) $invoiceNumber, $m)
+        // "B001" is current. "L001" and "L-001" remain valid historical slots;
+        // "LOCAL-2026-00001" and any other stray B/L text are not.
+        return preg_match('/^(?:' . preg_quote(self::PREFIX, '/') . '|' . preg_quote(self::LEGACY_PREFIX, '/') . ')-?(\d+)$/', (string) $invoiceNumber, $m)
             ? (int) $m[1]
             : null;
     }
@@ -181,7 +187,7 @@ class PosLocalSeries
         return self::serialOf($invoiceNumber) !== null;
     }
 
-    /** Render a number in the series format (L001, L1000). */
+    /** Render a number in the current series format (B001, B1000). */
     public static function format(int $number): string
     {
         return self::PREFIX . str_pad((string) $number, self::PAD, '0', STR_PAD_LEFT);

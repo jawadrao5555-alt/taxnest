@@ -526,8 +526,13 @@ foreach ([1366, 390] as $width) {
     $deliveryCreditCases[$width]=['login'=>$creditOwner->email,'riderLogin'=>$creditRiderUser->email,'ids'=>$creditIds];
 }
 
+// These journeys compare freshly seeded orders with the active business day.
+// Keep the fixture's rollover outside the browser run when seeding near 06:00 PKT.
+$topSellingSeedHour = now(config('app.timezone'))->hour;
+$topSellingCutoff = $topSellingSeedHour >= 4 && $topSellingSeedHour < 8 ? '11:30' : '06:00';
 $topSellingCompany = $company('Synthetic Top Selling', 'top-selling-company@rc-browser.invalid', 'RCTOPSELL001', 'pos', [
     'business_category' => 'restaurant', 'pos_type' => 'restaurant', 'restaurant_mode' => true,
+    'pos_business_day_cutoff' => $topSellingCutoff,
     'feature_flags' => PosFeatureService::defaultsForCategory('restaurant'), 'pos_setup_completed' => true,
 ]);
 $topSellingOwner = $user($topSellingCompany, 'Synthetic Top Selling Owner', 'top-selling-owner@rc-browser.invalid', 'company_admin', 'pos_admin');

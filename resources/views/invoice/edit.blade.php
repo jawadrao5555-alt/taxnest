@@ -265,6 +265,8 @@
                                 </div>
                             </div>
 
+                            @include('invoice.partials.dsi-reference-picker')
+
                             <div x-show="item.schedule_hint" x-cloak class="mb-3 px-3 py-2 bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-200 dark:border-indigo-700 rounded-lg">
                                 <p class="text-xs text-indigo-700 dark:text-indigo-300" x-text="item.schedule_hint"></p>
                             </div>
@@ -527,10 +529,13 @@
                     window.invoiceFormInstance = this;
                     // Pre-selected branch decides the supplier province → services (SN019) default rate.
                     const branchSel = document.getElementById('branch_id_select');
+                    this.referenceBranchId = branchSel?.value || '';
                     if (branchSel && branchSel.value) defaultTaxRates.services = branchServicesRates[branchSel.value] ?? companyServicesRate;
                 },
                 // Branch change → supplier province change → services default rate change (SN019).
+                referenceBranchId: '',
                 onBranchChange(branchId) {
+                    this.referenceBranchId = branchId;
                     const rate = branchServicesRates[branchId] ?? companyServicesRate;
                     defaultTaxRates.services = rate;
                     this.items.forEach((item, idx) => {
@@ -568,6 +573,7 @@
                         'tax' => $i->tax,
                         'schedule_type' => $scheduleType,
                         'sro_schedule_no' => $i->sro_schedule_no ?? '',
+                        'fbr_reference_checked' => (bool) $i->fbr_reference_checked,
                         'serial_no' => $i->serial_no ?? '',
                         'mrp' => $i->mrp ?? '',
                         'mrpManual' => true,

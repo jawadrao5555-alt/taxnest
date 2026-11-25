@@ -39,7 +39,7 @@ final class DiagnosticSourceExport
         $first = null;
         $last = null;
         $terminalFailure = null;
-        $failureStatuses = ['SOURCE_QUERY_FAILED', 'UNAVAILABLE', 'BRANCH_SCOPE_UNAVAILABLE'];
+        $readableStatuses = ['PARTIAL', 'NO_RETAINED_EVENTS'];
 
         while (count($rows) < $maxRows) {
             $remaining = $maxRows - count($rows);
@@ -50,7 +50,7 @@ final class DiagnosticSourceExport
             $first ??= $page;
             $last = $page;
 
-            if (in_array($page['status'], $failureStatuses, true)) {
+            if (! in_array($page['status'], $readableStatuses, true)) {
                 $terminalFailure = $page['status'];
                 break;
             }

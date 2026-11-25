@@ -55,7 +55,17 @@ class PosTaxIntegrationController extends Controller
             abort_unless($port>=1024 && $port<=65535,422,'Use the designated local FBR IMS port.');
         }
         DB::transaction(function() use($c,$data,$tokens){
-            Company::whereKey($c->id)->lockForUpdate()->firstOrFail();$p=PosImsProfile::firstOrNew(['company_id'=>$c->id]);
+            $c = Company::whereKey($c->id)->lockForUpdate()->firstOrFail();
+            $p=PosImsProfile::firstOrNew(['company_id'=>$c->id]);
+            $writesToken = array_filter($tokens, fn ($token) => is_string($token) && $token !== '') !== [];
+            $deviceUid = array_key_exists('device_uid', $data) ? $data['device_uid'] : $p->device_uid;
+            $localUrl = array_key_exists('local_ims_url', $data) ? $data['local_ims_url'] : $p->local_ims_url;
+            $writesDeviceConnection = $deviceUid && $localUrl
+                && ($deviceUid !== $p->device_uid || $localUrl !== $p->local_ims_url);
+            // Check access before changing the credentials or local connection that qualify a legacy profile.
+            if ($data['enabled'] || $writesToken || $writesDeviceConnection) {
+                abort_unless(\App\Services\PosFederalAddonAccess::allows($c, 'federal_ims'), 403, 'IMS setup requires an active paid add-on.');
+            }
             foreach(['sandbox','production'] as $env) {
                 foreach(['pos_id','url'] as $field) if(array_key_exists($env.'_'.$field,$data))$p->{$env.'_'.$field}=$data[$env.'_'.$field];
                 if(is_string($tokens[$env.'_token'] ?? null) && $tokens[$env.'_token']!=='')$p->{$env.'_token'}=$tokens[$env.'_token'];

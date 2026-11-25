@@ -65,6 +65,11 @@ class BranchAddonService
     /** hasColumn() per call = DB round trip; per-request memo. */
     private static ?bool $slotsColumn = null;
 
+    public static function forgetSchemaProbe(): void
+    {
+        self::$slotsColumn = null;
+    }
+
     public static function slotsColumnExists(): bool
     {
         if (self::$slotsColumn === null) {

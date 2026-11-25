@@ -91,7 +91,7 @@ class PosAddonService
             return [];
         }
 
-        return array_keys(array_filter(PosAddonPricingService::ADDONS, function (array $addon) use ($plan) {
+        return array_keys(array_filter(PosAddonPricingService::definitions(), function (array $addon) use ($plan) {
             $gate = $addon['gate'];
             return empty($plan->{$gate});
         }));
@@ -100,7 +100,8 @@ class PosAddonService
     /** Public/signup quote: never price a feature already inside the chosen package. */
     public static function quoteForPlan(array $codes, string $cycle, ?PricingPlan $plan): array
     {
-        return self::quote(array_values(array_intersect($codes, self::purchasableCodesForPlan($plan))), $cycle);
+        $publicCodes = array_intersect(self::purchasableCodesForPlan($plan), array_keys(PosAddonPricingService::ADDONS));
+        return self::quote(array_values(array_intersect($codes, $publicCodes)), $cycle);
     }
 
     /**
@@ -193,7 +194,7 @@ class PosAddonService
                 $q->whereNull('ends_at')->orWhereDate('ends_at', '>=', now()->toDateString());
             })
             ->pluck('addon_code')
-            ->filter(fn ($code) => isset(PosAddonPricingService::ADDONS[$code]) || isset(self::LEGACY_GATES[$code]))
+            ->filter(fn ($code) => isset(PosAddonPricingService::definitions()[$code]) || isset(self::LEGACY_GATES[$code]))
             ->values()
             ->all();
     }
@@ -226,6 +227,13 @@ class PosAddonService
 
         $taken = array_merge(self::activeCodes($company), self::pendingCodes($company));
         $out = [];
+        foreach (PosFederalAddonAccess::CODES as $code) {
+            if (!in_array($code, $taken, true) && PosAddonPricingService::price($code) > 0 && self::tableExists()
+                && self::purchaseEligibility($company)['allowed'] && PosFederalAddonAccess::hasPaidPackage($company)
+                && PosFederalAddonAccess::selectionAllowed($company, [$code])) {
+                $out[] = $code;
+            }
+        }
         foreach (PosAddonPricingService::ADDONS as $code => $addon) {
             if (in_array($code, $taken, true)) {
                 continue;
@@ -291,7 +299,7 @@ class PosAddonService
         $cycle = PosAddonPricingService::normalizeCycle($cycle);
         $codes = array_values(array_unique(array_filter(
             $codes,
-            fn ($code) => is_string($code) && isset(PosAddonPricingService::ADDONS[$code])
+            fn ($code) => is_string($code) && isset(PosAddonPricingService::definitions()[$code])
         )));
 
         $subscription ??= $company ? self::activeSubscription($company) : null;
@@ -331,7 +339,7 @@ class PosAddonService
     {
         $snapshotCodes = array_values(array_unique(array_filter(
             $snapshot['codes'] ?? [],
-            fn ($code) => is_string($code) && isset(PosAddonPricingService::ADDONS[$code])
+            fn ($code) => is_string($code) && isset(PosAddonPricingService::definitions()[$code])
         )));
         $codes = array_values(array_intersect($snapshotCodes, $codes));
         $lines = is_array($snapshot['lines'] ?? null) ? $snapshot['lines'] : [];

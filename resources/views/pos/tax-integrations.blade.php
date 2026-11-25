@@ -10,12 +10,12 @@
             <a class="inline-block underline mt-4" href="{{ route('pos.pra-settings') }}">PRA configuration</a>
         </section>
         <section class="rounded-xl border p-5 bg-white dark:bg-gray-900"><h2 class="text-lg font-bold">FBR POS · IMS</h2>
-            <p class="my-3">{{ $imsProfile?->enabled ? 'Enabled' : 'Disabled' }} · {{ ucfirst($imsProfile?->environment ?? 'sandbox') }}</p>
+            <p class="my-3">{{ \App\Services\PosFederalAddonAccess::display($company, 'federal_ims', (bool) $imsProfile?->enabled) }} · {{ ucfirst($imsProfile?->environment ?? 'sandbox') }}</p>
             <p>Separate Sandbox/Production POS IDs, URLs and tokens. Cloud or a dedicated local FBR IMS component.</p>
             <a class="inline-block underline mt-4" href="{{ route('pos.tax-integrations.ims') }}">FBR POS configuration</a>
         </section>
         <section class="rounded-xl border p-5 bg-white dark:bg-gray-900"><h2 class="text-lg font-bold">FBR Digital Invoice</h2>
-            <p class="my-3">{{ $diProfile?->enabled ? 'Enabled' : 'Disabled' }} · {{ ucfirst($diProfile?->environment ?? 'sandbox') }}</p>
+            <p class="my-3">{{ \App\Services\PosFederalAddonAccess::display($company, 'federal_di', (bool) $diProfile?->enabled) }} · {{ ucfirst($diProfile?->environment ?? 'sandbox') }}</p>
             <p>FBR identity, Sandbox/Production API endpoints, encrypted tokens and scenario testing.</p>
             <a class="inline-block underline mt-4" href="{{ route('pos.di-sandbox.setup') }}">Digital Invoice configuration</a>
         </section>

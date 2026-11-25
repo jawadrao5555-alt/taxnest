@@ -12,7 +12,8 @@ class PosImsReportingService
     public function profile(int $companyId, ?string $environment = null): PosImsProfile
     {
         abort_unless(PraDiSandboxGate::setupAvailable(),404);
-        abort_unless(Company::whereKey($companyId)->where('product_type','pos')->where('status','approved')->where('company_status','active')->exists(),403);
+        $company = Company::whereKey($companyId)->where('product_type','pos')->where('status','approved')->where('company_status','active')->first();
+        abort_unless($company && PosFederalAddonAccess::allows($company, 'federal_ims'), 403, 'IMS reporting requires an active paid add-on.');
         $p=PosImsProfile::where('company_id',$companyId)->first();
         abort_unless($p && $p->enabled && in_array($p->environment,['sandbox','production'],true),409,'Enable FBR POS in Tax Integrations first.');
         abort_if($environment !== null && $p->environment !== $environment,409,'Environment changed; refresh before continuing.');

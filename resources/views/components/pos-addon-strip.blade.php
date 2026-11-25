@@ -7,7 +7,7 @@
     the codes and calculate the amount again on the server.
 --}}
 @php
-    $adsCatalog = \App\Services\PosAddonPricingService::catalog();
+    $adsCatalog = array_intersect_key(\App\Services\PosAddonPricingService::catalog(), \App\Services\PosAddonPricingService::ADDONS);
     $adsPrices = [];
     $adsLabels = [];
     foreach ($adsCatalog as $adsCode => $adsSpec) {

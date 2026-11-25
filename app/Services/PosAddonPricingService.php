@@ -61,11 +61,22 @@ class PosAddonPricingService
         ],
     ];
 
+    public static function definitions(): array
+    {
+        return self::ADDONS + [
+            'federal_di' => ['label' => 'FBR Digital Invoice', 'description' => 'Set up FBR Digital Invoice for PRA POS', 'gate' => 'federal_di'],
+            'federal_ims' => ['label' => 'FBR POS · IMS', 'description' => 'Set up FBR POS IMS for PRA POS', 'gate' => 'federal_ims'],
+        ];
+    }
+
     public static function catalog(): array
     {
         $catalog = [];
 
-        foreach (self::ADDONS as $code => $addon) {
+        foreach (self::definitions() as $code => $addon) {
+            if (PosFederalAddonAccess::isFederalCode($code) && self::price($code) <= 0) {
+                continue;
+            }
             $catalog[$code] = array_merge($addon, [
                 'annual_price' => self::price($code, 'annual'),
                 'quarterly_price' => self::price($code, 'quarterly'),
@@ -100,7 +111,7 @@ class PosAddonPricingService
 
     public static function price(string $code, string $cycle = 'annual'): int
     {
-        if (!isset(self::ADDONS[$code])) {
+        if (!isset(self::definitions()[$code])) {
             throw new InvalidArgumentException("Unknown PRA POS add-on: {$code}");
         }
 
@@ -110,6 +121,11 @@ class PosAddonPricingService
             'monthly' => 'monthly',
             default => throw new InvalidArgumentException("Unsupported add-on billing cycle: {$cycle}"),
         };
+
+        if (PosFederalAddonAccess::isFederalCode($code)) {
+            $price = config("pra_di_sandbox.paid_addon_annual_rates.{$code}");
+            return $cycle === 'annual' && is_numeric($price) ? max(0, (int) round((float) $price)) : 0;
+        }
 
         $default = self::ADDONS[$code][$cycle] ?? match ($cycle) {
             'quarterly' => self::DEFAULT_QUARTERLY_PRICE,

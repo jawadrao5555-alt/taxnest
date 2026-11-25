@@ -194,7 +194,9 @@ function openPosWindow(config, opts = {}) {
     existing.focus();
     // An explicit Open POS click must recover a previously failed cold start.
     if (existing.webContents.getURL().startsWith('file:') && targetUrl) {
-      existing.loadURL(targetUrl).catch(() => loadOfflinePage(existing, targetUrl, 'retry failed'));
+      existing.loadURL(targetUrl).catch(error => {
+        if (error.code !== 'ERR_ABORTED' && error.errno !== -3) loadOfflinePage(existing, targetUrl, 'retry failed');
+      });
     }
     runResumeCheck(existing);
     return existing;
@@ -371,7 +373,9 @@ function openPosWindow(config, opts = {}) {
     slot.forceClose = false;
   });
 
-  posWindow.loadURL(targetUrl).catch(() => loadOfflinePage(posWindow, targetUrl, 'load failed'));
+  posWindow.loadURL(targetUrl).catch(error => {
+    if (error.code !== 'ERR_ABORTED' && error.errno !== -3) loadOfflinePage(posWindow, targetUrl, 'load failed');
+  });
 
   return posWindow;
 }

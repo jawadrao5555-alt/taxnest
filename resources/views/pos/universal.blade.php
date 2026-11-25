@@ -6795,6 +6795,16 @@ function restaurantPos() {
                 if (manual) this.showToast(window.TXT.still_offline_will_sync, 'error');
                 return;
             }
+            // The online event and the periodic tick can arrive in the same turn.
+            // Claim the drain before its first asynchronous read.
+            this.offlineSyncing = true;
+            try {
+                await this.drainOfflineBills(manual);
+            } finally {
+                this.offlineSyncing = false;
+            }
+        },
+        async drainOfflineBills(manual) {
             // Walk-ins first: a bill that syncs a second later should already
             // find its customer on file. Runs even when no bill is queued, and
             // can never stop the bill replay — it swallows its own failures.
@@ -6807,7 +6817,6 @@ function restaurantPos() {
                 else if (manual) this.showToast(window.TXT.all_bills_synced, 'success');
                 return;
             }
-            this.offlineSyncing = true;
             this.syncStatus = 'syncing';
             let ok = 0, failed = 0, authStop = false, poisoned = 0;
             // Task 217: quota-full 403 with provisional_allowed → ask the cashier ONCE
@@ -6878,7 +6887,6 @@ function restaurantPos() {
                     break;
                 }
             }
-            this.offlineSyncing = false;
             this.syncStatus = navigator.onLine ? 'online' : 'offline';
             await this.refreshOfflineCount();
             if (ok > 0) {

@@ -465,6 +465,8 @@ Route::middleware(['auth', 'company', 'rate_limit_company', 'company.approval'])
 
     Route::middleware(['role:company_admin,employee'])->group(function () {
         Route::get('/invoice/create', [InvoiceController::class, 'create'])->name('invoice.create');
+        Route::get('/invoice/fbr-reference-options', \App\Http\Controllers\DiFbrReferenceController::class)
+            ->middleware('throttle:40,1')->name('invoice.fbr-reference-options');
         Route::post('/invoice/store', [InvoiceController::class, 'store'])->middleware('plan.limit:invoices');
         Route::get('/invoice/{invoice}/edit', [InvoiceController::class, 'edit']);
         Route::put('/invoice/{invoice}', [InvoiceController::class, 'update']);

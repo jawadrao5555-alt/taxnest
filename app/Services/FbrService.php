@@ -346,7 +346,11 @@ class FbrService
             }
 
             $hsCode = $item->hs_code ?? "";
-            $uomCode = $localOnly ? $this->normalizeUom($item->default_uom) : $this->getUomByHsCode($hsCode, $item->default_uom ?? 'U', $company);
+            $uomCode = match (true) {
+                $localOnly => $this->normalizeUom($item->default_uom),
+                (bool) $item->fbr_reference_checked => app(DiFbrReferences::class)->payloadUnit($company, $hsCode, $item->default_uom ?? 'U'),
+                default => $this->getUomByHsCode($hsCode, $item->default_uom ?? 'U', $company),
+            };
 
             $itemPayload = [
                 "uoM" => $uomCode,
@@ -367,7 +371,14 @@ class FbrService
             ];
 
             $needsSro = ($is3rdSchedule && $taxRate < 18) || $isExempt || $isReduced;
-            if ($needsSro) {
+            if ($item->fbr_reference_checked) {
+                // Validate the exact selected pair before sending. Static or
+                // learned mappings would silently change its meaning.
+                if ($needsSro || filled($item->sro_schedule_no) || filled($item->serial_no)) {
+                    $itemPayload['sroScheduleNo'] = trim((string) $item->sro_schedule_no);
+                    $itemPayload['sroItemSerialNo'] = trim((string) $item->serial_no);
+                }
+            } elseif ($needsSro) {
                 $sroValue = $item->sro_schedule_no ?? "";
                 $serialNo = $item->serial_no ?? "";
 
@@ -759,7 +770,7 @@ class FbrService
         return $errors;
     }
 
-    private function normalizeProvince(?string $province): string
+    public function normalizeProvince(?string $province): string
     {
         if (empty($province)) return "Punjab";
 
@@ -788,7 +799,7 @@ class FbrService
         return ucwords(strtolower(trim($province)));
     }
 
-    private function normalizeUom(?string $uom): string
+    public function normalizeUom(?string $uom): string
     {
         if (empty($uom)) return "Numbers, pieces, units";
 
@@ -1396,7 +1407,11 @@ class FbrService
             $invoice->save();
         };
 
-        $payloadErrors = array_merge(ScheduleEngine::validateFbrPayload($payload), DiInvoiceMath::snapshotErrors($invoice, $payload));
+        $payloadErrors = array_merge(
+            ScheduleEngine::validateFbrPayload($payload),
+            DiInvoiceMath::snapshotErrors($invoice, $payload),
+            $this->referenceSelectionErrors($invoice, $payload)
+        );
         if (!empty($payloadErrors)) {
             $clearHashOnFailure();
             $log = FbrLog::create([
@@ -1898,6 +1913,23 @@ class FbrService
         return $errors;
     }
 
+    private function referenceSelectionErrors($invoice, array $payload): array
+    {
+        $errors = [];
+        foreach ($invoice->items->values() as $index => $item) {
+            if (!$item->fbr_reference_checked) {
+                continue;
+            }
+            $date = \Illuminate\Support\Carbon::parse($payload['invoiceDate'])->toDateString();
+            $row = $payload['items'][$index];
+            $lineErrors = app(DiFbrReferences::class)->errors($invoice->company, $date, $payload['sellerProvince'], $row);
+            foreach ($lineErrors as $error) {
+                $errors[] = 'Item '.($index + 1).': '.$error;
+            }
+        }
+        return $errors;
+    }
+
     public function validateOnly($invoice): array
     {
         $withheldErrors = $this->validateWithholdingAmounts($invoice);
@@ -1906,7 +1938,11 @@ class FbrService
         $company = $invoice->company;
         $env = $company->fbr_environment ?? 'sandbox';
 
-        $payloadErrors = array_merge(ScheduleEngine::validateFbrPayload($payload), DiInvoiceMath::snapshotErrors($invoice, $payload));
+        $payloadErrors = array_merge(
+            ScheduleEngine::validateFbrPayload($payload),
+            DiInvoiceMath::snapshotErrors($invoice, $payload),
+            $this->referenceSelectionErrors($invoice, $payload)
+        );
         if (!empty($payloadErrors)) {
             return [
                 'status' => 'invalid',

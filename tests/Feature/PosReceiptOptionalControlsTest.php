@@ -308,6 +308,21 @@ class PosReceiptOptionalControlsTest extends TestCase
         }
     }
 
+    public function test_separator_toggle_and_compact_delivery_payment_apply_to_both_papers(): void
+    {
+        $company = Company::findOrFail($this->companyId);
+        $company->invoice_display_prefs = ['receipt_options' => ['pra' => ['show_separators' => 'hide']]];
+        foreach (['80mm', '58mm'] as $paper) {
+            $bill = $this->bill($company, 'submitted');
+            $bill->order_type = 'delivery';
+            $html = view('pos.receipts.receipt_'.$paper, compact('company', 'bill') + ['transaction' => $bill])->render();
+            $this->assertStringContainsString('.separator{display:none !important;}', $html);
+            $this->assertStringContainsString('fiscal-qr-payment', $html);
+            $this->assertStringContainsString('compact-payment', $html);
+            $this->assertStringNotContainsString('class="edge-box"', $html);
+        }
+    }
+
     public function test_options_use_existing_fiscal_local_exempt_and_pending_stream_rules(): void
     {
         $company = Company::findOrFail($this->companyId);

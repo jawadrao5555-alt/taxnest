@@ -1,0 +1,171 @@
+'use strict';
+const assert = require('node:assert/strict');
+const { EventEmitter } = require('node:events');
+const fs = require('node:fs');
+const path = require('node:path');
+const test = require('node:test');
+const vm = require('node:vm');
+
+test('the POS 2 preload exposes printing without POS 1 local authority', async () => {
+  const exposed = new Map();
+  const messages = [];
+  const filename = path.join(__dirname, '../src/pos-print-preload.js');
+  vm.runInNewContext(fs.readFileSync(filename, 'utf8'), {
+    require(name) {
+      assert.equal(name, 'electron');
+      return {
+        contextBridge: { exposeInMainWorld: (key, api) => exposed.set(key, api) },
+        ipcRenderer: { invoke: async (...args) => { messages.push(args); } },
+      };
+    },
+  }, { filename });
+
+  assert.deepEqual([...exposed.keys()], ['nestposDesktop']);
+  const bridge = exposed.get('nestposDesktop');
+  assert.deepEqual(Object.keys(bridge).sort(), ['acceptImmediateSale', 'desktop', 'getVersion', 'printHtml']);
+  await bridge.printHtml('<p>Fictional receipt</p>');
+  await bridge.acceptImmediateSale({ offline_uuid: 'fictional-sale-id' });
+  await bridge.getVersion();
+  assert.deepEqual(messages, [
+    ['pos-print-html', '<p>Fictional receipt</p>', null],
+    ['local-core-accept-immediate-sale', { offline_uuid: 'fictional-sale-id' }],
+    ['get-version'],
+  ]);
+});
+
+test('POS windows retain independent sessions and reopen without affecting the other slot', () => {
+  const sessions = new Map();
+  const offlinePartitions = [];
+  const loginPartitions = [];
+
+  class Window extends EventEmitter {
+    constructor(options) {
+      super();
+      this.options = options;
+      const partition = options.webPreferences.partition;
+      if (!sessions.has(partition)) sessions.set(partition, new EventEmitter());
+      this.webContents = Object.assign(new EventEmitter(), {
+        session: sessions.get(partition),
+        getURL: () => this.url,
+        setWindowOpenHandler: (handler) => { this.popup = handler; },
+      });
+    }
+
+    loadURL(url) { this.url = url; return Promise.resolve(); }
+    isDestroyed() { return !!this.destroyed; }
+    isMinimized() { return false; }
+    show() { this.hidden = false; }
+    hide() { this.hidden = true; }
+    focus() {}
+    close() {
+      let prevented = false;
+      this.emit('close', { preventDefault: () => { prevented = true; } });
+      if (!prevented) {
+        this.destroyed = true;
+        this.emit('closed');
+      }
+    }
+  }
+
+  const filename = path.join(__dirname, '../src/pos-window.js');
+  const context = {
+    __dirname: path.dirname(filename),
+    module: { exports: {} },
+    process,
+    URL,
+    require(name) {
+      if (name === 'electron') return { BrowserWindow: Window, Notification: { isSupported: () => false } };
+      if (name === './company-login-hook') return {
+        wireCompanyLogin(win) { loginPartitions.push(win.webContents.session); },
+      };
+      if (name === './offline-snapshot') return {
+        registerOfflineInterception(session) { offlinePartitions.push(session); },
+      };
+      return require(name);
+    },
+  };
+  vm.runInNewContext(fs.readFileSync(filename, 'utf8'), context, { filename });
+  const { openPosWindow, getPosWindowRef, closePosWindow, isSecondaryPosPrintSender } = context.module.exports;
+  const config = { serverUrl: 'http://127.0.0.1:8080' };
+  assert.throws(() => openPosWindow(config, { slotNumber: 3 }), /Invalid POS/);
+  const primaryOptions = { isOfflineEnabled: () => true, onLoggedIn() {} };
+  const first = openPosWindow(config, primaryOptions);
+  const second = openPosWindow(config, { ...primaryOptions, slotNumber: 2 });
+  assert.equal(getPosWindowRef(), first);
+  assert.equal(getPosWindowRef(2), second);
+  assert.notEqual(first.webContents.session, second.webContents.session);
+  assert.deepEqual(offlinePartitions, [first.webContents.session]);
+  assert.deepEqual(loginPartitions, [first.webContents.session]);
+  assert.equal(first.options.webPreferences.partition, 'persist:pos');
+  assert.equal(second.options.webPreferences.partition, 'persist:pos-2');
+  assert.equal(path.basename(second.options.webPreferences.preload), 'pos-print-preload.js');
+  const frame = { url: config.serverUrl + '/pos/invoice/create' };
+  second.webContents.mainFrame = frame;
+  assert.equal(isSecondaryPosPrintSender({ sender: second.webContents, senderFrame: frame }), true);
+  assert.equal(isSecondaryPosPrintSender({ sender: second.webContents, senderFrame: { ...frame } }), false);
+  assert.equal(isSecondaryPosPrintSender({ sender: first.webContents, senderFrame: frame }), false);
+  frame.url = config.serverUrl + '/pos/login';
+  assert.equal(isSecondaryPosPrintSender({ sender: second.webContents, senderFrame: frame }), false);
+  frame.url = 'https://example.invalid/pos/invoice/create';
+  assert.equal(isSecondaryPosPrintSender({ sender: second.webContents, senderFrame: frame }), false);
+  assert.equal(second.popup({ url: config.serverUrl + '/pos/receipt' })
+    .overrideBrowserWindowOptions.webPreferences.partition, 'persist:pos-2');
+  second.close();
+  assert.equal(second.hidden, true);
+  assert.equal(first.hidden, undefined);
+  assert.equal(openPosWindow(config, { slotNumber: 2 }), second);
+  assert.equal(second.hidden, false);
+  closePosWindow();
+  assert.equal(getPosWindowRef(), null);
+  assert.equal(getPosWindowRef(2), null);
+});
+
+test('secondary cashier uses its own active lease and drops delayed replies across logout', async () => {
+  const { secondarySaleSession } = require('../src/secondary-sale-session');
+  const origin = 'https://fictional.example';
+  const win = new EventEmitter();
+  const contents = new EventEmitter();
+  let currentUrl = origin + '/pos/invoice/create';
+  win.webContents = contents;
+  win.isDestroyed = () => false;
+  contents.getURL = () => currentUrl;
+  let runtime = { companyId: '10', deviceUid: 'fictional-device' };
+  const scope = { company_id: '10', device_id: runtime.deviceUid, branch_id: '2', user_id: '8' };
+  const data = { ...scope, success: true, immediate_sale_allowed: true, lease: {
+    lease_id: 1, token: 'fictional', expires_at: new Date(Date.now() + 60000).toISOString(), scope,
+  } };
+  const response = { ok: true, json: async () => data };
+  contents.session = { fetch: async (url, options) => {
+    assert.equal(url, origin + '/pos/desktop/local-core-scope');
+    assert.equal(options.headers['X-NestPOS-Device-Uid'], runtime.deviceUid);
+    return response;
+  } };
+  const session = secondarySaleSession(win, origin, () => runtime);
+  await session.refresh();
+  assert.deepEqual(session.scope(), scope);
+  runtime = { ...runtime };
+  assert.equal(session.scope(), null);
+  await session.refresh();
+  data.immediate_sale_allowed = false;
+  await session.refresh();
+  assert.equal(session.scope(), null);
+  data.immediate_sale_allowed = true;
+  data.company_id = '99';
+  await session.refresh();
+  assert.equal(session.scope(), null);
+  data.company_id = '10';
+  data.lease.expires_at = new Date(0).toISOString();
+  await session.refresh();
+  assert.equal(session.scope(), null);
+  data.lease.expires_at = new Date(Date.now() + 60000).toISOString();
+  await session.refresh();
+  let finish;
+  contents.session.fetch = () => new Promise(resolve => { finish = resolve; });
+  const pending = session.refresh();
+  currentUrl = origin + '/pos/logout';
+  contents.emit('did-start-navigation', {}, currentUrl, false, true);
+  currentUrl = origin + '/pos/invoice/create';
+  finish(response);
+  await pending;
+  assert.equal(session.scope(), null);
+});

@@ -81,6 +81,9 @@
         .qr-code { text-align: center; margin: 3px 0; }
         .qr-code img { width: 84px; height: 84px; }
         .qr-code p { font-size: 10px; margin-top: 2px; color: #000; font-weight: normal; }
+        .fiscal-qr-payment { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 3px 0; break-inside: avoid; }
+        .fiscal-qr-payment .qr-code { flex: 0 0 auto; margin: 0; }
+        .compact-payment { flex: 1 1 auto; text-align: center; font-weight: bold; font-size: 13px; letter-spacing: .5px; color: #000; }
 
         .footer { margin-top: 3px; font-size: 11px; line-height: 1.35; color: #000; font-weight: normal; }
 
@@ -352,7 +355,7 @@ html body { width: auto; max-width: 180mm; margin: 0 auto; padding: 0; }
         @if($company->email && $rp['show_email'])<p><!--email_off-->{{ $company->email }}<!--/email_off--></p>@endif
         @if($company->website && $optionVisible('show_website'))<p>{{ $company->website }}</p>@endif
         @if($company->ntn && $rp['show_ntn'])<p><strong>NTN:</strong> {{ $company->ntn }}</p>@endif
-        @if(!empty($company->fbr_registration_no))<p><strong>STRN:</strong> {{ $company->fbr_registration_no }}</p>@endif
+        @if(!empty($company->fbr_registration_no) && $optionVisible('show_strn'))<p><strong>STRN:</strong> {{ $company->fbr_registration_no }}</p>@endif
     </div>
 
     @php
@@ -373,6 +376,8 @@ html body { width: auto; max-width: 180mm; margin: 0 auto; padding: 0; }
         // "Daily Token" label or the Bill Serial / local-invoice line. Internal
         // invoice_number stays on the bill for search/returns/reports.
         $rcptIsDailyStyle = \App\Support\PosBillNumberStyle::styleFor($company, $transaction) === 'daily';
+        $rcptShowPosSerial = $optionVisible('show_pos_invoice_number')
+            || ($rcptBillToken === null && !$rcptPraFiscal && !$federalFiscal);
     @endphp
 
     {{-- Order-number early lookup: for fiscal top box (code-style restaurant bills
@@ -422,9 +427,12 @@ html body { width: auto; max-width: 180mm; margin: 0 auto; padding: 0; }
         <span style="font-size:22px; font-weight:bold; color:#000; line-height:1.15;">{{ $rcptBillToken }}</span>
         @elseif($rcptBillToken !== null)
         <span style="font-size:9px; font-weight:700; color:#000;">{{ __('pos.daily_token_label') }}</span><br>
-        <span style="font-size:22px; font-weight:bold; color:#000; line-height:1.15;">{{ $rcptBillToken }}</span><br>
+        <span style="font-size:22px; font-weight:bold; color:#000; line-height:1.15;">{{ $rcptBillToken }}</span>
+        @if($rcptShowPosSerial)
+        <br>
         <span style="font-size:9px; font-weight:600; color:#000;">{{ __('pos.bill_serial_label') }}: {{ $transaction->invoice_number }}</span>
-        @else
+        @endif
+        @elseif($rcptShowPosSerial)
         <span style="font-size:13px; font-weight:bold; color:#000;">{{ $transaction->invoice_number }}</span>
         @endif
         @if($rcptTopProvisional)<br><span style="font-size:9px; color:#000;">{{ __('pos.receipt_provisional_note') }}</span>@endif
@@ -475,23 +483,23 @@ html body { width: auto; max-width: 180mm; margin: 0 auto; padding: 0; }
                 <td class="inv-value">{{ $transaction->pra_invoice_number }}</td>
             </tr>
             @endunless
-            @if($rcptBillToken !== null)
+            @if($rcptShowPosSerial && $rcptBillToken !== null)
             <tr>
                 <td class="inv-label" style="font-size:9px; font-weight:600; color:#000;">{{ __('pos.bill_serial_label') }}:</td>
                 <td class="inv-value" style="font-size:9px; font-weight:600; color:#000;">{{ $transaction->invoice_number }}</td>
             </tr>
-            @else
+            @elseif($rcptShowPosSerial)
             <tr>
                 <td class="inv-label">{{ __('pos.receipt_pos_invoice') }}:</td>
                 <td class="inv-value">{{ $transaction->invoice_number }}</td>
             </tr>
             @endif
-            @elseif($rcptIsLocalStream)
+            @elseif($rcptShowPosSerial && $rcptIsLocalStream)
             <tr>
                 <td class="inv-label">{{ __('pos.receipt_local_invoice') }}:</td>
                 <td class="inv-value">{{ $transaction->invoice_number }}</td>
             </tr>
-            @else
+            @elseif($rcptShowPosSerial)
             <tr>
                 <td class="inv-label">{{ __('pos.receipt_pos_invoice') }}:</td>
                 <td class="inv-value">{{ $transaction->invoice_number }}</td>
@@ -561,13 +569,13 @@ html body { width: auto; max-width: 180mm; margin: 0 auto; padding: 0; }
         @if($transaction->terminal && $optionVisible('show_terminal'))
         <tr><td class="info-label">{{ __('pos.receipt_terminal') }}:</td><td class="info-value">{{ $transaction->terminal->terminal_name }}</td></tr>
         @endif
-        @if($transaction->customer_name)
+        @if($transaction->customer_name && $optionVisible('show_customer_name'))
         <tr><td class="info-label">{{ __('pos.receipt_customer') }}:</td><td class="info-value">{{ $transaction->customer_name }}</td></tr>
         @endif
-        @if($transaction->customer_phone)
+        @if($transaction->customer_phone && $optionVisible('show_customer_phone'))
         <tr><td class="info-label">{{ __('pos.receipt_phone') }}:</td><td class="info-value">@if($transaction->order_type === 'delivery' || $transaction->delivery_address)<strong>{{ $transaction->customer_phone }}</strong>@else{{ $transaction->customer_phone }}@endif</td></tr>
         @endif
-        @if($transaction->delivery_address)
+        @if($transaction->delivery_address && $optionVisible('show_delivery_address'))
         <tr><td class="info-label">{{ __('pos.receipt_deliver') }}:</td><td class="info-value"><strong>{{ $transaction->delivery_address }}</strong></td></tr>
         @endif
         {{-- Delivery Riders (Jul 2026): assigned rider on delivery receipts (display-only, all branches). --}}
@@ -841,7 +849,6 @@ html body { width: auto; max-width: 180mm; margin: 0 auto; padding: 0; }
     <div style="font-size:9px; font-weight:normal; color:#000; text-align:center; margin:2px 0; padding:1px 0;">{{ __('pos.receipt_exempt_clarifier') }}</div>
     @endif
 
-    @if(($transaction->order_type ?? '') === 'delivery' || !empty($transaction->delivery_address) || $transaction->rider)
     @php
         // ZFC feedback Jul 2026: delivery riders must see AT A GLANCE whether the
         // bill is cash-to-collect or already paid by card/online. Owner update
@@ -850,17 +857,21 @@ html body { width: auto; max-width: 180mm; margin: 0 auto; padding: 0; }
         // Stored card bucket = 'debit_card' (+aliases); QR = 'qr_payment'.
         $rcptPayRaw = strtolower((string) $transaction->payment_method);
         $rcptPayLabel = \App\Support\PosPaymentLabels::upper($transaction->payment_method);
+        $rcptShowDeliveryPayment = (($transaction->order_type ?? '') === 'delivery'
+            || !empty($transaction->delivery_address) || $transaction->rider)
+            && $optionVisible('show_payment');
     @endphp
+    @if($rcptShowDeliveryPayment)
     @if($rcptPayRaw === 'qr_payment')
     {{-- PREPAID marker (Task 291): prominent stamp for riders/customers so no cash is mistakenly collected. --}}
     <div class="prepaid-banner" style="border: 3px solid #000; text-align: center; font-weight: bold; font-size: 16px; letter-spacing: 1px; padding: 4px 2px; margin: 4px 0; color: #000;">&#10003; {{ __('pos.rcpt_prepaid_marker') }}</div>
     @endif
-    <div class="edge-box" style="border: 2px solid #000; text-align: center; font-weight: bold; font-size: 14px; letter-spacing: 1px; padding: 3px 2px; margin: 3px 0; color: #000;">{{ __('pos.rcpt_payment_banner') }} {{ $rcptPayLabel }}</div>
     @endif
 
     @include('pos.hotel._credit-summary', ['summary' => $hotelCreditSummary, 'creditAmount' => $transaction->total_amount, 'creditReceipt' => true])
     @if($federalFiscal)
         @include('pos.receipts._dual-fiscal', ['fiscalQrSize' => 84])
+        @if($rcptShowDeliveryPayment)<div class="compact-payment">{{ __('pos.rcpt_payment_banner') }} {{ $rcptPayLabel }}</div>@endif
     @elseif($transaction->pra_status === 'submitted' && $transaction->pra_invoice_number)
     @php
         // QR carries the RAW PRA invoice number (PRA Sahulat app format).
@@ -871,12 +882,17 @@ html body { width: auto; max-width: 180mm; margin: 0 auto; padding: 0; }
             : ($transaction->pra_qr_code ?: '');
     @endphp
     @if($praQr)
-    <div class="qr-code">
-        <img src="{{ $praQr }}" alt="PRA Verification QR">
-        @if($rp['show_verify_line'] ?? true)
-        <p>{{ __('pos.receipt_scan_verify') }}</p>
-        @endif
+    <div @class(['fiscal-qr-payment' => $rcptShowDeliveryPayment])>
+        <div class="qr-code">
+            <img src="{{ $praQr }}" alt="PRA Verification QR">
+            @if($rp['show_verify_line'] ?? true)
+            <p>{{ __('pos.receipt_scan_verify') }}</p>
+            @endif
+        </div>
+        @if($rcptShowDeliveryPayment)<div class="compact-payment">{{ __('pos.rcpt_payment_banner') }} {{ $rcptPayLabel }}</div>@endif
     </div>
+    @elseif($rcptShowDeliveryPayment)
+    <div class="compact-payment">{{ __('pos.rcpt_payment_banner') }} {{ $rcptPayLabel }}</div>
     @endif
     @elseif($transaction->pra_status === 'offline')
     <div class="local-badge">
@@ -884,6 +900,7 @@ html body { width: auto; max-width: 180mm; margin: 0 auto; padding: 0; }
         {{ __('pos.receipt_offline_sync_auto') }}<br>
         {{ $transaction->invoice_number }}
     </div>
+    @if($rcptShowDeliveryPayment)<div class="compact-payment">{{ __('pos.rcpt_payment_banner') }} {{ $rcptPayLabel }}</div>@endif
     @else
     @php
         // Reporting-OFF FINALS vs provisionals (client report Jul 2026 — ZFC):
@@ -945,10 +962,15 @@ html body { width: auto; max-width: 180mm; margin: 0 auto; padding: 0; }
     {{-- Bottom SALE RECEIPT / PROVISIONAL badge removed (owner, Jul 2026) — the
          serial badge now prints in the TOP box; only the QR remains down here. --}}
     @if($qrUrl)
-    <div class="qr-code receipt-extra-qr">
-        <img src="{{ $qrUrl }}" alt="Invoice QR" style="width: 84px; height: 84px; margin: 3px auto;">
-        @if($optionVisible('show_qr_caption'))<p style="font-size: 10px; color: #000;">{{ $qrCaption }}</p>@endif
+    <div @class(['fiscal-qr-payment' => $rcptShowDeliveryPayment])>
+        <div class="qr-code receipt-extra-qr">
+            <img src="{{ $qrUrl }}" alt="Invoice QR" style="width: 84px; height: 84px; margin: 3px auto;">
+            @if($optionVisible('show_qr_caption'))<p style="font-size: 10px; color: #000;">{{ $qrCaption }}</p>@endif
+        </div>
+        @if($rcptShowDeliveryPayment)<div class="compact-payment">{{ __('pos.rcpt_payment_banner') }} {{ $rcptPayLabel }}</div>@endif
     </div>
+    @elseif($rcptShowDeliveryPayment)
+    <div class="compact-payment">{{ __('pos.rcpt_payment_banner') }} {{ $rcptPayLabel }}</div>
     @endif
     @endif
 

@@ -190,8 +190,8 @@ class PosReturnController extends Controller
             // Short final series (P036, and P-036 as issued before the dash was
             // dropped). Padded + unpadded, pad grows past 999.
             $candidates = array_merge($candidates, self::shortSeriesCandidates('P', $m[1]));
-        } elseif (preg_match('/^L-?(\d+)$/', $q, $m)) {
-            $candidates = array_merge($candidates, self::shortSeriesCandidates('L', $m[1]));
+        } elseif (preg_match('/^([BL])-?(\d+)$/', $q, $m)) {
+            $candidates = array_merge($candidates, self::shortSeriesCandidates($m[1], $m[2]));
         } elseif (ctype_digit($q)) {
             // Bare serial digits — the short final series, this year's + last
             // year's legacy POS series, and the L-series (padded + unpadded;
@@ -202,7 +202,11 @@ class PosReturnController extends Controller
             foreach ([now()->format('Y'), now()->subYear()->format('Y')] as $yr) {
                 $candidates[] = 'POS-' . $yr . '-' . str_pad($n, 5, '0', STR_PAD_LEFT);
             }
-            $candidates = array_merge($candidates, self::shortSeriesCandidates('L', $n));
+            $candidates = array_merge(
+                $candidates,
+                self::shortSeriesCandidates('B', $n),
+                self::shortSeriesCandidates('L', $n)
+            );
         }
         $candidates = array_values(array_unique($candidates));
 

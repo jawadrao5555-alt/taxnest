@@ -63,6 +63,7 @@ class PosHoldUuidReplayTest extends TestCase
             $table->unsignedBigInteger('company_id')->nullable();
             $table->string('name')->nullable();
             $table->string('pos_role')->nullable();
+            $table->string('pos_billing_scope')->nullable();
             $table->boolean('is_active')->default(true);
             $table->timestamps();
         });
@@ -120,6 +121,8 @@ class PosHoldUuidReplayTest extends TestCase
             $table->text('void_items')->nullable();
             // Task 1001: hold_uuid idempotency key.
             $table->string('hold_uuid', 64)->nullable()->unique();
+            $table->string('held_billing_stream', 5)->nullable();
+            $table->timestamp('online_payment_awaited_at')->nullable();
             $table->timestamps();
         });
 
@@ -158,6 +161,12 @@ class PosHoldUuidReplayTest extends TestCase
             $table->boolean('is_active')->default(true);
             $table->timestamps();
         });
+    }
+
+    protected function tearDown(): void
+    {
+        User::flushScopeColumnCache();
+        parent::tearDown();
     }
 
     // ── Seed helpers ──────────────────────────────────────────────────────
@@ -201,6 +210,100 @@ class PosHoldUuidReplayTest extends TestCase
     private function items(): array
     {
         return [['item_type' => 'manual', 'item_name' => 'Chai', 'unit_price' => 50, 'quantity' => 2]];
+    }
+
+    public function test_held_pra_order_rejects_payment_and_hold_retry_from_local_cashier(): void
+    {
+        $company = $this->makeCompany();
+        $cashier = $this->makeCashier($company);
+        User::flushScopeColumnCache();
+        $cashier->forceFill(['pos_role' => 'pos_cashier', 'pos_billing_scope' => 'pra'])->save();
+
+        $payload = ['items' => $this->items(), 'order_type' => 'dine_in', 'hold_uuid' => 'held-stream-test'];
+        $hold = $this->hold($payload);
+        $this->assertSame(200, $hold->getStatusCode(), $hold->getContent());
+        $order = RestaurantOrder::findOrFail($hold->getData()->order->id);
+        $this->assertSame('pra', $order->held_billing_stream);
+
+        $otherCashier = $this->makeCashier($company);
+        $otherCashier->forceFill(['pos_role' => 'pos_cashier', 'pos_billing_scope' => 'local'])->save();
+        $payment = Request::create('/pos/restaurant/orders/'.$order->id.'/pay', 'POST');
+        $result = app(RestaurantPosController::class)->payOrder($payment, $order->id);
+        $this->assertSame(403, $result->getStatusCode());
+        $this->assertSame('held', $order->refresh()->status);
+
+        $this->expectException(\Symfony\Component\HttpKernel\Exception\HttpException::class);
+        $this->expectExceptionMessage('This order belongs to a different billing stream.');
+        $this->hold($payload);
+    }
+
+    public function test_held_order_views_and_etag_follow_the_current_cashier_stream(): void
+    {
+        $company = $this->makeCompany();
+        $owner = $this->makeCashier($company);
+        $table = DB::table('restaurant_tables')->insertGetId([
+            'company_id' => $company->id, 'table_number' => 'Fictional table',
+        ]);
+        $local = DB::table('restaurant_orders')->insertGetId([
+            'company_id' => $company->id, 'table_id' => $table,
+            'order_number' => 'LOCAL-TEST', 'held_billing_stream' => 'local',
+        ]);
+        $pra = DB::table('restaurant_orders')->insertGetId([
+            'company_id' => $company->id, 'table_id' => $table,
+            'order_number' => 'PRA-TEST', 'held_billing_stream' => 'pra',
+        ]);
+        $legacy = DB::table('restaurant_orders')->insertGetId([
+            'company_id' => $company->id, 'table_id' => $table, 'order_number' => 'LEGACY-TEST',
+        ]);
+        DB::table('restaurant_orders')->insert([
+            'company_id' => $company->id + 1, 'table_id' => $table, 'order_number' => 'OTHER-TENANT',
+        ]);
+
+        $controller = app(RestaurantPosController::class);
+        $request = Request::create('/pos/restaurant/api/held-orders');
+        $this->assertEqualsCanonicalizing([$local, $pra, $legacy], array_column($controller->listHeldOrders($request)->getData(true), 'id'));
+
+        $localCashier = $this->makeCashier($company);
+        $localCashier->forceFill(['pos_role' => 'pos_cashier', 'pos_billing_scope' => 'local'])->save();
+        $localResponse = $controller->listHeldOrders($request);
+        $this->assertEqualsCanonicalizing([$local, $legacy], array_column($localResponse->getData(true), 'id'));
+        $this->assertEqualsCanonicalizing([$local, $legacy], array_column($controller->getOrdersByTable($table)->getData(true), 'id'));
+
+        $request->headers->set('If-None-Match', $localResponse->headers->get('ETag'));
+        $this->assertSame(304, $controller->listHeldOrders($request)->getStatusCode());
+
+        $praCashier = $this->makeCashier($company);
+        $praCashier->forceFill(['pos_role' => 'pos_cashier', 'pos_billing_scope' => 'pra'])->save();
+        $praResponse = $controller->listHeldOrders($request);
+        $this->assertSame(200, $praResponse->getStatusCode());
+        $this->assertEqualsCanonicalizing([$pra, $legacy], array_column($praResponse->getData(true), 'id'));
+
+        Auth::guard('pos')->setUser($owner);
+        $this->assertEqualsCanonicalizing([$local, $pra, $legacy], array_column($controller->getOrdersByTable($table)->getData(true), 'id'));
+    }
+
+    public function test_proof_bill_and_online_payment_marker_respect_the_held_order_stream(): void
+    {
+        $company = $this->makeCompany();
+        $cashier = $this->makeCashier($company);
+        $cashier->forceFill(['pos_role' => 'pos_cashier', 'pos_billing_scope' => 'local'])->save();
+        $order = DB::table('restaurant_orders')->insertGetId([
+            'company_id' => $company->id, 'order_number' => 'FICTIONAL-PRA', 'held_billing_stream' => 'pra',
+        ]);
+
+        $controller = app(RestaurantPosController::class);
+        $set = Request::create('/pos/restaurant/orders/'.$order.'/online-payment', 'POST', ['awaited' => '1']);
+        $this->assertSame(404, $controller->markOnlinePayment($set, $order)->getStatusCode());
+        $this->assertNull(RestaurantOrder::findOrFail($order)->online_payment_awaited_at);
+
+        $praCashier = $this->makeCashier($company);
+        $praCashier->forceFill(['pos_role' => 'pos_cashier', 'pos_billing_scope' => 'pra'])->save();
+        $this->assertSame(200, $controller->markOnlinePayment($set, $order)->getStatusCode());
+        $this->assertNotNull(RestaurantOrder::findOrFail($order)->online_payment_awaited_at);
+
+        Auth::guard('pos')->setUser($cashier);
+        $this->expectException(\Illuminate\Database\Eloquent\ModelNotFoundException::class);
+        $controller->proofBill($order, Request::create('/pos/proof-bill'));
     }
 
     // ── 1. SEQUENTIAL REPLAY ─────────────────────────────────────────────

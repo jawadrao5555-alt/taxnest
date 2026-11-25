@@ -511,6 +511,20 @@ class PosPaidAddonFlowTest extends TestCase
         $this->assertEquals($expected, $proof->addonQuoteSnapshot()['total'] ?? null);
     }
 
+    public function test_admin_can_open_a_pending_feature_addon_without_a_subscription_cycle_selector(): void
+    {
+        $company = $this->makeShop($this->makePlan('Business'));
+        $this->buy($company, ['caller_id']);
+        $this->withoutVite();
+
+        $this->actingAs($this->admin(), 'admin')
+            ->get(route('saas.admin.payment-proofs', ['company_id' => $company->id]))
+            ->assertOk()
+            ->assertSee('Approve Add-on')
+            ->assertSee('Caller ID')
+            ->assertDontSee('name="billing_cycle"', false);
+    }
+
     public function test_a_forged_browser_amount_cannot_change_the_server_quote(): void
     {
         $company = $this->makeShop($this->makePlan('Business'));

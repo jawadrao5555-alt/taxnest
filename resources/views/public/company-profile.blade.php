@@ -69,6 +69,16 @@
         </section>
         @endif
 
+        @if(!empty($settings['customer_links']))
+        <nav aria-label="{{ __('pos.qr_customer_links') }}" class="mt-4 grid gap-2">
+            @foreach($settings['customer_links'] as $link)
+                @if(!empty($link['label']) && preg_match('/^https?:\/\//i', $link['url'] ?? ''))
+                    <a href="{{ $link['url'] }}" class="rounded-xl bg-white border border-gray-200 px-4 py-3 font-semibold text-teal-800 break-words">{{ $link['label'] }}</a>
+                @endif
+            @endforeach
+        </nav>
+        @endif
+
         <!-- Menu -->
         @if(($settings['show_menu'] ?? true) && $menuItems->count())
         <section class="mt-6">

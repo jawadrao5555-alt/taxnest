@@ -2,6 +2,8 @@
 
 namespace App\Support;
 
+use App\Services\PosLocalSeries;
+
 /**
  * Bill Number Style — bill par CHHAPNE wala bara number kaunsa hai.
  *
@@ -13,14 +15,14 @@ namespace App\Support;
  * Teen styles:
  *   'serial' — asal invoice_number (default).
  *   'token'  — roz ka token (1, 2, 3…), 6 baje subah reset (business day).
- *   'daily'  — wohi roz ka token, magar local bill jaisi shakal mein: L001.
+ *   'daily'  — wohi roz ka token, magar local bill jaisi shakal mein: B001.
  *
  * ── 'daily' kyun (ZFC, 1 Sep 2026) ────────────────────────────────────────
- * Shop ki farmaish: "L series roz L001 se shuru ho." Asal invoice_number ko roz
- * dobara L001 karna MUMKIN NAHI — (company_id, invoice_number) par unique bandhi
+ * Shop ki farmaish: daily local number roz B001 se shuru ho. Asal invoice_number ko roz
+ * dobara B001 karna MUMKIN NAHI — (company_id, invoice_number) par unique bandhi
  * hai aur purane bill archive hote hain, mit'te nahi; us bandhish ko dhila karna
  * har shop ki P-series ki hifazat kam kar deta. Is liye number wahi hota hai jo
- * shop chahti hai — CHHAPTA L001 — aur neechay asal monotonic serial jyun ka
+ * shop chahti hai — CHHAPTA B001 — aur neechay asal monotonic serial jyun ka
  * tyun rehta hai, taake khata, search, return aur PRA sab usi aik serial par
  * chalte rahein (bilkul jaise 'token' style pehle se karti hai).
  *
@@ -29,8 +31,8 @@ namespace App\Support;
  */
 class PosBillNumberStyle
 {
-    /** Local bill ki shakal: L + 3 hindse (PosLocalSeries jaisi hi). */
-    public const DAILY_PREFIX = 'L';
+    /** Local bill ki shakal: B + 3 hindse (PosLocalSeries jaisi hi). */
+    public const DAILY_PREFIX = PosLocalSeries::PREFIX;
     public const DAILY_PAD = 3;
 
     /**
@@ -59,7 +61,7 @@ class PosBillNumberStyle
 
     /**
      * Bill par chhapne wala bara number — ya null (yani asal serial chhapega).
-     * String lautata hai: 'token' ke liye "7", 'daily' ke liye "L007".
+     * String lautata hai: 'token' ke liye "7", 'daily' ke liye "B007".
      */
     public static function bigNumber($company, $transaction): ?string
     {
@@ -76,7 +78,12 @@ class PosBillNumberStyle
                 return (string) $token;
             }
             if ($style === 'daily') {
-                return self::DAILY_PREFIX . str_pad((string) $token, self::DAILY_PAD, '0', STR_PAD_LEFT);
+                $serial = (string) ($transaction->invoice_number ?? '');
+                $prefix = str_starts_with($serial, PosLocalSeries::PREFIX) && PosLocalSeries::isSeriesSerial($serial)
+                    ? self::DAILY_PREFIX
+                    : PosLocalSeries::LEGACY_PREFIX;
+
+                return $prefix . str_pad((string) $token, self::DAILY_PAD, '0', STR_PAD_LEFT);
             }
         } catch (\Throwable $e) {
             return null;

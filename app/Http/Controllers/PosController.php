@@ -3792,6 +3792,16 @@ class PosController extends Controller
         // — khata/search/returns/PRA sab serial par chalte hain.
         $billTokenFields = [];
         $billStream = $initialPraStatus === 'pending' ? 'pra' : 'local';
+        if ($settleOrderIdIn > 0 && \Illuminate\Support\Facades\Schema::hasColumn('restaurant_orders', 'held_billing_stream')) {
+            $heldOrder = \App\Models\RestaurantOrder::where('company_id', $companyId)->find($settleOrderIdIn);
+            if ($heldOrder && !$heldOrder->allowsHeldBillingStream($billStream)) {
+                $message = __('This order belongs to a different billing stream.');
+                if ($request->expectsJson()) {
+                    return response()->json(['success' => false, 'error' => $message, 'message' => $message], 403);
+                }
+                return back()->withInput()->with('error', $message);
+            }
+        }
         $billStyleCol = $billStream === 'pra' ? 'pra_number_style' : 'local_number_style';
         if (\App\Support\PosBillNumberStyle::needsToken($company->{$billStyleCol} ?? 'serial')
             && \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'bill_token')) {

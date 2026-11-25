@@ -3,16 +3,6 @@
     use App\Support\HealthPanel;
     use App\Support\NestErps;
 @endphp
-{{--
-    TaxNest ERP hub (Task 1568).
-
-    This page introduces the PRODUCT LINE, not one ERP. It is deliberately
-    small: the three main products own the pricing tables, and TaxNest ERP is sold
-    on enquiry until the owner sets public rates — so there is no price grid
-    here, only the live vertical and a way to ask for one that does not exist
-    yet. A future vertical appears in the list below the moment it registers
-    itself in NestErps::VERTICALS; nothing on this page needs editing.
---}}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -153,11 +143,36 @@
     </div>
 </section>
 
+@if($publicPlans->isNotEmpty())
+<section id="pricing" class="py-16 lg:py-20" aria-labelledby="healthcare-pricing-title">
+    <div class="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8">
+        <h2 id="healthcare-pricing-title" class="text-2xl font-extrabold tracking-tight">Healthcare package prices</h2>
+        <p class="mt-2 text-sm text-gray-600">Prices in PKR for the full billing period.</p>
+        <div class="mt-6 grid gap-4 sm:grid-cols-2">
+            @foreach($publicPlans as $plan)
+                <article class="rounded-2xl border border-gray-200 p-5">
+                    <h3 class="font-extrabold text-[#0A4D5C]">{{ $plan['name'] }}</h3>
+                    <dl class="mt-3 divide-y divide-gray-100">
+                        @foreach($plan['periods'] as $label => $total)
+                            <div class="flex justify-between gap-4 py-2 text-sm">
+                                <dt>{{ $label }}</dt>
+                                <dd class="text-right font-semibold tabular-nums">PKR {{ number_format($total, 2) }}</dd>
+                            </div>
+                        @endforeach
+                    </dl>
+                    <a href="{{ url('/contact') }}" class="mt-4 inline-block font-semibold text-[#0A4D5C] underline">Enquire about {{ $plan['name'] }}</a>
+                </article>
+            @endforeach
+        </div>
+    </div>
+</section>
+@endif
+
 {{-- ══════════════ Enquiry ══════════════ --}}
 <section class="py-16 lg:py-20">
     <div class="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8">
         <div class="rounded-2xl bg-[#052730] text-white p-8 sm:p-10">
-            <h2 class="text-2xl font-extrabold tracking-tight">Pricing is quoted, not listed</h2>
+            <h2 class="text-2xl font-extrabold tracking-tight">Custom ERP quotes</h2>
             <p class="mt-3 text-sm text-white/70 leading-relaxed max-w-2xl">
                 An ERP is scoped to the organisation that runs it — how many branches, which
                 departments, how many people on it. Tell us how yours works and we quote the line

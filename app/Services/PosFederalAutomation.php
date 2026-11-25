@@ -46,6 +46,7 @@ class PosFederalAutomation
         $selected=$this->selected($company->id);
         if (!$selected) return;
         [$channel,$profile]=$selected;
+        if (!PosFederalAddonAccess::allows($company, 'federal_'.$channel)) return;
         $rule=PosFederalRule::where('company_id',$company->id)->where('channel',$channel)
             ->where('environment',$profile->environment)->where('enabled',true)->first();
         if (!$rule) return; // all existing customers default to their existing flow

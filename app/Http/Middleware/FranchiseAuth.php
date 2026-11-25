@@ -2,6 +2,8 @@
 
 namespace App\Http\Middleware;
 
+use App\Services\FranchiseSession;
+use App\Services\TwoStepLogin;
 use Closure;
 use Illuminate\Http\Request;
 
@@ -13,12 +15,16 @@ class FranchiseAuth
             return redirect('/franchise/login');
         }
 
-        $franchise = auth('franchise')->user();
-        if ($franchise->status !== 'active') {
-            auth('franchise')->logout();
+        $franchise = auth('franchise')->user()->fresh();
+        if (!$franchise || !$franchise->isActive()) {
+            FranchiseSession::revokeCurrent($request);
             return redirect('/franchise/login')->with('error', 'Your franchise account is suspended.');
         }
+        if (!FranchiseSession::matches($request, $franchise)) {
+            FranchiseSession::revokeCurrent($request);
+            return redirect('/franchise/login');
+        }
 
-        return $next($request);
+        return TwoStepLogin::challenge($request, 'franchise') ?? $next($request);
     }
 }

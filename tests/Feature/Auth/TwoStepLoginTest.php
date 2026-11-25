@@ -4,6 +4,7 @@ namespace Tests\Feature\Auth;
 
 use App\Models\AdminUser;
 use App\Models\Company;
+use App\Models\Franchise;
 use App\Models\User;
 use App\Services\TwoStepLogin;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -25,7 +26,7 @@ class TwoStepLoginTest extends TestCase
     {
         parent::setUp();
         Mail::fake();
-        foreach (['di' => 'auth', 'pos' => 'pos.auth', 'fbrpos' => 'fbrpos.auth', 'health' => 'health.auth', 'admin' => 'admin.auth'] as $panel => $middleware) {
+        foreach (['di' => 'auth', 'pos' => 'pos.auth', 'fbrpos' => 'fbrpos.auth', 'health' => 'health.auth', 'admin' => 'admin.auth', 'franchise' => 'franchise.auth'] as $panel => $middleware) {
             Route::middleware(['web', $middleware])->match(['GET', 'POST'], '/two-step-test/'.$panel, fn () => response('Protected handler reached'));
         }
     }
@@ -35,6 +36,10 @@ class TwoStepLoginTest extends TestCase
         if ($panel === 'admin') {
             return AdminUser::create(['name' => 'Fictional admin', 'email' => 'factor-admin@example.invalid',
                 'password' => 'Synthetic123!', 'role' => 'super_admin']);
+        }
+        if ($panel === 'franchise') {
+            return Franchise::create(['name' => 'Fictional franchise', 'email' => 'factor-franchise@example.invalid',
+                'password' => 'Synthetic123!', 'status' => 'active']);
         }
         $company = Company::create(['name' => 'Fictional factor '.$panel, 'ntn' => uniqid('factor'),
             'product_type' => $panel === 'health' ? 'erps' : $panel, 'fbr_pos_enabled' => $panel === 'fbrpos',
@@ -101,6 +106,39 @@ class TwoStepLoginTest extends TestCase
             Auth::guard($guard)->logout();
             $this->flushSession();
         }
+    }
+
+    public function test_franchise_factor_enrollment_is_separate_from_company_and_enforced_on_next_login(): void
+    {
+        $actor = $this->actor('franchise');
+        $other = new User();
+        $other->id = $actor->id;
+        $this->install($other);
+        $otherCredential = TwoStepLogin::credential($other);
+
+        $credentials = ['email' => $actor->email, 'password' => 'Synthetic123!'];
+        $this->post('/franchise/login', $credentials)->assertRedirect('/franchise/dashboard');
+        $this->get('/franchise/dashboard')->assertOk()->assertSee('Two-step login');
+        $this->get('/security/two-step/franchise')->assertOk()->assertSee('Off');
+        $this->post('/security/two-step/franchise/begin', ['password' => 'Synthetic123!'])->assertRedirect();
+        $key = session('two_step_enrollment.franchise.secret');
+        $this->post('/security/two-step/franchise/confirm', ['code' => TwoStepLogin::code($key, intdiv(now()->timestamp, 30))])
+            ->assertRedirect('/security/two-step/franchise');
+        $this->assertDatabaseHas('two_step_events', ['actor_type' => 'franchise', 'actor_id' => $actor->id, 'event' => 'enabled']);
+
+        $this->post('/franchise/logout')->assertRedirect('/franchise/login');
+        $this->post('/franchise/login', $credentials)->assertRedirect('/franchise/dashboard');
+        $this->get('/franchise/companies')->assertRedirect('/security/two-step/franchise/challenge');
+        $this->travel(30)->seconds();
+        $this->post('/security/two-step/franchise/verify', ['code' => TwoStepLogin::code($key, intdiv(now()->timestamp, 30))])
+            ->assertRedirect('/franchise/dashboard');
+        $this->get('/franchise/companies')->assertOk();
+        $this->assertEquals($otherCredential, TwoStepLogin::credential($other));
+
+        $actor->update(['status' => 'suspended']);
+        Auth::forgetGuards();
+        $this->get('/security/two-step/franchise')->assertForbidden();
+        $this->get('/franchise/companies')->assertRedirect('/franchise/login');
     }
 
     public function test_used_step_and_recovery_cannot_replay_and_other_actor_is_unchanged(): void

@@ -21,7 +21,7 @@ final class LocalCollectionReports
     {
         abort_unless($company->isLocalCollectionPilot(), 422);
         $v = validator($args, [
-            'date_from'=>'nullable|date_format:Y-m-d', 'date_to'=>'nullable|date_format:Y-m-d|after_or_equal:date_from',
+            'date_from'=>'nullable|date_format:Y-m-d', 'date_to'=>'nullable|date_format:Y-m-d',
             'date_basis'=>'nullable|in:calendar', 'branch_id'=>'nullable|integer|min:0',
         ])->validate();
         foreach (['terminal_id','payment_method','stream'] as $unsupported) {

@@ -957,6 +957,60 @@ class PraDiSandboxTest extends TestCase
         try{$svc->submit($this->company->id,$r->id,$this->owner->id);$this->fail('replay allowed');}catch(HttpException $e){$this->assertSame(409,$e->getStatusCode());}
         Http::assertSentCount(1);
     }
+    public function test_paid_cutover_blocks_direct_new_setup_and_preserves_a_previously_configured_channel(): void
+    {
+        (require database_path('migrations/2026_08_22_130000_pos_addons.php'))->up();
+        \App\Services\PosAddonService::flushCache();
+        config(['pra_di_sandbox.paid_addon_policy_starts_at' => now()->toDateTimeString()]);
+        Http::fake();
+        $di = ['_token' => 'cutover-csrf', 'enabled' => 1, 'environment' => 'sandbox',
+            'confirm_sandbox_setup' => 1, 'sandbox_token' => 'fictional-cutover-di-token'];
+        $ims = ['_token' => 'cutover-csrf', 'enabled' => 1, 'environment' => 'sandbox',
+            'connection_mode' => 'cloud', 'sandbox_pos_id' => '12345',
+            'sandbox_token' => 'fictional-cutover-ims-token', 'confirm_setup' => 1];
+        $empty = PosDiSandboxProfile::create([
+            'company_id' => $this->company->id, 'enabled' => false, 'updated_by' => $this->owner->id,
+        ]);
+        $empty->forceFill(['created_at' => now()->subDay()])->save();
+
+        $this->withSession(['_token' => 'cutover-csrf'])->post('/pos/di-sandbox/setup', $di)->assertForbidden();
+        $this->withSession(['_token' => 'cutover-csrf'])->post('/pos/tax-integrations/fbr-pos/setup', $ims)->assertForbidden();
+        $this->assertNull($empty->fresh()->sandbox_token);
+        $this->assertDatabaseCount('pos_ims_profiles', 0);
+
+        // Saving credentials with reporting off must not qualify an empty
+        // pre-cutover profile for legacy access on the next request.
+        $this->withSession(['_token' => 'cutover-csrf'])->post('/pos/di-sandbox/setup', array_replace($di, ['enabled' => 0]))
+            ->assertForbidden();
+        $this->assertNull($empty->fresh()->sandbox_token);
+
+        $emptyIms = \App\Models\PosImsProfile::create([
+            'company_id' => $this->company->id, 'enabled' => false, 'updated_by' => $this->owner->id,
+        ]);
+        $emptyIms->forceFill(['created_at' => now()->subDay()])->save();
+        $imsSetup = $this->withSession(['_token' => 'cutover-csrf']);
+        $imsSetup->post('/pos/tax-integrations/fbr-pos/setup', array_replace($ims, ['enabled' => 0]))
+            ->assertForbidden();
+        $this->assertNull($emptyIms->fresh()->sandbox_token);
+
+        unset($ims['sandbox_token']);
+        $imsSetup->post('/pos/tax-integrations/fbr-pos/setup', array_replace($ims, [
+            'enabled' => 0, 'connection_mode' => 'fiscal_device', 'device_uid' => 'fictional-device',
+            'local_ims_url' => 'http://127.0.0.1:8524/api/IMSFiscal/GetInvoiceNumberByModel',
+        ]))->assertForbidden();
+        $this->assertNull($emptyIms->fresh()->device_uid);
+        $this->assertNull($emptyIms->fresh()->local_ims_url);
+
+        $empty->update(['sandbox_token' => 'fictional-legacy-token']);
+        unset($di['sandbox_token']);
+        $this->withSession(['_token' => 'cutover-csrf'])->post('/pos/di-sandbox/setup', $di)
+            ->assertRedirect('/pos/di-sandbox/setup');
+        $this->assertTrue($empty->fresh()->enabled);
+        $this->assertSame('fictional-legacy-token', $empty->fresh()->sandbox_token);
+        Http::assertNothingSent();
+        \App\Services\PosAddonService::flushCache();
+    }
+
     public function test_ims_setup_encrypts_tokens_selects_one_federal_channel_and_preserves_pra_settings(): void
     {
         PosDiSandboxProfile::create(['company_id'=>$this->company->id,'enabled'=>true,'sandbox_token'=>'preserved-di','updated_by'=>$this->owner->id]);

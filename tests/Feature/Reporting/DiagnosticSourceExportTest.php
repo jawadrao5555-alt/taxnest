@@ -87,6 +87,32 @@ class DiagnosticSourceExportTest extends TestCase
         $this->assertSame($before, DB::table('pos_transactions')->orderBy('id')->get()->toJson());
     }
 
+    public function test_branch_export_does_not_widen_when_di_source_has_no_branch_key(): void
+    {
+        DB::table('companies')->insert(['id' => 3, 'name' => 'Synthetic export DI', 'product_type' => 'di']);
+        DB::table('branches')->insert(['id' => 30, 'company_id' => 3, 'created_at' => '2026-11-06 20:00:00']);
+        Schema::create('invoices', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('company_id');
+            $table->dateTime('created_at');
+        });
+        DB::table('invoices')->insert([
+            ['id' => 1, 'company_id' => 3, 'created_at' => '2026-11-06 20:00:00'],
+            ['id' => 2, 'company_id' => 2, 'created_at' => '2026-11-06 20:00:00'],
+        ]);
+
+        $args = ['company_name' => 'Synthetic export DI', 'date_from' => '2026-11-07', 'source' => 'di.sales'];
+        $exporter = app(DiagnosticSourceExport::class);
+        $company = $exporter->read($args, [3]);
+        $this->assertSame([1], array_column($company['rows'], 'id'));
+
+        $branch = $exporter->read($args + ['branch_id' => 30], [3]);
+        $this->assertSame('BRANCH_SCOPE_UNAVAILABLE', $branch['status']);
+        $this->assertSame([], $branch['rows']);
+        $this->assertFalse($branch['export']['retained_window_rows_exhausted']);
+        $this->assertFalse($branch['export']['source_collection_complete']);
+    }
+
     public function test_export_rejects_unbounded_or_arbitrary_filters(): void
     {
         foreach ([

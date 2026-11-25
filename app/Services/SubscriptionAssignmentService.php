@@ -179,7 +179,7 @@ class SubscriptionAssignmentService
             // extra-branch slots it has already bought (Rs 10,000/branch/year).
             if ($approvedQuote !== null) {
                 $cycle = self::purchaseCycle($billingCycle, $plan->product_type);
-                $error = DistributorDiscountService::validateSnapshot($approvedQuote, $company, $plan, $cycle);
+                $error = DistributorDiscountService::validateSnapshot($approvedQuote, $company, $plan, $cycle, checkBranchCapacity: true);
                 if ($error) throw \Illuminate\Validation\ValidationException::withMessages(['billing_cycle' => $error]);
                 $priced = [
                     'cycle' => $cycle,

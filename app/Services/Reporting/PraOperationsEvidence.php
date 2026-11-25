@@ -13,19 +13,23 @@ final class PraOperationsEvidence
 {
     public function read(array $args, ?array $allowed): array
     {
-        if (array_diff(array_keys($args), ['company_name', 'company_id', 'date_from', 'date_to', 'stream', 'branch_id', 'after_id', 'limit'])) {
+        if (array_diff(array_keys($args), ['company_name', 'company_id', 'date_from', 'date_to', 'stream', 'branch_id', 'diagnostic_stream_id', 'after_id', 'limit'])) {
             throw ValidationException::withMessages(['arguments' => 'Unsupported operational evidence filter.']);
         }
         $v = validator($args, ['company_name' => 'required|string|min:2|max:150', 'company_id' => 'nullable|integer|min:1',
             'date_from' => 'required|date_format:Y-m-d', 'date_to' => 'nullable|date_format:Y-m-d',
             'stream' => 'required|in:cash_reconciliation,print_chains,agent_collection',
-            'branch_id' => 'nullable|integer|min:0', 'after_id' => 'nullable|integer|min:0', 'limit' => 'nullable|integer|min:1|max:50'])->validate();
+            'branch_id' => 'nullable|integer|min:0', 'diagnostic_stream_id' => 'nullable|integer|min:1',
+            'after_id' => 'nullable|integer|min:0', 'limit' => 'nullable|integer|min:1|max:50'])->validate();
         $v['date_to'] ??= $v['date_from'];
         $from = Carbon::parse($v['date_from'], 'Asia/Karachi')->startOfDay();
         $to = Carbon::parse($v['date_to'], 'Asia/Karachi')->startOfDay();
         if ($from->gt($to) || $from->diffInDays($to) > 6) throw ValidationException::withMessages(['date_from' => 'Use at most seven ordered dates.']);
         if ($v['stream'] === 'cash_reconciliation' && ($v['limit'] ?? 5) > 10) throw ValidationException::withMessages(['limit' => 'At most ten frozen reports per cash page.']);
         if (isset($v['branch_id']) && $v['stream'] !== 'cash_reconciliation') throw ValidationException::withMessages(['branch_id' => 'Agent/print collection is company-scoped; current device branches cannot establish historical scope.']);
+        if (isset($v['diagnostic_stream_id']) && $v['stream'] !== 'agent_collection') {
+            throw ValidationException::withMessages(['diagnostic_stream_id' => 'Select the Agent collection report to filter by a retained diagnostic stream.']);
+        }
         $company = app(CompanyReadReports::class)->company($v['company_name'], $allowed, isset($v['company_id']) ? (int) $v['company_id'] : null);
         if ($company->product_type !== 'pos') throw ValidationException::withMessages(['company_name' => 'This evidence adapter supports PRA POS only.']);
         $meta = ['company' => ['id' => (int) $company->id, 'name' => $company->name, 'product' => 'pos'],
@@ -104,7 +108,18 @@ final class PraOperationsEvidence
                 'Only observed streams are listed, not a complete device inventory. Empty streams expire after 90 days. Older Agents without this capability remain unknown. Actual installed rollout, host capacity and scheduler retention require field acceptance.']];
         if (!Schema::hasTable('pra_diagnostic_samples') || !Schema::hasTable('pra_diagnostic_streams')) return $out;
         $limit = (int) ($v['limit'] ?? 25);
-        $q = DB::table('pra_diagnostic_samples')->where('company_id', $companyId)->whereBetween('received_at', $bounds);
+        $sampleScope = DB::table('pra_diagnostic_samples')->where('company_id', $companyId);
+        $streamScope = DB::table('pra_diagnostic_streams')->where('company_id', $companyId);
+        if (isset($v['diagnostic_stream_id'])) {
+            $streamId = (int) $v['diagnostic_stream_id'];
+            $streamScope->where('id', $streamId);
+            if (! $streamScope->exists()) {
+                throw ValidationException::withMessages(['diagnostic_stream_id' => 'Retained diagnostic stream is unavailable for this company.']);
+            }
+            $out['diagnostic_stream_id'] = $streamId;
+            $sampleScope->where('diagnostic_stream_id', $streamId);
+        }
+        $q = (clone $sampleScope)->whereBetween('received_at', $bounds);
         $extent = (clone $q)->selectRaw('COUNT(*) AS samples, MIN(received_at) AS earliest, MAX(received_at) AS latest')->first();
         $rows = (clone $q)->where('id', '>', $v['after_id'] ?? 0)->orderBy('id')->limit($limit + 1)->get();
         foreach ($rows->take($limit) as $row) {
@@ -115,7 +130,7 @@ final class PraOperationsEvidence
                 'facts' => is_array($facts) ? PraAgentDiagnosticEvidence::facts($facts) : null];
         }
         // Include stale known streams; absence of recent samples must not hide a device.
-        $streams = DB::table('pra_diagnostic_streams')->where('company_id', $companyId)->orderBy('id')->limit(101)->get();
+        $streams = $streamScope->orderBy('id')->limit(101)->get();
         foreach ($streams->take(100) as $stream) {
             $stats = DB::table('pra_diagnostic_samples')->where('company_id', $companyId)->where('diagnostic_stream_id', $stream->id)
                 ->selectRaw('COUNT(*) AS samples, MIN(sequence) AS first_sequence, MAX(sequence) AS last_sequence')->first();
@@ -128,7 +143,8 @@ final class PraOperationsEvidence
         $out['received_days'] = [];
         for ($day = Carbon::parse($v['date_from'], 'Asia/Karachi'); $day->toDateString() <= $v['date_to']; $day->addDay()) {
             $dayBounds = [$day->copy()->setTimezone(config('app.timezone'))->toDateTimeString(), $day->copy()->endOfDay()->setTimezone(config('app.timezone'))->toDateTimeString()];
-            $out['received_days'][] = ['date' => $day->toDateString(), 'samples' => DB::table('pra_diagnostic_samples')->where('company_id', $companyId)->whereBetween('received_at', $dayBounds)->count(), 'complete' => false];
+            $out['received_days'][] = ['date' => $day->toDateString(),
+                'samples' => (clone $sampleScope)->whereBetween('received_at', $dayBounds)->count(), 'complete' => false];
         }
         $out['stream_inventory_truncated'] = $streams->count() > 100;
         $out['observed'] = ['matching_samples' => (int) $extent->samples, 'earliest_received_at' => $extent->earliest, 'latest_received_at' => $extent->latest];

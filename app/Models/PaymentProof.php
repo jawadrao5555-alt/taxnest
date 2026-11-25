@@ -142,7 +142,12 @@ class PaymentProof extends Model
 
         $pages = (int) ($this->addon_quote_snapshot['pages'] ?? 0);
 
-        return \App\Services\AiPageCreditService::packPrice($pages) === null ? 0 : $pages;
+        return array_key_exists($pages, \App\Services\AiPageCreditService::PACKS) ? $pages : 0;
+    }
+
+    public function aiPagesQuotedPrice(): float
+    {
+        return round((float) ($this->addon_quote_snapshot['price'] ?? $this->amount), 2);
     }
 
     /** Feature codes requested on a pos_addon proof (JSON column → clean list). */
@@ -159,7 +164,7 @@ class PaymentProof extends Model
 
         return array_values(array_unique(array_filter(
             $decoded,
-            fn ($code) => is_string($code) && isset(\App\Services\PosAddonPricingService::ADDONS[$code])
+            fn ($code) => is_string($code) && isset(\App\Services\PosAddonPricingService::definitions()[$code])
         )));
     }
 
@@ -178,7 +183,7 @@ class PaymentProof extends Model
         $cycle = \App\Services\PosAddonPricingService::normalizeCycle($snapshot['cycle'] ?? null);
         $codes = array_values(array_unique(array_filter(
             $snapshot['codes'] ?? [],
-            fn ($code) => is_string($code) && isset(\App\Services\PosAddonPricingService::ADDONS[$code])
+            fn ($code) => is_string($code) && isset(\App\Services\PosAddonPricingService::definitions()[$code])
         )));
         $lines = is_array($snapshot['lines'] ?? null) ? $snapshot['lines'] : [];
         $safeLines = [];

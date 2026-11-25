@@ -109,7 +109,9 @@ class AdminPaymentProofController extends Controller
         $company = Company::findOrFail($proof->company_id);
         $reviewPlan = $plan;
         if (is_array($persistedQuote)) {
-            $error = \App\Services\DistributorDiscountService::validateSnapshot($persistedQuote, $company, $plan, $requestedCycle);
+            $error = \App\Services\DistributorDiscountService::validateSnapshot(
+                $persistedQuote, $company, $plan, $requestedCycle, checkBranchCapacity: true
+            );
             if ($error) return back()->with('error', 'Cannot approve: ' . $error);
             if (is_array($persistedQuote['plan_snapshot'] ?? null)) {
                 $reviewPlan = new PricingPlan;
@@ -164,7 +166,7 @@ class AdminPaymentProofController extends Controller
             $netReceived = $verifiedReceived;
             if ($discountSnapshot) {
                 $snapshotError = \App\Services\DistributorDiscountService::validateSnapshot(
-                    $discountSnapshot, $attributedCompany, $plan, $enforcedCycle
+                    $discountSnapshot, $attributedCompany, $plan, $enforcedCycle, checkBranchCapacity: true
                 );
                 if ($snapshotError) return ['outcome'=>'invalid_distributor_snapshot','message'=>$snapshotError];
                 $expectedNet = round((float) $discountSnapshot['net_quote'], 2);
@@ -445,8 +447,7 @@ class AdminPaymentProofController extends Controller
         }
 
         $verifiedReceived = round((float) $request->input('verified_received_amount'), 2);
-        $expected = (float) \App\Services\AiPageCreditService::packPrice($pages);
-        $result = DB::transaction(function () use ($proof, $pages, $verifiedReceived, $expected) {
+        $result = DB::transaction(function () use ($proof, $pages, $verifiedReceived) {
             $locked = PaymentProof::where('id', $proof->id)->lockForUpdate()->first();
             if (!$locked || $locked->status !== 'pending') {
                 return null;
@@ -475,6 +476,7 @@ class AdminPaymentProofController extends Controller
                 'reject_reason' => null,
             ]);
             $locked->refresh();
+            $expected = $locked->aiPagesQuotedPrice();
             \App\Services\VerifiedSubscriptionDocuments::recordAddon(
                 $locked,
                 \App\Services\PlanLimitService::getActiveSubscription($company->id),
@@ -484,7 +486,7 @@ class AdminPaymentProofController extends Controller
                 ['label' => 'AI Reader page top-up', 'pages' => $pages]
             );
 
-            return ['company' => $company, 'before' => $before, 'after' => $before + $pages];
+            return ['company' => $company, 'before' => $before, 'after' => $before + $pages, 'quoted_total' => $expected];
         });
 
         if (!$result) {
@@ -498,7 +500,7 @@ class AdminPaymentProofController extends Controller
             'balance_after' => $result['after'],
             'amount_claimed' => $proof->amount,
             'verified_received_amount' => $verifiedReceived,
-            'quoted_total' => $expected,
+            'quoted_total' => $result['quoted_total'],
         ]);
 
         $this->notifyCompany($proof->fresh(['company', 'pricingPlan']), 'approved');
@@ -595,7 +597,8 @@ class AdminPaymentProofController extends Controller
                 $currentUntil = $sub->end_date instanceof \DateTimeInterface
                     ? $sub->end_date->format('Y-m-d')
                     : (string) $sub->end_date;
-                if ($snapshot['until'] !== $currentUntil) {
+                if ($snapshot['until'] !== $currentUntil
+                    || (isset($snapshot['subscription_id']) && (int) $snapshot['subscription_id'] !== (int) $sub->id)) {
                     return ['outcome' => 'subscription_changed'];
                 }
 
@@ -606,6 +609,14 @@ class AdminPaymentProofController extends Controller
             } else {
                 // Pre-snapshot proof: preserve the legacy review path.
                 $quote = \App\Services\PosAddonService::quote($codes, $cycle, $company, $sub);
+            }
+
+            if (array_intersect($quote['codes'], \App\Services\PosFederalAddonAccess::CODES)
+                && (!$snapshot || empty($snapshot['subscription_id'])
+                    || !\App\Services\PosFederalAddonAccess::hasPaidPackage($company)
+                    || !\App\Services\PosFederalAddonAccess::selectionAllowed($company, $quote['codes'])
+                    || $verifiedReceived < $quote['total'])) {
+                return ['outcome' => 'federal_review_required'];
             }
 
             \App\Services\PosAddonService::activate(
@@ -650,6 +661,7 @@ class AdminPaymentProofController extends Controller
                 'no_expiry' => 'This shop has no dated active package to attach the add-on to. Renew or fix the package first — an add-on must always expire with it.',
                 'subscription_changed' => 'This shop’s package changed after it submitted this add-on request. Reject this proof and ask the shop to submit a fresh request against its current package.',
                 'no_codes' => 'This payment proof no longer contains a valid feature selection. Reject it and ask the shop to submit a fresh request.',
+                'federal_review_required' => 'A federal add-on requires a valid paid term, one eligible channel and full payment of the saved quote.',
                 default => 'This payment proof was already processed.',
             });
         }
@@ -672,7 +684,7 @@ class AdminPaymentProofController extends Controller
         $this->notifyCompany($proof->fresh(['company', 'pricingPlan']), 'approved');
 
         $labels = array_map(
-            fn ($code) => \App\Services\PosAddonPricingService::ADDONS[$code]['label'] ?? $code,
+            fn ($code) => \App\Services\PosAddonPricingService::definitions()[$code]['label'] ?? $code,
             $quote['codes']
         );
 
@@ -906,7 +918,7 @@ class AdminPaymentProofController extends Controller
             if ($proof->isPosAddon()) {
                 $codes = $proof->addonCodeList();
                 $labels = array_map(
-                    fn ($code) => \App\Services\PosAddonPricingService::ADDONS[$code]['label'] ?? $code,
+                    fn ($code) => \App\Services\PosAddonPricingService::definitions()[$code]['label'] ?? $code,
                     $codes
                 );
                 $featureList = $labels ? implode(', ', $labels) : 'the requested features';

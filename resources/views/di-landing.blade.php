@@ -232,7 +232,7 @@
                 "name": "What happens if a submission fails?",
                 "acceptedAnswer": {
                     "@@type": "Answer",
-                    "text": "Nothing is lost. The invoice stays in your panel with the exact FBR response, you fix the flagged field and resubmit. Duplicate protection makes sure a retry never creates a second invoice."
+                    "text": "Review the saved response and correct rejected fields before retrying. If the outcome is uncertain, verify the earlier submission first."
                 }
             }
         ]
@@ -363,7 +363,7 @@
                     An accountant’s ledger, <br>built for the PRAL API.
                 </h1>
                 <p class="text-lg text-gray-600 mb-10 leading-relaxed max-w-2xl mx-auto">
-                    Replace manual registers and stressful FBR notices with a meticulous digital workflow. Generate formal invoices, validate HS codes instantly, and submit to FBR with total certainty.
+                    Create a draft, search FBR tax references and review each line before submission. Test buyer scenarios in Sandbox and follow the saved status of your invoice.
                 </p>
                 <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
                     <a href="/register" class="w-full sm:w-auto px-8 py-3.5 btn-solid btn-dark text-base shadow-lg">
@@ -476,7 +476,7 @@
                 <div class="reveal-on-scroll">
                     <p class="text-[3.5rem] font-serif font-bold text-[#0A4D5C] leading-none mb-2">100%</p>
                     <p class="text-sm font-semibold text-gray-900 uppercase tracking-widest mb-1">Payloads Validated</p>
-                    <p class="text-sm text-gray-500">Every invoice is checked against FBR tax schedules before it is submitted.</p>
+                    <p class="text-sm text-gray-500">Enable reference checking on a line to verify its FBR references before submission.</p>
                 </div>
                 <div class="reveal-on-scroll md:pl-12" style="transition-delay: 100ms;">
                     <p class="text-[3.5rem] font-serif font-bold text-[#0A4D5C] leading-none mb-2">3-Step</p>
@@ -715,7 +715,7 @@
                         <span class="font-bold text-gray-900 text-sm uppercase tracking-wide">What happens if a submission fails?</span>
                         <svg class="w-5 h-5 text-gray-400 transition-transform flex-shrink-0 ml-4" :class="open === 4 ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                     </button>
-                    <div x-show="open === 4" x-collapse class="px-2 pb-6 text-sm text-gray-600 leading-relaxed">Nothing is lost. The invoice stays in your panel with the exact FBR response, you fix the flagged field and resubmit. Duplicate protection makes sure a retry never creates a second invoice.</div>
+                    <div x-show="open === 4" x-collapse class="px-2 pb-6 text-sm text-gray-600 leading-relaxed">Review the saved response and correct rejected fields before retrying. If the outcome is uncertain, verify the earlier submission first.</div>
                 </div>
             </div>
         </div>

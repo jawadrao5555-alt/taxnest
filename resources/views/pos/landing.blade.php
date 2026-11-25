@@ -424,14 +424,14 @@
                 <div class="border-t-2 border-[#0A4D5C] pt-6 relative group">
                     <div class="absolute right-0 top-6 text-[#E7BF3B] opacity-20 font-serif text-8xl leading-none transition-transform group-hover:-translate-y-2">11</div>
                     <h3 class="text-2xl font-serif text-[#052730] mb-4 relative z-10">Madadgar — AI support</h3>
-                    <p class="text-gray-600 text-lg leading-relaxed relative z-10">An in-panel support assistant that answers in Urdu, any hour of the day. It knows every TaxNest PRA POS screen — and when it can't solve something, it hands you straight to a human.</p>
+                    <p class="text-gray-600 text-lg leading-relaxed relative z-10">Get help inside PRA POS, including guidance in Urdu. When reporting a counter or printer issue, include the receipt or kitchen ticket reference.</p>
                 </div>
 
                 <!-- Feature 12 -->
                 <div class="border-t-2 border-[#0A4D5C] pt-6 relative group">
                     <div class="absolute right-0 top-6 text-[#E7BF3B] opacity-20 font-serif text-8xl leading-none transition-transform group-hover:-translate-y-2">12</div>
                     <h3 class="text-2xl font-serif text-[#052730] mb-4 relative z-10">Counter essentials</h3>
-                    <p class="text-gray-600 text-lg leading-relaxed relative z-10">Order tokens printed on receipt and KOT so orders never get mixed up, customer khata and loyalty points, product Excel import/export for bulk catalogs (Business plan onwards), an optional caller-ID customer lookup add-on, tax-inclusive menu pricing, and an opening-cash record for a clean day-close.</p>
+                    <p class="text-gray-600 text-lg leading-relaxed relative z-10">Match receipts and kitchen tickets by order token. Queued kitchen tickets survive restarts; later additions print on separate slips. The counter also supports customer khata and loyalty points, product Excel import/export for bulk catalogs (Business plan onwards), an optional caller-ID customer lookup add-on, tax-inclusive menu pricing, and an opening-cash record for a clean day-close.</p>
                 </div>
             </div>
         </div>

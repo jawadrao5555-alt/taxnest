@@ -400,7 +400,7 @@
                 <div class="lg:col-span-7 bg-[#FDFBF7] border border-gray-200 p-10 fade-in-up">
                     <h3 class="text-2xl font-serif font-bold text-[#052730] mb-4">Direct API Transmission</h3>
                     <p class="text-gray-700 leading-relaxed mb-6">
-                        No middleman middleware delaying your transactions. The moment a cashier confirms payment, the payload goes directly to FBR. If the connection fails, the sale is queued, the receipt prints normally, and the system securely retries in the background until successful.
+                        Track fiscal sales through the configured cloud or device route. Check local device acceptance and central confirmation separately before retrying an uncertain submission.
                     </p>
                     <ul class="space-y-3">
                         <li class="flex items-center text-sm font-medium text-gray-800">
@@ -658,7 +658,7 @@
                         <span class="font-bold text-[#052730]">Are bills really submitted to FBR in real time?</span>
                         <span class="text-gray-400 text-xl font-light" x-text="open === 1 ? '−' : '+'"></span>
                     </button>
-                    <div x-show="open === 1" x-collapse class="px-6 pb-6 text-gray-600 leading-relaxed text-sm">Yes. Each completed sale goes straight to FBR's POS service and the fiscal invoice number prints on the receipt. If FBR rejects a bill, it lands in a fail queue where you can fix the data and retry — nothing silently disappears.</div>
+                    <div x-show="open === 1" x-collapse class="px-6 pb-6 text-gray-600 leading-relaxed text-sm">Check the saved submission status and fiscal number. School and hospital collection desks with IMS reporting configured can reprint an accepted receipt with its recorded fiscal number and QR.</div>
                 </div>
                 <div class="bg-white border border-gray-200 fade-in-up" style="transition-delay: 50ms;">
                     <button @click="open = (open === 2 ? null : 2)" class="w-full flex items-center justify-between p-6 text-left hover:bg-gray-50 transition-colors">

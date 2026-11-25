@@ -74,7 +74,7 @@
             {{-- ── Serial box (top badge) ── --}}
             <div style="border:1.5px solid #000;padding:5px 4px;margin:5px 0;text-align:center;">
                 <div data-optional-heading style="font-size:12px;font-weight:bold;letter-spacing:1px;">SALE RECEIPT</div>
-                <div style="font-size:11px;font-weight:bold;margin-top:2px;" x-text="serialNow()"></div>
+                <div style="font-size:11px;font-weight:bold;margin-top:2px;" x-show="tab !== 'pra' || optionShow('show_pos_invoice_number')" x-text="serialNow()"></div>
             </div>
 
             {{-- ── Order Matching token / code (live radios on both panels) ── --}}
@@ -151,6 +151,7 @@
             </div>
             @else
             <div x-show="qrNow()" style="text-align:center;margin:6px 0 2px;">
+                <div x-show="tab === 'pra'" style="font-size:10px;font-weight:bold;">PRA fiscal number: EXAMPLE-PRA-001</div>
                 <span data-optional-qr style="display:inline-block;width:64px;height:64px;border:2px solid #000;padding:6px;">
                     <span style="display:block;width:100%;height:100%;background:
                         linear-gradient(90deg,#000 25%,transparent 25%,transparent 50%,#000 50%,#000 75%,transparent 75%),
@@ -325,7 +326,7 @@ if (!window.rcptThemePicker) {
             },
             serialNow: function () {
                 if (cfg.mode === 'fbr') { return 'INV-2026-00817'; }
-                return this.tab === 'local' ? 'L0817' : 'P817';
+                return this.tab === 'local' ? 'B0817' : 'P817';
             },
             qrNow: function () {
                 if (cfg.mode === 'fbr') { return true; }

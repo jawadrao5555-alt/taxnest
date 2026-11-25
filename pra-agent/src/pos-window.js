@@ -35,12 +35,12 @@ function nestposIcon(ext) {
   return null;
 }
 
-let posWindow = null;
-let targetUrl = null;
-let onKioskToggleCb = null;
-let forceClose = false;          // set only by closePosWindow() / app quit
-let hideNoticeShown = false;     // one tray notification per run
-let lastResumeCheck = 0;         // throttle for the on-show freshness check
+const posSlots = [
+  { partition: 'persist:pos', window: null, forceClose: false },
+  { partition: 'persist:pos-2', window: null, forceClose: false },
+];
+let hideNoticeShown = false;
+const lastResumeChecks = new WeakMap();
 
 // Keep-alive resume check (v1.5.2): the POS window now HIDES on close instead
 // of being destroyed, so "Open POS" is instant (no reload). Every time it
@@ -51,8 +51,8 @@ let lastResumeCheck = 0;         // throttle for the on-show freshness check
 function runResumeCheck(win) {
   try {
     const now = Date.now();
-    if (now - lastResumeCheck < 60 * 1000) return;
-    lastResumeCheck = now;
+    if (now - (lastResumeChecks.get(win) || 0) < 60 * 1000) return;
+    lastResumeChecks.set(win, now);
     win.webContents
       .executeJavaScript('window.tnDesktopResumeCheck && window.tnDesktopResumeCheck(); true', true)
       .catch(() => {});
@@ -135,16 +135,31 @@ function wireSilentDownloads(ses, shouldAsk = () => false) {
   } catch (e) {}
 }
 
-function getPosWindowRef() {
-  return posWindow && !posWindow.isDestroyed() ? posWindow : null;
+function getPosWindowRef(slotNumber = 1) {
+  const win = posSlots[slotNumber - 1]?.window;
+  return win && !win.isDestroyed() ? win : null;
+}
+
+function isSecondaryPosPrintSender(event) {
+  const win = getPosWindowRef(2);
+  if (!win || event.sender !== win.webContents || event.senderFrame !== win.webContents.mainFrame) {
+    return false;
+  }
+  try {
+    const page = new URL(event.senderFrame.url);
+    return page.origin === posSlots[1].origin && page.pathname.startsWith('/pos/')
+      && !/^\/pos\/(?:login|logout)(?:\/|$)/.test(page.pathname);
+  } catch (_) {
+    return false;
+  }
 }
 
 function isPosWindowOpen() {
   return !!getPosWindowRef();
 }
 
-function applyKiosk(kiosk) {
-  const win = getPosWindowRef();
+function applyKiosk(kiosk, slotNumber = 1) {
+  const win = getPosWindowRef(slotNumber);
   if (!win) return;
   try {
     win.setKiosk(!!kiosk);
@@ -157,14 +172,19 @@ function loadOfflinePage(win, failedUrl, errorDescription) {
   if (!win || win.isDestroyed()) return;
   win.loadFile(path.join(__dirname, '..', 'offline.html'), {
     query: {
-      target: targetUrl || failedUrl || '',
+      target: failedUrl || '',
       err: String(errorDescription || ''),
     },
   }).catch(() => {});
 }
 
 function openPosWindow(config, opts = {}) {
-  const existing = getPosWindowRef();
+  const slotNumber = opts.slotNumber ?? 1;
+  if (slotNumber !== 1 && slotNumber !== 2) throw new Error('Invalid POS window slot');
+  const slot = posSlots[slotNumber - 1];
+  const origin = deriveOrigin(config);
+  const targetUrl = origin + '/pos/invoice/create';
+  const existing = getPosWindowRef(slotNumber);
   if (existing) {
     // Keep-alive path (v1.5.2): the window survived its last "close" as a
     // hidden window — showing it is INSTANT (no page reload). Freshness is
@@ -180,21 +200,17 @@ function openPosWindow(config, opts = {}) {
     return existing;
   }
 
-  const origin = deriveOrigin(config);
-  // Land on the sale screen; if not logged in, Laravel redirects to the POS
-  // login and (via redirect()->intended) returns here after login.
-  targetUrl = origin + '/pos/invoice/create';
-  onKioskToggleCb = typeof opts.onKioskToggle === 'function' ? opts.onKioskToggle : null;
+  const onKioskToggleCb = typeof opts.onKioskToggle === 'function' ? opts.onKioskToggle : null;
   let kioskOn = !!opts.kiosk;
   const isOfflineEnabled =
-    typeof opts.isOfflineEnabled === 'function' ? opts.isOfflineEnabled : () => false;
+    slotNumber === 1 && typeof opts.isOfflineEnabled === 'function' ? opts.isOfflineEnabled : () => false;
 
-  posWindow = new BrowserWindow({
+  const posWindow = new BrowserWindow({
     width: 1366,
     height: 820,
     minWidth: 900,
     minHeight: 600,
-    title: 'NestPOS Desktop',
+    title: 'NestPOS Desktop · POS ' + slotNumber,
     icon: nestposIcon(process.platform === 'win32' ? 'ico' : 'png') ||
       path.join(__dirname, '..', 'assets', 'icon.png'),
     fullscreen: kioskOn,
@@ -202,17 +218,20 @@ function openPosWindow(config, opts = {}) {
     autoHideMenuBar: true,
     backgroundColor: '#0A4D5C',
     webPreferences: {
-      partition: 'persist:pos',
+      partition: slot.partition,
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
-      preload: path.join(__dirname, 'pos-preload.js'),
+      preload: path.join(__dirname, slotNumber === 1 ? 'pos-preload.js' : 'pos-print-preload.js'),
       // Keep-alive (v1.5.2): the window keeps living hidden after "close",
       // so timers must NOT be throttled in the background — the sale screen's
       // incoming-orders poll + offline bill queue keep running at full speed.
       backgroundThrottling: false,
     },
   });
+
+  slot.window = posWindow;
+  slot.origin = origin;
 
   // Keep our own title — the web app rewrites document.title on every page.
   posWindow.on('page-title-updated', (e) => e.preventDefault());
@@ -222,7 +241,7 @@ function openPosWindow(config, opts = {}) {
   // icon at the bottom, and can be pinned — pinning relaunches this same exe
   // with --pos (straight into the POS screen).
   try {
-    if (process.platform === 'win32') {
+    if (slotNumber === 1 && process.platform === 'win32') {
       const ico = nestposIcon('ico');
       posWindow.setAppDetails({
         appId: 'com.taxnest.nestpos',
@@ -251,7 +270,9 @@ function openPosWindow(config, opts = {}) {
   // Agent AUTO-CONFIG (v1.5.0): once the cashier is logged in (any authed
   // /pos/ page loaded), let main.js pull the company's agent credentials
   // with the session cookie — zero manual agent setup on shop PCs.
-  wireCompanyLogin(posWindow, origin, 'pos', opts.onLoggedIn);
+  if (slotNumber === 1) {
+    wireCompanyLogin(posWindow, origin, 'pos', opts.onLoggedIn);
+  }
 
   // Offline Mode (Beta): register the passthrough-first https interception on
   // the persist:pos partition BEFORE the first load, and snapshot the sale
@@ -283,7 +304,7 @@ function openPosWindow(config, opts = {}) {
     ) {
       event.preventDefault();
       kioskOn = !kioskOn;
-      applyKiosk(kioskOn);
+      applyKiosk(kioskOn, slotNumber);
       if (onKioskToggleCb) { try { onKioskToggleCb(kioskOn); } catch (e) {} }
     }
   });
@@ -292,7 +313,7 @@ function openPosWindow(config, opts = {}) {
   // being superseded) — never treat that as a failure.
   posWindow.webContents.on('did-fail-load', (e, errorCode, errorDescription, validatedURL, isMainFrame) => {
     if (!isMainFrame || errorCode === -3) return;
-    loadOfflinePage(posWindow, validatedURL, errorDescription);
+    loadOfflinePage(posWindow, targetUrl, errorDescription);
   });
 
   // Same-origin popups (receipt/report windows) stay inside the app + same
@@ -305,7 +326,7 @@ function openPosWindow(config, opts = {}) {
           overrideBrowserWindowOptions: {
             autoHideMenuBar: true,
             webPreferences: {
-              partition: 'persist:pos',
+              partition: slot.partition,
               contextIsolation: true,
               nodeIntegration: false,
               sandbox: true,
@@ -324,7 +345,7 @@ function openPosWindow(config, opts = {}) {
   // only on app quit / self-update (forceClose or opts.isQuitting()).
   const isQuittingFn = typeof opts.isQuitting === 'function' ? opts.isQuitting : () => false;
   posWindow.on('close', (e) => {
-    if (forceClose || isQuittingFn()) return; // let it really close
+    if (slot.forceClose || isQuittingFn()) return; // let it really close
     e.preventDefault();
     try { posWindow.hide(); } catch (err) {}
     if (!hideNoticeShown) {
@@ -345,9 +366,9 @@ function openPosWindow(config, opts = {}) {
   posWindow.on('restore', () => runResumeCheck(posWindow));
 
   posWindow.on('closed', () => {
-    posWindow = null;
-    onKioskToggleCb = null;
-    forceClose = false; // reset here (not synchronously) — safe even if a future beforeunload defers 'close'
+    slot.window = null;
+    slot.origin = null;
+    slot.forceClose = false;
   });
 
   posWindow.loadURL(targetUrl).catch(() => loadOfflinePage(posWindow, targetUrl, 'load failed'));
@@ -356,10 +377,11 @@ function openPosWindow(config, opts = {}) {
 }
 
 function closePosWindow() {
-  const win = getPosWindowRef();
-  if (win) {
-    forceClose = true;
-    try { win.close(); } catch (e) { forceClose = false; }
+  for (const [index, slot] of posSlots.entries()) {
+    const win = getPosWindowRef(index + 1);
+    if (!win) continue;
+    slot.forceClose = true;
+    try { win.close(); } catch (e) { slot.forceClose = false; }
   }
   closeFbrWindow();
 }
@@ -481,4 +503,4 @@ function closeFbrWindow() {
   }
 }
 
-module.exports = { openPosWindow, getPosWindowRef, isPosWindowOpen, applyKiosk, closePosWindow, openFbrPosWindow, closeFbrWindow };
+module.exports = { openPosWindow, getPosWindowRef, isPosWindowOpen, applyKiosk, closePosWindow, openFbrPosWindow, closeFbrWindow, isSecondaryPosPrintSender };

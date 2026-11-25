@@ -379,7 +379,7 @@ class PosOfflineUuidRaceTest extends TestCase
         // A planted row with the SAME serial the controller is about to mint
         // but a DIFFERENT uuid: the collision is on (company_id, invoice_number),
         // which is a real problem and must surface as a failure.
-        $this->plantConcurrentWinner($company->id, 'some-other-uuid', ['invoice_number' => 'L001']);
+        $this->plantConcurrentWinner($company->id, 'some-other-uuid', ['invoice_number' => 'B001']);
 
         $response = $this->actingAs($user, 'pos')
             ->postJson('/pos/invoice/store', $this->queuedBillPayload('race-uuid-0003'));

@@ -1558,12 +1558,15 @@ window.addEventListener('popstate', function() {
                                     {{-- ZFC (Aug 2026): purana address wahin se DELETE bhi ho sake —
                                          selected address ka ✕. Customers page ka chakkar khatam. --}}
                                     <button x-show="selectedDeliveryAddress && customerAddresses.some(a => a.address === selectedDeliveryAddress)" @click="deleteSelectedAddress()" title="{{ __('pos.ti_delete_address') }}" class="text-xs font-bold text-red-500 dark:text-red-400 px-2 py-1.5 rounded-md border border-red-200 dark:border-red-800 hover:bg-red-50 dark:hover:bg-red-900/30 whitespace-nowrap">✕</button>
-                                    <button @click="showAddrNew = !showAddrNew; if (showAddrNew) $nextTick(() => document.getElementById('tnNewAddrInput')?.focus())" class="text-xs font-bold text-blue-600 dark:text-blue-300 px-2 py-1.5 rounded-md border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/30 whitespace-nowrap">{{ __('pos.new_short') }}</button>
+                                    <button @click="showAddrNew = !showAddrNew; if (showAddrNew) { addressSaveError = ''; $nextTick(() => document.getElementById('tnNewAddrInput')?.focus()) }" class="text-xs font-bold text-blue-600 dark:text-blue-300 px-2 py-1.5 rounded-md border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/30 whitespace-nowrap">{{ __('pos.new_short') }}</button>
                                 </div>
-                                <div x-show="showAddrNew" x-cloak class="flex items-center gap-1">
-                                    <input id="tnNewAddrLabel" type="text" x-model="newAddrLabel" @keydown.enter.prevent="saveNewAddress()" @keydown.escape.prevent="showAddrNew = false" placeholder="{{ __('pos.ph_addr_label') }}" autocomplete="off" name="pos_new_addr_label_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore class="w-24 flex-none text-sm rounded-md border-blue-200 dark:border-blue-800 dark:bg-gray-800 dark:text-white py-1.5 px-2 focus:ring-blue-500 focus:border-blue-400">
-                                    <input id="tnNewAddrInput" type="text" x-model="newAddrText" @keydown.enter.prevent="saveNewAddress()" @keydown.escape.prevent="showAddrNew = false" placeholder="{{ __('pos.ph_full_delivery_address') }}" autocomplete="off" name="pos_new_addr_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore class="flex-1 min-w-0 text-sm rounded-md border-blue-200 dark:border-blue-800 dark:bg-gray-800 dark:text-white py-1.5 px-2 focus:ring-blue-500 focus:border-blue-400">
-                                    <button @click="saveNewAddress()" class="text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 px-2 py-1.5 rounded-md">{{ __('pos.save_btn') }}</button>
+                                <div x-show="showAddrNew" x-cloak class="space-y-2">
+                                    <label for="tnNewAddrLabel" class="block text-xs font-semibold">{{ __('pos.ph_addr_label') }}</label>
+                                    <input id="tnNewAddrLabel" type="text" maxlength="50" x-model="newAddrLabel" :disabled="addressSaving" @keydown.enter.prevent="saveNewAddress()" autocomplete="off" name="pos_new_addr_label_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore class="w-full text-sm rounded-md border-blue-200 dark:border-blue-800 dark:bg-gray-800 dark:text-white py-1.5 px-2">
+                                    <label for="tnNewAddrInput" class="block text-xs font-semibold">{{ __('pos.ph_full_delivery_address') }}</label>
+                                    <textarea id="tnNewAddrInput" rows="2" maxlength="500" x-model="newAddrText" :disabled="addressSaving" @keydown.escape.prevent="if (!addressSaving) showAddrNew = false" autocomplete="off" name="pos_new_addr_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore class="w-full text-sm rounded-md border-blue-200 dark:border-blue-800 dark:bg-gray-800 dark:text-white py-1.5 px-2"></textarea>
+                                    <p x-show="addressSaveError" x-text="addressSaveError" role="alert" class="text-xs text-red-700 dark:text-red-300"></p>
+                                    <button type="button" @click="saveNewAddress()" :disabled="addressSaving || !newAddrText.trim()" class="text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 px-2 py-1.5 rounded-md disabled:opacity-50" :aria-busy="addressSaving">{{ __('pos.save_btn') }}</button>
                                 </div>
                             </div>
                         </template>
@@ -2042,8 +2045,14 @@ window.addEventListener('popstate', function() {
                         <button @click="tableBoardOpen = false" class="text-gray-400 hover:text-gray-600 flex-shrink-0"><svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
                     </div>
                     <div class="p-3 overflow-y-auto">
+                        <div x-show="!tablesLoading && tablesError && tableFloors.length" class="mb-3 text-xs text-amber-600 dark:text-amber-400" role="status">
+                            <p x-text="tableStatusErrorMessage()"></p>
+                            <p>{{ __('pos.tables_cached_warning') }}</p>
+                            <button type="button" @click="loadTableStatus()" class="mt-1 font-bold underline">{{ __('pos.tables_offline_retry') }}</button>
+                        </div>
+                        <p x-show="tablesCheckedAt" class="mb-2 text-xs text-gray-500 dark:text-gray-400"><span>{{ __('pos.tables_last_checked') }}</span> <span x-text="tablesCheckedAt ? new Date(tablesCheckedAt).toLocaleTimeString() : ''"></span></p>
                         <template x-if="tableFloors.length === 0">
-                            <p class="text-xs text-center py-6" :class="(tablesError && !tablesLoading) ? 'text-amber-600 dark:text-amber-400 font-bold' : 'text-gray-400'" x-text="tablesLoading ? window.TXT.tables_loading_js : (tablesError ? window.TXT.tables_offline : window.TXT.no_tables_set)"></p>
+                            <p class="text-xs text-center py-6" :class="(tablesError && !tablesLoading) ? 'text-amber-600 dark:text-amber-400 font-bold' : 'text-gray-400'" x-text="tablesLoading ? window.TXT.tables_loading_js : (tablesError ? tableStatusErrorMessage() : window.TXT.no_tables_set)"></p>
                         </template>
                         <template x-for="floor in tableFloors" :key="'bf' + floor.name">
                             <div>
@@ -2232,6 +2241,7 @@ window.addEventListener('popstate', function() {
                  /pos/restaurant/api/table-status. Green=free, amber=reserved, red=occupied.
                  Selecting a table RESERVES it server-side (race-safe) before it sticks. --}}
             <div class="p-4 max-h-[65vh] overflow-y-auto">
+                <p x-show="tablesCheckedAt" class="mb-2 text-xs text-gray-500 dark:text-gray-400"><span>{{ __('pos.tables_last_checked') }}</span> <span x-text="tablesCheckedAt ? new Date(tablesCheckedAt).toLocaleTimeString() : ''"></span></p>
                 <template x-if="tablesLoading && tableFloors.length === 0">
                     <p class="text-center text-sm text-gray-400 py-6">{{ __('pos.loading_tables') }}</p>
                 </template>
@@ -2241,7 +2251,8 @@ window.addEventListener('popstate', function() {
                 {{-- Rabta toot jaye to sach: tables "configure nahi" nahi hain, load nahi ho sakeen. --}}
                 <template x-if="!tablesLoading && tablesError">
                     <div class="text-center py-6">
-                        <p class="text-sm font-bold text-amber-600 dark:text-amber-400">{{ __('pos.tables_offline') }}</p>
+                        <p role="status" class="text-sm font-bold text-amber-600 dark:text-amber-400" x-text="tableStatusErrorMessage()"></p>
+                        <p x-show="tableFloors.length" class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ __('pos.tables_cached_warning') }}</p>
                         <button type="button" @click="loadTableStatus()" class="mt-3 px-4 py-2 rounded-xl bg-amber-500 text-white text-sm font-bold">{{ __('pos.tables_offline_retry') }}</button>
                     </div>
                 </template>
@@ -3538,7 +3549,7 @@ window.addEventListener('popstate', function() {
                             {{-- Task 1036: WhatsApp Bill — purana bill dobara bhejna (share link
                                  on-demand mint hota hai). Sirf routable number wale bills par. --}}
                             <template x-if="bill.wa_phone">
-                                <span @click.stop="waShareReprint(bill)"
+                                <span @click.stop="openReprintPreview(bill)"
                                       class="text-[10px] font-bold text-green-600 hover:text-green-700 flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-green-100 dark:hover:bg-green-900/30 mr-1"
                                       title="{{ __('pos.ti_wa_bill') }}">
                                     <svg x-show="waReprintBusyId !== bill.id" class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
@@ -3596,14 +3607,16 @@ window.addEventListener('popstate', function() {
                     <iframe :src="receiptViewUrl(reprintPreviewBill)" class="w-full h-full bg-white" style="min-height:55vh;border:0"></iframe>
                 </template>
             </div>
-            <div class="p-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 flex items-center justify-end gap-2 flex-shrink-0">
+            <div class="p-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 flex flex-wrap items-center justify-end gap-2 flex-shrink-0">
                 {{-- Task 1036: WhatsApp Bill from the preview footer too --}}
                 <template x-if="reprintPreviewBill && reprintPreviewBill.wa_phone">
                     <button @click="waShareReprint(reprintPreviewBill)" :disabled="waReprintBusyId === reprintPreviewBill.id" class="px-4 py-2 text-xs font-bold text-white bg-green-600 hover:bg-green-700 disabled:opacity-60 rounded-xl transition flex items-center gap-1.5">
                         <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
-                        {{ __('pos.wa_bill_btn') }}
+                        {{ __('pos.wa_full_bill') }}
                     </button>
                 </template>
+                <button type="button" x-show="reprintPreviewBill?.wa_phone" @click="waShareReprint(reprintPreviewBill, true)" :disabled="waReprintBusyId === reprintPreviewBill?.id"
+                    class="px-4 py-2 text-xs font-bold text-white bg-green-600 hover:bg-green-700 disabled:opacity-60 rounded-xl">{{ __('pos.wa_name_and_total') }}</button>
                 <button @click="reprintPreviewBill = null" class="px-4 py-2 text-xs font-bold text-gray-600 dark:text-gray-300 rounded-xl border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition">{{ __('pos.close_btn_ur') }}</button>
                 <button @click="reprintBill(reprintPreviewBill); reprintPreviewBill = null" class="px-5 py-2 text-xs font-bold text-white bg-teal-600 hover:bg-teal-700 rounded-xl transition flex items-center gap-1.5">
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
@@ -4348,7 +4361,11 @@ window.addEventListener('popstate', function() {
                     :class="waHighlight ? 'ring-4 ring-green-300 animate-pulse' : ''"
                     title="{{ __('pos.ti_wa_bill') }}">
                     <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
-                    {{ __('pos.wa_bill_btn') }}
+                    {{ __('pos.wa_full_bill') }}
+                </button>
+                <button type="button" x-show="waBillEnabled && lastWaPhone && lastShareUrl && !lastIsOffline" x-cloak
+                    @click="openWaBill(false, true)" class="w-full mb-2 py-2 text-center rounded-xl border border-green-600 text-green-700 dark:text-green-300 text-sm font-bold">
+                    {{ __('pos.wa_name_and_total') }}
                 </button>
                 <div class="grid grid-cols-4 gap-2">
                     {{-- 1. Print Receipt (P) --}}
@@ -5208,6 +5225,8 @@ function restaurantPos() {
         _deliveryAddressGeneration: 0,
         _deliveryAddressLoad: null,
         showAddrNew: false,
+        addressSaving: false,
+        addressSaveError: '',
         newAddrText: '',
         newAddrLabel: '',
         cart: [],
@@ -5219,6 +5238,7 @@ function restaurantPos() {
         _heldEtag: null,     // Task 1097: ETag from last held-orders poll (If-None-Match fast-path)
         _incomingEtag: null, // Task 1097: ETag from last incoming-orders poll
         _tableEtag: null,    // Task 1109: ETag from last table-status poll (If-None-Match fast-path)
+        _tableRequestSerial: 0,
         // Task 502: Tables page open-order card → boot par isi order ka direct recall.
         bootRecallOrderId: {!! $jsEnc($recallOrderIdForJs ?? null, 'null') !!},
         showTablePicker: false,
@@ -5236,6 +5256,8 @@ function restaurantPos() {
         // Table-status fetch nakaam (net/server down) — tab "no tables configured"
         // dikhana JHOOT hai; picker aur board dono sach batate hain.
         tablesError: false,
+        tablesErrorKind: '',
+        tablesCheckedAt: null,
         // Occupied-timer tick — bumped every 30s so elapsed labels re-render live.
         nowTick: Date.now(),
         showPayModal: false,
@@ -5570,6 +5592,7 @@ function restaurantPos() {
         waBillAutoOpen: {{ !empty($company->pos_whatsapp_bill_auto_open) ? 'true' : 'false' }},
         waShopName: @json($company->name ?? ''),
         lastWaPhone: null,
+        lastWaCustomerName: null,
         lastShareUrl: null,
         waHighlight: false,
         waReprintBusyId: null,
@@ -9022,40 +9045,56 @@ function restaurantPos() {
         },
         async saveNewAddress() {
             const text = (this.newAddrText || '').trim();
-            if (!text) return;
+            if (!text || this.addressSaving) return;
+            this.addressSaveError = '';
             const label = (this.newAddrLabel || '').trim();
-            const c = this.selectedCustomer;
-            if (!c || !c.id) {
-                // Walk-in: one-off snapshot only, nothing to persist against.
+            const customer = this.selectedCustomer;
+            const generation = this._deliveryAddressGeneration;
+            const choice = this._deliveryAddressChoiceVersion = (this._deliveryAddressChoiceVersion || 0) + 1;
+            const current = () => this.selectedCustomer === customer
+                && this._deliveryAddressGeneration === generation && this.hasDeliveryPortion();
+
+            // The current order can use a one-off address even when the address
+            // book cannot be saved. A retry must not add another picker option.
+            if (!this.customerAddresses.some(row => row.address === text)) {
                 this.customerAddresses.push({ id: null, label: label || null, address: text });
-                this.selectedDeliveryAddress = text;
+            }
+            this.selectedDeliveryAddress = text;
+            if (!customer?.id) {
                 this.showAddrNew = false; this.newAddrText = ''; this.newAddrLabel = '';
                 return;
             }
-            // The cashier's typed address is valid for this bill even when saving
-            // the reusable address book fails/offline. Keep it visibly as a one-off.
-            const temporary = { id: null, label: label || null, address: text };
-            this.customerAddresses.push(temporary);
-            this.selectedDeliveryAddress = text;
-            this._deliveryAddressChoiceVersion = (this._deliveryAddressChoiceVersion || 0) + 1;
+
+            this.addressSaving = true;
+            const load = this._deliveryAddressLoad;
             try {
-                const res = await fetch('/pos/api/customer-addresses', {
+                const res = await this._fetchWithTimeout('/pos/api/customer-addresses', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
-                    body: JSON.stringify({ customer_id: c.id, address: text, label: label || null }),
+                    body: JSON.stringify({ customer_id: customer.id, address: text, label: label || null }),
                 });
                 const data = await res.json().catch(() => null);
-                if (this.selectedCustomer !== c) return;
-                if (data && data.success && data.address) {
-                    this.customerAddresses = this.customerAddresses.filter(a => !(a.id === null && a.address === text));
-                    this.customerAddresses.push(data.address);
-                    this.selectedDeliveryAddress = data.address.address;
+                if (!current()) return;
+                if (res.ok && data?.success && data.address) {
+                    // Finish any earlier GET before applying the confirmed POST.
+                    // Its older payload cannot then replace the saved option.
+                    await load?.pending;
+                    if (!current()) return;
+                    const saved = data.address;
+                    this.customerAddresses = this.customerAddresses.filter(row =>
+                        row.id !== saved.id && !(row.id === null && row.address === saved.address));
+                    this.customerAddresses.push(saved);
+                    if (this._deliveryAddressChoiceVersion === choice) this.selectedDeliveryAddress = saved.address;
                     this.showAddrNew = false; this.newAddrText = ''; this.newAddrLabel = '';
                     this.showToast(window.TXT.address_saved, 'success');
                 } else {
-                    this.showToast((data && data.message) || window.TXT.could_not_save_address, 'error');
+                    this.addressSaveError = data?.message || window.TXT.could_not_save_address;
                 }
-            } catch (e) { this.showToast(window.TXT.could_not_save_address_conn, 'error'); }
+            } catch (_) {
+                if (current()) this.addressSaveError = window.TXT.could_not_save_address_conn;
+            } finally {
+                this.addressSaving = false;
+            }
         },
         // ZFC (Aug 2026): delete the SELECTED saved address from the sale screen.
         // id=0 = customer's default address (cleared, not row-deleted); walk-in
@@ -9146,26 +9185,50 @@ function restaurantPos() {
                 clearTimeout(timer);
             }
         },
+        tableStatusErrorMessage() {
+            if (this.tablesErrorKind === 'auth') return window.TXT.tables_session_expired;
+            if (this.tablesErrorKind === 'server') return window.TXT.tables_server_error;
+            return window.TXT.tables_offline;
+        },
         async loadTableStatus() {
+            const serial = ++this._tableRequestSerial;
             this.tablesLoading = true;
             try {
                 const hdrs = { 'Accept': 'application/json' };
                 if (this._tableEtag) hdrs['If-None-Match'] = this._tableEtag;
                 const res = await this._fetchWithTimeout('/pos/restaurant/api/table-status', { headers: hdrs });
-                if (res.status === 304) { this.tablesError = false; this.tablesLoading = false; return; }
-                if (!res.ok) { this.tablesError = true; this.tablesLoading = false; return; }
-                const etag = res.headers.get('ETag');
-                if (etag) this._tableEtag = etag;
-                const list = await res.json();
-                const groups = {};
-                (Array.isArray(list) ? list : []).forEach(t => {
-                    const f = t.floor || 'Main';
-                    (groups[f] = groups[f] || []).push(t);
-                });
-                this.tableFloors = Object.keys(groups).map(name => ({ name, tables: groups[name] }));
+                if (serial !== this._tableRequestSerial) return;
+                if (res.status === 304) {
+                    if (!this._tableEtag) throw new Error('Uncached table response');
+                } else if (!res.ok || res.redirected) {
+                    this.tablesError = true;
+                    this.tablesErrorKind = [401, 403, 419].includes(res.status) || res.redirected ? 'auth' : 'server';
+                    return;
+                } else {
+                    const list = await res.json();
+                    if (serial !== this._tableRequestSerial) return;
+                    if (!Array.isArray(list) || list.some(t => !t || !t.id)) throw new Error('Invalid table response');
+                    const groups = new Map();
+                    list.forEach(t => {
+                        const f = t.floor || 'Main';
+                        if (!groups.has(f)) groups.set(f, []);
+                        groups.get(f).push(t);
+                    });
+                    this.tableFloors = Array.from(groups, ([name, tables]) => ({ name, tables }));
+                    // Cache validators belong to the body we actually accepted.
+                    this._tableEtag = res.headers.get('ETag') || null;
+                }
                 this.tablesError = false;
-            } catch (e) { this.tablesError = true; console.error('[tables] status load failed', e); }
-            this.tablesLoading = false;
+                this.tablesErrorKind = '';
+                this.tablesCheckedAt = Date.now();
+            } catch (e) {
+                if (serial === this._tableRequestSerial) {
+                    this.tablesError = true;
+                    this.tablesErrorKind = e instanceof TypeError || e.name === 'AbortError' ? 'network' : 'server';
+                }
+            } finally {
+                if (serial === this._tableRequestSerial) this.tablesLoading = false;
+            }
         },
         // Task 899 / 935: cross-terminal held-orders sync — refreshes this.heldOrders from
         // the server every 25 s. Works BOTH directions: a cancel on Tab B disappears here
@@ -13849,6 +13912,7 @@ function restaurantPos() {
         // an empty wa.me can NEVER open (server sends nulls when unroutable).
         setWaBill(data) {
             this.lastWaPhone = (data && data.wa_phone) || null;
+            this.lastWaCustomerName = data?.wa_customer_name ?? null;
             this.lastShareUrl = (data && data.share_url) || null;
             this.waHighlight = false;
             // Consume the gesture-reserved tab (see reserveWaWindow). Kept on
@@ -13899,13 +13963,19 @@ function restaurantPos() {
                 + window.TXT.wa_msg_receipt + ': ' + url + '\n'
                 + window.TXT.wa_msg_thanks;
         },
-        waBillLinkFromLast() {
+        waBillSummary(name, total) {
+            const customer = String(name || '').replace(/\s+/g, ' ').trim() || window.TXT.walk_in_customer;
+            return customer + '\n' + window.TXT.total_word + ': Rs ' + Number(total || 0).toLocaleString(undefined, { maximumFractionDigits: 2 });
+        },
+        waBillLinkFromLast(summary = false) {
             if (!this.lastWaPhone || !this.lastShareUrl) return null;
-            const msg = this.waBillMessage(this.lastPraNumber || this.lastInvoiceNumber, this.lastTotal, this.lastShareUrl);
+            const msg = summary
+                ? this.waBillSummary(this.lastWaCustomerName, this.lastTotal)
+                : this.waBillMessage(this.lastPraNumber || this.lastInvoiceNumber, this.lastTotal, this.lastShareUrl);
             return 'https://wa.me/' + this.lastWaPhone + '?text=' + encodeURIComponent(msg);
         },
-        openWaBill(auto = false) {
-            const link = this.waBillLinkFromLast();
+        openWaBill(auto = false, summary = false) {
+            const link = this.waBillLinkFromLast(summary);
             if (!link) return;
             const w = window.open(link, '_blank');
             if (!w) {
@@ -14052,8 +14122,15 @@ function restaurantPos() {
         // hai. The blank tab opens SYNCHRONOUSLY (inside the click gesture) and
         // navigates after the fetch — window.open after an await would be
         // popup-blocked on Chrome.
-        async waShareReprint(bill) {
+        async waShareReprint(bill, summary = false) {
             if (!bill || !bill.wa_phone || this.waReprintBusyId) return;
+            if (summary) {
+                const message = this.waBillSummary(bill.customer_name, bill.total_amount);
+                if (!window.open('https://wa.me/' + bill.wa_phone + '?text=' + encodeURIComponent(message), '_blank')) {
+                    this.showToast(window.TXT.wa_popup_blocked, 'error');
+                }
+                return;
+            }
             this.waReprintBusyId = bill.id;
             const w = window.open('', '_blank');
             try {
@@ -14062,7 +14139,11 @@ function restaurantPos() {
                 if (!data || !data.url) throw new Error('no share url');
                 const msg = this.waBillMessage(bill.pra_invoice_number || bill.invoice_number, bill.total_amount, data.url);
                 const link = 'https://wa.me/' + bill.wa_phone + '?text=' + encodeURIComponent(msg);
-                if (w) { w.location = link; } else { window.open(link, '_blank'); }
+                if (w) {
+                    w.location = link;
+                } else if (!window.open(link, '_blank')) {
+                    this.showToast(window.TXT.wa_popup_blocked, 'error');
+                }
             } catch (e) {
                 console.error('waShareReprint', e);
                 if (w) { try { w.close(); } catch (e2) {} }

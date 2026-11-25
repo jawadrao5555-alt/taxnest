@@ -64,8 +64,8 @@ final class DiagnosticBillLookup
                 $bills->where('branch_id', $v['branch_id']);
             }
             if ($daily) {
-                if (! preg_match('/^L0*([1-9][0-9]{0,8})$/D', $v['bill_reference'], $match)) {
-                    throw ValidationException::withMessages(['bill_reference' => 'PRA daily reference must be an L-prefixed positive token.']);
+                if (! preg_match('/^[BL]0*([1-9][0-9]{0,8})$/D', $v['bill_reference'], $match)) {
+                    throw ValidationException::withMessages(['bill_reference' => 'PRA daily reference must be a B-prefixed current token or an L-prefixed legacy token.']);
                 }
                 // OrderTokenService has historically reset this counter at 06:00
                 // in app timezone. Current mutable receipt style is irrelevant.

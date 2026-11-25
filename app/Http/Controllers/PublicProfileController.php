@@ -6,7 +6,9 @@ use App\Models\Company;
 use App\Models\PosMenuItem;
 use App\Models\PosProduct;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 /**
  * P8 (F8) — Public QR business profile + menu.
@@ -34,6 +36,7 @@ class PublicProfileController extends Controller
         'hours_text' => '',
         'about_text' => '',
         'show_menu' => true,
+        'customer_links' => [],
     ];
 
     public static function settingsFor(Company $company): array
@@ -225,6 +228,17 @@ class PublicProfileController extends Controller
             'hours_text' => 'nullable|string|max:200',
             'about_text' => 'nullable|string|max:600',
         ]);
+        $links = null;
+        if ($request->has('pp_links_present')) {
+            $rules = ['customer_links' => 'nullable|array:whatsapp,menu,website'];
+            foreach (['whatsapp', 'menu', 'website'] as $slot) {
+                $rules["customer_links.$slot"] = 'nullable|array:label,url';
+                $rules["customer_links.$slot.label"] = "nullable|string|max:60|required_with:customer_links.$slot.url";
+                $rules["customer_links.$slot.url"] = "nullable|url:http,https|max:2048|required_with:customer_links.$slot.label";
+            }
+            $validated = $request->validate($rules);
+            $links = array_filter($validated['customer_links'] ?? [], fn ($link) => !empty($link['url']));
+        }
 
         // Stale-form guard (Task 1393 — same shape as the PRA Receipt Settings page,
         // Task 1377). This whole block is a wholesale rewrite driven by checkbox
@@ -240,11 +254,11 @@ class PublicProfileController extends Controller
             ['pp_enabled', 'hours_text', 'about_text'],
             array_map(fn ($k) => 'pp_' . $k, $showKeys)
         ));
-        if (!$ppPresent) {
+        if (!$ppPresent && $links === null) {
             return back()->with('success', 'Public profile settings saved.');
         }
 
-        $enabled = $request->has('pp_enabled');
+        $enabled = $ppPresent && $request->has('pp_enabled');
 
         // First enable ever → mint the permanent random slug (same UPDATE below).
         $also = [];
@@ -255,14 +269,19 @@ class PublicProfileController extends Controller
         // Merged onto the FRESH row under a lock (Company::mergeJsonColumn):
         // defaults + whatever is stored now + this form's values, so keys a
         // future writer adds to the column are never dropped by a stale copy.
-        $company->mergeJsonColumn('public_profile_settings', function (array $current) use ($request, $showKeys, $enabled): array {
+        $company->mergeJsonColumn('public_profile_settings', function (array $current) use ($request, $showKeys, $enabled, $ppPresent, $links): array {
             $settings = array_merge(self::DEFAULT_SETTINGS, $current);
-            $settings['enabled'] = $enabled;
-            foreach ($showKeys as $key) {
-                $settings[$key] = $request->has('pp_' . $key);
+            if ($ppPresent) {
+                $settings['enabled'] = $enabled;
+                foreach ($showKeys as $key) {
+                    $settings[$key] = $request->has('pp_' . $key);
+                }
+                $settings['hours_text'] = trim((string) $request->input('hours_text', ''));
+                $settings['about_text'] = trim((string) $request->input('about_text', ''));
             }
-            $settings['hours_text'] = trim((string) $request->input('hours_text', ''));
-            $settings['about_text'] = trim((string) $request->input('about_text', ''));
+            if ($links !== null) {
+                $settings['customer_links'] = $links;
+            }
             return $settings;
         }, $also);
 
@@ -305,31 +324,38 @@ class PublicProfileController extends Controller
 
         $ids = collect($request->input('menu_product_ids', []))
             ->map(fn ($v) => (int) $v)
-            ->filter()
             ->unique()
             ->values();
 
-        // Company-scoped: only this company's own products can be pinned.
-        $validIds = PosProduct::where('company_id', $company->id)
-            ->whereIn('id', $ids)
-            ->pluck('id')
-            ->map(fn ($v) => (int) $v)
-            ->all();
-        $validSet = array_flip($validIds);
-        $ordered = $ids->filter(fn ($id) => isset($validSet[$id]))->values();
+        DB::transaction(function () use ($company, $ids) {
+            Company::whereKey($company->id)->lockForUpdate()->firstOrFail();
 
-        PosMenuItem::where('company_id', $company->id)
-            ->whereNotIn('pos_product_id', $ordered->all())
-            ->delete();
+            $matched = PosProduct::where('company_id', $company->id)
+                ->where('is_active', true)
+                ->whereIn('id', $ids)
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->pluck('id')
+                ->count();
+            if ($matched !== $ids->count()) {
+                throw ValidationException::withMessages([
+                    'menu_product_ids' => 'The product list has changed. Reload the menu and select the products again.',
+                ]);
+            }
 
-        foreach ($ordered as $i => $productId) {
-            PosMenuItem::updateOrCreate(
-                ['company_id' => $company->id, 'pos_product_id' => $productId],
-                ['sort_order' => $i, 'is_active' => true]
-            );
-        }
+            PosMenuItem::where('company_id', $company->id)
+                ->whereNotIn('pos_product_id', $ids->all())
+                ->delete();
 
-        return back()->with('success', 'Public menu updated (' . $ordered->count() . ' items).');
+            foreach ($ids as $i => $productId) {
+                PosMenuItem::updateOrCreate(
+                    ['company_id' => $company->id, 'pos_product_id' => $productId],
+                    ['sort_order' => $i, 'is_active' => true]
+                );
+            }
+        });
+
+        return back()->with('success', 'Public menu updated (' . $ids->count() . ' items).');
     }
 
     private static function mintSlug(): string

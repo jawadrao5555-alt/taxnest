@@ -363,6 +363,33 @@ class PosSettingsStaleFormGuardTest extends TestCase
         $this->assertFalse((bool) ($pp['show_phone'] ?? true));
     }
 
+    public function test_public_menu_customer_links_keep_the_slug_and_reject_other_protocols(): void
+    {
+        $company = $this->company();
+        $company->public_profile_settings = ['enabled' => true, 'show_phone' => false];
+        $company->public_profile_slug = 'fictionaltestmenu1234';
+        $company->save();
+        $this->actAsAdmin();
+
+        $menu = ['label' => 'Lunch menu', 'url' => 'https://example.com/lunch.pdf'];
+        $this->post('/pos/public-profile', [
+            'pp_links_present' => '1',
+            'customer_links' => ['menu' => $menu],
+        ])->assertSessionHasNoErrors();
+        $this->assertSame('fictionaltestmenu1234', $this->company()->public_profile_slug);
+        $settings = $this->company()->public_profile_settings;
+        $this->assertTrue($settings['enabled']);
+        $this->assertFalse($settings['show_phone']);
+        $this->assertSame($menu, $settings['customer_links']['menu']);
+        $this->get('/menu/fictionaltestmenu1234')->assertOk()->assertSee($menu['url'])->assertSee('Lunch menu');
+
+        $this->post('/pos/public-profile', [
+            'pp_links_present' => '1',
+            'customer_links' => ['menu' => ['label' => 'Invalid', 'url' => 'ftp://example.com/lunch.pdf']],
+        ])->assertSessionHasErrors('customer_links.menu.url');
+        $this->assertSame($menu, $this->company()->public_profile_settings['customer_links']['menu']);
+    }
+
     // ── /pos/public-profile/menu — the QR menu picker ───────────────────────
 
     /** A POST carrying no menu picker at all must not delete the shop's QR menu. */
@@ -408,6 +435,42 @@ class PosSettingsStaleFormGuardTest extends TestCase
         $rows = DB::table('pos_menu_items')->where('company_id', $this->companyId)->pluck('pos_product_id')->all();
         $this->assertSame([2], array_map('intval', $rows),
             'A POST that carries the picker still rewrites the menu, marker or not');
+    }
+
+    public function test_bulk_menu_save_preserves_current_menu_when_a_selected_item_belongs_to_another_shop(): void
+    {
+        $this->seedMenu([1, 2, 3]);
+        $otherCompanyId = $this->companyId + 1;
+        DB::table('pos_products')->insert([
+            'id' => 4, 'company_id' => $otherCompanyId, 'name' => 'Example Soup',
+        ]);
+        $this->actAsAdmin();
+
+        $this->post('/pos/public-profile/menu', [
+            '_token' => csrf_token(),
+            'pm_present' => 1,
+            'menu_product_ids' => [2, 4],
+        ])->assertSessionHasErrors('menu_product_ids');
+
+        $items = DB::table('pos_menu_items')->where('company_id', $this->companyId)
+            ->orderBy('sort_order')->pluck('pos_product_id')->map(fn ($id) => (int) $id)->all();
+        $this->assertSame([1, 2, 3], $items);
+    }
+
+    public function test_bulk_menu_save_rejects_a_product_deactivated_since_the_picker_opened(): void
+    {
+        $this->seedMenu([1, 2, 3]);
+        DB::table('pos_products')->where('id', 2)->update(['is_active' => false]);
+        $this->actAsAdmin();
+
+        $this->post('/pos/public-profile/menu', [
+            'pm_present' => '1',
+            'menu_product_ids' => [2, 3],
+        ])->assertSessionHasErrors('menu_product_ids');
+
+        $items = DB::table('pos_menu_items')->where('company_id', $this->companyId)
+            ->orderBy('sort_order')->pluck('pos_product_id')->map(fn ($id) => (int) $id)->all();
+        $this->assertSame([1, 2, 3], $items);
     }
 
     // ── helpers ─────────────────────────────────────────────────────────────

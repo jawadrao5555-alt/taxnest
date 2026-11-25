@@ -65,6 +65,8 @@ Audit baseline [`eb7477f9`](https://github.com/jawadrao5555-alt/taxnest/commit/e
 
 ## Remaining bulk acceptance
 
+The Company Usage FBR POS report now has an explicit screen-to-CSV verification for daily, monthly, yearly, same-period year comparison and inclusive custom ranges. The fictional fixtures also verify exclusion of voided and undated bills from dated totals, and exclusion of other branches, companies and School collections from the selected shop. The Admin Usage, Admin Pages and PRA Operations Evidence suites passed together (37 tests, 223 assertions). Installed Agent collection evidence and the remaining linked source acceptance are still open.
+
 1. Reconcile released billing and onboarding behavior with #423 and #417 in #430. Record already delivered results and route implementation gaps to their existing owner.
 2. Complete Active Admin and Company Usage acceptance with daily, monthly, yearly, two-year comparison and custom-date ranges, consistent totals/exports and proper scopes. Verify Live Ops and diagnostics on applicable existing products, including per-stream evidence retention.
 3. Verify security, franchise boundaries, mobile/accessibility, downloads and public onboarding. Keep restricted audit records private and use fictional test data. Treat the linked #395 acceptance register as the complete source checklist and close its source only after all applicable rows, including those verified by the fiscal draft, are recorded.

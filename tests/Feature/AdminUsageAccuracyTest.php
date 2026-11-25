@@ -193,6 +193,8 @@ class AdminUsageAccuracyTest extends TestCase
         $this->travelTo(now()->setDate(2024, 2, 29)->startOfDay());
         foreach ([
             [4, 11, '2024-02-29', 'completed', 1200],
+            [4, 11, '2024-02-15', 'completed', 100],
+            [4, 11, '2024-01-15', 'completed', 250],
             [4, 11, '2023-02-28', 'completed', 450],
             [4, 11, '2024-03-01', 'completed', 900],
             [4, 11, '2024-02-29', 'voided', 800],
@@ -215,19 +217,38 @@ class AdminUsageAccuracyTest extends TestCase
         $this->get($url)->assertOk()->assertSee('Download FBR POS bill totals (CSV)')
             ->assertSee('Last year: 450.00')
             ->assertViewHas('usageStats', fn ($rows) => $rows->count() === 1
-                && $rows->first()->fbr_sales === ['bills' => 1, 'amount' => 1200.0]
+                && $rows->first()->fbr_sales === ['bills' => 3, 'amount' => 1550.0]
                 && $rows->first()->fbr_comparison === ['bills' => 1, 'amount' => 450.0]);
+
+        $rangeUrl = '/admin/company-usage?product_scope=fbrpos&company_id=4&branch_id=11';
+        foreach ([
+            ['period=daily', '2024-02-29', '2024-02-29', 1, 1200.0],
+            ['period=monthly', '2024-02-01', '2024-02-29', 2, 1300.0],
+            ['period=yearly', '2024-01-01', '2024-02-29', 3, 1550.0],
+            ['period=custom&date_from=2024-01-15&date_to=2024-02-15', '2024-01-15', '2024-02-15', 2, 350.0],
+        ] as [$periodQuery, $from, $to, $bills, $amount]) {
+            $reportUrl = $rangeUrl.'&'.$periodQuery;
+            $this->get($reportUrl)->assertOk()
+                ->assertViewHas('usageStats', fn ($rows) => $rows->count() === 1
+                    && $rows->first()->fbr_sales === ['bills' => $bills, 'amount' => $amount]);
+            $csv = $this->get($reportUrl.'&export=fbr_csv&as_of='.$to)
+                ->assertOk()->assertDownload('fbr-bills-4.csv')->streamedContent();
+            $this->assertSame([
+                'company_id,branch_id,business_date_from,business_date_to,completed_bills,total_pkr',
+                implode(',', [4, 11, $from, $to, $bills, number_format($amount, 2, '.', '')]),
+            ], explode("\n", trim($csv)), $periodQuery);
+        }
 
         $this->travel(1)->day();
         $csv = $this->get($url.'&as_of=2024-02-29&export=fbr_csv')->assertOk()
             ->assertDownload('fbr-bills-4.csv')->streamedContent();
         $this->assertSame([
             'company_id,branch_id,business_date_from,business_date_to,completed_bills,total_pkr',
-            '4,11,2024-01-01,2024-02-29,1,1200.00',
+            '4,11,2024-01-01,2024-02-29,3,1550.00',
             '4,11,2023-01-01,2023-02-28,1,450.00',
         ], explode("\n", trim($csv)));
 
-        $this->assertSame(['bills' => 5, 'amount' => 2850.0], CompanyUsageStat::refreshForCompany(4)->fbr_sales);
+        $this->assertSame(['bills' => 7, 'amount' => 3200.0], CompanyUsageStat::refreshForCompany(4)->fbr_sales);
         $this->getJson('/admin/company-usage?company_id=6&export=fbr_csv')->assertNotFound();
         $this->getJson('/admin/company-usage?company_id=1&export=fbr_csv')->assertNotFound();
     }

@@ -9,8 +9,8 @@ use App\Models\AdminAuditLog;
 use App\Models\AdminUser;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 
 class AdminFranchiseController extends Controller
 {
@@ -136,18 +136,19 @@ class AdminFranchiseController extends Controller
         AdminUser::requireSuperAdministrator();
         $franchise = Franchise::findOrFail($id);
 
-        $request->validate([
+        $data = $request->validate([
             'name' => 'required|string|max:255',
             'email' => "required|email|unique:franchises,email,{$id}",
             'phone' => 'nullable|string|max:30',
             'commission_rate' => 'required|numeric|min:0|max:100',
+            'password' => ['nullable', 'string', \Illuminate\Validation\Rules\Password::defaults()],
         ]);
-
-        $franchise->update($request->only(['name', 'email', 'phone', 'commission_rate']));
-
-        if ($request->filled('password')) {
-            $franchise->update(['password' => $request->password]);
+        if (isset($data['password'])) {
+            $franchise->session_generation = Str::uuid()->toString();
+        } else {
+            unset($data['password']);
         }
+        $franchise->fill($data)->save();
 
         AdminAuditLog::log(auth('admin')->id(), 'Franchise updated', 'Franchise', $franchise->id, ['name' => $franchise->name]);
         return back()->with('success', "Franchise '{$franchise->name}' updated.");
@@ -156,9 +157,15 @@ class AdminFranchiseController extends Controller
     public function toggleStatus($id)
     {
         AdminUser::requireSuperAdministrator();
-        $franchise = Franchise::findOrFail($id);
-        $newStatus = $franchise->status === 'active' ? 'suspended' : 'active';
-        $franchise->update(['status' => $newStatus]);
+        $franchise = DB::transaction(function () use ($id) {
+            $franchise = Franchise::query()->lockForUpdate()->findOrFail($id);
+            $franchise->status = $franchise->isActive() ? 'suspended' : 'active';
+            $franchise->session_generation = Str::uuid()->toString();
+            $franchise->save();
+
+            return $franchise;
+        });
+        $newStatus = $franchise->status;
 
         AdminAuditLog::log(auth('admin')->id(), "Franchise {$newStatus}", 'Franchise', $franchise->id);
         return back()->with('success', "Franchise '{$franchise->name}' is now {$newStatus}.");

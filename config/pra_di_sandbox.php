@@ -10,4 +10,9 @@ return [
     // No company is enabled automatically; checkout does not auto-submit.
     'hosted_enabled' => (bool) env('PRA_DI_SANDBOX_HOSTED_ENABLED', true),
     'production_enabled' => (bool) env('PRA_DI_PRODUCTION_ENABLED', true),
+    'paid_addon_policy_starts_at' => env('PRA_POS_FEDERAL_ADDON_POLICY_STARTS_AT'),
+    'paid_addon_annual_rates' => [
+        'federal_di' => env('PRA_POS_DI_ADDON_ANNUAL_PRICE'),
+        'federal_ims' => env('PRA_POS_IMS_ADDON_ANNUAL_PRICE'),
+    ],
 ];

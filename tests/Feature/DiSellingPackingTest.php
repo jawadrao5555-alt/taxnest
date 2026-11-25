@@ -142,6 +142,14 @@ class DiSellingPackingTest extends TestCase
         $return = Invoice::withoutGlobalScopes()->where('client_reference', $input['client_reference'])->sole();
         $this->assertEquals(25, $return->items()->sole()->quantity);
         $this->assertSame('25', $return->items()->sole()->selling_snapshot['factor']);
+        foreach ([$invoice, $return] as $document) {
+            $document->load('items', 'company');
+            $data = \App\Services\InvoicePdfService::buildData($document);
+            $html = view('invoice.pdf-bw', $data)->render();
+            $quantity = $document->is($invoice) ? '2' : '1';
+            $this->assertStringContainsString($quantity.' × 25 KG bag', $html);
+            $this->assertStringNotContainsString('50 KG bag', $html);
+        }
         $input['client_reference'] = 'excess-packing-return';
         $input['items'][0]['quantity'] = '2';
         $api->postJson('/api/di/v1/invoices', $input)->assertStatus(422);

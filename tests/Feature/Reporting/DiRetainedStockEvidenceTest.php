@@ -1,7 +1,7 @@
 <?php
 namespace Tests\Feature\Reporting;
 
-use App\Services\Reporting\{DiagnosticBillEvidence,DiagnosticSourceEvidence};
+use App\Services\Reporting\{DiagnosticBillEvidence,DiagnosticSourceEvidence,DiagnosticSourceExport};
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\{DB,Schema};
 use Tests\TestCase;
@@ -60,6 +60,27 @@ class DiRetainedStockEvidenceTest extends TestCase
         $r=$this->source(['branch_id'=>10]);$this->assertSame('INCONSISTENT_RETAINED_LINKS',$r['status']);$this->assertSame([],$r['rows']);
         $this->assertSame('PARTIAL',$this->source(['branch_id'=>20])['status']);
     }
+    public function test_export_distinguishes_inconsistent_stock_links_from_an_exhausted_window(): void
+    {
+        DB::table('di_invoice_inventory_postings')->where('id', 1)->update(['movement_id' => 104]);
+        $export = app(DiagnosticSourceExport::class);
+        $scope = ['company_name' => 'Synthetic DI', 'source' => 'di.stock_postings', 'date_from' => '2026-11-15'];
+
+        $inconsistent = $export->read($scope + ['branch_id' => 10], [1]);
+        $this->assertSame('INCONSISTENT_RETAINED_LINKS', $inconsistent['status']);
+        $this->assertSame('INCONSISTENT_RETAINED_LINKS', $inconsistent['export']['read_status']);
+        $this->assertSame([], $inconsistent['rows']);
+        $this->assertFalse($inconsistent['export']['retained_window_rows_exhausted']);
+
+        $valid = $export->read($scope + ['branch_id' => 20], [1]);
+        $this->assertSame([3], array_column($valid['rows'], 'id'));
+        $this->assertTrue($valid['export']['retained_window_rows_exhausted']);
+
+        $empty = $export->read(array_replace($scope, ['date_from' => '2026-11-16', 'branch_id' => 20]), [1]);
+        $this->assertSame('NO_RETAINED_EVENTS', $empty['status']);
+        $this->assertTrue($empty['export']['retained_window_rows_exhausted']);
+    }
+
     public function test_forged_item_and_movement_namespace_are_rejected(): void
     {
         DB::table('invoice_items')->where('id',1)->update(['invoice_id'=>4]);

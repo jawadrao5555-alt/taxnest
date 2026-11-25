@@ -6,7 +6,7 @@ use Illuminate\Support\Facades\Route;
 
 // Exact-guard authorization lives in the controller so the challenge cannot
 // redirect back into its own protected middleware. All writes retain web CSRF.
-Route::prefix('security/two-step/{panel}')->where(['panel' => 'di|pos|fbrpos|health|admin'])
+Route::prefix('security/two-step/{panel}')->where(['panel' => 'di|pos|fbrpos|health|admin|franchise'])
     ->controller(\App\Http\Controllers\Auth\TwoStepController::class)->group(function () {
         Route::get('/', 'settings')->name('two-step.settings');
         Route::get('/challenge', 'challenge')->name('two-step.challenge');

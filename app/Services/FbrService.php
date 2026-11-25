@@ -2222,7 +2222,7 @@ class FbrService
      */
     private function parseFbrPosImsResponse(array $responseData): array
     {
-        $code = (string) ($responseData['Code'] ?? $responseData['code'] ?? '');
+        $code = FbrPosFiscalResult::code($responseData) ?? '';
         $invoiceNumber = FbrPosFiscalResult::fromResponse($responseData);
 
         if ($code === '100' && !empty($invoiceNumber)) {
@@ -2730,13 +2730,13 @@ class FbrService
                 ];
             }
 
-            $responseCode = trim((string) ($responseData['Code'] ?? $responseData['code'] ?? ''));
+            $responseCode = FbrPosFiscalResult::code($responseData) ?? '';
             $failedStatus = in_array($responseCode, ['', '100'], true) ? 'verification_pending' : 'failed';
             if ($failedStatus !== 'verification_pending') $clearHashOnFailure();
             $log->update([
                 'status' => 'failed',
                 'response_payload' => $responseData,
-                'response_code' => (string) ($responseData['Code'] ?? 'unknown'),
+                'response_code' => $responseCode !== '' ? $responseCode : 'unknown',
                 'error_message' => implode('; ', $fbrResult['errors']),
             ]);
             $transaction->update(array_merge([

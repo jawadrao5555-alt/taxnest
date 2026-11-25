@@ -44,6 +44,78 @@ class SharedPackageCheckoutTest extends TestCase
         $this->assertDatabaseCount('subscription_payments',0);
     }
 
+    public function test_erp_proof_upload_respects_the_same_vertical_rules_as_checkout(): void
+    {
+        Mail::fake();
+        Storage::fake('local');
+        $this->withoutMiddleware();
+        $company = Company::create(['name' => 'Fictional ERP shop', 'ntn' => 'ERPQA001', 'product_type' => 'erps']);
+        $owner = User::create([
+            'name' => 'Fictional owner', 'email' => 'erp-proof-owner@example.test',
+            'password' => 'unused', 'role' => 'company_admin', 'company_id' => $company->id,
+        ]);
+        $plan = PricingPlan::create([
+            'name' => 'Starter', 'product_type' => 'erps', 'invoice_limit' => 100, 'price' => 14999, 'is_public' => true,
+        ]);
+        $plan->forceFill(['erps_vertical' => 'unregistered-example'])->save();
+        $this->actingAs($owner, 'health');
+        $submit = fn () => $this->post(route('health.payment-proof.store'), [
+            'pricing_plan_id' => $plan->id, 'billing_cycle' => 'annual', 'amount' => 14999,
+            'payment_method' => 'bank', 'proof' => UploadedFile::fake()->create('fictional.pdf', 2, 'application/pdf'),
+        ]);
+
+        $submit()->assertSessionHasErrors('pricing_plan_id');
+        $this->assertDatabaseCount('payment_proofs', 0);
+        $this->assertSame([], Storage::disk('local')->allFiles());
+
+        // The route test disables session middleware, so clear the previous response's flash data.
+        session()->forget('errors');
+        $plan->forceFill(['erps_vertical' => null])->save();
+        $submit()->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('payment_proofs', [
+            'company_id' => $company->id, 'pricing_plan_id' => $plan->id, 'status' => 'pending',
+        ]);
+        $this->assertDatabaseCount('subscription_payments', 0);
+    }
+
+    public function test_checkout_displays_and_submits_the_same_saved_monthly_price_after_catalogue_changes(): void
+    {
+        Mail::fake();
+        Storage::fake('local');
+        $this->withoutMiddleware();
+        view()->share('errors', new \Illuminate\Support\ViewErrorBag);
+        config(['billing.shared_configured_cycles' => true]);
+        $company = Company::create(['name' => 'Fictional monthly shop', 'ntn' => 'MONTHLYQA', 'product_type' => 'pos']);
+        $plan = PricingPlan::create([
+            'name' => 'Business', 'product_type' => 'pos', 'price' => 24000,
+            'price_monthly' => 2200, 'invoice_limit' => 1000, 'is_public' => true,
+        ]);
+        $admin = User::create([
+            'name' => 'Fictional owner', 'email' => 'monthly-owner@example.test',
+            'password' => 'unused', 'role' => 'company_admin', 'company_id' => $company->id,
+        ]);
+        $this->actingAs($admin, 'pos');
+        app()->instance('currentCompanyId', $company->id);
+        app()->instance('currentBranchGuard', 'pos');
+        app()->instance('currentBranchId', null);
+        $this->post(route('pos.package-checkout.select'), [
+            'plan_id' => $plan->id, 'billing_cycle' => 'monthly',
+        ])->assertRedirect();
+
+        $plan->update(['price_monthly' => 2600]);
+        $page = route('pos.package-checkout', ['plan_id' => $plan->id]);
+        $this->get($page)->assertOk()->assertSee('Monthly · PKR 2,200.00')->assertDontSee('2,600.00');
+        config(['billing.disable_fresh_monthly' => true]);
+        $this->get($page)->assertOk()->assertSee('Monthly · PKR 2,200.00');
+        $this->post(route('pos.payment-proof.store'), [
+            'pricing_plan_id' => $plan->id, 'billing_cycle' => 'monthly', 'amount' => 2200,
+            'payment_method' => 'bank', 'proof' => UploadedFile::fake()->create('fictional.pdf', 2, 'application/pdf'),
+        ])->assertSessionHasNoErrors();
+        $proof = PaymentProof::where('company_id', $company->id)->sole();
+        $this->assertSame('monthly', $proof->billing_cycle);
+        $this->assertEquals(2200, $proof->distributor_quote_snapshot['net_quote']);
+    }
+
     public function test_checkout_rejects_cashier_wrong_product_and_unconfigured_period(): void
     {
         $this->withoutMiddleware();

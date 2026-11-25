@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -43,14 +44,19 @@ class CompanyUsageStat extends Model
 
         $ids = $companies->pluck('id');
         $praIds = $companies->filter(fn ($company) => $company->product_type === 'pos')->pluck('id');
-        $hasSales = Schema::hasColumns('pos_transactions', ['company_id', 'status', 'total_amount']);
-        $sales = $hasSales && $praIds->isNotEmpty()
-            ? DB::table('pos_transactions')->whereIn('company_id', $praIds)->where('status', 'completed')
-                ->when(Schema::hasColumn('pos_transactions', 'is_archived'), fn ($query) => $query
-                    ->where(fn ($visible) => $visible->where('is_archived', false)->orWhereNull('is_archived')))
-                ->selectRaw('company_id, COUNT(*) as bills, COALESCE(SUM(total_amount), 0) as amount')
-                ->groupBy('company_id')->get()->keyBy('company_id')
-            : collect();
+        $fbrIds = $companies->filter(fn ($company) => $company->product_type === 'fbrpos'
+            && !$company->isLocalCollectionPilot())->pluck('id');
+        $diIds = $companies->where('product_type', 'di')->pluck('id');
+        $praTable = 'pos_transactions';
+        $fbrTable = 'fbr_pos_transactions';
+        $sales = self::completedSales($praTable, $praIds, $localFilters);
+        $fbrSales = self::completedSales($fbrTable, $fbrIds, $localFilters);
+        $diDocuments = self::reportedDiDocuments($diIds, $localFilters);
+        $comparisonFilters = isset($localFilters['comparison']) ? $localFilters['comparison'] + $localFilters : null;
+        $comparison = $comparisonFilters ? self::completedSales($praTable, $praIds, $comparisonFilters) : null;
+        $fbrComparison = $comparisonFilters ? self::completedSales($fbrTable, $fbrIds, $comparisonFilters) : null;
+
+        $diComparison = $comparisonFilters ? self::reportedDiDocuments($diIds, $comparisonFilters) : null;
 
         $counts = [];
         foreach (['active_terminals' => 'pos_terminals', 'active_users' => 'users', 'inventory_items' => 'inventory_stocks'] as $field => $table) {
@@ -80,23 +86,107 @@ class CompanyUsageStat extends Model
         }
 
         $localReporter=app(\App\Services\Reporting\LocalCollectionReports::class);
-        return $companies->map(function (Company $company) use ($hasSales, $sales, $counts, $lastActivity, $localReporter, $localFilters) {
+        return $companies->map(function (Company $company) use ($sales, $comparison, $fbrSales, $fbrComparison, $diDocuments, $diComparison, $counts, $lastActivity, $localReporter, $localFilters) {
             $pra = $company->product_type === 'pos';
-            $sale = $sales->get($company->id);
+            $sale = $sales?->get($company->id);
             $snapshot = new self([
                 'company_id' => $company->id,
-                'total_pos_transactions' => $pra && $hasSales ? (int) ($sale->bills ?? 0) : null,
-                'total_sales_amount' => $pra && $hasSales ? (float) ($sale->amount ?? 0) : null,
+                'total_pos_transactions' => $pra && $sales !== null ? (int) ($sale->bills ?? 0) : null,
+                'total_sales_amount' => $pra && $sales !== null ? (float) ($sale->amount ?? 0) : null,
                 'last_activity_at' => $lastActivity[$company->id] ?? null,
             ]);
+            $snapshot->setAttribute('pra_comparison', $pra ? self::salesTotals($comparison, $company->id) : null);
+            $fbr = $company->product_type === 'fbrpos' && !$company->isLocalCollectionPilot();
+            $snapshot->setAttribute('fbr_sales', $fbr ? self::salesTotals($fbrSales, $company->id) : null);
+            $snapshot->setAttribute('fbr_comparison', $fbr ? self::salesTotals($fbrComparison, $company->id) : null);
+            $di = $company->product_type === 'di';
+            $snapshot->setAttribute('di_documents', $di ? self::salesTotals($diDocuments, $company->id) : null);
+            $snapshot->setAttribute('di_comparison', $di ? self::salesTotals($diComparison, $company->id) : null);
             foreach ($counts as $field => $values) {
                 $snapshot->setAttribute($field, $values !== null && ($pra || $field === 'active_users')
                     ? (int) ($values[$company->id] ?? 0) : null);
             }
             $snapshot->setRelation('company', $company);
             $snapshot->setAttribute('local_collections', $company->isLocalCollectionPilot() ? $localReporter->read($company, $localFilters) : null);
+            if ($company->isLocalCollectionPilot() && isset($localFilters['comparison'])) {
+                $snapshot->setAttribute('local_collections_comparison', $localReporter->read(
+                    $company,
+                    $localFilters['comparison'] + $localFilters
+                ));
+            }
 
             return $snapshot;
         });
+    }
+
+    private static function completedSales(string $table, Collection $companyIds, array $filters): ?Collection
+    {
+        if ($companyIds->isEmpty() || !Schema::hasColumns($table, ['company_id', 'status', 'total_amount'])) {
+            return null;
+        }
+        $sales = DB::table($table)->whereIn('company_id', $companyIds)->where('status', 'completed')
+            ->when(Schema::hasColumn($table, 'is_archived'), fn (Builder $query) => $query
+                ->where(fn (Builder $visible) => $visible->where('is_archived', false)->orWhereNull('is_archived')))
+            ->selectRaw('company_id, COUNT(*) as bills, COALESCE(SUM(total_amount), 0) as amount')
+            ->groupBy('company_id');
+        return self::scopedTotals($sales, $table, 'business_date', $filters);
+    }
+
+    private static function reportedDiDocuments(Collection $companyIds, array $filters): ?Collection
+    {
+        $table = 'invoices';
+        if ($companyIds->isEmpty() || !Schema::hasColumns($table, [
+            'company_id', 'status', 'fbr_status', 'fbr_invoice_number', 'document_type', 'total_amount',
+        ])) {
+            return null;
+        }
+
+        $documents = DB::table($table)->whereIn('company_id', $companyIds)
+            ->where('status', 'locked')
+            ->where('fbr_status', 'production')
+            ->whereNotNull('fbr_invoice_number')
+            ->whereRaw("TRIM(fbr_invoice_number) <> ''");
+        if (Schema::hasColumn($table, 'fiscal_submission_environment')) {
+            $documents->where(fn (Builder $query) => $query
+                ->whereNull('fiscal_submission_environment')->orWhere('fiscal_submission_environment', 'production'));
+        }
+        $documents->selectRaw(
+            'company_id, COUNT(*) as bills, SUM(CASE WHEN document_type = ? THEN -total_amount ELSE total_amount END) as amount',
+            ['Credit Note']
+        )->groupBy('company_id');
+
+        return self::scopedTotals($documents, $table, 'invoice_date', $filters);
+    }
+
+    private static function scopedTotals(Builder $query, string $table, string $dateColumn, array $filters): ?Collection
+    {
+        if (isset($filters['date_from']) || isset($filters['date_to'])) {
+            if (!Schema::hasColumn($table, $dateColumn)) {
+                return null;
+            }
+            $query->when(isset($filters['date_from']), fn (Builder $range) => $range->where($dateColumn, '>=', $filters['date_from']))
+                ->when(isset($filters['date_to']), fn (Builder $range) => $range->where($dateColumn, '<=', $filters['date_to']));
+        }
+        if (isset($filters['branch_id'])) {
+            if (!Schema::hasColumn($table, 'branch_id')) {
+                return null;
+            }
+            $branchId = (int) $filters['branch_id'];
+            $query->where(fn (Builder $branch) => $branch->where('branch_id', $branchId)
+                ->when($branchId === 0, fn (Builder $unassigned) => $unassigned->orWhereNull('branch_id')));
+        }
+
+        return $query->get()->keyBy('company_id');
+    }
+
+    private static function salesTotals(?Collection $rows, int $companyId): ?array
+    {
+        if ($rows === null) {
+            return null;
+        }
+
+        $row = $rows->get($companyId);
+
+        return ['bills' => (int) ($row->bills ?? 0), 'amount' => (float) ($row->amount ?? 0)];
     }
 }

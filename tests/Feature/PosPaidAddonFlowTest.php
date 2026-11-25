@@ -12,6 +12,7 @@ use App\Models\User;
 use App\Services\PosAddonPricingService;
 use App\Services\PosAddonService;
 use App\Services\PosFeatureService;
+use App\Services\PosFederalAddonAccess;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -1030,6 +1031,91 @@ class PosPaidAddonFlowTest extends TestCase
         $addon = PosAddon::where('company_id', $company->id)->firstOrFail();
         $this->assertEquals($quotedAmount, (float) $addon->amount);
         $this->assertEquals($quotedAmount, (float) $proof->fresh()->amount);
+    }
+
+    public function test_federal_addon_cutover_starts_at_the_configured_time(): void
+    {
+        $company = $this->makeShop($this->makePlan('Business'));
+        $cutoff = now()->addHour()->startOfMinute();
+        config(['pra_di_sandbox.paid_addon_policy_starts_at' => $cutoff->copy()->utc()->toIso8601String()]);
+
+        $this->travelTo($cutoff->copy()->subSecond());
+        $this->assertSame('legacy', PosFederalAddonAccess::state($company, 'federal_di'));
+        $this->assertSame('legacy', PosFederalAddonAccess::state($company, 'federal_ims'));
+
+        $this->travelTo($cutoff);
+        $this->assertSame('locked', PosFederalAddonAccess::state($company, 'federal_di'));
+        $this->assertSame('locked', PosFederalAddonAccess::state($company, 'federal_ims'));
+    }
+
+    public static function federalAddonChannels(): array
+    {
+        return [
+            'DI purchase leaves IMS locked' => ['federal_di', 'federal_ims'],
+            'IMS purchase leaves DI locked' => ['federal_ims', 'federal_di'],
+        ];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('federalAddonChannels')]
+    public function test_federal_addon_locks_other_channel_and_requires_full_payment_for_the_exact_term(
+        string $selected,
+        string $unselected,
+    ): void
+    {
+        config([
+            'pra_di_sandbox.paid_addon_policy_starts_at' => now()->toDateTimeString(),
+            'pra_di_sandbox.paid_addon_annual_rates' => [$selected => 12000, $unselected => 13000],
+        ]);
+        $plan = $this->makePlan('Business');
+        $company = $this->makeShop($plan);
+        $other = $this->makeShop($plan);
+        $this->assertSame('locked', PosFederalAddonAccess::state($company, $selected));
+        $this->buy($company, [$selected, $unselected])->assertSessionHas('error');
+        $this->assertDatabaseCount('payment_proofs', 0);
+        session()->forget('error');
+
+        $this->buy($company, [$selected])->assertSessionHasNoErrors();
+        $proof = PaymentProof::where('company_id', $company->id)->sole();
+        $this->assertEquals(12000, $proof->amount);
+        $this->assertSame('pending', PosFederalAddonAccess::state($company, $selected));
+        $this->assertFalse(PosFederalAddonAccess::allows($other, $selected));
+
+        config(['pra_di_sandbox.paid_addon_annual_rates.'.$selected => 16000]);
+        $this->approve($proof, ['verified_received_amount' => 11999])->assertSessionHas('error');
+        $this->assertDatabaseCount('pos_addons', 0);
+        session()->forget('error');
+        $this->approve($proof)->assertSessionHasNoErrors();
+        $this->assertSame('paid', PosFederalAddonAccess::state($company, $selected));
+        $this->assertSame('Setup required', PosFederalAddonAccess::display($company, $selected, false));
+        $this->assertFalse(PosFederalAddonAccess::allows($other, $selected));
+        $this->assertFalse(PosFederalAddonAccess::allows($company, $unselected));
+        $this->assertFalse(PosFederalAddonAccess::selectionAllowed($company, [$unselected]));
+        $this->approve($proof);
+        $this->assertDatabaseCount('pos_addons', 1);
+
+        $this->travel(13)->months();
+        $this->assertSame('expired', PosFederalAddonAccess::state($company, $selected));
+        $this->assertFalse(PosFederalAddonAccess::allows($company, $selected));
+        $this->travelBack();
+    }
+
+    public function test_pending_addon_cannot_be_approved_against_a_replacement_with_the_same_plan_and_expiry(): void
+    {
+        $company = $this->makeShop($this->makePlan('Business'));
+        $original = Subscription::where('company_id', $company->id)->sole();
+        $this->buy($company, ['caller_id'])->assertSessionHasNoErrors();
+        $proof = PaymentProof::where('company_id', $company->id)->sole();
+        $this->assertSame((int) $original->id, $proof->addonQuoteSnapshot()['subscription_id'] ?? null);
+
+        $replacement = $original->replicate();
+        $original->update(['active' => false]);
+        $replacement->save();
+
+        $this->approve($proof)->assertSessionHas('error', function (string $error): bool {
+            return str_contains($error, 'package changed');
+        });
+        $this->assertSame('pending', $proof->fresh()->status);
+        $this->assertDatabaseMissing('pos_addons', ['company_id' => $company->id]);
     }
 
     public function test_pending_addon_approval_uses_the_frozen_purchased_plan_after_catalogue_gate_edit(): void

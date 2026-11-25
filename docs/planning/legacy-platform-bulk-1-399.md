@@ -54,11 +54,22 @@ Audit baseline [`eb7477f9`](https://github.com/jawadrao5555-alt/taxnest/commit/e
 - #395 Company Usage PRA CSV exports the selected company's displayed bill totals by branch and stored business date. The comparison export includes both periods and holds the displayed cutoff when downloaded the next day.
 - #395 A10 Company Usage filters by product or standalone School/Hospital category before pagination and report queries. Legacy ERP product aliases and legacy category fields remain supported. A company selection must also match the selected product or category.
 - #319 PRA Agent collection accepts a retained diagnostic stream ID within the selected company. A fictional seven-day test verifies the Pakistan calendar boundaries, counts by day, pagination and isolation from other streams and companies. Installed-device rollout and complete retention still need field evidence.
+- #395 A13 Franchise login uses a one-minute failed-attempt budget for the normalized identity and requesting IP, separate from Admin login. The existing opt-in two-step flow now supports active franchise accounts with separate credential and audit identities. Fictional route coverage checks retries, enrollment, the next sign-in, company account separation and suspension.
+
+## Evidence reviewed before the franchise login correction
+
+- [CI on `4b5434dd`](https://github.com/jawadrao5555-alt/taxnest/actions/runs/45540311757) passed the required validation, full PHP suite, isolated MariaDB verification and desktop/390px browser suite. The browser lane exercised admin dashboard details and exports, reporting access, onboarding and the dedicated Hospital demo.
+- Fictional route and report tests on that revision covered the Admin Reports date presets, custom dates, same-period comparison, scoped exports, and Company Usage totals and CSV for PRA POS, standalone FBR POS, DI and School/Hospital collections. The franchise, public signup, rate card and diagnostic tests ran alongside those reports. The combined run passed 132 tests.
+- [#417](https://github.com/jawadrao5555-alt/taxnest/pull/417) carries the full #321 onboarding and support contract. [#423](https://github.com/jawadrao5555-alt/taxnest/pull/423) carries the full #264, #374 and #316 billing and lifecycle contracts. The [#433 register](https://github.com/jawadrao5555-alt/taxnest/blob/c40f08387f226627586ccc2832d237eeef60720b/docs/planning/bulk-pending-prs-400-430.md) records the remaining source requirements. Scope stays open for linked outcomes with pending acceptance.
+
+## Remaining bulk acceptance
 
 1. Reconcile released billing and onboarding behavior with #423 and #417 in #430. Record already delivered results and route implementation gaps to their existing owner.
 2. Complete Active Admin and Company Usage acceptance with daily, monthly, yearly, two-year comparison and custom-date ranges, consistent totals/exports and proper scopes. Verify Live Ops and diagnostics on applicable existing products, including per-stream evidence retention.
 3. Verify security, franchise boundaries, mobile/accessibility, downloads and public onboarding. Keep restricted audit records private and use fictional test data. Treat the linked #395 acceptance register as the complete source checklist and close its source only after all applicable rows, including those verified by the fiscal draft, are recorded.
 4. Reconcile #301 B01, B06–B08 and existing-product Q3–Q6 evidence here. Include B02–B05 and the remaining Q1/Q2 evidence from the fiscal draft in the same master. Carry unresolved requirements into their designated implementation checkpoint.
+
+For installed PRA Agent acceptance, record the tested Agent and app revisions and the seven Pakistan calendar dates for each applicable diagnostic stream. Use the authorized read-only Agent collection report to verify receipt dates, sample counts, any gaps and offline recovery at the actual installation. Keep the original evidence private and add its approved reference and outcome to the release record.
 
 ## Approved pricing cutover
 

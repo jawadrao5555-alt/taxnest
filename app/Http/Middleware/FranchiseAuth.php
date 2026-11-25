@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Services\TwoStepLogin;
 use Closure;
 use Illuminate\Http\Request;
 
@@ -19,6 +20,6 @@ class FranchiseAuth
             return redirect('/franchise/login')->with('error', 'Your franchise account is suspended.');
         }
 
-        return $next($request);
+        return TwoStepLogin::challenge($request, 'franchise') ?? $next($request);
     }
 }

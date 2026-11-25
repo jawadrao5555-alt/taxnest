@@ -65,6 +65,26 @@ class FranchiseIdorTest extends TestCase
         return $this->actingAs($this->x, 'franchise');
     }
 
+    public function test_repeated_failed_logins_are_limited_and_an_active_franchise_can_retry(): void
+    {
+        $this->freezeTime();
+        for ($attempt = 0; $attempt < 5; $attempt++) {
+            $this->from('/franchise/login')->post('/franchise/login', [
+                'email' => strtoupper($this->x->email),
+                'password' => 'Fictional incorrect password',
+            ])->assertSessionHasErrors(['email' => 'Invalid credentials.']);
+        }
+        $credentials = ['email' => $this->x->email, 'password' => 'Passw0rd!2026'];
+        $this->from('/franchise/login')->post('/franchise/login', $credentials)
+            ->assertRedirect('/franchise/login')
+            ->assertSessionHasErrors(['email' => 'Too many login attempts. Please try again in 60 seconds.']);
+        $this->assertGuest('franchise');
+
+        $this->travel(61)->seconds();
+        $this->post('/franchise/login', $credentials)->assertRedirect('/franchise/dashboard');
+        $this->assertAuthenticatedAs($this->x, 'franchise');
+    }
+
     public function test_franchise_x_sees_only_its_own_companies(): void
     {
         $this->asX()->get('/franchise/companies')

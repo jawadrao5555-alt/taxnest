@@ -17,7 +17,9 @@ final class TwoStepController extends Controller
         abort_unless($guard, 404);
         $actor = auth($guard)->user()?->fresh();
         abort_unless($actor, 403);
-        if ($guard !== 'admin') {
+        if ($guard === 'franchise') {
+            abort_unless($actor->isActive(), 403);
+        } elseif ($guard !== 'admin') {
             abort_unless($actor->is_active, 403);
             $company = \App\Models\Company::find($actor->company_id);
             $expected = $panel === 'health' ? 'erps' : $panel;

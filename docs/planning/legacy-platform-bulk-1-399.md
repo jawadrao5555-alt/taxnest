@@ -55,6 +55,7 @@ Audit baseline [`eb7477f9`](https://github.com/jawadrao5555-alt/taxnest/commit/e
 - #395 A10 Company Usage filters by product or standalone School/Hospital category before pagination and report queries. Legacy ERP product aliases and legacy category fields remain supported. A company selection must also match the selected product or category.
 - #319 PRA Agent collection accepts a retained diagnostic stream ID within the selected company. A fictional seven-day test verifies the Pakistan calendar boundaries, counts by day, pagination and isolation from other streams and companies. Installed-device rollout and complete retention still need field evidence.
 - #395 A13 Franchise login uses a one-minute failed-attempt budget for the normalized identity and requesting IP, separate from Admin login. The existing opt-in two-step flow now supports active franchise accounts with separate credential and audit identities. Fictional route coverage checks retries, enrollment, the next sign-in, company account separation and suspension.
+- #395 A13 A franchise password change or suspension revokes that franchise's existing sessions, including access to its two-step settings. Reactivation requires a fresh login. The additive session generation keeps legacy sessions for accounts whose credentials and status have not changed, and revocation preserves a concurrent Admin session.
 
 ## Evidence reviewed before the franchise login correction
 

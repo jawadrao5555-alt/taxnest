@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Franchise;
 
 use App\Http\Controllers\Controller;
+use App\Services\FranchiseSession;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\RateLimiter;
@@ -10,11 +11,16 @@ use Illuminate\Support\Str;
 
 class FranchiseAuthController extends Controller
 {
-    public function showLogin()
+    public function showLogin(Request $request)
     {
-        if (auth('franchise')->check()) {
+        $franchise = auth('franchise')->user()?->fresh();
+        if ($franchise?->isActive() && FranchiseSession::matches($request, $franchise)) {
             return redirect('/franchise/dashboard');
         }
+        if (auth('franchise')->hasUser()) {
+            FranchiseSession::revokeCurrent($request);
+        }
+
         return view('franchise.login');
     }
 
@@ -39,9 +45,10 @@ class FranchiseAuthController extends Controller
             return back()->withErrors(['email' => "Too many login attempts. Please try again in {$wait} seconds."])->onlyInput('email');
         }
 
-        if (Auth::guard('franchise')->attempt($request->only('email', 'password'), $request->boolean('remember'))) {
+        if (Auth::guard('franchise')->attempt($request->only('email', 'password') + ['status' => 'active'])) {
             RateLimiter::clear($identityKey);
             $request->session()->regenerate();
+            FranchiseSession::bind($request, Auth::guard('franchise')->user());
             return redirect('/franchise/dashboard');
         }
 

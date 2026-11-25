@@ -6,6 +6,21 @@ use App\Models\SecurityLog;
 
 class SecurityLogService
 {
+    public static function failedLogin(\Illuminate\Auth\Events\Failed $event): void
+    {
+        SecurityLog::create([
+            'user_id' => null,
+            'action' => 'failed_login',
+            'ip_address' => request()->ip(),
+            'user_agent' => request()->userAgent(),
+            'metadata' => [
+                'guard' => $event->guard,
+                'email' => $event->credentials['email'] ?? 'unknown',
+            ],
+            'created_at' => now(),
+        ]);
+    }
+
     /** Login identities are guard-bound; admin IDs are not company user IDs. */
     public static function login(\Illuminate\Auth\Events\Login $event): void
     {

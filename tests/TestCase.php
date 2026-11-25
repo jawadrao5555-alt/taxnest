@@ -35,11 +35,10 @@ abstract class TestCase extends BaseTestCase
         \App\Services\CompanyGroupService::flushSchemaCache();
         \App\Http\Controllers\Auth\PasswordResetLinkController::flushSchemaCache();
         \App\Support\AgentApiKey::flushSchemaCache();
-        // PosFeatureService caches plan/category answers by company id, while
-        // feature tests routinely drop and rebuild minimal schemas (and SQLite
-        // reuses company id 1). Never let an earlier test's entitlement answer
-        // leak into the next isolated fixture.
+        // POS and Healthcare memoize entitlements by company ID. SQLite
+        // fixtures reuse IDs, so reset both caches when switching fixtures.
         \App\Services\PosFeatureService::flushGateCaches();
+        \App\Services\HealthModuleService::forget();
         // Admin DI review reads the full ledger schema; later tests build
         // legacy schemas without it. Do not reuse that per-process answer.
         \App\Services\AiPageCreditService::forgetLedgerProbe();

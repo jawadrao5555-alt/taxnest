@@ -147,7 +147,7 @@
                 "name": "What do the TaxNest PRA POS plans include?",
                 "acceptedAnswer": {
                     "@@type": "Answer",
-                    "text": "The comparison table reads the current package limits and feature permissions directly from our package settings. Check its Restaurant / Kitchen, Attendance, QR Menu and WhatsApp rows for your chosen plan. Business can purchase eligible Rider Live Tracking and Caller ID add-ons; Unlimited includes them. Extra branches are priced separately. Your business category and enabled settings also determine which screens appear."
+                    "text": "The comparison table reads the current package limits and feature permissions directly from our package settings. Check its Restaurant / Kitchen, Attendance, QR Menu and WhatsApp rows for your chosen plan. Check the selected package for Rider Live Tracking and Caller ID eligibility before adding either to your quote. Extra branches are priced separately. Your business category and enabled settings also determine which screens appear."
                 }
             },
             {
@@ -316,7 +316,7 @@
         <div class="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8">
             <div class="text-center max-w-2xl mx-auto mb-16">
                 <h2 class="text-4xl font-serif text-[#052730] mb-6">Simple pricing.</h2>
-                <p class="text-gray-600 font-light text-lg">Full PRA compliance in every plan — pick the size that fits your shop.</p>
+                <p class="text-gray-600 font-light text-lg">Compare counter features, account limits and available billing periods for your shop.</p>
             </div>
 
             {{-- Task 1483 — the comparison table IS the package block now: the
@@ -389,7 +389,7 @@
                 <div class="border-t-2 border-[#0A4D5C] pt-6 relative group">
                     <div class="absolute right-0 top-6 text-[#E7BF3B] opacity-20 font-serif text-8xl leading-none transition-transform group-hover:-translate-y-2">6</div>
                     <h3 class="text-2xl font-serif text-[#052730] mb-4 relative z-10">The manager's cockpit</h3>
-                    <p class="text-gray-600 text-lg leading-relaxed relative z-10">Staff attendance (included from Business upward), cancelled-orders and waste reports, analytics dashboards with PDF export, per-member Custom Access permissions (Business plan and above), and a day-close that can auto-finalize leftover bills — the whole day reconciled in one screen.</p>
+                    <p class="text-gray-600 text-lg leading-relaxed relative z-10">Staff attendance, cancelled-orders and waste reports, analytics dashboards with PDF export, per-member permissions where included in your plan, and a day-close that can auto-finalize leftover bills — the whole day reconciled in one screen.</p>
                 </div>
 
                 <!-- Feature 7 -->
@@ -424,14 +424,14 @@
                 <div class="border-t-2 border-[#0A4D5C] pt-6 relative group">
                     <div class="absolute right-0 top-6 text-[#E7BF3B] opacity-20 font-serif text-8xl leading-none transition-transform group-hover:-translate-y-2">11</div>
                     <h3 class="text-2xl font-serif text-[#052730] mb-4 relative z-10">Madadgar — AI support</h3>
-                    <p class="text-gray-600 text-lg leading-relaxed relative z-10">An in-panel support assistant that answers in Urdu, any hour of the day. It knows every TaxNest PRA POS screen — and when it can't solve something, it hands you straight to a human.</p>
+                    <p class="text-gray-600 text-lg leading-relaxed relative z-10">Get help inside PRA POS, including guidance in Urdu. When reporting a counter or printer issue, include the receipt or kitchen ticket reference.</p>
                 </div>
 
                 <!-- Feature 12 -->
                 <div class="border-t-2 border-[#0A4D5C] pt-6 relative group">
                     <div class="absolute right-0 top-6 text-[#E7BF3B] opacity-20 font-serif text-8xl leading-none transition-transform group-hover:-translate-y-2">12</div>
                     <h3 class="text-2xl font-serif text-[#052730] mb-4 relative z-10">Counter essentials</h3>
-                    <p class="text-gray-600 text-lg leading-relaxed relative z-10">Order tokens printed on receipt and KOT so orders never get mixed up, customer khata and loyalty points, product Excel import/export for bulk catalogs (Business plan onwards), an optional caller-ID customer lookup add-on, tax-inclusive menu pricing, and an opening-cash record for a clean day-close.</p>
+                    <p class="text-gray-600 text-lg leading-relaxed relative z-10">Match receipts and kitchen tickets by order token. Queued kitchen tickets survive restarts; later additions print on separate slips. The counter also supports customer khata and loyalty points, product Excel import/export for bulk catalogs on eligible plans, an optional caller-ID customer lookup add-on, tax-inclusive menu pricing, and an opening-cash record for a clean day-close.</p>
                 </div>
             </div>
         </div>
@@ -480,7 +480,7 @@
                         <span class="font-serif text-lg text-gray-900">What do the plans include?</span>
                         <span class="text-gray-400 font-mono text-xl" x-text="open === 4 ? '-' : '+'">+</span>
                     </button>
-                    <div x-show="open === 4" x-collapse class="pb-6 text-gray-600 leading-relaxed font-light">The comparison table reads the current package limits and feature permissions directly from our package settings. Check its Restaurant / Kitchen, Attendance, QR Menu and WhatsApp rows for your chosen plan. Business can purchase eligible Rider Live Tracking and Caller ID add-ons; Unlimited includes them. Extra branches are priced separately. Your business category and enabled settings also determine which screens appear.</div>
+                    <div x-show="open === 4" x-collapse class="pb-6 text-gray-600 leading-relaxed font-light">The comparison table reads the current package limits and feature permissions directly from our package settings. Check its Restaurant / Kitchen, Attendance, QR Menu and WhatsApp rows for your chosen plan. Check the selected package for Rider Live Tracking and Caller ID eligibility before adding either to your quote. Extra branches are priced separately. Your business category and enabled settings also determine which screens appear.</div>
                 </div>
                 <div class="border-b border-gray-200">
                     <button @click="open = (open === 5 ? null : 5)" class="w-full flex items-center justify-between py-6 text-left">

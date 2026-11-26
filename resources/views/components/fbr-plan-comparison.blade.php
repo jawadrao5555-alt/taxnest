@@ -42,7 +42,7 @@
     popular-label="Popular"
     current-label="Your plan"
     tick-label="Included"
-    note="The table shows annual package prices. Additional configured periods appear below when available. Fiscal reporting depends on category, approved integration and verification; School and Hospital fiscal submission remains disabled."
+    note="The table shows annual package prices. Additional configured periods appear below when available. School and Hospital collections use the fiscal route configured for the company. Selecting a package alone does not enable IMS reporting."
     tip="Scroll sideways to see all packages."
     included-title="Included in every package"
     included-sub="These never depend on which package you pick."

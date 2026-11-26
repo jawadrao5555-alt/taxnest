@@ -3,7 +3,7 @@
         'di' => [
             'name' => 'TaxNest Digital Invoice', 'path' => '/digital-invoice', 'pricing' => '/digital-invoice#pricing',
             'fit' => 'Businesses preparing FBR digital invoices, including batch imports and consultant-managed companies.',
-            'steps' => ['Prepare buyer and product records, then create a draft or import rows using the template inside your account.', 'Review identifiers, quantities, HS classification, rates and validation errors. AI suggestions need your confirmation.', 'Test the workflow in Sandbox. Submit approved invoices using your configured production credentials and check the actual authority response.', 'Review invoice status, download PDFs and reconcile sales, tax and payments.'],
+            'steps' => ['Prepare buyer and product records, then create a draft or import rows using the template inside your account.', 'Review selling packs, base quantities and buyer details. Search FBR references for the applicable rate, schedule and unit. Confirm AI suggestions before saving.', 'Test the workflow in Sandbox. Submit approved invoices using your configured production credentials and check the actual authority response.', 'Review invoice status, download PDFs and reconcile sales, tax and payments.'],
             'before' => 'Bring a small sample of your own invoice format with customer details removed. Ask us to demonstrate import mapping, a rejected row, its correction and the final PDF.',
             'scope' => 'AI usage is subject to the selected package allowance. White-label PDFs and API access depend on the package. Recurring automatic invoicing is not currently offered.',
             'image' => 'di-create.jpg', 'alt' => 'Example Digital Invoice draft screen with blank buyer fields and Sandbox indicator',
@@ -18,9 +18,9 @@
         ],
         'fbr' => [
             'name' => 'TaxNest FBR POS', 'path' => '/fbr-pos-landing', 'pricing' => '/fbr-pos-landing#pricing',
-            'fit' => 'Goods retailers needing the FBR POS product, inventory, counter billing and associated reporting.',
+            'fit' => 'Retail counters managing stock and sales, and standalone school fee or hospital payment desks using their respective collection workspaces.',
             'steps' => ['Set up products, tax treatment, barcode or SKU and opening stock; configure the required integration and printers.', 'Build the customer bill, take payment and check the receipt and actual FBR response.', 'Review failed or queued submissions and resolve the specific error before retrying.', 'Use stock/purchase, transaction and sales reports; use returns or credit-note workflows against the original sale where supported.'],
-            'before' => 'Bring an anonymised product list and the printer models you use. Ask us to show stock receipt, a sale, a return and how the authority response is tracked.',
+            'before' => 'For retail, ask to see a sale and a return against its receipt. For collections, ask to see a partial payment, remaining balance and reprint. Where IMS reporting is enabled, check the saved acknowledgement and QR.',
             'scope' => 'Pharmacy and kitchen-ticket features depend on the selected package. Do not assume the PRA table board, kitchen display or public QR menu is included in FBR POS; confirm any required restaurant workflow before purchase.',
             'image' => 'fbr-stock.jpg', 'alt' => 'Example FBR stock screen showing low-stock alerts, purchase entry and supplier fields',
         ],

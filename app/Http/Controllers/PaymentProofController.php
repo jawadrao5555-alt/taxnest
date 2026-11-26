@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\PaymentProof;
+use App\Services\PlanCompanyCompatibility;
+use App\Support\NestErps;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
@@ -73,7 +75,9 @@ class PaymentProofController extends Controller
         // The selected package must be a real, non-trial plan for THIS account's
         // product line — a company can never request a plan from another panel.
         $plan = \App\Models\PricingPlan::find($validated['pricing_plan_id']);
-        if (!$plan || $plan->is_trial || \App\Services\PlanCompanyCompatibility::productKey($plan->product_type) !== \App\Services\PlanCompanyCompatibility::productKey($productType)) {
+        if (!$plan || $plan->is_trial
+            || PlanCompanyCompatibility::productKey($plan->product_type) !== PlanCompanyCompatibility::productKey($productType)
+            || (NestErps::isProductType($productType) && !PlanCompanyCompatibility::matches($company, $plan))) {
             return back()
                 ->withErrors(['pricing_plan_id' => 'Please select a valid package for your account.'])
                 ->withInput()
@@ -265,7 +269,9 @@ class PaymentProofController extends Controller
                 ->with('payment_proof', 'error');
         }
 
-        $eligibility = \App\Services\PosAddonService::purchaseEligibility($company);
+        $submittedCodes = $request->input('addon_codes');
+        $codesForEligibility = is_array($submittedCodes) ? array_filter($submittedCodes, 'is_string') : [];
+        $eligibility = \App\Services\PosAddonService::purchaseEligibility($company, $codesForEligibility);
         if (!$eligibility['allowed']) {
             return back()->with('error', __($eligibility['reason_key'] ?? 'pos.addons_not_available'))
                 ->with('payment_proof', 'error');
@@ -273,7 +279,7 @@ class PaymentProofController extends Controller
 
         $validated = $request->validate([
             'addon_codes' => 'required|array|min:1',
-            'addon_codes.*' => 'required|string|in:' . implode(',', array_keys(\App\Services\PosAddonPricingService::ADDONS)),
+            'addon_codes.*' => 'required|string|in:' . implode(',', array_keys(\App\Services\PosAddonPricingService::definitions())),
             'addon_cycle' => 'required|in:' . implode(',', \App\Services\PosAddonPricingService::CYCLES),
             'payment_method' => 'nullable|in:bank,jazzcash,easypaisa,other',
             'reference' => 'nullable|string|max:120',
@@ -300,7 +306,7 @@ class PaymentProofController extends Controller
             // The package can lapse or be replaced while this request waits for
             // the company mutex. Re-check on the locked row so an expired or
             // newly ineligible package can never create a zero-month proof.
-            $eligibility = \App\Services\PosAddonService::purchaseEligibility($lockedCompany);
+            $eligibility = \App\Services\PosAddonService::purchaseEligibility($lockedCompany, $validated['addon_codes']);
             if (!$eligibility['allowed']) {
                 return [
                     'status' => 'ineligible',
@@ -323,6 +329,10 @@ class PaymentProofController extends Controller
             \App\Services\PosAddonService::flushCache();
             $purchasable = \App\Services\PosAddonService::purchasableCodes($lockedCompany);
             $codes = array_values(array_intersect($validated['addon_codes'], $purchasable));
+            $federalCodes = array_intersect($validated['addon_codes'], \App\Services\PosFederalAddonAccess::CODES);
+            if (array_diff($federalCodes, $codes) || !\App\Services\PosFederalAddonAccess::selectionAllowed($lockedCompany, $codes)) {
+                return ['status' => 'federal_unavailable'];
+            }
             if (empty($codes)) {
                 return ['status' => 'nothing_to_buy'];
             }
@@ -330,8 +340,15 @@ class PaymentProofController extends Controller
             $quote = \App\Services\PosAddonService::quote(
                 $codes,
                 $validated['addon_cycle'],
-                $lockedCompany
+                $lockedCompany,
+                $eligibility['subscription']
             );
+            foreach ($federalCodes as $code) {
+                if (($quote['lines'][$code] ?? 0) <= 0 || !PaymentProof::addonQuoteSnapshotColumnExists()) {
+                    return ['status' => 'federal_unavailable'];
+                }
+            }
+            $quote['subscription_id'] = (int) $eligibility['subscription']->id;
             $proofData = [
                 'company_id' => $lockedCompany->id,
                 // Context only — approval never reads it for pricing.
@@ -364,6 +381,11 @@ class PaymentProofController extends Controller
             ];
         });
 
+        if ($outcome['status'] === 'federal_unavailable') {
+            Storage::disk('local')->delete($path);
+            return back()->with('error', 'Select one available federal add-on. Changing an existing DI or IMS channel requires review.')
+                ->with('payment_proof', 'error');
+        }
         if ($outcome['status'] === 'pending') {
             return back()->with('success', __('pos.addons_already_pending'))
                 ->with('payment_proof', 'pending');
@@ -521,7 +543,7 @@ class PaymentProofController extends Controller
                 return;
             }
 
-            $catalog = \App\Services\PosAddonPricingService::ADDONS;
+            $catalog = \App\Services\PosAddonPricingService::definitions();
             $lines = [];
             foreach ($quote['codes'] as $code) {
                 $lines[] = '  - ' . ($catalog[$code]['label'] ?? $code)

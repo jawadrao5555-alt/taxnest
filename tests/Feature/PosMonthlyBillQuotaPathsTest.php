@@ -575,11 +575,11 @@ class PosMonthlyBillQuotaPathsTest extends TestCase
         $response->assertStatus(200)->assertJson(['success' => true]);
 
         $tx = DB::table('pos_transactions')->where('company_id', $companyId)->orderByDesc('id')->first();
-        // Reporting-OFF final = 'pra' mode + NULL status on the L-series.
+        // Reporting-OFF final = 'pra' mode + NULL status on the B-series.
         $this->assertSame('completed', $tx->status);
         $this->assertSame('pra', $tx->invoice_mode);
         $this->assertNull($tx->pra_status);
-        $this->assertMatchesRegularExpression('/^L\d+$/', $tx->invoice_number);
+        $this->assertMatchesRegularExpression('/^B\d+$/', $tx->invoice_number);
         $this->assertSame(116.0, (float) $tx->total_amount); // 100 + 16% whole-rupee
 
         // The new final CONSUMED the last slot — quota is now closed (2/2).
@@ -670,7 +670,7 @@ class PosMonthlyBillQuotaPathsTest extends TestCase
         $this->assertSame('completed', $tx->status);
         $this->assertSame('pra', $tx->invoice_mode);
         $this->assertNull($tx->pra_status); // reporting-OFF final
-        $this->assertMatchesRegularExpression('/^L\d+$/', $tx->invoice_number);
+        $this->assertMatchesRegularExpression('/^B\d+$/', $tx->invoice_number);
 
         // Settle consumed the only slot — next final is blocked.
         $this->assertFalse(PlanLimitService::canCreatePosBill($companyId)['allowed']);

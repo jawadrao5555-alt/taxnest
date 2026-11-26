@@ -3,16 +3,24 @@
 namespace App\Http\Controllers\Franchise;
 
 use App\Http\Controllers\Controller;
+use App\Services\FranchiseSession;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Str;
 
 class FranchiseAuthController extends Controller
 {
-    public function showLogin()
+    public function showLogin(Request $request)
     {
-        if (auth('franchise')->check()) {
+        $franchise = auth('franchise')->user()?->fresh();
+        if ($franchise?->isActive() && FranchiseSession::matches($request, $franchise)) {
             return redirect('/franchise/dashboard');
         }
+        if (auth('franchise')->hasUser()) {
+            FranchiseSession::revokeCurrent($request);
+        }
+
         return view('franchise.login');
     }
 
@@ -23,11 +31,29 @@ class FranchiseAuthController extends Controller
             'password' => 'required',
         ]);
 
-        if (Auth::guard('franchise')->attempt($request->only('email', 'password'), $request->boolean('remember'))) {
+        $email = Str::lower(trim($request->string('email')->toString()));
+        $ip = (string) $request->ip();
+        $identityKey = 'franchise-login:identity:'.hash('sha256', $email.'|'.$ip);
+        $ipKey = 'franchise-login:ip:'.hash('sha256', $ip);
+        $wait = 0;
+        foreach ([$identityKey => 5, $ipKey => 20] as $key => $limit) {
+            if (RateLimiter::tooManyAttempts($key, $limit)) {
+                $wait = max($wait, RateLimiter::availableIn($key));
+            }
+        }
+        if ($wait > 0) {
+            return back()->withErrors(['email' => "Too many login attempts. Please try again in {$wait} seconds."])->onlyInput('email');
+        }
+
+        if (Auth::guard('franchise')->attempt($request->only('email', 'password') + ['status' => 'active'])) {
+            RateLimiter::clear($identityKey);
             $request->session()->regenerate();
+            FranchiseSession::bind($request, Auth::guard('franchise')->user());
             return redirect('/franchise/dashboard');
         }
 
+        RateLimiter::hit($identityKey, 60);
+        RateLimiter::hit($ipKey, 60);
         return back()->withErrors(['email' => 'Invalid credentials.'])->onlyInput('email');
     }
 

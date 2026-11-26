@@ -6,6 +6,7 @@ use App\Models\Company;
 use App\Models\PosDiSandboxSubmission;
 use App\Models\PosDiSandboxProfile;
 use App\Models\PosTransaction;
+use App\Services\PosFederalAddonAccess;
 use App\Services\PraDiSandboxService;
 use App\Support\PraDiSandboxGate;
 use Illuminate\Http\Request;
@@ -35,6 +36,7 @@ class PraDiSandboxController extends Controller
     public function setup(Request $request)
     {
         $company = $this->company($request, true);
+        abort_unless(PosFederalAddonAccess::allows($company, 'federal_di'), 403);
         $profile = PosDiSandboxProfile::where('company_id', $company->id)->first();
         $scenarios = PosDiSandboxSubmission::where('company_id', $company->id)->where('environment', 'sandbox')
             ->where('state', 'accepted')->get()->map(fn ($record) => $record->payload['scenarioId'] ?? null)->filter()->unique()->values();
@@ -71,7 +73,12 @@ class PraDiSandboxController extends Controller
         $tokenRule = ['nullable', 'string', 'max:8192', 'regex:/^[\x21-\x7E]+$/'];
         Validator::make($tokens, ['sandbox_token' => $tokenRule, 'production_token' => $tokenRule])->validate();
         DB::transaction(function () use ($company, $data, $tokens) {
-            Company::whereKey($company->id)->lockForUpdate()->firstOrFail();
+            $company = Company::whereKey($company->id)->lockForUpdate()->firstOrFail();
+            $writesToken = array_filter($tokens, fn ($token) => is_string($token) && $token !== '') !== [];
+            // Evaluate access before a credential can turn an empty legacy row into a configured profile.
+            if ($data['enabled'] || $writesToken) {
+                abort_unless(\App\Services\PosFederalAddonAccess::allows($company, 'federal_di'), 403, 'DI setup requires an active paid add-on.');
+            }
             $profile = PosDiSandboxProfile::firstOrNew(['company_id' => $company->id]);
             $environment = $data['environment'] ?? $profile->environment ?? 'sandbox';
             foreach (['sandbox','production'] as $env) {

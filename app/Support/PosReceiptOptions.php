@@ -8,10 +8,18 @@ use Illuminate\Http\Request;
 /** Optional presentation overrides. Absent/inherit never changes a legacy design. */
 final class PosReceiptOptions
 {
+    public const LEGACY_DISPLAY_CONTROLS = [
+        'show_business_name', 'show_address', 'show_mobile', 'show_email', 'show_ntn',
+        'show_cashier', 'show_footer', 'show_developed_by', 'show_verify_line',
+    ];
+
     public const VISIBILITY = [
         'show_logo' => 'Logo', 'show_business_name' => 'Business name',
         'show_address' => 'Address', 'show_mobile' => 'Phone / mobile',
-        'show_email' => 'Email', 'show_ntn' => 'NTN',
+        'show_email' => 'Email', 'show_ntn' => 'NTN', 'show_strn' => 'STRN',
+        'show_pos_invoice_number' => 'POS invoice number when a fiscal or calling number is shown',
+        'show_customer_name' => 'Customer name', 'show_customer_phone' => 'Customer phone',
+        'show_delivery_address' => 'Delivery address',
         'show_business_activity' => 'Business activity', 'show_website' => 'Website',
         'show_date' => 'Bill date and time', 'show_terminal' => 'Terminal',
         'show_payment' => 'Payment method', 'show_cashier' => 'Cashier',
@@ -23,6 +31,7 @@ final class PosReceiptOptions
         'show_rate' => 'Rate column', 'show_item_notes' => 'Item comments',
         'show_deal_components' => 'Deal contents', 'show_bill_notes' => 'Bill notes',
         'show_subtotal' => 'Subtotal / menu total line',
+        'show_separators' => 'Dotted separator lines',
         'show_menu_qr' => 'Extra bill / menu QR (not fiscal QR)',
         'show_qr_caption' => 'Extra QR caption', 'show_verify_line' => 'Fiscal QR caption',
         'show_footer' => 'Thank-you / footer text', 'show_developed_by' => 'Developed by line',
@@ -161,6 +170,9 @@ final class PosReceiptOptions
         if (in_array($options['spacing'] ?? '', ['compact', 'roomy'], true)) {
             $pad = $options['spacing'] === 'compact' ? 1 : 4;
             $css .= '.items-table td,.info-table td{padding-top:'.$pad.'px !important;padding-bottom:'.$pad.'px !important;}';
+        }
+        if (! self::visible($options, 'show_separators')) {
+            $css .= '.separator{display:none !important;}.items-table tbody tr{border-bottom:0 !important;}';
         }
 
         return $css;

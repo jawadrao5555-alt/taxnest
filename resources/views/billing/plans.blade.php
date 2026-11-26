@@ -10,11 +10,18 @@
             @if(($pendingSelection ?? null) && ($pendingSelectionPlan ?? null))
             <section class="bg-white dark:bg-gray-900 border border-emerald-300 rounded-xl p-6 mb-6" aria-labelledby="selected-package-payment">
                 <h3 id="selected-package-payment" class="font-semibold text-lg">Selected: {{ $pendingSelectionPlan->name }}</h3>
-                <p class="text-sm mt-2">{{ \App\Models\Subscription::getCycleLabel($pendingSelection['cycle'] ?? 'annual') }} package total: PKR {{ number_format((float) $pendingSelection['net_quote'], 2) }}. Upload your receipt for review. Selecting a package does not activate or replace your subscription.</p>
+                @php
+                    $selectedCycle = $pendingSelection['cycle'] ?? 'annual';
+                @endphp
+                <p class="text-sm mt-2">{{ \App\Models\Subscription::getCycleLabel($selectedCycle) }} package total: PKR {{ number_format((float) $pendingSelection['net_quote'], 2) }}.</p>
+                @if(\App\Models\Subscription::getMonthsForCycle($selectedCycle) > 1)
+                    <p class="text-sm">Monthly equivalent: PKR {{ number_format($pendingSelection['net_quote'] / \App\Models\Subscription::getMonthsForCycle($selectedCycle), 2) }}.</p>
+                @endif
+                <p class="text-sm">Upload your receipt for review. Selecting a package does not activate or replace your subscription.</p>
                 <form method="POST" action="{{ route('payment-proof.store') }}" enctype="multipart/form-data" class="mt-4 space-y-3">
                     @csrf
                     <input type="hidden" name="pricing_plan_id" value="{{ $pendingSelectionPlan->id }}">
-                    <input type="hidden" name="billing_cycle" value="{{ $pendingSelection['cycle'] ?? 'annual' }}">
+                    <input type="hidden" name="billing_cycle" value="{{ $selectedCycle }}">
                     <div><label for="selected-package-amount" class="block text-sm">Amount you paid (PKR)</label><input id="selected-package-amount" name="amount" type="number" min="0" step="0.01" value="{{ old('amount') }}" class="rounded border-gray-300 dark:bg-gray-900"></div>
                     <div><label for="selected-package-method" class="block text-sm">Payment method</label><select id="selected-package-method" name="payment_method" class="rounded border-gray-300 dark:bg-gray-900"><option value="bank">Bank transfer</option><option value="jazzcash">JazzCash</option><option value="easypaisa">EasyPaisa</option><option value="other">Other</option></select></div>
                     <div><label for="selected-package-reference" class="block text-sm">Transaction reference</label><input id="selected-package-reference" name="reference" maxlength="120" value="{{ old('reference') }}" class="rounded border-gray-300 dark:bg-gray-900"></div>

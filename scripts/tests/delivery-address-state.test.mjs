@@ -79,7 +79,7 @@ test('typed one-off address remains billable if saving the address book fails of
 });
 test('confirmed address-book save replaces its temporary one-off without duplicate options',async()=>{
  const f=fixture();f.ui.newAddrText='Saved office';f.ui.newAddrLabel='Office';
- const pending=f.ui.saveNewAddress();f.requests[0].resolve({json:async()=>({success:true,address:{id:7,address:'Saved office'}})});await pending;
+ const pending=f.ui.saveNewAddress();f.requests[0].resolve({ok:true,json:async()=>({success:true,address:{id:7,address:'Saved office'}})});await pending;
  assert.equal(f.ui.customerAddresses.filter(a=>a.address==='Saved office').length,1);
  assert.equal(f.ui.customerAddresses.find(a=>a.address==='Saved office').id,7);
 });
@@ -88,4 +88,32 @@ test('delivery portion on a Dine In bill accepts and awaits the same customer ad
  const f=fixture();f.ui.orderType='dine_in';f.ui.cart=[{fulfillment:'delivery'}];f.ui.selectedCustomer={id:22,name:'Mixed guest'};
  f.ui.loadCustomerAddresses();const wait=f.ui.waitForDeliveryAddress();f.reply(0,[{id:0,address:'Mixed destination'}]);
  assert.equal(await wait,true);assert.equal(f.ui.selectedDeliveryAddress,'Mixed destination');
+});
+
+test('confirmed save survives the older address-book load and a double click sends one POST', async () => {
+ const f = fixture();
+ const lookup = f.ui.loadCustomerAddresses();
+ f.ui.newAddrText = 'Saved office';
+ const save = f.ui.saveNewAddress();
+ await f.ui.saveNewAddress();
+ assert.equal(f.requests.length, 2);
+ f.requests[1].resolve({ok: true, json: async () => ({success: true, address: {id: 7, address: 'Saved office'}})});
+ f.reply(0, [{id: 0, address: 'A default'}]);
+ await Promise.all([lookup, save]);
+ assert.equal(f.ui.selectedDeliveryAddress, 'Saved office');
+ assert.equal(f.ui.customerAddresses.find(row => row.address === 'Saved office').id, 7);
+});
+
+test('failed address-book save can be retried without duplicating the bill address', async () => {
+ const f = fixture();
+ f.ui.newAddrText = 'Office';
+ const first = f.ui.saveNewAddress();
+ f.requests[0].resolve({ok: false, json: async () => ({message: 'Try again'})});
+ await first;
+ assert.equal(f.ui.addressSaveError, 'Try again');
+ const retry = f.ui.saveNewAddress();
+ f.requests[1].resolve({ok: true, json: async () => ({success: true, address: {id: 7, address: 'Office'}})});
+ await retry;
+ assert.equal(f.ui.customerAddresses.filter(row => row.address === 'Office').length, 1);
+ assert.equal(f.ui.addressSaveError, '');
 });

@@ -14,6 +14,7 @@ if ($mode === 'verify') {
     $invoice = App\Models\Invoice::withoutGlobalScopes()->with(['items', 'company'])->sole();
     $expected = ($argv[3] ?? '') === 'financial' ? 98.0 : 11800.0;
     if ($invoice->status !== 'draft' || abs((float) $invoice->total_amount - $expected) > 0.005 || $invoice->fbr_invoice_number) exit(1);
+    if (($argv[3] ?? '') === 'financial' && !$invoice->items->first()->fbr_reference_checked) exit(1);
     if (($argv[3] ?? '') === 'withholding' && abs((float) $invoice->items->first()->st_withheld_amount - 500.25) > 0.005) exit(1);
     echo "DI browser draft persisted with expected amount and no fiscal submission.\n"; exit(0);
 }

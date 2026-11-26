@@ -12,7 +12,8 @@ class PosImsReportingService
     public function profile(int $companyId, ?string $environment = null): PosImsProfile
     {
         abort_unless(PraDiSandboxGate::setupAvailable(),404);
-        abort_unless(Company::whereKey($companyId)->where('product_type','pos')->where('status','approved')->where('company_status','active')->exists(),403);
+        $company = Company::whereKey($companyId)->where('product_type','pos')->where('status','approved')->where('company_status','active')->first();
+        abort_unless($company && PosFederalAddonAccess::allows($company, 'federal_ims'), 403, 'IMS reporting requires an active paid add-on.');
         $p=PosImsProfile::where('company_id',$companyId)->first();
         abort_unless($p && $p->enabled && in_array($p->environment,['sandbox','production'],true),409,'Enable FBR POS in Tax Integrations first.');
         abort_if($environment !== null && $p->environment !== $environment,409,'Environment changed; refresh before continuing.');
@@ -148,7 +149,7 @@ class PosImsReportingService
     }
     public function submit(int $companyId,int $id,int $actor): PosImsSubmission
     {
-        [$r,$token]=DB::transaction(function() use($companyId,$id,$actor){
+        [$r,$token,$url]=DB::transaction(function() use($companyId,$id,$actor){
             Company::whereKey($companyId)->lockForUpdate()->firstOrFail();
             $r=$this->locked($companyId,$id);$p=$this->activeRecord($r);
             self::preventOtherFederalRecord($companyId,$r->source_transaction_id,$r->environment,'ims');
@@ -157,17 +158,23 @@ class PosImsReportingService
             abort_unless(hash_equals($r->payload_hash,hash('sha256',json_encode($r->payload,JSON_THROW_ON_ERROR))),409);
             $token=(string)$p->{$r->environment.'_token'};
             if ($r->connection_mode==='cloud' && $token==='') throw ValidationException::withMessages(['token'=>'Configure the selected IMS token.']);
+            // Resolve the endpoint alongside its token before recording a dispatch attempt.
+            $url = $r->connection_mode === 'cloud'
+                ? PosTaxIntegrationEndpoints::checked('ims', $r->environment, $p->{$r->environment.'_url'})
+                : null;
             $state=$r->connection_mode==='fiscal_device' ? 'queued_agent':'submitting';
             $attempts=$r->attempts ?? []; $attempts[]=['actor_id'=>$actor,'at'=>now()->toIso8601String(),'state'=>$state,'environment'=>$r->environment,'hash'=>$r->payload_hash,'payload'=>$r->payload];
-            $r->fill(['state'=>$state,'attempted_at'=>now(),'attempts'=>$attempts])->save();return [$r,$token];
+            $r->fill(['state'=>$state,'attempted_at'=>now(),'attempts'=>$attempts])->save();return [$r,$token,$url];
         });
         if ($r->state==='queued_agent') return $r;
         $unknown=['state'=>'verification_required','reference'=>null,'error_codes'=>[]];
         try {
-            $p=PosImsProfile::where('company_id',$companyId)->firstOrFail();
-            $url=PosTaxIntegrationEndpoints::checked('ims',$r->environment,$p->{$r->environment.'_url'});
             $res=Http::withToken($token)->acceptJson()->connectTimeout(10)->timeout(45)->withoutRedirecting()->post($url,$r->payload);
-            $result=$res->successful() ? self::result($res->json()) : $unknown;
+            $response = $res->successful() ? $res->json() : null;
+            $result = self::result($response);
+            if ($evidence = self::acknowledgementEvidence($response)) {
+                $result['acknowledgement'] = $evidence;
+            }
         } catch (\Throwable $e) { $result=$unknown; }
         return $this->complete($companyId,$id,$result);
     }
@@ -176,23 +183,21 @@ class PosImsReportingService
         $unknown=['state'=>'verification_required','reference'=>null,'error_codes'=>[]];
         if (!is_array($data)) return $unknown;
         $number=FbrPosFiscalResult::fromResponse($data);
-        $codes=[];
-        foreach (['Code','code'] as $key) {
-            if (!isset($data[$key])) continue;
-            if (!is_string($data[$key]) && !is_int($data[$key]) && !(is_float($data[$key]) && is_finite($data[$key]))) return $unknown;
-            $codes[]=trim((string)$data[$key]);
-        }
-        if (count(array_unique($codes))>1) return $unknown;
-        $code=$codes[0] ?? '';
+        $code=FbrPosFiscalResult::code($data) ?? '';
         if ($code==='100' && $number) return ['state'=>$local?'local_accepted':'accepted','reference'=>$number,'error_codes'=>[]];
         // Any acknowledgement evidence makes a conflicting rejection uncertain.
-        if ($number || !empty($data['InvoiceNumber']) || !empty($data['FBRInvoiceNumber']) || !empty($data['invoiceNumber'])) return $unknown;
+        if (FbrPosFiscalResult::hasInvoiceEvidence($data)) return $unknown;
         if (preg_match('/^[0-9]{3}$/',$code) && $code !== '100') return ['state'=>'rejected','reference'=>null,'error_codes'=>[$code]];
         return $unknown;
     }
     private function complete(int $companyId,int $id,array $result,?string $claim=null,?string $diagnostic=null): PosImsSubmission
     {
-        return DB::transaction(function() use($companyId,$id,$result,$claim,$diagnostic){
+        $evidence = array_intersect_key($result, array_flip(['central_confirmation', 'acknowledgement']));
+        if (!empty($result['response_fields'])) $evidence['response_fields'] = $result['response_fields'];
+        if (in_array($diagnostic, ['invalid_endpoint', 'response_received', 'unrecognized_response', 'transport_timeout', 'http_error', 'invalid_json_result', 'unconfirmed_soap_or_transport'], true)) {
+            $evidence['diagnostic'] = $diagnostic;
+        }
+        return DB::transaction(function() use($companyId,$id,$result,$claim,$evidence){
             $r=$this->locked($companyId,$id);
             if ($claim !== null) abort_unless(is_string($r->agent_claim) && hash_equals($r->agent_claim,$claim),409);
             // A later authenticated callback may promote the same local reference exactly once.
@@ -200,17 +205,14 @@ class PosImsReportingService
                 && $r->fiscal_number === $result['reference']) {
                 $attempts = $r->attempts ?? [];
                 $attempts[] = ['at' => now()->toIso8601String(), 'state' => 'accepted', 'error_codes' => [],
-                    'previous_state' => 'local_accepted', 'central_confirmation' => $result['central_confirmation']];
+                    'previous_state' => 'local_accepted'] + $evidence;
                 $r->fill(['state' => 'accepted', 'attempts' => $attempts])->save();
                 return $r;
             }
             // Replayed callbacks are idempotent and never overwrite terminal evidence.
             if ($r->state !== 'submitting') return $r;
             $a=$r->attempts;$a[array_key_last($a)]['state']=$result['state'];$a[array_key_last($a)]['error_codes']=$result['error_codes'];
-            if ($diagnostic !== null && in_array($diagnostic,['invalid_endpoint','response_received','unrecognized_response','transport_timeout','http_error','invalid_json_result','unconfirmed_soap_or_transport'],true)) $a[array_key_last($a)]['diagnostic']=$diagnostic;
-            if (!empty($result['response_fields'])) $a[array_key_last($a)]['response_fields']=$result['response_fields'];
-            if (isset($result['central_confirmation'])) $a[array_key_last($a)]['central_confirmation']=$result['central_confirmation'];
-            if (isset($result['acknowledgement'])) $a[array_key_last($a)]['acknowledgement']=$result['acknowledgement'];
+            $a[array_key_last($a)] = array_replace($a[array_key_last($a)], $evidence);
             $r->fill(['state'=>$result['state'],'fiscal_number'=>$result['reference'],'attempts'=>$a])->save();return $r;
         });
     }
@@ -235,32 +237,39 @@ class PosImsReportingService
     {
         $r=PosImsSubmission::where('company_id',$companyId)->findOrFail($id);
         abort_unless($r->connection_mode==='fiscal_device' && $r->device_uid===$deviceUid,403);
-        $result=self::result($response,true);
+        // Older agents omit this field. An explicit transport failure cannot
+        // establish acceptance or rejection, even when the envelope carries a body.
+        $result = self::result($diagnostic === null || $diagnostic === 'response_received' ? $response : null, true);
         // The live IMS component can acknowledge with only FBRInvoiceNumber.
         // Bind that reply shape to this claimed POS and keep central verification separate.
+        $posId = $r->payload['POSID'] ?? null;
+        $posId = is_string($posId) || is_int($posId) ? (string) $posId : '';
         if ($result['state'] === 'verification_required' && $r->environment === 'production'
-            && ($number = ImsNumberOnlyAcknowledgement::number($response, (string)$r->payload['POSID'], $diagnostic, $responseFields))) {
+            && ($number = ImsNumberOnlyAcknowledgement::number($response, $posId, $diagnostic, $responseFields))) {
             $result = ['state'=>'local_accepted','reference'=>$number,'error_codes'=>[]];
         }
 
         $centralStatus = is_array($response) ? ($response['CentralStatus'] ?? null) : null;
         $centralReference = is_array($response) ? FbrPosFiscalResult::number($response['CentralReference'] ?? null) : null;
-        $posId = str_pad((string) ($r->payload['POSID'] ?? ''), 6, '0', STR_PAD_LEFT);
         if ($r->environment === 'production' && $diagnostic === 'response_received'
             && $result['state'] === 'local_accepted'
             && is_string($centralStatus) && in_array($centralStatus, ['confirmed', 'verified'], true)
             && $centralReference && $centralReference === $result['reference']
-            && !empty($r->payload['POSID']) && strlen($posId) === 6 && str_starts_with($centralReference, $posId)
-            && preg_match('/[0-9]/', substr($centralReference, 6))) {
+            && ImsNumberOnlyAcknowledgement::matchesPosId($centralReference, $posId)) {
             $result['state'] = 'accepted';
             $result['central_confirmation'] = ['source' => 'fbr_ims_callback', 'status' => $centralStatus,
                 'reference' => $centralReference];
         }
 
-        // Retain only bounded, validated fiscal fields in encrypted evidence.
-        // The original code used to discard all callback evidence after classification.
+        $result['acknowledgement'] = self::acknowledgementEvidence($response);
+        $result['response_fields']=array_values(array_filter(array_slice($responseFields,0,16),fn($field)=>is_string($field) && strlen($field)<=100 && preg_match('/^[A-Za-z0-9_.]+:(string|number|boolean|object|array|null)$/D',$field)));
+        return $this->complete($companyId,$id,$result,$claim,$diagnostic);
+    }
+    /** Keep only recognized, bounded fiscal fields in the encrypted attempt record. */
+    private static function acknowledgementEvidence($response): array
+    {
         $evidence=[];
-        foreach (['Code','code'] as $key) {
+        foreach (['Code','code','response_code'] as $key) {
             $value=is_array($response) ? ($response[$key] ?? null) : null;
             if ((is_string($value) || is_int($value) || (is_float($value) && is_finite($value))) && preg_match('/^[A-Za-z0-9_-]{1,12}$/D',trim((string)$value))) $evidence[$key]=trim((string)$value);
         }
@@ -269,10 +278,9 @@ class PosImsReportingService
             if ($key==='Response' && (!is_string($value) || !preg_match('/^(?:[0-9]{6}|[A-Z][A-Z-]*-[0-9]{3,}$)/',trim($value)))) continue;
             if ($number=FbrPosFiscalResult::number($value)) $evidence[$key]=$number;
         }
-        $result['acknowledgement']=$evidence;
-        $result['response_fields']=array_values(array_filter(array_slice($responseFields,0,16),fn($field)=>is_string($field) && strlen($field)<=100 && preg_match('/^[A-Za-z0-9_.]+:(string|number|boolean|object|array|null)$/D',$field)));
-        return $this->complete($companyId,$id,$result,$claim,$diagnostic);
+        return $evidence;
     }
+
     /** Record independently checked portal evidence; NEVER dispatch an invoice. */
     public function reconcilePortal(int $companyId,int $id,int $actor,array $evidence): PosImsSubmission
     {

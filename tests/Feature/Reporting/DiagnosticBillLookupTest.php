@@ -46,7 +46,7 @@ class DiagnosticBillLookupTest extends TestCase
 
     private function args(): array
     {
-        return ['company_name' => 'Synthetic token shop', 'reference_kind' => 'pra_daily_token', 'bill_reference' => 'L042', 'counter_date' => '2026-11-07'];
+        return ['company_name' => 'Synthetic token shop', 'reference_kind' => 'pra_daily_token', 'bill_reference' => 'B042', 'counter_date' => '2026-11-07'];
     }
 
     public function test_daily_token_uses_frozen_token_and_exact_counter_boundaries_without_current_style_or_archive_filters(): void
@@ -57,6 +57,7 @@ class DiagnosticBillLookupTest extends TestCase
         $this->assertSame('RESOLVED', $r['status']);
         $this->assertSame(1, $r['bill_id']);
         $this->assertSame(3, $service->read(array_replace($this->args(), ['counter_date' => '2026-11-08']), [1])['bill_id']);
+        $this->assertSame(1, $service->read(array_replace($this->args(), ['bill_reference' => 'L042']), [1])['bill_id']);
         $this->assertSame('unknown', $r['physical_print']);
         $this->assertFalse($r['complete']);
         $this->assertStringNotContainsString('PRIVATE', json_encode($r));

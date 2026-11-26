@@ -1,4 +1,8 @@
 <x-pos-layout>
+@php
+    $canSetUpIms = \App\Services\PosFederalAddonAccess::allows($company, 'federal_ims');
+    $canSetUpDi = \App\Services\PosFederalAddonAccess::allows($company, 'federal_di');
+@endphp
 <div class="max-w-5xl mx-auto p-6">
     <a href="{{ route('pos.customize') }}" class="underline">Back to Customize POS</a>
     <h1 class="text-2xl font-bold my-4">{{ __('tax_integrations.title') }}</h1>
@@ -9,17 +13,24 @@
             <p>Punjab service-tax registration, connection mode and Desktop Agent.</p>
             <a class="inline-block underline mt-4" href="{{ route('pos.pra-settings') }}">PRA configuration</a>
         </section>
+        @if($canSetUpIms)
         <section class="rounded-xl border p-5 bg-white dark:bg-gray-900"><h2 class="text-lg font-bold">FBR POS · IMS</h2>
-            <p class="my-3">{{ $imsProfile?->enabled ? 'Enabled' : 'Disabled' }} · {{ ucfirst($imsProfile?->environment ?? 'sandbox') }}</p>
+            <p class="my-3">{{ \App\Services\PosFederalAddonAccess::display($company, 'federal_ims', (bool) $imsProfile?->enabled) }} · {{ ucfirst($imsProfile?->environment ?? 'sandbox') }}</p>
             <p>Separate Sandbox/Production POS IDs, URLs and tokens. Cloud or a dedicated local FBR IMS component.</p>
             <a class="inline-block underline mt-4" href="{{ route('pos.tax-integrations.ims') }}">FBR POS configuration</a>
         </section>
+        @endif
+        @if($canSetUpDi)
         <section class="rounded-xl border p-5 bg-white dark:bg-gray-900"><h2 class="text-lg font-bold">FBR Digital Invoice</h2>
-            <p class="my-3">{{ $diProfile?->enabled ? 'Enabled' : 'Disabled' }} · {{ ucfirst($diProfile?->environment ?? 'sandbox') }}</p>
+            <p class="my-3">{{ \App\Services\PosFederalAddonAccess::display($company, 'federal_di', (bool) $diProfile?->enabled) }} · {{ ucfirst($diProfile?->environment ?? 'sandbox') }}</p>
             <p>FBR identity, Sandbox/Production API endpoints, encrypted tokens and scenario testing.</p>
             <a class="inline-block underline mt-4" href="{{ route('pos.di-sandbox.setup') }}">Digital Invoice configuration</a>
         </section>
+        @endif
     </div>
+    @if(!$canSetUpIms && !$canSetUpDi)
+        <a class="inline-block underline mt-4" href="{{ route('pos.billing') }}">{{ __('pos_federal_addons.review_account') }}</a>
+    @endif
     <p class="mt-6">PRA keeps its own connection. Enabling FBR POS selects IMS and disables new DI requests; enabling DI disables new IMS requests. Saved credentials and history remain. An accepted or unresolved bill cannot be resent through the other federal integration.</p>
     <p class="mt-3"><a class="underline" href="{{ route('pos.federal-auto') }}">Automatic reporting and dual-QR receipts</a> · review a supported tax mapping once, then new finalized bills enter the reporting queue automatically. Existing manual recovery remains available. PRA tax does not automatically make a federal sale exempt or zero-rated.</p>
 </div>

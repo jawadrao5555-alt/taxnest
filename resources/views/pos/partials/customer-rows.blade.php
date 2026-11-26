@@ -98,17 +98,20 @@
                                         <li class="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300">
                                             <span x-show="a.id === 0" class="inline-flex px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300 font-medium shrink-0">{{ __('pos.default_addr_label') }}</span>
                                             <span x-show="a.id !== 0 && a.label" class="inline-flex px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400 font-medium shrink-0" x-text="a.label"></span>
-                                            <span x-text="a.address" class="truncate"></span>
-                                            <button type="button" @click="deleteAddress(a)" title="{{ __('pos.ti_delete_address') }}" class="text-red-500 hover:text-red-600 font-bold px-1.5 shrink-0">&times;</button>
+                                            <span x-text="a.address" class="min-w-0 break-words"></span>
+                                            <button type="button" @click="editAddress(a)" :disabled="addrSaving" class="text-purple-700 dark:text-purple-300 font-semibold px-1.5 shrink-0">{{ __('pos.edit') }}</button>
+                                            <button type="button" @click="deleteAddress(a)" :disabled="addrSaving || editingAddress !== null" title="{{ __('pos.ti_delete_address') }}" class="text-red-500 hover:text-red-600 font-bold px-1.5 shrink-0">&times;</button>
                                         </li>
                                     </template>
                                 </ul>
-                                <p x-show="addrError" x-text="addrError" class="text-xs text-red-500 mt-1"></p>
+                                <p x-show="addrError" x-text="addrError" role="alert" class="text-xs text-red-500 mt-1"></p>
                                 {{-- Task 103: add a NEW delivery address right from the Customers page
                                      (POST /pos/api/customer-addresses — duplicate + 15-limit guards server-side). --}}
-                                <div class="flex items-center gap-1.5 mt-2">
-                                    <input type="text" x-model="newAddrLabel" maxlength="50" placeholder="{{ __('pos.ph_addr_label') }}" autocomplete="off" name="pos_cust_addr_label_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore class="w-28 shrink-0 text-xs rounded-md border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-white py-1.5 px-2 focus:ring-purple-500 focus:border-purple-400">
-                                    <input type="text" x-model="newAddrText" maxlength="500" @keydown.enter.prevent="saveAddress()" placeholder="{{ __('pos.ph_full_delivery_address') }}" autocomplete="off" name="pos_cust_addr_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore class="flex-1 min-w-0 text-xs rounded-md border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-white py-1.5 px-2 focus:ring-purple-500 focus:border-purple-400">
+                                <div class="space-y-2 mt-2">
+                                    <p x-show="editingAddress" class="text-xs font-semibold">{{ __('pos.edit') }}: {{ __('pos.address_label') }}</p>
+                                    <input type="text" x-show="editingAddress?.id !== 0" :disabled="addrSaving" aria-label="{{ __('pos.ph_addr_label') }}" x-model="newAddrLabel" maxlength="50" placeholder="{{ __('pos.ph_addr_label') }}" autocomplete="off" name="pos_cust_addr_label_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore class="w-full text-xs rounded-md border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-white py-1.5 px-2 focus:ring-purple-500 focus:border-purple-400">
+                                    <input type="text" x-ref="addrText" :disabled="addrSaving" aria-label="{{ __('pos.address_label') }}" x-model="newAddrText" maxlength="500" @keydown.enter.prevent="saveAddress()" placeholder="{{ __('pos.ph_full_delivery_address') }}" autocomplete="off" name="pos_cust_addr_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore class="w-full text-xs rounded-md border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-white py-1.5 px-2 focus:ring-purple-500 focus:border-purple-400">
+                                    <button type="button" x-show="editingAddress" @click="resetAddressForm()" :disabled="addrSaving" class="text-xs px-2 py-1.5">{{ __('pos.cancel') }}</button>
                                     <button type="button" @click="saveAddress()" :disabled="addrSaving || !newAddrText.trim()" class="text-xs font-bold text-white bg-purple-600 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed px-2.5 py-1.5 rounded-md shrink-0" x-text="addrSaving ? {{ Js::from(__('pos.saving_dots')) }} : {{ Js::from(__('pos.save_btn')) }}"></button>
                                 </div>
                             </div>

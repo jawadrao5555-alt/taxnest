@@ -49,6 +49,9 @@
                     <span class="text-xs font-bold">PKR</span>
                     Commission statement
                 </a>
+                <a href="{{ route('two-step.settings', ['panel' => 'franchise']) }}" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800">
+                    Two-step login
+                </a>
             </nav>
 
             <div class="border-t border-gray-200 dark:border-gray-800 px-4 py-3">

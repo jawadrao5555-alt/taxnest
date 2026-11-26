@@ -29,7 +29,7 @@ Bill banane ka aam tareeqa, shuru se aakhir tak:
 5. Order type chunein (restaurant mode mein): Dine In / Takeaway / Delivery buttons (guided flow mein keys 1/2/3). Dine In chunte hi TABLE PICKER khul jata hai — arrow keys se table select, Enter. Delivery chunein to address picker aata hai (customer ke saved addresses + "Add New Address" inline) aur cart (Current Order) ke upar "Delivery Charges" ki patti — wahan raqam likhein, yeh charges bill mein tax-free line ban kar judte hain.
 6. Bill mukammal karne ke 2 raste:
    - "PAY" button (ya F8) → payment modal → Cash (key 1) ya Card (key 2) → bill FINAL ho jata hai (PRA reporting ON ho to PRA ko report hota hai).
-   - "Save Provisional" (ya F9) → bill L-series LOCAL/provisional ban jata hai — PRA ko report NAHI hota, quota nahi katta; baad mein promote kar sakte hain.
+   - "Save Provisional" (ya F9) → bill B-series LOCAL/provisional ban jata hai — PRA ko report NAHI hota, quota nahi katta; baad mein promote kar sakte hain.
 7. Receipt popup khulta hai — P = Print, K = KOT, Enter = nayi sale, Esc = band. Popup default 10 second mein khud band hota hai (koi bhi key dabane ya mouse le jane se timer ruk jata hai); yeh waqt /pos/customize se badlein (Never/5/10/15/20/30 sec).
 
 Payment modal ki keys: 1 = Cash (foran), 2 = Card (foran), arrow keys se method highlight, Enter = highlighted method confirm, P = Save Provisional (guided flow ON ho to), Esc = band.
@@ -100,7 +100,7 @@ Sale screen ki mazeed cheezein:
 
 ## PRA Reporting (Fiscal)
 - PRA reporting ON ho to har final bill PRA ko report hota hai aur POS-YYYY-NNNNN fiscal serial milta hai; receipt par PRA fiscal number aur QR aata hai.
-- Reporting ke BAGHAIR bane bills (provisional ya reporting-OFF finals) L-series serial par rehte hain.
+- Reporting ke BAGHAIR bane bills (provisional ya reporting-OFF finals) B-series serial par rehte hain.
 - Internet na ho ya PRA down ho to bill 'offline' queue mein jata hai aur khud retry hota hai — quota dobara nahi katta.
 - PRA se reject bills F11 modal mein aate hain — wahan se Edit & Retry karein.
 - Per-cashier PRA toggle: /pos/team par har cashier ke liye PRA reporting alag ON/OFF ho sakti hai.
@@ -113,12 +113,12 @@ Sale screen ki mazeed cheezein:
 - NestPOS Desktop window (agent v1.5.2+): X se band karne par window poori tarah band NAHI hoti — background mein tayyar rehti hai. Dobara "Open POS" ya Desktop ka NestPOS icon = screen FORAN khulti hai, koi loading nahi. Jab TaxNest ki update aati hai to screen khud aik dafa refresh ho kar naya data le leti hai (bill banate waqt kabhi refresh nahi hoti). Poori tarah band karna ho to tray icon par right-click → Quit Agent.
 
 ## Provisional / Local Bills
-- Provisional (local) bill = abhi PRA ko report NAHI hua; L-series number; quota nahi katta.
+- Provisional (local) bill = abhi PRA ko report NAHI hua; B-series number; quota nahi katta.
 - Banane ka tareeqa: sale screen par "Save Provisional" button ya F9 (ya pay modal mein P — guided flow ON ho to).
 - Dekhne ke tareeqay: sale screen par F10 modal, ya /pos/local-bills portal (export bhi ho sakta hai).
 - F10 modal ke andar har local bill par actions: Enter = Make Final (promote), E = Edit, D = Delete (cashier delete nahi kar sakta).
 - F10 modal mein upar SEARCH box hai (1 Aug 2026): customer ka naam, phone number ya bill number likhein to list foran filter ho jati hai — raat ko bohat se provisional bills ikathay final karne walon ke liye. Modal khulte hi cursor search mein hota hai; ↑↓ se select, Enter = Make Final. FBR POS ke F10 modal mein bhi yehi search hai.
-- Promote karne par method picker khulta hai — 3 options: Cash (1), Card (2), ya "Finalize LOCAL — don't send to PRA" (3 ya L) = bill final ho jata hai lekin PRA ko NAHI jata, L-series par hi rehta hai. Esc = cancel.
+- Promote karne par method picker khulta hai — 3 options: Cash (1), Card (2), ya "Finalize LOCAL — don't send to PRA" (3 ya L) = bill final ho jata hai lekin PRA ko NAHI jata, B-series par hi rehta hai. Esc = cancel.
 - Cash/Card se promote = PRA final: naya POS fiscal serial milta hai aur monthly quota use hota hai. Promote sirf USI mahine ke andar ho sakta hai.
 - /pos/transactions par bhi local bill ke saamne "Submit to PRA" button hota hai (current month ke bills par).
 - Day-close par us din ke local bills company ki standing policy ke mutabiq save ya delete hote hain — policy /pos/customize → Local Billing se (sirf admin; provisional aur final dono ke liye alag "Save to record"/"Auto-delete" options + customer spend history rakhne ka toggle).

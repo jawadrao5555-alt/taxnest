@@ -59,8 +59,11 @@ class Product extends Model
         return $this->belongsTo(MedicineCatalogueEntry::class, 'medicine_catalogue_id');
     }
 
+    protected $hidden = ['di_tax_verification'];
+
     protected $casts = [
         'selling_packings' => 'array',
+        'di_tax_verification' => 'array',
         'is_price_editable' => 'boolean',
         'is_active' => 'boolean',
         'show_on_sale' => 'boolean',

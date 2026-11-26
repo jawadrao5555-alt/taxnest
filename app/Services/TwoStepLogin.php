@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Schema;
 
 final class TwoStepLogin
 {
-    public const PANELS = ['di' => 'web', 'pos' => 'pos', 'fbrpos' => 'fbrpos', 'health' => 'health', 'admin' => 'admin'];
+    public const PANELS = ['di' => 'web', 'pos' => 'pos', 'fbrpos' => 'fbrpos', 'health' => 'health', 'admin' => 'admin', 'franchise' => 'franchise'];
 
     public static function secret(): string
     {
@@ -67,7 +67,13 @@ final class TwoStepLogin
 
     public static function identity(object $actor): array
     {
-        return ['actor_type' => $actor instanceof \App\Models\AdminUser ? 'admin' : 'user', 'actor_id' => (int) $actor->id];
+        $type = match (true) {
+            $actor instanceof \App\Models\AdminUser => 'admin',
+            $actor instanceof \App\Models\Franchise => 'franchise',
+            default => 'user',
+        };
+
+        return ['actor_type' => $type, 'actor_id' => (int) $actor->id];
     }
 
     public static function credential(object $actor): ?object
@@ -118,7 +124,7 @@ final class TwoStepLogin
         // An audited admin grant authorizes company impersonation. Its own
         // configured second factor must be verified independently first.
         $imp = $request->session()->get('impersonation');
-        if ($guard !== 'admin' && is_array($imp) && ($imp['guard'] ?? null) === $guard
+        if (! in_array($guard, ['admin', 'franchise'], true) && is_array($imp) && ($imp['guard'] ?? null) === $guard
             && (int) ($imp['company_id'] ?? 0) === (int) $actor->company_id) {
             $admin = auth('admin')->user()?->fresh();
             if ($admin && $admin->role === 'super_admin' && (int) $admin->id === (int) ($imp['admin_id'] ?? 0)) {

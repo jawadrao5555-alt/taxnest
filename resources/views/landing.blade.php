@@ -175,7 +175,7 @@
                 "name": "Is there a free trial?",
                 "acceptedAnswer": {
                     "@@type": "Answer",
-                    "text": "Yes. Every product starts with a 3-day free trial — no credit card required. Register, get approved, and explore the full system before paying."
+                    "text": "Digital Invoice, PRA POS and FBR POS offer a 3-day trial after approval. Check the Healthcare ERP page for packages and enquiries."
                 }
             },
             {
@@ -199,7 +199,7 @@
                 "name": "Does the POS keep working if the internet drops?",
                 "acceptedAnswer": {
                     "@@type": "Answer",
-                    "text": "Yes. Bills keep printing offline and the system submits them to the authority automatically the moment connectivity returns — no manual re-entry."
+                    "text": "Supported POS counters can queue sales offline. After reconnection, check the sync status and the authority acknowledgement."
                 }
             },
             {
@@ -280,7 +280,7 @@
                         <span class="text-white/80 italic">structured for Pakistan.</span>
                     </h1>
                     <p class="text-lg text-white/70 leading-relaxed mb-10 max-w-xl font-light">
-                        TaxNest brings Digital Invoice, PRA POS, FBR POS and TaxNest ERP together on one platform. Each product has its own workspace. ERP is available on request.
+                        TaxNest brings Digital Invoice, PRA POS, FBR POS and TaxNest ERP together on one platform. Each product has its own workspace. Explore Healthcare ERP for clinics, hospitals, laboratories and pharmacies. Other ERP sectors are scoped on request.
                     </p>
                     <div class="flex flex-col sm:flex-row items-start gap-4 mb-10">
                         <a href="#products" class="btn-solid bg-[#E7BF3B] text-[#052730] hover:bg-[#F2D06B]">
@@ -382,7 +382,7 @@
                         </div>
                         <h4 class="text-3xl font-serif text-[#052730] mb-4">TaxNest Digital Invoice</h4>
                         <p class="text-gray-600 mb-6 leading-relaxed">
-                            Direct integration with FBR via the PRAL API. Generate, validate, and submit invoices with zero friction. Built for serious volume with an unyielding focus on data integrity.
+                            Prepare a draft or import invoice rows. Review buyer details, search FBR references and track the response to each submission.
                         </p>
                         <ul class="space-y-3 mb-8">
                             <li class="flex items-start">
@@ -391,11 +391,11 @@
                             </li>
                             <li class="flex items-start">
                                 <span class="accent-emerald mr-3 text-lg leading-none">•</span>
-                                <span class="text-gray-700 text-sm">HS code intelligence with tax-schedule validation</span>
+                                <span class="text-gray-700 text-sm">Search FBR references by HS code, rate, schedule and unit</span>
                             </li>
                             <li class="flex items-start">
                                 <span class="accent-emerald mr-3 text-lg leading-none">•</span>
-                                <span class="text-gray-700 text-sm">Customer ledgers & formal invoice PDFs</span>
+                                <span class="text-gray-700 text-sm">Customer ledgers and invoice PDFs with saved selling-pack quantities</span>
                             </li>
                             <li class="flex items-start">
                                 <span class="accent-emerald mr-3 text-lg leading-none">•</span>
@@ -516,7 +516,7 @@
                         </div>
                         <h4 class="text-3xl font-serif text-[#052730] mb-4">TaxNest FBR POS</h4>
                         <p class="text-gray-600 mb-6 leading-relaxed">
-                            A complete retail &amp; restaurant billing system wired directly to the FBR — cloud submission or fiscal-device local mode. Everything a real shop runs daily, on the same terminal that stays compliant.
+                            Record counter sales, stock movements and returns. Track fiscal submissions through the configured cloud or local device route.
                         </p>
                         <ul class="space-y-3 mb-8">
                             <li class="flex items-start">
@@ -525,7 +525,7 @@
                             </li>
                             <li class="flex items-start">
                                 <span class="accent-blue mr-3 text-lg leading-none">•</span>
-                                <span class="text-gray-700 text-sm">Restaurant tools — KOT, kitchen display, dine-in tables &amp; QR menu</span>
+                                <span class="text-gray-700 text-sm">School fee and hospital payment receipts in dedicated collection workspaces</span>
                             </li>
                             <li class="flex items-start">
                                 <span class="accent-blue mr-3 text-lg leading-none">•</span>
@@ -586,9 +586,9 @@
                     <div class="w-10 h-10 bg-gray-100 rounded mb-6 flex items-center justify-center">
                         <svg class="w-5 h-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
                     </div>
-                    <h4 class="font-serif text-xl text-[#052730] mb-3">Immutable Audit Logs</h4>
+                    <h4 class="font-serif text-xl text-[#052730] mb-3">Invoice history</h4>
                     <p class="text-sm text-gray-600 leading-relaxed">
-                        Every action is recorded and unalterable. From invoice creation to tax rate changes, maintaining a complete paper trail for regulatory scrutiny.
+                        Review recorded invoice events and verify the integrity of locked invoices.
                     </p>
                 </div>
                 <div class="card-solid p-8 rounded-lg fade-in-up" style="transition-delay: 100ms;">
@@ -606,7 +606,7 @@
                     </div>
                     <h4 class="font-serif text-xl text-[#052730] mb-3">Offline Resilience</h4>
                     <p class="text-sm text-gray-600 leading-relaxed">
-                        Internet drops shouldn't stop your business. Generate bills offline; the system automatically syncs with authorities the moment connectivity returns.
+                        Supported POS counters can queue sales during an outage. Check the saved fiscal status after reconnection.
                     </p>
                 </div>
             </div>
@@ -650,26 +650,26 @@
                             <td class="p-5 font-semibold text-gray-500 text-xs uppercase tracking-wider">Built for</td>
                             <td class="p-5">Businesses issuing sales tax invoices</td>
                             <td class="p-5">Retail &amp; restaurants in Punjab</td>
-                            <td class="p-5">FBR-registered retail counters</td>
+                            <td class="p-5">Retail counters and collection desks</td>
                         </tr>
                         <tr class="border-b border-gray-100">
                             <td class="p-5 font-semibold text-gray-500 text-xs uppercase tracking-wider">Billing</td>
-                            <td class="p-5">Annual billing</td>
-                            <td class="p-5">Annual billing</td>
-                            <td class="p-5">Annual billing</td>
+                            <td class="p-5"><a class="underline" href="/digital-invoice#pricing">View billing periods</a></td>
+                            <td class="p-5"><a class="underline" href="/pos#pricing">View billing periods</a></td>
+                            <td class="p-5"><a class="underline" href="/fbr-pos-landing#pricing">View billing periods</a></td>
                         </tr>
                         <tr class="border-b border-gray-100">
                             <td class="p-5 font-semibold text-gray-500 text-xs uppercase tracking-wider">Starting at</td>
-                            <td class="p-5 font-bold text-[#052730]">PKR 17,990 / year</td>
+                            <td class="p-5 font-bold text-[#052730]"><a href="/digital-invoice#pricing">See current DI prices</a></td>
                             <td class="p-5 font-bold text-[#052730]">@php($publicPraStart = \Illuminate\Support\Facades\Schema::hasTable('pricing_plans') ? \App\Services\PosPlanComparisonService::plans()->sortBy(fn ($plan) => (float) $plan->sale_price)->first() : null)
                             @if($publicPraStart) PKR {{ number_format((float) $publicPraStart->sale_price) }} / year @else See PRA pricing @endif</td>
-                            <td class="p-5 font-bold text-[#052730]">PKR 17,999 / year</td>
+                            <td class="p-5 font-bold text-[#052730]"><a href="/fbr-pos-landing#pricing">See current FBR POS prices</a></td>
                         </tr>
                         <tr class="border-b border-gray-100">
                             <td class="p-5 font-semibold text-gray-500 text-xs uppercase tracking-wider">Standout features</td>
                             <td class="p-5">HS code intelligence, AI invoice parsing, buyer delivery via WhatsApp &amp; email, consultant console</td>
                             <td class="p-5">Restaurant suite, delivery riders with live tracking, khata, Urdu interface, desktop &amp; mobile apps</td>
-                            <td class="p-5">Restaurant KOT &amp; kitchen display, inventory, offline billing, khata &amp; loyalty, delivery riders</td>
+                            <td class="p-5">Inventory, fiscal receipt tracking, returns and standalone collections</td>
                         </tr>
                         <tr>
                             <td class="p-5"></td>
@@ -680,7 +680,7 @@
                     </tbody>
                 </table>
             </div>
-            <p class="text-center text-sm text-gray-500 mt-6 fade-in-up">Every product includes a 3-day free trial. No credit card required.</p>
+            <p class="text-center text-sm text-gray-500 mt-6 fade-in-up">See each product page for trial and registration options.</p>
         </div>
     </section>
 
@@ -697,7 +697,7 @@
                         <span class="font-semibold text-[#052730]">Is there a free trial?</span>
                         <svg class="w-4 h-4 text-gray-400 transition-transform flex-shrink-0 ml-4" :class="open === 1 ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                     </button>
-                    <div x-show="open === 1" x-collapse class="px-5 pb-5 text-sm text-gray-600 leading-relaxed">Yes. Every product starts with a 3-day free trial — no credit card required. Register, get approved, and explore the full system before paying.</div>
+                    <div x-show="open === 1" x-collapse class="px-5 pb-5 text-sm text-gray-600 leading-relaxed">Digital Invoice, PRA POS and FBR POS offer a 3-day trial after approval. Check the Healthcare ERP page for packages and enquiries.</div>
                 </div>
                 <div class="card-solid rounded-lg">
                     <button @click="open = (open === 2 ? null : 2)" class="w-full flex items-center justify-between p-5 text-left">
@@ -718,7 +718,7 @@
                         <span class="font-semibold text-[#052730]">Does the POS keep working if the internet drops?</span>
                         <svg class="w-4 h-4 text-gray-400 transition-transform flex-shrink-0 ml-4" :class="open === 4 ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                     </button>
-                    <div x-show="open === 4" x-collapse class="px-5 pb-5 text-sm text-gray-600 leading-relaxed">Yes. Bills keep printing offline and the system submits them to the authority automatically the moment connectivity returns — no manual re-entry.</div>
+                    <div x-show="open === 4" x-collapse class="px-5 pb-5 text-sm text-gray-600 leading-relaxed">Supported POS counters can queue sales offline. After reconnection, check the sync status and the authority acknowledgement.</div>
                 </div>
                 <div class="card-solid rounded-lg">
                     <button @click="open = (open === 5 ? null : 5)" class="w-full flex items-center justify-between p-5 text-left">
@@ -732,6 +732,8 @@
     </section>
 
     <!-- Footer -->
+    <x-website-clients />
+
     @include('partials.product-guide-link', ['productGuideKey' => ''])
     <x-site-footer />
 

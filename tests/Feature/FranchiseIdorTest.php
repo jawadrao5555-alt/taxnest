@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Company;
+use App\Models\AdminUser;
 use App\Models\Franchise;
 use App\Models\PricingPlan;
 use App\Models\Subscription;
@@ -65,6 +66,26 @@ class FranchiseIdorTest extends TestCase
         return $this->actingAs($this->x, 'franchise');
     }
 
+    public function test_repeated_failed_logins_are_limited_and_an_active_franchise_can_retry(): void
+    {
+        $this->freezeTime();
+        for ($attempt = 0; $attempt < 5; $attempt++) {
+            $this->from('/franchise/login')->post('/franchise/login', [
+                'email' => strtoupper($this->x->email),
+                'password' => 'Fictional incorrect password',
+            ])->assertSessionHasErrors(['email' => 'Invalid credentials.']);
+        }
+        $credentials = ['email' => $this->x->email, 'password' => 'Passw0rd!2026'];
+        $this->from('/franchise/login')->post('/franchise/login', $credentials)
+            ->assertRedirect('/franchise/login')
+            ->assertSessionHasErrors(['email' => 'Too many login attempts. Please try again in 60 seconds.']);
+        $this->assertGuest('franchise');
+
+        $this->travel(61)->seconds();
+        $this->post('/franchise/login', $credentials)->assertRedirect('/franchise/dashboard');
+        $this->assertAuthenticatedAs($this->x, 'franchise');
+    }
+
     public function test_franchise_x_sees_only_its_own_companies(): void
     {
         $this->asX()->get('/franchise/companies')
@@ -121,5 +142,50 @@ class FranchiseIdorTest extends TestCase
         $this->x->forceFill(['status' => 'suspended'])->save();
 
         $this->asX()->get('/franchise/companies')->assertRedirect('/franchise/login');
+    }
+
+    public function test_admin_password_change_revokes_only_the_target_franchise_session(): void
+    {
+        $admin = AdminUser::create(['name' => 'Fictional reviewer', 'email' => 'franchise-review@example.test',
+            'password' => 'Fictional reviewer password', 'role' => 'super_admin']);
+        $this->post('/franchise/login', ['email' => $this->x->email, 'password' => 'Passw0rd!2026'])
+            ->assertRedirect('/franchise/dashboard');
+        $this->get('/franchise/companies')->assertOk();
+
+        $this->actingAs($admin, 'admin')->put(route('saas.admin.franchises.update', $this->x->id), [
+            'name' => $this->x->name, 'email' => $this->x->email, 'commission_rate' => 10,
+            'password' => 'Fictional replacement password 52!',
+        ])->assertSessionHas('success');
+
+        $this->get('/franchise/companies')->assertRedirect('/franchise/login');
+        $this->get('/security/two-step/franchise')->assertForbidden();
+        $this->assertGuest('franchise');
+        $this->assertAuthenticatedAs($admin, 'admin');
+        $this->assertSame('active', $this->y->fresh()->status);
+        $this->asX()->get('/franchise/companies')->assertRedirect('/franchise/login');
+        $this->post('/franchise/login', ['email' => $this->x->email, 'password' => 'Fictional replacement password 52!'])
+            ->assertRedirect('/franchise/dashboard');
+        $this->get('/franchise/companies')->assertOk();
+    }
+
+    public function test_suspension_then_reactivation_does_not_restore_a_previous_session(): void
+    {
+        $admin = AdminUser::create(['name' => 'Fictional reviewer', 'email' => 'franchise-suspension@example.test',
+            'password' => 'Fictional reviewer password', 'role' => 'super_admin']);
+        $credentials = ['email' => $this->x->email, 'password' => 'Passw0rd!2026'];
+        $this->post('/franchise/login', $credentials)->assertRedirect('/franchise/dashboard');
+        $this->actingAs($admin, 'admin')->post(route('saas.admin.franchises.toggle', $this->x->id))->assertSessionHas('success');
+        $this->from('/franchise/login')->post('/franchise/login', $credentials)
+            ->assertSessionHasErrors(['email' => 'Invalid credentials.']);
+        $failure = \App\Models\SecurityLog::where('action', 'failed_login')->latest('id')->firstOrFail();
+        $this->assertNull($failure->user_id);
+        $this->assertSame('franchise', $failure->metadata['guard']);
+        $this->post(route('saas.admin.franchises.toggle', $this->x->id))->assertSessionHas('success');
+
+        $this->get('/security/two-step/franchise')->assertForbidden();
+        $this->assertGuest('franchise');
+        $this->assertAuthenticatedAs($admin, 'admin');
+        $this->post('/franchise/login', $credentials)->assertRedirect('/franchise/dashboard');
+        $this->get('/franchise/companies')->assertOk();
     }
 }

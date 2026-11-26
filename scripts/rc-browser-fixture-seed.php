@@ -72,6 +72,20 @@ if (Company::withoutGlobalScopes()->where('email', 'like', '%@rc-browser.invalid
     $fail('fresh browser database already contains a synthetic fixture.');
 }
 
+// Public client cards in this guarded fixture use fictional branding only.
+$clientLogo = 'iVBORw0KGgoAAAANSUhEUgAAAFAAAAAwCAIAAAAJh2qgAAAA60lEQVR4nO2auw0CMRBEfQiR0AMxKXVQBCllUAYpRVAHKTE9kJCYwCL0rC3dh52dl651mqe980fnIeecIrFaOsDcSJiddcugzf4wdY6x+DwfeIDdYUe2qSGtIezLtoAzI2GPtgWQvCrs17ZQyx9ulpYwO03rsMnxdgHV+wlVZyZchyXMjoTZCSc8zrLUBT7BTb2lDddhCbMjYXYWmKW7eF23oLo7v3sfGK7DEmZHwuxImB0JszPUrjx4/9WSKgfvcB2WMDsS/mFelvhzavlRh/06g+TGK+3RGWe2v2Ffzmba6saDFc3S7IQT/gJL8jBdHe4YfAAAAABJRU5ErkJggg==';
+foreach ([
+    ['Synthetic Retail Studio', 'pos', $clientLogo, now()],
+    ['Synthetic Invoice Studio', 'di', null, now()],
+    ['Synthetic Unpublished Studio', 'pos', $clientLogo, null],
+] as [$displayName, $product, $logo, $publishedAt]) {
+    DB::table('website_clients')->insert([
+        'display_name' => $displayName, 'product' => $product,
+        'logo_data' => $logo, 'logo_mime' => $logo ? 'image/png' : null,
+        'published_at' => $publishedAt, 'created_at' => now(), 'updated_at' => now(),
+    ]);
+}
+
 $password = 'RcBrowser!'.bin2hex(random_bytes(18));
 $now = now();
 $company = static function (string $name, string $email, string $ntn, string $product, array $attributes = []): Company {
@@ -526,8 +540,13 @@ foreach ([1366, 390] as $width) {
     $deliveryCreditCases[$width]=['login'=>$creditOwner->email,'riderLogin'=>$creditRiderUser->email,'ids'=>$creditIds];
 }
 
+// These journeys compare freshly seeded orders with the active business day.
+// Keep the fixture's rollover outside the browser run when seeding near 06:00 PKT.
+$topSellingSeedHour = now(config('app.timezone'))->hour;
+$topSellingCutoff = $topSellingSeedHour >= 4 && $topSellingSeedHour < 8 ? '11:30' : '06:00';
 $topSellingCompany = $company('Synthetic Top Selling', 'top-selling-company@rc-browser.invalid', 'RCTOPSELL001', 'pos', [
     'business_category' => 'restaurant', 'pos_type' => 'restaurant', 'restaurant_mode' => true,
+    'pos_business_day_cutoff' => $topSellingCutoff,
     'feature_flags' => PosFeatureService::defaultsForCategory('restaurant'), 'pos_setup_completed' => true,
 ]);
 $topSellingOwner = $user($topSellingCompany, 'Synthetic Top Selling Owner', 'top-selling-owner@rc-browser.invalid', 'company_admin', 'pos_admin');

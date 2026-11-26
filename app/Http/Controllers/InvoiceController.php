@@ -331,6 +331,7 @@ class InvoiceController extends Controller
             'invoice_date' => 'nullable|date|before_or_equal:today',
             'items' => 'required|array|min:1',
             'items.*.hs_code' => 'required|string|max:50',
+            'items.*.fbr_reference_checked' => 'nullable|boolean',
             'items.*.description' => 'required|string|max:255',
             'items.*.quantity' => 'required|numeric|min:0.0001',
             'items.*.price' => 'required|numeric|min:0.01',
@@ -445,6 +446,7 @@ class InvoiceController extends Controller
 
                 InvoiceItem::create([
                     'invoice_id' => $invoice->id,
+                    ...(!empty($item['fbr_reference_checked']) ? ['fbr_reference_checked' => true] : []),
                     ...(!empty($item['selling_snapshot']) ? ['selling_snapshot' => $item['selling_snapshot']] : []),
                     ...(!empty($item['inventory_snapshot']) ? ['inventory_snapshot' => $item['inventory_snapshot']] : []),
                     'hs_code' => $item['hs_code'],
@@ -631,6 +633,7 @@ class InvoiceController extends Controller
             'invoice_date' => 'nullable|date|before_or_equal:today',
             'items' => 'required|array|min:1',
             'items.*.hs_code' => 'required|string|max:50',
+            'items.*.fbr_reference_checked' => 'nullable|boolean',
             'items.*.description' => 'required|string|max:255',
             'items.*.quantity' => 'required|numeric|min:0.0001',
             'items.*.price' => 'required|numeric|min:0.01',
@@ -766,6 +769,7 @@ class InvoiceController extends Controller
 
                 InvoiceItem::create([
                     'invoice_id' => $invoice->id,
+                    ...(!empty($item['fbr_reference_checked']) ? ['fbr_reference_checked' => true] : []),
                     ...(!empty($item['selling_snapshot']) ? ['selling_snapshot' => $item['selling_snapshot']] : []),
                     ...(!empty($item['inventory_snapshot']) ? ['inventory_snapshot' => $item['inventory_snapshot']] : []),
                     'hs_code' => $item['hs_code'],
@@ -1216,6 +1220,7 @@ class InvoiceController extends Controller
                         'status' => 'success',
                         'invoice_id' => $invoice->id,
                         'fbr_invoice_number' => $fbrNum,
+                        'fiscal_submission_environment' => $invoice->fiscal_submission_environment,
                         'pdf_url' => '/invoice/' . $invoice->id . '/pdf',
                         'execution_ms' => $result['execution_ms'],
                         'message' => 'Invoice submitted via Direct MIS mode',
@@ -1302,6 +1307,7 @@ class InvoiceController extends Controller
                     'status' => 'success',
                     'invoice_id' => $invoice->id,
                     'fbr_invoice_number' => $fbrNum,
+                    'fiscal_submission_environment' => $invoice->fiscal_submission_environment,
                     'pdf_url' => '/invoice/' . $invoice->id . '/pdf',
                     'execution_ms' => $result['execution_ms'],
                     'compliance_score' => $scoreResult['final_score'],
@@ -1405,6 +1411,7 @@ class InvoiceController extends Controller
                     'status' => 'success',
                     'invoice_id' => $invoice->id,
                     'fbr_invoice_number' => $fbrNum,
+                    'fiscal_submission_environment' => $invoice->fiscal_submission_environment,
                     'pdf_url' => '/invoice/' . $invoice->id . '/pdf',
                     'execution_ms' => $result['execution_ms'],
                     'message' => 'Invoice successfully submitted to FBR',
@@ -1539,6 +1546,7 @@ class InvoiceController extends Controller
                     'status' => 'success',
                     'invoice_id' => $invoice->id,
                     'fbr_invoice_number' => $fbrNum,
+                    'fiscal_submission_environment' => $invoice->fiscal_submission_environment,
                     'pdf_url' => '/invoice/' . $invoice->id . '/pdf',
                     'message' => 'Invoice successfully submitted to FBR',
                 ]);

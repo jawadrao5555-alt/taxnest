@@ -168,6 +168,22 @@ class AdminPlanStorePostTest extends TestCase
         $this->assertNull($plan->price_monthly);
     }
 
+    public function test_di_monthly_checkout_rate_can_be_set_explicitly_and_survives_an_unchecked_edit(): void
+    {
+        $id = $this->seedPlan(['product_type' => 'di', 'price' => 1500, 'price_monthly' => 1500]);
+        $payload = ['product_type' => 'di', 'price' => 1500, 'price_monthly' => 1750];
+
+        $this->actingAsAdmin()->put("/admin/plans/{$id}", $this->validPayload($payload + [
+            'configure_shared_cycle_rates' => '1',
+        ]))->assertSessionHasNoErrors();
+        $plan = \App\Models\PricingPlan::findOrFail($id);
+        $this->assertSame(1750.0, $plan->explicitCyclePrice('monthly'));
+
+        $payload['price_monthly'] = 1;
+        $this->actingAsAdmin()->put("/admin/plans/{$id}", $this->validPayload($payload))->assertSessionHasNoErrors();
+        $this->assertSame(1750.0, $plan->fresh()->explicitCyclePrice('monthly'));
+    }
+
     /**
      * fbrpos plans store ANNUAL prices since 23 Aug 2026 — price_monthly is a
      * hand-set rate, never a mirror. Mirroring it would sell a whole year for

@@ -87,7 +87,7 @@
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Default Tax Rate (%) <span class="text-red-500">*</span></label>
-                            <input type="number" step="1" min="0" max="100" name="default_tax_rate" x-model="taxRate" @input="updateRules()" required
+                            <input type="number" step="0.01" min="0" max="100" name="default_tax_rate" x-model="taxRate" @input="updateRules()" required
                                 class="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
                         </div>
                     </div>
@@ -212,6 +212,17 @@
                     </div>
                 </div>
 
+                <label class="block text-sm">
+                    <input type="checkbox" name="verify_di_tax" value="1" @checked(old('verify_di_tax'))>
+                    Verify tax defaults with FBR for today and the company province
+                </label>
+                @error('verify_di_tax') <p class="text-sm text-red-600" role="alert">{{ $message }}</p> @enderror
+                @if(\App\Services\DiProductTaxProfile::hasVerifiedDefaults($product))
+                    <p class="text-sm text-gray-600 dark:text-gray-300">
+                        Last verified {{ $product->di_tax_verification['date'] }} for {{ $product->di_tax_verification['province'] }}.
+                    </p>
+                @endif
+
                 <div class="flex justify-end space-x-3">
                     <a href="/products" class="px-6 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 font-medium hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-800 dark:hover:bg-gray-800 transition">Cancel</a>
                     <button type="submit" class="px-6 py-2.5 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-700 transition">
@@ -227,7 +238,7 @@
     function productForm() {
         return {
             scheduleType: '{{ old("schedule_type", $product->schedule_type ?? "") }}',
-            taxRate: '{{ old("default_tax_rate", intval($product->default_tax_rate)) }}',
+            taxRate: '{{ old("default_tax_rate", $product->default_tax_rate) }}',
             price: '{{ old("default_price", $product->default_price) }}',
             mrp: '{{ old("mrp", $product->mrp ?? "") }}',
             mrpManual: true,

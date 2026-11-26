@@ -604,6 +604,13 @@ class ReadOnlyReportingConnectorTest extends TestCase
             $this->assertStringNotContainsString('PRIVATE', json_encode($result));
             if ($stream === 'agent_collection') {
                 $this->assertSame(2, $result['samples'][0]['facts']['pending_callbacks']);
+                $streamId = $result['streams'][0]['id'];
+                $this->toolCall($t['access_token'], 'get_pra_operations_evidence', $args + ['diagnostic_stream_id' => $streamId])
+                    ->assertJsonPath('result.structuredContent.diagnostic_stream_id', $streamId)
+                    ->assertJsonCount(1, 'result.structuredContent.samples');
+            } else {
+                $this->toolCall($t['access_token'], 'get_pra_operations_evidence', $args + ['diagnostic_stream_id' => 1])
+                    ->assertJsonPath('result.isError', true);
             }
             $this->toolCall($t['access_token'], 'get_pra_operations_evidence', array_replace($args, ['company_name' => 'Pizza Master Twin']))->assertJsonPath('result.isError', true);
             $this->toolCall($t['access_token'], 'get_pra_operations_evidence', $args + ['arbitrary_sql' => 'SELECT 1'])->assertJsonPath('result.isError', true);

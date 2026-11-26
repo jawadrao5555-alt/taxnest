@@ -81,7 +81,7 @@ class HotelGuestHouseV1Test extends TestCase
         $this->assertDatabaseCount('pos_transactions', 1);
         $this->assertSame($count, HotelFolioEntry::count());
         $this->assertNull(\App\Models\PosTransaction::first()->pra_status);
-        $this->assertStringStartsWith('L', \App\Models\PosTransaction::first()->invoice_number);
+        $this->assertStringStartsWith('B', \App\Models\PosTransaction::first()->invoice_number);
         $this->getJson($result['status_url'])->assertOk()->assertJsonPath('status', 'local')->assertJsonPath('qr', null);
     }
 

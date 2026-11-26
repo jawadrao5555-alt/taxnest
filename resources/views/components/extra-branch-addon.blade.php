@@ -1,4 +1,4 @@
-@props(['addon', 'bank', 'action', 'accent' => 'purple'])
+@props(['addon', 'bank', 'action', 'accent' => 'purple', 'showUnavailable' => false])
 {{-- ── Paid extra-branch add-on (Rs 10,000/branch/year, owner-approved Aug 2026) ──
      Shared by the PRA POS and FBR POS branch pages so both panels quote and
      submit EXACTLY the same thing. Package ki shamil branches MUFT hain; us se
@@ -112,8 +112,11 @@
         </form>
     </div>
 </div>
-@elseif($ebExhausted && ($addon['eligibility']['reason_key'] ?? null))
+@elseif(($ebExhausted || $showUnavailable) && ($addon['eligibility']['reason_key'] ?? null))
 <div class="mb-5 rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 p-4">
+    @if($showUnavailable)
+        <h2 class="text-sm font-semibold text-amber-800 dark:text-amber-300">{{ __('pos.eb_more_title') }}</h2>
+    @endif
     <p class="text-sm text-amber-800 dark:text-amber-300">{{ __($addon['eligibility']['reason_key']) }}</p>
 </div>
 @endif

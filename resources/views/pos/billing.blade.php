@@ -55,6 +55,16 @@
             </div>
             @endif
 
+            @php
+                $billingUser = auth('pos')->user();
+            @endphp
+            @if($billingUser?->isCompanyAdmin() || $billingUser?->pos_role === 'pos_admin')
+                <section id="extra-branches">
+                    <x-extra-branch-addon :addon="\App\Services\BranchAddonService::status($company)"
+                        :bank="$bank" :action="route('pos.payment-proof.store')" :show-unavailable="true" />
+                </section>
+            @endif
+
             @php $annualDiscount = 6; @endphp
 
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
@@ -134,7 +144,9 @@
                  filtered out server-side. --}}
             @php
                 $adCatalog = $addons['catalog'] ?? [];
-                $adEligible = $addons['eligibility']['allowed'] ?? false;
+                $adFederalCodes = \App\Services\PosFederalAddonAccess::CODES;
+                $adEligible = ($addons['eligibility']['allowed'] ?? false)
+                    || \App\Services\PosAddonService::purchaseEligibility($company ?? null, $adFederalCodes)['allowed'];
                 $adPurchasable = $addons['purchasable'] ?? [];
                 $adActive = $addons['active'] ?? [];
                 $adPending = $addons['pending'] ?? [];
@@ -158,6 +170,11 @@
                     <h3 class="text-xl font-bold text-gray-900 dark:text-gray-100">{{ __('pos.addons_title') }}</h3>
                     <p class="text-gray-500 dark:text-gray-400 text-sm mt-1">{{ __('pos.addons_subtitle') }}</p>
                 </div>
+
+                @if(\App\Services\PosAddonService::isPraCompany($company ?? null))
+                    <x-pos-federal-addon-options :billing="true"
+                        :codes="array_values(array_intersect($adFederalCodes, $adActive)) ?: $adFederalCodes" />
+                @endif
 
                 @if(!empty($adActive))
                 <div class="mb-4 rounded-xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/20 p-4">
@@ -231,7 +248,7 @@
                                     ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/20 ring-1 ring-purple-500'
                                     : 'border-gray-200 dark:border-gray-700 hover:border-purple-300'">
                             <div class="flex items-start gap-2">
-                                <input type="checkbox" class="mt-0.5 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                                <input type="checkbox" data-addon-code="{{ $adCode }}" class="mt-0.5 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
                                        :checked="picked.includes({{ \Illuminate\Support\Js::from($adCode) }})"
                                        @change="toggle({{ \Illuminate\Support\Js::from($adCode) }})">
                                 <div class="min-w-0">

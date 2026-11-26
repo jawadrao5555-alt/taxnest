@@ -558,6 +558,24 @@ class PosExtraBranchPurchaseFlowTest extends TestCase
 
     // ─── 4. who may buy at all ───────────────────────────────────────────
 
+    public function test_billing_offers_the_same_branch_purchase_and_pending_status_as_branch_settings(): void
+    {
+        $shop = $this->makeShop($this->makePlan(), branches: 2);
+        $owner = $this->posUser($shop);
+        $form = 'name="request_type" value="extra_branch"';
+
+        $this->get('/pos')->assertOk()->assertSee('/pos/billing#extra-branches', false);
+        $this->actingAs($owner, 'pos')->get('/pos/branches')->assertOk()->assertSee($form, false);
+        $this->get('/pos/billing')->assertOk()->assertSee('id="extra-branches"', false)->assertSee($form, false)
+            ->assertSee('10,000');
+
+        $this->from('/pos/billing')->submitAddonRequest($owner, 2)->assertRedirect('/pos/billing');
+        $this->assertDatabaseHas('payment_proofs', [
+            'company_id' => $shop->id, 'extra_branch_qty' => 2, 'status' => 'pending', 'amount' => 20000,
+        ]);
+        $this->get('/pos/billing')->assertOk()->assertSee(__('pos.eb_pending_title'))->assertDontSee($form, false);
+    }
+
     public function test_a_shop_on_a_paid_package_can_submit_an_extra_branch_request(): void
     {
         $plan = $this->makePlan();

@@ -134,7 +134,9 @@
                  filtered out server-side. --}}
             @php
                 $adCatalog = $addons['catalog'] ?? [];
-                $adEligible = $addons['eligibility']['allowed'] ?? false;
+                $adFederalCodes = \App\Services\PosFederalAddonAccess::CODES;
+                $adEligible = ($addons['eligibility']['allowed'] ?? false)
+                    || \App\Services\PosAddonService::purchaseEligibility($company ?? null, $adFederalCodes)['allowed'];
                 $adPurchasable = $addons['purchasable'] ?? [];
                 $adActive = $addons['active'] ?? [];
                 $adPending = $addons['pending'] ?? [];
@@ -160,7 +162,8 @@
                 </div>
 
                 @if(\App\Services\PosAddonService::isPraCompany($company ?? null))
-                    <x-pos-federal-addon-options :billing="true" />
+                    <x-pos-federal-addon-options :billing="true"
+                        :codes="array_values(array_intersect($adFederalCodes, $adActive)) ?: $adFederalCodes" />
                 @endif
 
                 @if(!empty($adActive))
@@ -235,7 +238,7 @@
                                     ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/20 ring-1 ring-purple-500'
                                     : 'border-gray-200 dark:border-gray-700 hover:border-purple-300'">
                             <div class="flex items-start gap-2">
-                                <input type="checkbox" class="mt-0.5 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                                <input type="checkbox" data-addon-code="{{ $adCode }}" class="mt-0.5 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
                                        :checked="picked.includes({{ \Illuminate\Support\Js::from($adCode) }})"
                                        @change="toggle({{ \Illuminate\Support\Js::from($adCode) }})">
                                 <div class="min-w-0">

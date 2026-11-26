@@ -1,4 +1,4 @@
-@props(['billing' => false])
+@props(['billing' => false, 'codes' => \App\Services\PosFederalAddonAccess::CODES])
 
 @php
     $definitions = \App\Services\PosAddonPricingService::definitions();
@@ -8,7 +8,7 @@
     <h3 id="federal-addon-heading" class="text-lg font-bold">{{ __('pos_federal_addons.heading') }}</h3>
     <p class="mt-1 text-sm text-gray-600 dark:text-gray-300">{{ __('pos_federal_addons.eligibility') }}</p>
     <dl class="mt-4 grid gap-3 sm:grid-cols-2">
-        @foreach(\App\Services\PosFederalAddonAccess::CODES as $code)
+        @foreach($codes as $code)
             @php($annualPrice = \App\Services\PosAddonPricingService::price($code))
             <div class="rounded-lg border border-gray-200 p-3 dark:border-gray-700">
                 <dt class="font-semibold">{{ $definitions[$code]['label'] }}</dt>

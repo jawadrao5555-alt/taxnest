@@ -72,6 +72,20 @@ if (Company::withoutGlobalScopes()->where('email', 'like', '%@rc-browser.invalid
     $fail('fresh browser database already contains a synthetic fixture.');
 }
 
+// Public client cards in this guarded fixture use fictional branding only.
+$clientLogo = 'iVBORw0KGgoAAAANSUhEUgAAAFAAAAAwCAIAAAAJh2qgAAAA60lEQVR4nO2auw0CMRBEfQiR0AMxKXVQBCllUAYpRVAHKTE9kJCYwCL0rC3dh52dl651mqe980fnIeecIrFaOsDcSJiddcugzf4wdY6x+DwfeIDdYUe2qSGtIezLtoAzI2GPtgWQvCrs17ZQyx9ulpYwO03rsMnxdgHV+wlVZyZchyXMjoTZCSc8zrLUBT7BTb2lDddhCbMjYXYWmKW7eF23oLo7v3sfGK7DEmZHwuxImB0JszPUrjx4/9WSKgfvcB2WMDsS/mFelvhzavlRh/06g+TGK+3RGWe2v2Ffzmba6saDFc3S7IQT/gJL8jBdHe4YfAAAAABJRU5ErkJggg==';
+foreach ([
+    ['Synthetic Retail Studio', 'pos', $clientLogo, now()],
+    ['Synthetic Invoice Studio', 'di', null, now()],
+    ['Synthetic Unpublished Studio', 'pos', $clientLogo, null],
+] as [$displayName, $product, $logo, $publishedAt]) {
+    DB::table('website_clients')->insert([
+        'display_name' => $displayName, 'product' => $product,
+        'logo_data' => $logo, 'logo_mime' => $logo ? 'image/png' : null,
+        'published_at' => $publishedAt, 'created_at' => now(), 'updated_at' => now(),
+    ]);
+}
+
 $password = 'RcBrowser!'.bin2hex(random_bytes(18));
 $now = now();
 $company = static function (string $name, string $email, string $ntn, string $product, array $attributes = []): Company {

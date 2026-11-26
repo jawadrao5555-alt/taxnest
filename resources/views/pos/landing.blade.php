@@ -333,6 +333,14 @@
             <x-pos-addon-strip />
             <x-pos-federal-addon-options />
 
+            <section class="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white p-5">
+                <div>
+                    <h3 class="text-lg font-bold text-gray-900">{{ __('pos.eb_more_title') }}</h3>
+                    <p class="mt-1 text-sm text-gray-600">{{ __('pos.eb_price_line', ['price' => number_format(\App\Services\BranchAddonService::PRICE_PER_YEAR)]) }}</p>
+                </div>
+                <a href="{{ route('pos.billing') }}#extra-branches" class="text-sm font-semibold text-teal-700 underline">{{ __('pos.eb_buy_cta') }}</a>
+            </section>
+
             <div class="mt-16 text-center">
                 <a href="/pos/register" class="btn-solid bg-[#052730] text-white hover:bg-[#0A4D5C] px-8 py-4 text-base">
                     Start Your Free Trial

@@ -55,6 +55,16 @@
             </div>
             @endif
 
+            @php
+                $billingUser = auth('pos')->user();
+            @endphp
+            @if($billingUser?->isCompanyAdmin() || $billingUser?->pos_role === 'pos_admin')
+                <section id="extra-branches">
+                    <x-extra-branch-addon :addon="\App\Services\BranchAddonService::status($company)"
+                        :bank="$bank" :action="route('pos.payment-proof.store')" :show-unavailable="true" />
+                </section>
+            @endif
+
             @php $annualDiscount = 6; @endphp
 
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">

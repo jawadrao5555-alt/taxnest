@@ -79,6 +79,10 @@ class HealthAuthController extends Controller
 
         // ═══ STEP 2 — Healthcare user lookup (strict product isolation) ═══
         $user = $this->findUser($login, $throttleKey, $ambiguous);
+        if ($user && !HealthPlatformService::isHealthcareCompany($user->company)) {
+            $user = null;
+        }
+
         if ($ambiguous) {
             return back()->withErrors([
                 'login' => __('pos.auth_username_ambiguous'),
@@ -86,11 +90,7 @@ class HealthAuthController extends Controller
         }
 
         if ($user && Hash::check($password, $user->password)) {
-            $company = $user->company_id ? Company::find($user->company_id) : null;
-
-            if (HealthPlatformService::isHealthcareCompany($company)
-                && HealthAccessService::roleFor($user) !== null
-                && $user->is_active) {
+            if (HealthAccessService::roleFor($user) !== null && $user->is_active) {
                 RateLimiter::clear($throttleKey);
                 Auth::guard(HealthPanel::GUARD)->login($user, $remember);
                 $request->session()->regenerate();
@@ -167,7 +167,7 @@ class HealthAuthController extends Controller
                 // The same NTN/CNIC may legitimately sit on this person's POS
                 // or DI company too (identity is per product, 5 Sep 2026), and
                 // this panel only accepts its own product line.
-                $company = $matches->first(fn ($c) => HealthPanel::isProductType($c->product_type ?? null));
+                $company = $matches->first(fn ($c) => HealthPlatformService::isHealthcareCompany($c));
                 if ($company) {
                     $user = User::where('company_id', $company->id)
                         ->where('role', 'company_admin')

@@ -4,6 +4,7 @@ namespace App\Http\Middleware;
 
 use App\Services\HealthAccessService;
 use App\Services\HealthModuleService;
+use App\Services\HealthPlatformService;
 use App\Services\HealthScopeService;
 use App\Support\HealthPanel;
 use Closure;
@@ -55,7 +56,7 @@ class HealthAuth
 
         // Product isolation, both ways: a healthcare panel only ever serves a
         // healthcare company, and a POS / DI company can never reach it.
-        if (!HealthPanel::isProductType($company->product_type ?? null)) {
+        if (!HealthPlatformService::isHealthcareCompany($company)) {
             Auth::guard($guard)->logout();
             return $this->toLogin()->with('error', __('health.auth_not_healthcare'));
         }

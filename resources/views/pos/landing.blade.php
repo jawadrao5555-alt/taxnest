@@ -331,6 +331,7 @@
                  table. Only the three genuinely optional paid features live
                  in this separately priced add-on strip. --}}
             <x-pos-addon-strip />
+            <x-pos-federal-addon-options />
 
             <div class="mt-16 text-center">
                 <a href="/pos/register" class="btn-solid bg-[#052730] text-white hover:bg-[#0A4D5C] px-8 py-4 text-base">

@@ -1048,6 +1048,24 @@ class PosPaidAddonFlowTest extends TestCase
         $this->assertSame('locked', PosFederalAddonAccess::state($company, 'federal_ims'));
     }
 
+    public function test_federal_options_are_visible_on_the_public_page_and_pra_billing_before_pricing_is_enabled(): void
+    {
+        config(['pra_di_sandbox.paid_addon_annual_rates' => []]);
+
+        $this->get('/pos')->assertOk()
+            ->assertSee('FBR Digital Invoice')->assertSee('FBR POS · IMS')->assertSee('Price setup pending');
+
+        $company = $this->makeShop($this->makePlan('Business'));
+        $this->actingAs($this->posUser($company), 'pos')->get('/pos/billing')->assertOk()
+            ->assertSee('PRA POS ke FBR add-ons')->assertSee(__('pos_federal_addons.price_pending'));
+
+        config(['pra_di_sandbox.paid_addon_annual_rates' => ['federal_di' => 12000, 'federal_ims' => 18000]]);
+        $this->get('/pos/billing')->assertOk()
+            ->assertSee(__('pos_federal_addons.annual', ['amount' => '12,000']))
+            ->assertSee(__('pos_federal_addons.annual', ['amount' => '18,000']))
+            ->assertDontSee(__('pos_federal_addons.price_pending'));
+    }
+
     public static function federalAddonChannels(): array
     {
         return [

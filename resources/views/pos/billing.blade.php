@@ -159,6 +159,10 @@
                     <p class="text-gray-500 dark:text-gray-400 text-sm mt-1">{{ __('pos.addons_subtitle') }}</p>
                 </div>
 
+                @if(\App\Services\PosAddonService::isPraCompany($company ?? null))
+                    <x-pos-federal-addon-options :billing="true" />
+                @endif
+
                 @if(!empty($adActive))
                 <div class="mb-4 rounded-xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/20 p-4">
                     <p class="text-sm font-semibold text-emerald-800 dark:text-emerald-300">{{ __('pos.addons_active_title') }}</p>

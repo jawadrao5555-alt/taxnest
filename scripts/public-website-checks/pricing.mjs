@@ -7,7 +7,12 @@ export default async function check(page, baseUrl) {
   const read=()=>picker.evaluate(el=>{const d=window.Alpine.$data(el);return {package:d.packagePrice(),addons:d.total(),total:d.grandTotal(),picked:d.picked,better:d.betterPlan()};});
   let quote=await read(); assert.equal(quote.addons,0);assert.equal(quote.total,quote.package);
   const boxes=picker.locator('input[type=checkbox]:enabled');
-  if(await boxes.count()!==2)throw new Error('synthetic Business package must offer two add-ons');
+  assert.deepEqual((await boxes.evaluateAll(inputs=>inputs.map(input=>input.value))).sort(),['caller_id','rider_tracking']);
+  const federal=page.locator('section[aria-labelledby="federal-addon-heading"]');
+  assert.match(await federal.innerText(),/FBR Digital Invoice/);
+  assert.match(await federal.innerText(),/FBR POS/);
+  assert.equal(await federal.locator('input[type=checkbox]').count(),0);
+  assert.equal(await page.locator('a[href$="/pos/billing#extra-branches"]').count(),1);
   await boxes.nth(0).check();await boxes.nth(1).check();
   quote=await read();assert.equal(quote.picked.length,2);assert.equal(quote.total,quote.package+quote.addons);assert(quote.addons>0);
   const text=await picker.locator('[data-quote-total]').innerText();assert.equal(text,quote.total.toLocaleString('en-US'));

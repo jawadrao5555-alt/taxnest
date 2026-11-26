@@ -97,10 +97,16 @@ class PosAddonService
         }, ARRAY_FILTER_USE_BOTH));
     }
 
+    /** Federal integrations are available only through paid-account billing. */
+    public static function publicCodesForPlan(?PricingPlan $plan): array
+    {
+        return array_values(array_intersect(self::purchasableCodesForPlan($plan), array_keys(PosAddonPricingService::ADDONS)));
+    }
+
     /** Public/signup quote: never price a feature already inside the chosen package. */
     public static function quoteForPlan(array $codes, string $cycle, ?PricingPlan $plan): array
     {
-        $publicCodes = array_intersect(self::purchasableCodesForPlan($plan), array_keys(PosAddonPricingService::ADDONS));
+        $publicCodes = self::publicCodesForPlan($plan);
         return self::quote(array_values(array_intersect($codes, $publicCodes)), $cycle);
     }
 

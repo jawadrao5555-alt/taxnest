@@ -476,7 +476,11 @@ class PosPaidAddonFlowTest extends TestCase
         $unlimited = $this->makePlan('Unlimited', [
             'whatsapp_enabled' => true, 'caller_id_enabled' => true, 'rider_tracking_enabled' => true,
         ]);
-        $requested = ['whatsapp_bill', 'rider_tracking', 'caller_id'];
+        $requested = ['whatsapp_bill', 'rider_tracking', 'caller_id', 'federal_di', 'federal_ims'];
+
+        $this->assertSame([], PosAddonService::publicCodesForPlan($starter));
+        $this->assertSame(['rider_tracking', 'caller_id'], PosAddonService::publicCodesForPlan($business));
+        $this->assertSame([], PosAddonService::publicCodesForPlan($unlimited));
 
         $this->assertSame([], PosAddonService::quoteForPlan($requested, 'annual', $starter)['codes']);
         $this->assertSame(['rider_tracking', 'caller_id'],

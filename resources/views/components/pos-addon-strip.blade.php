@@ -19,10 +19,10 @@
     }
     $adsAllPlans = $plans ?? \App\Services\PosPlanComparisonService::plans();
     $adsPlans = $adsAllPlans
-        ->filter(fn ($plan) => \App\Services\PosAddonService::purchasableCodesForPlan($plan) !== [])
+        ->filter(fn ($plan) => \App\Services\PosAddonService::publicCodesForPlan($plan) !== [])
         ->values();
     $adsAvailable = $adsPlans->mapWithKeys(fn ($plan) => [
-        (string) $plan->id => \App\Services\PosAddonService::purchasableCodesForPlan($plan),
+        (string) $plan->id => \App\Services\PosAddonService::publicCodesForPlan($plan),
     ])->all();
     $adsNames = $adsPlans->mapWithKeys(fn ($plan) => [(string) $plan->id => $plan->name])->all();
     $adsBasePrices = $adsPlans->mapWithKeys(fn ($plan) => [(string) $plan->id =>

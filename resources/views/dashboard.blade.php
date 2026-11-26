@@ -153,17 +153,7 @@
 
             @if(auth()->user()->role !== 'super_admin')
             <div class="mb-6">
-                <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
-                    <a href="/invoice/create" class="group relative flex flex-col items-center justify-center p-5 rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-600 shadow-lg shadow-emerald-500/20 hover:shadow-xl hover:shadow-emerald-500/30 hover:-translate-y-1 transition-all duration-300 overflow-hidden">
-                        <div class="absolute inset-0 bg-white/0 group-hover:bg-white/10 transition-all duration-300"></div>
-                        <div class="relative">
-                            <div class="p-2.5 bg-white/20 rounded-xl mb-2.5 backdrop-blur-sm">
-                                <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                            </div>
-                            <span class="text-xs font-bold text-white text-center block">New Invoice</span>
-                        </div>
-                    </a>
-
+                <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
                     <a href="/invoices" class="group relative flex flex-col items-center justify-center p-5 rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 shadow-lg shadow-blue-500/20 hover:shadow-xl hover:shadow-blue-500/30 hover:-translate-y-1 transition-all duration-300 overflow-hidden">
                         <div class="absolute inset-0 bg-white/0 group-hover:bg-white/10 transition-all duration-300"></div>
                         <div class="relative">
@@ -336,6 +326,13 @@
                                 </div>
                             </div>
                         </div>
+                        <div class="mt-4">
+                            <h3 class="text-xs font-extrabold text-gray-900 dark:text-white mb-3 uppercase tracking-widest flex items-center space-x-2">
+                                <span class="w-2 h-2 bg-indigo-500 rounded-full"></span>
+                                <span>Compliance Trend</span>
+                            </h3>
+                            <div style="height: 160px;"><canvas id="complianceChart"></canvas></div>
+                        </div>
                     </div>
                 </div>
 
@@ -425,7 +422,7 @@
                 </div>
             </div>
 
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
                 <div class="premium-card p-5">
                     <h3 class="text-xs font-extrabold text-gray-900 dark:text-white mb-3 uppercase tracking-widest flex items-center space-x-2">
                         <span class="w-2 h-2 bg-amber-500 rounded-full"></span>
@@ -439,13 +436,6 @@
                         <span>Monthly Invoices</span>
                     </h3>
                     <div style="height: 160px;"><canvas id="monthlyChart"></canvas></div>
-                </div>
-                <div class="premium-card p-5">
-                    <h3 class="text-xs font-extrabold text-gray-900 dark:text-white mb-3 uppercase tracking-widest flex items-center space-x-2">
-                        <span class="w-2 h-2 bg-indigo-500 rounded-full"></span>
-                        <span>Compliance Trend</span>
-                    </h3>
-                    <div style="height: 160px;"><canvas id="complianceChart"></canvas></div>
                 </div>
             </div>
 
@@ -571,7 +561,7 @@
             </div>
             </div>
 
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-5">
+            <div class="grid grid-cols-1 gap-4 mb-5">
                 <div class="premium-card overflow-hidden">
                     <div class="px-5 py-4 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between bg-gradient-to-r from-gray-50 to-white dark:from-gray-800/60 dark:to-gray-900">
                         <h3 class="text-xs font-extrabold text-gray-900 dark:text-white uppercase tracking-widest flex items-center space-x-2">
@@ -606,13 +596,8 @@
                     </div>
                 </div>
 
-                <div class="premium-card overflow-hidden">
-                    <div class="px-5 py-4 border-b border-gray-100 dark:border-gray-800 bg-gradient-to-r from-gray-50 to-white dark:from-gray-800/60 dark:to-gray-900">
-                        <h3 class="text-xs font-extrabold text-gray-900 dark:text-white uppercase tracking-widest flex items-center space-x-2">
-                            <span class="w-2 h-2 bg-blue-500 rounded-full"></span>
-                            <span>Recent Activity</span>
-                        </h3>
-                    </div>
+                <details class="premium-card overflow-hidden self-start">
+                    <summary class="cursor-pointer px-5 py-4 text-sm font-bold">Activity History</summary>
                     <div class="p-4 max-h-80 overflow-y-auto">
                         @forelse($recentActivity as $activity)
                         <div class="flex items-start space-x-3 py-2.5 {{ !$loop->last ? 'border-b border-gray-50 dark:border-gray-700/30' : '' }}">
@@ -645,7 +630,7 @@
                         </div>
                         @endforelse
                     </div>
-                </div>
+                </details>
             </div>
 
             <div class="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-5">

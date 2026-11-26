@@ -1019,6 +1019,8 @@ class PraDiSandboxTest extends TestCase
     }
     public function test_paid_cutover_blocks_direct_new_setup_and_preserves_a_previously_configured_channel(): void
     {
+        (require database_path('migrations/2026_02_11_081526_create_pricing_plans_table.php'))->up();
+        (require database_path('migrations/2026_02_11_081526_create_subscriptions_table.php'))->up();
         (require database_path('migrations/2026_08_22_130000_pos_addons.php'))->up();
         \App\Services\PosAddonService::flushCache();
         config(['pra_di_sandbox.paid_addon_policy_starts_at' => now()->toDateTimeString()]);
@@ -1032,6 +1034,9 @@ class PraDiSandboxTest extends TestCase
             'company_id' => $this->company->id, 'enabled' => false, 'updated_by' => $this->owner->id,
         ]);
         $empty->forceFill(['created_at' => now()->subDay()])->save();
+
+        $this->get('/pos/di-sandbox/setup')->assertForbidden();
+        $this->get('/pos/tax-integrations/fbr-pos')->assertForbidden();
 
         $this->withSession(['_token' => 'cutover-csrf'])->post('/pos/di-sandbox/setup', $di)->assertForbidden();
         $this->withSession(['_token' => 'cutover-csrf'])->post('/pos/tax-integrations/fbr-pos/setup', $ims)->assertForbidden();
@@ -1067,6 +1072,10 @@ class PraDiSandboxTest extends TestCase
             ->assertRedirect('/pos/di-sandbox/setup');
         $this->assertTrue($empty->fresh()->enabled);
         $this->assertSame('fictional-legacy-token', $empty->fresh()->sandbox_token);
+        $this->get('/pos/tax-integrations')->assertOk()->assertSee('Digital Invoice configuration')
+            ->assertDontSee('FBR POS configuration');
+        $this->get('/pos/di-sandbox/setup')->assertOk();
+        $this->get('/pos/tax-integrations/fbr-pos')->assertForbidden();
         Http::assertNothingSent();
         \App\Services\PosAddonService::flushCache();
     }

@@ -269,7 +269,9 @@ class PaymentProofController extends Controller
                 ->with('payment_proof', 'error');
         }
 
-        $eligibility = \App\Services\PosAddonService::purchaseEligibility($company);
+        $submittedCodes = $request->input('addon_codes');
+        $codesForEligibility = is_array($submittedCodes) ? array_filter($submittedCodes, 'is_string') : [];
+        $eligibility = \App\Services\PosAddonService::purchaseEligibility($company, $codesForEligibility);
         if (!$eligibility['allowed']) {
             return back()->with('error', __($eligibility['reason_key'] ?? 'pos.addons_not_available'))
                 ->with('payment_proof', 'error');
@@ -304,7 +306,7 @@ class PaymentProofController extends Controller
             // The package can lapse or be replaced while this request waits for
             // the company mutex. Re-check on the locked row so an expired or
             // newly ineligible package can never create a zero-month proof.
-            $eligibility = \App\Services\PosAddonService::purchaseEligibility($lockedCompany);
+            $eligibility = \App\Services\PosAddonService::purchaseEligibility($lockedCompany, $validated['addon_codes']);
             if (!$eligibility['allowed']) {
                 return [
                     'status' => 'ineligible',

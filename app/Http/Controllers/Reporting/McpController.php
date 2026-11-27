@@ -154,6 +154,7 @@ final class McpController extends Controller
             ['get_pra_operations_evidence', 'PRA cash source reconciliation, print attempt chains or retained Agent collection samples. At most seven dates; cash uses stored business dates, other streams use server receipt dates. Explicit gaps, no business writes or retries. Cash pages allow at most ten reports.',
                 array_intersect_key($operationsPeriod, array_flip(['company_name', 'company_id', 'date_from', 'date_to'])) + $cursor + [
                     'stream' => ['type' => 'string', 'enum' => ['cash_reconciliation', 'print_chains', 'agent_collection']],
+                    'diagnostic_stream_id' => ['type' => 'integer', 'minimum' => 1, 'description' => 'Agent collection only. Use the numeric ID from streams in the company report.'],
                     'branch_id' => ['type' => 'integer', 'minimum' => 0, 'description' => 'Cash stream only: frozen report scope; zero is company-wide.']], ['company_name', 'date_from', 'stream']],
             ['get_pra_incident_timeline', 'PRA server print-attempt timeline, immutable bill/order correlation, retention policy and explicit collection gaps. Maximum seven calendar days; physical paper and full SaaS coverage are unknown. JSON pages can be saved as evidence; no writes or retries.',
                 array_intersect_key($period, array_flip(['company_name', 'company_id', 'date_from', 'date_to'])) + $cursor + [

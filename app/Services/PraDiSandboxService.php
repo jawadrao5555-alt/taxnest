@@ -20,6 +20,7 @@ class PraDiSandboxService
         abort_unless($company->product_type === 'pos', 403);
         return DB::transaction(function () use ($company, $transactionId, $actorId, $expectedEnvironment) {
             Company::whereKey($company->id)->lockForUpdate()->firstOrFail();
+            abort_unless(PosFederalAddonAccess::allows($company, 'federal_di'), 403, 'DI reporting requires an active paid add-on.');
             $environment = PraDiSandboxGate::environment($company->id);
             PraDiSandboxGate::enforce($company->id, $environment);
             abort_if(($expectedEnvironment !== null && $expectedEnvironment !== $environment)
@@ -113,6 +114,7 @@ class PraDiSandboxService
             Company::whereKey($companyId)->lockForUpdate()->firstOrFail();
             $record = $this->locked($companyId, $id);
             $environment = $record->reportingEnvironment();
+            abort_unless(PosFederalAddonAccess::allows($company, 'federal_di'), 403, 'DI reporting requires an active paid add-on.');
             PraDiSandboxGate::enforce($companyId, $environment);
             if (\Illuminate\Support\Facades\Schema::hasTable('pos_ims_submissions')) PosImsReportingService::preventOtherFederalRecord($companyId, $record->source_transaction_id, $environment, 'di');
             $profile = PosDiSandboxProfile::where('company_id', $companyId)->first();

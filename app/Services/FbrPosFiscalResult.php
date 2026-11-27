@@ -4,16 +4,23 @@ namespace App\Services;
 
 final class FbrPosFiscalResult
 {
+    private const INVOICE_FIELDS = ['InvoiceNumber', 'FBRInvoiceNumber', 'invoiceNumber'];
+
     /** Extract the existing IMS code aliases without inferring success from a number. */
     public static function code(?array $response): ?string
     {
+        $codes = [];
         foreach (['Code', 'response_code', 'code'] as $key) {
             if (array_key_exists($key, $response ?? []) && $response[$key] !== null) {
-                $candidate = trim((string) $response[$key]);
-                if ($candidate !== '') return $candidate;
+                $value = $response[$key];
+                if (!is_string($value) && !is_int($value) && !is_float($value)) {
+                    return null;
+                }
+                $candidate = trim((string) $value);
+                if ($candidate !== '') $codes[] = $candidate;
             }
         }
-        return null;
+        return count(array_unique($codes)) === 1 ? $codes[0] : null;
     }
 
     /** Pure interpretation only; device/claim/company binding remains the caller's duty. */
@@ -36,16 +43,33 @@ final class FbrPosFiscalResult
     {
         if (!$response) return null;
         $numbers = [];
-        foreach (['InvoiceNumber', 'FBRInvoiceNumber', 'invoiceNumber'] as $key) {
-            if (!isset($response[$key]) || trim((string) $response[$key]) === '') continue;
-            $number = self::number($response[$key]);
+        foreach (self::INVOICE_FIELDS as $key) {
+            $value = $response[$key] ?? null;
+            if ($value === null || (is_string($value) && trim($value) === '')) continue;
+            $number = self::number($value);
             if (!$number) return null;
             $numbers[] = $number;
         }
-        if (!$numbers) {
-            $legacy = $response['Response'] ?? null;
-            return is_string($legacy) && preg_match('/^(?:[0-9]{6}|[A-Z][A-Z-]*-[0-9]{3,}$)/', trim($legacy)) ? self::number($legacy) : null;
+        $legacy = $response['Response'] ?? null;
+        if (is_string($legacy) && preg_match('/^(?:[0-9]{6}|[A-Z][A-Z-]*-[0-9]{3,}$)/', trim($legacy))) {
+            $legacyNumber = self::number($legacy);
+            if ($legacyNumber !== null) {
+                $numbers[] = $legacyNumber;
+            }
         }
         return count(array_unique($numbers)) === 1 ? $numbers[0] : null;
+    }
+
+    /** A malformed explicit invoice field cannot establish a replayable rejection. */
+    public static function hasInvoiceEvidence(array $response): bool
+    {
+        foreach (self::INVOICE_FIELDS as $key) {
+            $value = $response[$key] ?? null;
+            if ($value !== null && $value !== '') {
+                return true;
+            }
+        }
+
+        return self::fromResponse($response) !== null;
     }
 }

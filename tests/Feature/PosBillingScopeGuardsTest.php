@@ -873,6 +873,8 @@ class PosBillingScopeGuardsTest extends TestCase
 
     public function test_special_deal_stock_failure_returns_422_and_rolls_back_bill_quota_and_stock(): void
     {
+        $this->travelTo(now()->setTime(12, 0));
+
         $cid = $this->makeCompany(['inventory_enabled' => true]);
         $this->subscribe($cid);
         $owner = $this->makeOwner($cid);
@@ -926,6 +928,8 @@ class PosBillingScopeGuardsTest extends TestCase
 
     public function test_special_deal_commits_frozen_recipe_when_live_recipe_changes_after_quota_reservation(): void
     {
+        $this->travelTo(now()->setTime(12, 0));
+
         $cid = $this->makeCompany(['inventory_enabled' => true]);
         $this->subscribe($cid);
         $owner = $this->makeOwner($cid);
@@ -992,6 +996,8 @@ class PosBillingScopeGuardsTest extends TestCase
 
     public function test_special_deal_keeps_frozen_direct_mode_when_recipe_is_added_after_quota_reservation(): void
     {
+        $this->travelTo(now()->setTime(12, 0));
+
         $cid = $this->makeCompany(['inventory_enabled' => true]);
         $this->subscribe($cid);
         $owner = $this->makeOwner($cid);

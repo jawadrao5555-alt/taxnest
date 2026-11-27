@@ -6,7 +6,7 @@ use Illuminate\Support\Facades\Route;
 
 // Exact-guard authorization lives in the controller so the challenge cannot
 // redirect back into its own protected middleware. All writes retain web CSRF.
-Route::prefix('security/two-step/{panel}')->where(['panel' => 'di|pos|fbrpos|health|admin'])
+Route::prefix('security/two-step/{panel}')->where(['panel' => 'di|pos|fbrpos|health|admin|franchise'])
     ->controller(\App\Http\Controllers\Auth\TwoStepController::class)->group(function () {
         Route::get('/', 'settings')->name('two-step.settings');
         Route::get('/challenge', 'challenge')->name('two-step.challenge');
@@ -465,6 +465,8 @@ Route::middleware(['auth', 'company', 'rate_limit_company', 'company.approval'])
 
     Route::middleware(['role:company_admin,employee'])->group(function () {
         Route::get('/invoice/create', [InvoiceController::class, 'create'])->name('invoice.create');
+        Route::get('/invoice/fbr-reference-options', \App\Http\Controllers\DiFbrReferenceController::class)
+            ->middleware('throttle:40,1')->name('invoice.fbr-reference-options');
         Route::post('/invoice/store', [InvoiceController::class, 'store'])->middleware('plan.limit:invoices');
         Route::get('/invoice/{invoice}/edit', [InvoiceController::class, 'edit']);
         Route::put('/invoice/{invoice}', [InvoiceController::class, 'update']);
@@ -1350,6 +1352,8 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
         Route::get('/customers/template', [PosController::class, 'downloadCustomerTemplate'])->name('pos.customers.template');
         Route::post('/customers/import', [PosController::class, 'importCustomers'])->name('pos.customers.import');
         Route::put('/customers/{id}', [PosController::class, 'updateCustomer'])->name('pos.customers.update');
+        Route::patch('/customers/{customer}/addresses/{address}', [PosController::class, 'updateSavedCustomerAddress'])
+            ->whereNumber(['customer', 'address'])->name('pos.customers.addresses.update');
         Route::delete('/customers/{id}', [PosController::class, 'deleteCustomer'])->name('pos.customers.delete');
         Route::post('/customers/{id}/toggle', [PosController::class, 'toggleCustomer'])->name('pos.customers.toggle');
         Route::get('/customers/{id}/history', [PosController::class, 'customerHistory'])->name('pos.customers.history');

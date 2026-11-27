@@ -69,7 +69,7 @@
                             $signupSelectedPlan
                         );
                         $signupAllowedByPlan = ($plans ?? collect())->mapWithKeys(fn ($plan) => [
-                            (string) $plan->id => \App\Services\PosAddonService::purchasableCodesForPlan($plan),
+                            (string) $plan->id => \App\Services\PosAddonService::publicCodesForPlan($plan),
                         ])->all();
                         $signupAddonPrices = collect(\App\Services\PosAddonPricingService::catalog())
                             ->mapWithKeys(fn ($item, $code) => [$code => (int) $item['annual_price']])->all();
@@ -113,9 +113,9 @@
                              the card prices re-quote from the server-computed figures. --}}
                         <input type="hidden" name="billing_cycle" :value="cycle">
                         @if(count($cycleOptions ?? []) > 1)
-                        <div class="grid grid-cols-3 gap-1 p-1 rounded-xl" style="background: rgba(10,77,92,0.28); border: 1px solid rgba(125,211,252,0.22);">
+                        <div x-show="planId" x-cloak class="grid grid-cols-3 gap-1 p-1 rounded-xl" style="background: rgba(10,77,92,0.28); border: 1px solid rgba(125,211,252,0.22);">
                             @foreach(($cycleOptions ?? []) as $cycleKey => $cycleLabel)
-                            <button type="button" @click="cycle = @js($cycleKey)"
+                            <button type="button" x-show="(prices[planId] || {})[@js($cycleKey)] !== undefined" @click="cycle = @js($cycleKey)"
                                     class="text-[11px] font-semibold py-1.5 rounded-lg transition-all"
                                     :class="cycle === @js($cycleKey) ? 'bg-purple-600 text-white shadow' : 'text-purple-200/60 hover:text-white'">
                                 {{ $cycleLabel }}
@@ -168,7 +168,7 @@
                         <p data-signup-quote-total x-show="planId" class="text-sm font-semibold text-white" aria-live="polite">
                             {{ __('pos.addons_grand_total') }}: PKR
                             <span x-text="(prices[planId] || {})[cycle] === undefined ? 'Unavailable' : (Number(prices[planId][cycle]) + addonTotal()).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})"></span>
-                            <span x-text="perLabel"></span>
+                            <span x-show="cycle === 'annual' || billableAddons().length === 0" x-text="perLabel"></span>
                         </p>
 
                         <div class="pt-1 pb-2" style="border-top: 1px solid rgba(255,255,255,0.08); margin-top: 8px; padding-top: 12px;">

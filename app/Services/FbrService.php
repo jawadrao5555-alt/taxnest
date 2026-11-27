@@ -346,7 +346,11 @@ class FbrService
             }
 
             $hsCode = $item->hs_code ?? "";
-            $uomCode = $localOnly ? $this->normalizeUom($item->default_uom) : $this->getUomByHsCode($hsCode, $item->default_uom ?? 'U', $company);
+            $uomCode = match (true) {
+                $localOnly => $this->normalizeUom($item->default_uom),
+                (bool) $item->fbr_reference_checked => app(DiFbrReferences::class)->payloadUnit($company, $hsCode, $item->default_uom ?? 'U'),
+                default => $this->getUomByHsCode($hsCode, $item->default_uom ?? 'U', $company),
+            };
 
             $itemPayload = [
                 "uoM" => $uomCode,
@@ -367,7 +371,14 @@ class FbrService
             ];
 
             $needsSro = ($is3rdSchedule && $taxRate < 18) || $isExempt || $isReduced;
-            if ($needsSro) {
+            if ($item->fbr_reference_checked) {
+                // Validate the exact selected pair before sending. Static or
+                // learned mappings would silently change its meaning.
+                if ($needsSro || filled($item->sro_schedule_no) || filled($item->serial_no)) {
+                    $itemPayload['sroScheduleNo'] = trim((string) $item->sro_schedule_no);
+                    $itemPayload['sroItemSerialNo'] = trim((string) $item->serial_no);
+                }
+            } elseif ($needsSro) {
                 $sroValue = $item->sro_schedule_no ?? "";
                 $serialNo = $item->serial_no ?? "";
 
@@ -759,7 +770,7 @@ class FbrService
         return $errors;
     }
 
-    private function normalizeProvince(?string $province): string
+    public function normalizeProvince(?string $province): string
     {
         if (empty($province)) return "Punjab";
 
@@ -788,7 +799,7 @@ class FbrService
         return ucwords(strtolower(trim($province)));
     }
 
-    private function normalizeUom(?string $uom): string
+    public function normalizeUom(?string $uom): string
     {
         if (empty($uom)) return "Numbers, pieces, units";
 
@@ -1396,7 +1407,11 @@ class FbrService
             $invoice->save();
         };
 
-        $payloadErrors = array_merge(ScheduleEngine::validateFbrPayload($payload), DiInvoiceMath::snapshotErrors($invoice, $payload));
+        $payloadErrors = array_merge(
+            ScheduleEngine::validateFbrPayload($payload),
+            DiInvoiceMath::snapshotErrors($invoice, $payload),
+            $this->referenceSelectionErrors($invoice, $payload)
+        );
         if (!empty($payloadErrors)) {
             $clearHashOnFailure();
             $log = FbrLog::create([
@@ -1898,6 +1913,23 @@ class FbrService
         return $errors;
     }
 
+    private function referenceSelectionErrors($invoice, array $payload): array
+    {
+        $errors = [];
+        foreach ($invoice->items->values() as $index => $item) {
+            if (!$item->fbr_reference_checked) {
+                continue;
+            }
+            $date = \Illuminate\Support\Carbon::parse($payload['invoiceDate'])->toDateString();
+            $row = $payload['items'][$index];
+            $lineErrors = app(DiFbrReferences::class)->errors($invoice->company, $date, $payload['sellerProvince'], $row);
+            foreach ($lineErrors as $error) {
+                $errors[] = 'Item '.($index + 1).': '.$error;
+            }
+        }
+        return $errors;
+    }
+
     public function validateOnly($invoice): array
     {
         $withheldErrors = $this->validateWithholdingAmounts($invoice);
@@ -1906,7 +1938,11 @@ class FbrService
         $company = $invoice->company;
         $env = $company->fbr_environment ?? 'sandbox';
 
-        $payloadErrors = array_merge(ScheduleEngine::validateFbrPayload($payload), DiInvoiceMath::snapshotErrors($invoice, $payload));
+        $payloadErrors = array_merge(
+            ScheduleEngine::validateFbrPayload($payload),
+            DiInvoiceMath::snapshotErrors($invoice, $payload),
+            $this->referenceSelectionErrors($invoice, $payload)
+        );
         if (!empty($payloadErrors)) {
             return [
                 'status' => 'invalid',
@@ -1935,66 +1971,80 @@ class FbrService
 
         $validateUrl = $this->getValidateUrl($company);
 
+        $unavailable = [
+            'status' => 'error',
+            'message' => "Local checks passed. FBR {$env} validation could not be confirmed. Try Validate FBR Payload again.",
+            'payload' => $payload,
+        ];
+
         try {
-            $jsonBody = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRESERVE_ZERO_FRACTION);
+            $jsonBody = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRESERVE_ZERO_FRACTION | JSON_THROW_ON_ERROR);
             $result = $this->sendToFbr($validateUrl, $token, $jsonBody, 0);
-            $responseBody = $result['body'];
-            $httpCode = $result['http_code'];
+        } catch (\Exception $e) {
+            return $unavailable;
+        }
 
-            $response = new class($responseBody, $httpCode) {
-                private $body;
-                private $status;
-                public function __construct($body, $status) { $this->body = $body; $this->status = $status; }
-                public function body() { return $this->body; }
-                public function json() { return json_decode($this->body, true); }
-                public function status() { return $this->status; }
-                public function successful() { return $this->status >= 200 && $this->status < 300; }
-            };
+        $httpCode = $result['http_code'];
+        $body = is_string($result['body']) ? json_decode($result['body'], true) : null;
+        if ($httpCode < 200 || $httpCode >= 500 || !is_array($body['validationResponse'] ?? null)) {
+            return $unavailable;
+        }
 
-            if ($response->successful()) {
-                $responseData = $response->json();
-                if (!is_array($responseData)) {
-                    return [
-                        'status' => 'invalid',
-                        'message' => "FBR {$env} returned non-JSON response",
-                        'errors' => [substr($response->body(), 0, 500)],
-                        'payload' => $payload,
-                    ];
-                }
-                $fbrResult = $this->parseFbrResponse($responseData);
+        $validation = $body['validationResponse'];
+        $items = $validation['invoiceStatuses'] ?? [];
+        if (!is_array($items) || !array_is_list($items)) {
+            return $unavailable;
+        }
 
-                if ($fbrResult['valid']) {
-                    return [
-                        'status' => 'valid',
-                        'message' => "FBR {$env} payload validated successfully",
-                        'payload' => $payload,
-                        'fbr_response' => $responseData,
-                    ];
-                }
-
-                return [
-                    'status' => 'invalid',
-                    'message' => "FBR {$env} rejected the payload",
-                    'errors' => $fbrResult['errors'],
-                    'payload' => $payload,
-                    'fbr_response' => $responseData,
-                ];
+        $seen = [];
+        $valid = $httpCode < 300 && count($items) === count($payload['items']);
+        $rejected = false;
+        foreach ([$validation, ...$items] as $index => $row) {
+            if (!is_array($row) || !is_string($row['statusCode'] ?? null)
+                || !is_string($row['status'] ?? null)
+                || !is_string($row['errorCode'] ?? '')
+                || !is_string($row['error'] ?? '')) {
+                return $unavailable;
             }
 
-            $errors = $this->extractErrorsFromResponse($response->body());
+            $status = strtolower(trim($row['status']));
+            $hasError = trim($row['errorCode'] ?? '') !== '' || trim($row['error'] ?? '') !== '';
+            $rejected = $rejected || $row['statusCode'] === '01' || $status === 'invalid' || $hasError;
+            $valid = $valid && $row['statusCode'] === '00' && $status === 'valid';
+
+            if ($index > 0) {
+                $serial = $row['itemSNo'] ?? '';
+                if ((!is_int($serial) && !is_string($serial)) || !ctype_digit((string) $serial)) {
+                    return $unavailable;
+                }
+                $serial = (int) $serial;
+                if ($serial < 1 || $serial > count($payload['items']) || isset($seen[$serial])) {
+                    return $unavailable;
+                }
+                $seen[$serial] = true;
+            }
+        }
+
+        if ($rejected) {
             return [
                 'status' => 'invalid',
                 'message' => "FBR {$env} rejected the payload",
-                'errors' => $errors,
+                'errors' => $this->safeFbrDiagnostics($validation) ?: ['FBR rejected the supplied data. Review the invoice details.'],
                 'payload' => $payload,
-            ];
-        } catch (\Exception $e) {
-            return [
-                'status' => 'valid',
-                'message' => "Payload structure validated locally. FBR {$env} endpoint unreachable.",
-                'payload' => $payload,
+                'fbr_response' => $body,
             ];
         }
+
+        if (!$valid) {
+            return $unavailable;
+        }
+
+        return [
+            'status' => 'valid',
+            'message' => "FBR {$env} payload validated successfully",
+            'payload' => $payload,
+            'fbr_response' => $body,
+        ];
     }
 
     private function classifyFailure(int $statusCode, string $body): string
@@ -2186,7 +2236,7 @@ class FbrService
      */
     private function parseFbrPosImsResponse(array $responseData): array
     {
-        $code = (string) ($responseData['Code'] ?? $responseData['code'] ?? '');
+        $code = FbrPosFiscalResult::code($responseData) ?? '';
         $invoiceNumber = FbrPosFiscalResult::fromResponse($responseData);
 
         if ($code === '100' && !empty($invoiceNumber)) {
@@ -2694,13 +2744,13 @@ class FbrService
                 ];
             }
 
-            $responseCode = trim((string) ($responseData['Code'] ?? $responseData['code'] ?? ''));
+            $responseCode = FbrPosFiscalResult::code($responseData) ?? '';
             $failedStatus = in_array($responseCode, ['', '100'], true) ? 'verification_pending' : 'failed';
             if ($failedStatus !== 'verification_pending') $clearHashOnFailure();
             $log->update([
                 'status' => 'failed',
                 'response_payload' => $responseData,
-                'response_code' => (string) ($responseData['Code'] ?? 'unknown'),
+                'response_code' => $responseCode !== '' ? $responseCode : 'unknown',
                 'error_message' => implode('; ', $fbrResult['errors']),
             ]);
             $transaction->update(array_merge([

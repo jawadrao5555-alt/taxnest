@@ -99,9 +99,7 @@ class AppServiceProvider extends ServiceProvider
         }
 
         Event::listen(Failed::class, function (Failed $event) {
-            SecurityLogService::log('failed_login', null, [
-                'email' => $event->credentials['email'] ?? 'unknown',
-            ]);
+            SecurityLogService::failedLogin($event);
         });
 
         Event::listen(Login::class, function (Login $event) {

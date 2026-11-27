@@ -333,12 +333,12 @@ class PosDayClosePerBillActionTest extends TestCase
             $this->closeDay($owner)->assertSessionHas('success');
             $this->assertSame($action === 'delete' ? 1 : 0,
                 DB::table('saas_local_bill_records')->where('company_id', $cid)->count());
-            $expected = $action === 'delete' ? 'L001' : 'L042';
+            $expected = $action === 'delete' ? 'B001' : 'B042';
             $this->assertSame($expected, \App\Services\PosLocalSeries::previewNext($cid));
             $this->assertSame($expected, DB::transaction(fn () => \App\Services\PosLocalSeries::issueNext($cid)));
             // Retried close may not reset a number issued after the winning close.
             $this->closeDay($owner);
-            $this->assertSame($action === 'delete' ? 'L002' : 'L043', \App\Services\PosLocalSeries::previewNext($cid));
+            $this->assertSame($action === 'delete' ? 'B002' : 'B043', \App\Services\PosLocalSeries::previewNext($cid));
         }
     }
 

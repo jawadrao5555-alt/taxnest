@@ -13,7 +13,9 @@ export default async function check(page, baseUrl) {
       const box=await action.boundingBox();
       assert(box&&box.x>=0&&box.x+box.width<=width,'Get Started clipped at '+width);
       assert.equal(await menu.isVisible(),width<1280);
-      assert(await page.locator('body').innerText().then(x=>x.includes('ERP is available on request.')));
+      const platformOverview = await page.getByText('TaxNest brings Digital Invoice, PRA POS, FBR POS and TaxNest ERP together on one platform.', {exact: false}).innerText();
+      assert.match(platformOverview, /Explore Healthcare ERP for clinics, hospitals, laboratories and pharmacies\./);
+      assert.match(platformOverview, /Other ERP sectors are scoped on request\./);
       if(width<1280) {
         await menu.click();
         await nav.getByRole('link',{name:'TaxNest ERP',exact:true}).waitFor({state:'visible'});

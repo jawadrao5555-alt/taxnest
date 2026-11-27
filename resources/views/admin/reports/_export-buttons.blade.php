@@ -2,6 +2,8 @@
     $qs = http_build_query(array_filter([
         'date_from' => $from, 'date_to' => $to,
         'company_id' => $companyId, 'branch_id' => $branchId,
+        'period' => isset($comparison) ? 'two_year' : null,
+        'comparison_as_of' => isset($comparison) ? $to : null,
     ]));
 @endphp
 <div class="flex items-center gap-2">

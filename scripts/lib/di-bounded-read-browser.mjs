@@ -3,6 +3,8 @@ export async function diBoundedReadWorkflow(page,t,v,{baseUrl,login,loopback,sav
  const f=t.diReadCases[v.width],path='/madadgar/di-read';
  const check=(ok,message)=>{if(!ok)throw Error(message);};
  await page.goto(baseUrl+'/dashboard',{waitUntil:'domcontentloaded'});
+ const environment=page.locator('[data-di-fbr-environment]');
+ check(await environment.isVisible() && /^FBR (Sandbox|Production)$/.test((await environment.innerText()).trim()),'DI fiscal environment label is missing');
  if(v.width<1024) await page.locator('button[onclick="toggleSidebar()"]').click();
  const link=page.getByRole('link',{name:'Madadgar: recorded totals',exact:true});
  await link.click();

@@ -55,6 +55,16 @@
             </div>
             @endif
 
+            @php
+                $billingUser = auth('pos')->user();
+            @endphp
+            @if($billingUser?->isCompanyAdmin() || $billingUser?->pos_role === 'pos_admin')
+                <section id="extra-branches">
+                    <x-extra-branch-addon :addon="\App\Services\BranchAddonService::status($company)"
+                        :bank="$bank" :action="route('pos.payment-proof.store')" :show-unavailable="true" />
+                </section>
+            @endif
+
             @php $annualDiscount = 6; @endphp
 
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
@@ -134,7 +144,9 @@
                  filtered out server-side. --}}
             @php
                 $adCatalog = $addons['catalog'] ?? [];
-                $adEligible = $addons['eligibility']['allowed'] ?? false;
+                $adFederalCodes = \App\Services\PosFederalAddonAccess::CODES;
+                $adEligible = ($addons['eligibility']['allowed'] ?? false)
+                    || \App\Services\PosAddonService::purchaseEligibility($company ?? null, $adFederalCodes)['allowed'];
                 $adPurchasable = $addons['purchasable'] ?? [];
                 $adActive = $addons['active'] ?? [];
                 $adPending = $addons['pending'] ?? [];
@@ -159,11 +171,16 @@
                     <p class="text-gray-500 dark:text-gray-400 text-sm mt-1">{{ __('pos.addons_subtitle') }}</p>
                 </div>
 
+                @if(\App\Services\PosAddonService::isPraCompany($company ?? null))
+                    <x-pos-federal-addon-options :billing="true"
+                        :codes="array_values(array_intersect($adFederalCodes, $adActive)) ?: $adFederalCodes" />
+                @endif
+
                 @if(!empty($adActive))
                 <div class="mb-4 rounded-xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/20 p-4">
                     <p class="text-sm font-semibold text-emerald-800 dark:text-emerald-300">{{ __('pos.addons_active_title') }}</p>
                     <p class="text-xs text-emerald-700 dark:text-emerald-400 mt-1">
-                        {{ implode(', ', array_map(fn ($c) => __('pos.addon_label_' . $c), $adActive)) }}
+                        {{ implode(', ', array_map(fn ($c) => \App\Services\PosFederalAddonAccess::isFederalCode($c) ? \App\Services\PosAddonPricingService::definitions()[$c]['label'] : __('pos.addon_label_' . $c), $adActive)) }}
                     </p>
                 </div>
                 @endif
@@ -173,7 +190,7 @@
                     <p class="text-sm font-semibold text-amber-800 dark:text-amber-300">{{ __('pos.addons_pending_title') }}</p>
                     <p class="text-xs text-amber-700 dark:text-amber-400 mt-1">
                         {{ __('pos.addons_pending_desc') }}
-                        <span class="block mt-0.5 font-medium">{{ implode(', ', array_map(fn ($c) => __('pos.addon_label_' . $c), $adPending)) }}</span>
+                        <span class="block mt-0.5 font-medium">{{ implode(', ', array_map(fn ($c) => \App\Services\PosFederalAddonAccess::isFederalCode($c) ? \App\Services\PosAddonPricingService::definitions()[$c]['label'] : __('pos.addon_label_' . $c), $adPending)) }}</span>
                     </p>
                 </div>
                 @endif
@@ -197,9 +214,14 @@
                         cycle: {{ \Illuminate\Support\Js::from(old('addon_cycle', $adPreselectedCycle)) }},
                         picked: {{ \Illuminate\Support\Js::from(array_values(array_intersect((array) old('addon_codes', $adPreselected), $adPurchasable))) }},
                         prices: {{ \Illuminate\Support\Js::from($adPrices) }},
+                        federalCodes: {{ \Illuminate\Support\Js::from(\App\Services\PosFederalAddonAccess::CODES) }},
                         toggle(code) {
                             const i = this.picked.indexOf(code);
-                            if (i === -1) { this.picked.push(code); } else { this.picked.splice(i, 1); }
+                            if (i !== -1) { this.picked.splice(i, 1); return; }
+                            if (this.federalCodes.includes(code)) {
+                                this.picked = this.picked.filter(value => !this.federalCodes.includes(value));
+                            }
+                            this.picked.push(code);
                         },
                         priceOf(code) {
                             const row = this.prices[code];
@@ -226,12 +248,12 @@
                                     ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/20 ring-1 ring-purple-500'
                                     : 'border-gray-200 dark:border-gray-700 hover:border-purple-300'">
                             <div class="flex items-start gap-2">
-                                <input type="checkbox" class="mt-0.5 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                                <input type="checkbox" data-addon-code="{{ $adCode }}" class="mt-0.5 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
                                        :checked="picked.includes({{ \Illuminate\Support\Js::from($adCode) }})"
                                        @change="toggle({{ \Illuminate\Support\Js::from($adCode) }})">
                                 <div class="min-w-0">
-                                    <p class="text-sm font-semibold text-gray-900 dark:text-gray-100">{{ __('pos.addon_label_' . $adCode) }}</p>
-                                    <p class="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">{{ __('pos.addon_desc_' . $adCode) }}</p>
+                                    <p class="text-sm font-semibold text-gray-900 dark:text-gray-100">{{ \App\Services\PosFederalAddonAccess::isFederalCode($adCode) ? $adCatalog[$adCode]['label'] : __('pos.addon_label_' . $adCode) }}</p>
+                                    <p class="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">{{ \App\Services\PosFederalAddonAccess::isFederalCode($adCode) ? $adCatalog[$adCode]['description'] : __('pos.addon_desc_' . $adCode) }}</p>
                                 </div>
                             </div>
                             <p class="text-sm font-bold text-purple-700 dark:text-purple-300 mt-1">

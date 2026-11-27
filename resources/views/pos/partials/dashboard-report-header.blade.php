@@ -2,14 +2,22 @@
     $reportUser = auth('pos')->user();
     $reportCashier = $dashCashierId ?? $cashierFilter ?? 'all';
     $reportDate = $todayKhata['date'] ?? \App\Services\PosBusinessDay::current((int) $company->id);
+    $reportHasPra = ($todayKhata['pra'] ?? null) !== null;
+    $reportHasLocal = ($todayKhata['local'] ?? null) !== null;
+    $reportTab = $reportHasLocal ? ($reportHasPra ? 'combined' : 'local') : 'pra';
+    $reportFilters = ['from' => $reportDate, 'to' => $reportDate, 'cashier' => $reportCashier];
 @endphp
 @include('pos.partials.report-screen-style')
 <section class="pos-report-document mt-6" data-dashboard-report-section>
 <x-pos.report-header :title="__('pos.reports_word')" :subtitle="__('pos.business_day_label') . ' · ' . $reportDate" :back="false" heading="h2">
     <x-slot:actions>
         @if(($reportUser?->posCustomAllows('reports') ?? true))
-            <a data-pos-report-link="sales" href="{{ route('pos.reports', ['from' => $reportDate, 'to' => $reportDate, 'cashier' => $reportCashier]) }}"
+            <a data-pos-report-link="sales" href="{{ route('pos.reports', $reportFilters + ['tab' => $reportTab]) }}"
                class="rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800">{{ __('pos.nav_sales_reports') }}</a>
+            @if($reportTab === 'combined')
+                <a data-pos-report-link="local-sales" href="{{ route('pos.reports', $reportFilters + ['tab' => 'local']) }}"
+                   class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 dark:border-gray-600 dark:text-gray-200">{{ __('pos.local_reports') }}</a>
+            @endif
         @endif
         @if(($reportUser?->posCustomAllows('tax_reports') ?? true))
             <a data-pos-report-link="tax" href="{{ route('pos.tax-reports') }}"
@@ -22,7 +30,7 @@
     </x-slot:actions>
 </x-pos.report-header>
 @if($reportUser?->posCustomAllows('reports') !== false)
-    <div data-dashboard-sales-overview="{{ route('pos.reports.dashboard-overview', ['cashier' => $reportCashier]) }}"
+    <div data-dashboard-sales-overview="{{ route('pos.reports.dashboard-overview', ['date' => $reportDate, 'tab' => $reportTab, 'cashier' => $reportCashier]) }}"
          x-data="{ fragment: '' }" x-html="fragment"
          x-init="
             const panel = $el;

@@ -17,14 +17,19 @@ function wireCompanyLogin(win, origin, panel, onLoggedIn) {
       }
     } catch (_) { generation++; done = false; }
   });
-  win.webContents.on('did-finish-load', () => {
+  function confirmCurrentLogin() {
     if (done || inFlight || !current()) return;
     const gen = generation;
     inFlight = true;
     Promise.resolve(onLoggedIn(win.webContents.session, origin, () => gen === generation && current()))
       .then(ok => { if (gen === generation) done = !!ok; })
       .catch(() => {})
-      .finally(() => { inFlight = false; });
-  });
+      .finally(() => {
+        inFlight = false;
+        // A new login can finish loading while the old confirmation is open.
+        if (gen !== generation) confirmCurrentLogin();
+      });
+  }
+  win.webContents.on('did-finish-load', confirmCurrentLogin);
 }
 module.exports = { wireCompanyLogin };

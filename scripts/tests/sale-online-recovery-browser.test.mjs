@@ -1,8 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {readFileSync} from 'node:fs';
+import {mkdtempSync, readFileSync, rmSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import path from 'node:path';
 import http from 'node:http';
-import {launchLocalBrowser} from '../lib/local-browser.mjs';
+import {chromium, launchLocalBrowser, resolveChromiumPath} from '../lib/local-browser.mjs';
 
 const worker = readFileSync(new URL('../../public/sw.js', import.meta.url), 'utf8');
 const saleHtml = (variant, label = 'current') => `<!doctype html><html><head>
@@ -159,5 +161,104 @@ test('actual POS service worker opens online PRA/FBR despite failed offline pref
     if (browser) await browser.close();
     server.closeAllConnections();
     await new Promise(resolve => server.close(resolve));
+  }
+});
+
+test('two cashier profiles cold-start and drain their own bills once on reconnect', {timeout: 120000}, async () => {
+  const blade = readFileSync(new URL('../../resources/views/pos/universal.blade.php', import.meta.url), 'utf8');
+  const methods = (start, end) => {
+    const a = blade.indexOf(start), b = blade.indexOf(end, a);
+    assert.ok(a >= 0 && b > a);
+    return blade.slice(a, b);
+  };
+  // Exercise the actual IndexedDB and reconnect methods with a fictional receipt endpoint.
+  const queue = methods('        idbOpen() {', '        // ─── OFFLINE CUSTOMER QUEUE') +
+    methods('        async syncOfflineBills(', '        // Client-rendered interim receipt')
+      .replace('{{ route("pos.invoice.store") }}', '/sale').replace('{{ csrf_token() }}', 'fictional');
+  const billRequests = [];
+  let offline = false;
+  const server = http.createServer(async (req, res) => {
+    if (offline) return req.socket.destroy();
+    if (req.url === '/sw.js') {
+      res.setHeader('Content-Type', 'application/javascript');
+      return res.end(worker);
+    }
+    if (req.url === '/install') {
+      res.setHeader('Content-Type', 'text/html');
+      return res.end('<script>navigator.serviceWorker.register("/sw.js")</script>');
+    }
+    const cashier = /cashier=(one|two)/.exec(req.headers.cookie || '')?.[1];
+    if (req.url === '/pos/invoice/create' && cashier) {
+      res.setHeader('Content-Type', 'text/html');
+      res.setHeader('X-TaxNest-Sale-Document', 'pra');
+      return res.end(saleHtml('pra').replace('Opening sale', cashier));
+    }
+    if (req.url === '/sale' && req.method === 'POST') {
+      let body = '';
+      for await (const part of req) body += part;
+      billRequests.push([cashier, JSON.parse(body).offline_uuid]);
+      res.setHeader('Content-Type', 'application/json');
+      return res.end('{"success":true}');
+    }
+    res.setHeader('Content-Type', req.url.endsWith('.js') ? 'application/javascript' : 'text/plain');
+    res.end('');
+  });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  const url = 'http://127.0.0.1:' + server.address().port;
+  const root = mkdtempSync(path.join(tmpdir(), 'nestpos-dual-'));
+  const profiles = ['one', 'two'];
+  const contexts = new Set();
+  const open = async cashier => {
+    const ctx = await chromium.launchPersistentContext(path.join(root, cashier), {
+      executablePath: resolveChromiumPath(), headless: true, args: ['--no-sandbox', '--disable-dev-shm-usage'],
+    });
+    contexts.add(ctx);
+    return ctx;
+  };
+  const close = async ctx => { await ctx.close(); contexts.delete(ctx); };
+  try {
+    for (const cashier of profiles) {
+      const ctx = await open(cashier);
+      await ctx.addCookies([{name:'cashier', value:cashier, domain:'127.0.0.1', path:'/', expires:Math.floor(Date.now()/1000)+3600}]);
+      const page = await ctx.newPage();
+      await page.goto(url + '/install');
+      await page.waitForFunction(() => !!navigator.serviceWorker.controller);
+      await page.goto(url + '/pos/invoice/create');
+      await page.waitForFunction(async () => {
+        const k = (await caches.keys()).find(name => name.endsWith('-sale'));
+        return k && !!await (await caches.open(k)).match('/pos/invoice/create');
+      });
+      await close(ctx);
+    }
+    offline = true;
+    const pages = [];
+    for (const cashier of profiles) {
+      const ctx = await open(cashier);
+      const page = await ctx.newPage();
+      await page.goto(url + '/pos/invoice/create');
+      assert.equal(await page.locator('h1').innerText(), cashier);
+      await page.addScriptTag({content: 'window.app = {' + queue + ' _offlineCompanyId:1, async syncOfflineCustomers(){}, _markConnectivity(){}, showToast(){}, loadLocalBills(){}, loadFailedBills(){} };'});
+      await page.evaluate(id => app.idbPut({uuid:id, company_id:1, payload:{offline_uuid:id}}), 'sale-' + cashier);
+      pages.push(page);
+    }
+    offline = false;
+    await Promise.all(pages.map(page => page.evaluate(async () => {
+      await Promise.all([app.syncOfflineBills(), app.syncOfflineBills()]);
+      if ((await app.idbAllMine()).length) throw Error('Bill still queued');
+    })));
+    assert.deepEqual(billRequests.sort(), [['one','sale-one'], ['two','sale-two']]);
+    // Login in one profile invalidates its cashier screen, the other stays usable.
+    await pages[1].evaluate(() => fetch('/pos/login', {method:'POST'}));
+    await pages[1].waitForFunction(async () => !(await caches.keys()).some(k=>k.endsWith('-sale')));
+    offline = true;
+    await pages[1].goto(url + '/pos/invoice/create');
+    assert.match(await pages[1].locator('body').innerText(), /You're Offline|fresh copy/);
+    await pages[0].goto(url + '/pos/invoice/create');
+    assert.equal(await pages[0].locator('h1').innerText(), 'one');
+  } finally {
+    await Promise.all([...contexts].map(ctx=>ctx.close()));
+    server.closeAllConnections();
+    await new Promise(resolve=>server.close(resolve));
+    rmSync(root, {recursive:true, force:true});
   }
 });

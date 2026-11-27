@@ -2,6 +2,12 @@
 
 const crypto = require('crypto');
 const { MAX_PAYLOAD_BYTES } = require('./protocol');
+const SCOPE_KEYS = ['company_id', 'branch_id', 'device_id', 'user_id'];
+
+function sameScope(left, right) {
+    return object(left) && object(right) && SCOPE_KEYS.every((key) =>
+        String(left[key] || '') === String(right[key] || ''));
+}
 
 function fail(code, message) {
     const error = new Error(message);
@@ -36,8 +42,7 @@ function createSaleAcceptance(options) {
             }
             const expected = opts.scopeProvider();
             const scope = command.scope;
-            if (!object(scope) || ['company_id', 'branch_id', 'device_id', 'user_id'].some((key) =>
-                !expected || String(scope[key] || '') !== String(expected[key] || ''))) {
+            if (!sameScope(scope, expected)) {
                 fail('scope_mismatch', 'sale scope does not match the authenticated desktop session');
             }
             if (!/^[1-9]\d*$/.test(String(scope.company_id)) ||
@@ -92,7 +97,9 @@ function createSaleAcceptance(options) {
             const idempotencyKey = 'sale:' + command.offline_uuid;
             const existing = store.findByIdempotency(idempotencyKey);
             if (existing) {
-                if (existing.id !== id) fail('idempotency_conflict', 'offline_uuid was reused');
+                if (existing.id !== id || !sameScope(existing.scope, scope)) {
+                    fail('idempotency_conflict', 'offline_uuid was reused');
+                }
                 return { ok: true, status: 'duplicate', duplicate: true, event_id: existing.id,
                     receipt: existing.payload.receipt };
             }

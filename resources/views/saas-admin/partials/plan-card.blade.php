@@ -121,10 +121,17 @@
                 <label class="text-[10px] text-gray-500 dark:text-gray-400 uppercase">Price (PKR{{ (in_array($plan->product_type, ['pos', 'fbrpos', 'standalone']) || \App\Support\NestErps::isProductType($plan->product_type ?? null)) ? '/yr' : '/mo' }})</label>
                 <input type="number" name="price" value="{{ intval($plan->price) }}" step="1" required class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-1.5 focus:ring-2 focus:ring-indigo-500">
             </div>
-            <label class="block text-xs text-gray-400"><input type="checkbox" name="configure_shared_cycle_rates" value="1"> Update configured POS/FBR/ERP period rates (unchecked preserves stored rates; does not enable selling)</label>
+            <label class="block text-xs text-gray-400"><input type="checkbox" name="configure_shared_cycle_rates" value="1"> Update configured period rates. For DI, tick this to change the monthly checkout rate.</label>
                 @foreach(['price_monthly' => 'Monthly total', 'price_quarterly' => 'Quarterly total', 'price_semi_annual' => 'Six-month total'] as $cycleField => $cycleLabel)
                 <div><label class="text-[10px] text-gray-500 uppercase">{{ $cycleLabel }} (PKR; blank = unavailable)</label>
                     <input type="number" name="{{ $cycleField }}" value="{{ $plan->getAttribute($cycleField) }}" min="0" step="0.01" class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-1.5">
+                    @if($cycleField === 'price_semi_annual' && ($sixMonthRate = $plan->explicitCyclePrice('semi_annual')) !== null)
+                        @php($raisedRate = number_format(round($sixMonthRate * 1.05, 2), 2, '.', ''))
+                        <button type="button" class="mt-1 text-xs text-indigo-400 underline"
+                            @click="$el.form.elements.price_semi_annual.value = '{{ $raisedRate }}'; $el.form.elements.configure_shared_cycle_rates.checked = true">
+                            Use six-month rate +5% (PKR {{ number_format((float) $raisedRate, 2) }})
+                        </button>
+                    @endif
                 </div>
             @endforeach
             @if($plan->product_type === 'di')

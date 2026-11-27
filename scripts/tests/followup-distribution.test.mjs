@@ -33,6 +33,20 @@ test('download source keeps independent gated APKs and safe Caller ID advice', (
   assert.doesNotMatch(view, /Scan apps with Play Protect|Play Protect band karna|no Play Protect warning|App bilkul theek hai/);
 });
 
+test('POS setup keeps Play Protect enabled in every supported language', () => {
+  for (const [locale, enabled, support] of [
+    ['en', /Keep Google Play Protect enabled/, /contact TaxNest support/],
+    ['rur', /Play Protect ON rakhein/, /TaxNest support se rabta/],
+    ['ur', /پلے پروٹیکٹ آن رکھیں/, /ٹیکس نیسٹ سپورٹ سے رابطہ/],
+  ]) {
+    const copy = readFileSync(`lang/${locale}/pos.php`, 'utf8')
+      .split('\n').filter(line => /'caller_id_plus_(intro|step[1-4]|warn)'/.test(line)).join('\n');
+    assert.match(copy, enabled);
+    assert.match(copy, support);
+    assert.doesNotMatch(copy, /turn OFF|turn the scan off|Turning Play Protect off|OFF kar dein|scan band karein|بند کر دیں/);
+  }
+});
+
 test('Rider push is a private refresh hint; resumed refresh coalesces and guards account changes', () => {
   const main = readFileSync('rider-app/app/src/main/java/pk/taxnest/rider/MainActivity.kt','utf8');
   const push = readFileSync('rider-app/app/src/main/java/pk/taxnest/rider/PushService.kt','utf8');

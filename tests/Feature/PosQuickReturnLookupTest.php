@@ -19,8 +19,8 @@ use Tests\TestCase;
  * PosReturnController::quickLookup resolves a typed bill number into a return
  * form URL. The matching depends on the CURRENT numbering conventions:
  *   - POS serial padding = 5 digits (POS-YYYY-00012)
- *   - L-series padding   = 3 digits (L-012), unpadded also stored historically
- *   - bare digits try this year's + last year's POS series, then L-series
+ *   - B-series padding   = 3 digits (B012), with legacy L/L- forms retained
+ *   - bare digits try this year's + last year's POS series, then B and legacy L
  *   - PRA fiscal number matches exactly
  *   - receipt order code = last segment of ORD-yymmdd-XXXXX ('code' shops)
  *
@@ -214,6 +214,24 @@ class PosQuickReturnLookupTest extends TestCase
             'invoice_mode' => 'local', 'pra_status' => 'local',
         ]);
         $this->assertFinds('L-1234', $unpadded);
+    }
+
+    public function test_current_b_series_padded_and_unpadded(): void
+    {
+        $this->actAs('pos_manager');
+        $padded = $this->seedBill([
+            'invoice_number' => 'B012',
+            'invoice_mode' => 'local', 'pra_status' => 'local',
+        ]);
+
+        $this->assertFinds('b-12', $padded);
+        $this->assertFinds('B012', $padded);
+
+        $unpadded = $this->seedBill([
+            'invoice_number' => 'B1234',
+            'invoice_mode' => 'local', 'pra_status' => 'local',
+        ]);
+        $this->assertFinds('B-1234', $unpadded);
     }
 
     /**

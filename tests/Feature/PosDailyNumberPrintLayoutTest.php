@@ -223,6 +223,17 @@ class PosDailyNumberPrintLayoutTest extends TestCase
         }
     }
 
+    public function test_new_local_daily_receipt_and_paid_kot_share_the_b_number(): void
+    {
+        $company = $this->makeCompany();
+        $txn = $this->makeTxn($company, ['invoice_number' => 'B210']);
+        foreach (self::RECEIPT_TEMPLATES as $template) {
+            $this->assertStringContainsString('B003', $this->renderReceiptBody($template, $company, $txn));
+        }
+        $this->insertTxn(['invoice_number' => 'B210']);
+        $this->assertStringContainsString('B003', $this->renderKotBody($company, $this->makePaidOrder()));
+    }
+
     public function test_token_style_receipts_still_print_label_and_bill_serial(): void
     {
         $company = $this->makeCompany(['local_number_style' => 'token']);

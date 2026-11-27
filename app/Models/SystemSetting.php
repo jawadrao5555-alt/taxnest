@@ -6,6 +6,8 @@ use Illuminate\Database\Eloquent\Model;
 
 class SystemSetting extends Model
 {
+    public const APPROVED_BILLING_RATE_CARD_APPLIED = 'billing_approved_rate_card_applied';
+
     protected $fillable = [
         'key',
         'value',

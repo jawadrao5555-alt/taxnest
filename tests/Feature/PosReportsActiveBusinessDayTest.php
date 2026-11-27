@@ -37,6 +37,12 @@ class PosReportsActiveBusinessDayTest extends TestCase
 
         $dashboard = $controller->dashboard(Request::create('/pos/dashboard', 'GET'))->render();
         $this->assertStringContainsString('data-pos-report-header', $dashboard);
+        $this->assertStringContainsString(e(route('pos.reports', [
+            'from' => $date, 'to' => $date, 'cashier' => 'all', 'tab' => 'combined',
+        ])), $dashboard);
+        $this->assertStringContainsString(e(route('pos.reports.dashboard-overview', [
+            'date' => $date, 'tab' => 'combined', 'cashier' => 'all',
+        ])), $dashboard);
         $this->assertStringContainsString('data-dashboard-metric="revenue"', $dashboard);
         $this->assertMatchesRegularExpression('/data-dashboard-metric="revenue"[^>]*class="[^"]*stat-card[^"]*from-emerald-500/', $dashboard);
         $this->assertLessThan(strpos($dashboard, 'data-dashboard-report-section'), strpos($dashboard, 'data-dashboard-theme'));

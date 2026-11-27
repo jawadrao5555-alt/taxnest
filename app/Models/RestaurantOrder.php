@@ -30,7 +30,7 @@ class RestaurantOrder extends Model
         // Task 841: KDS cancelled-items badge — JSON list of voided dishes.
         'void_items',
         // Task 1001: per-hold-attempt idempotency key — replay guard for lost responses.
-        'hold_uuid',
+        'hold_uuid', 'held_billing_stream',
         // Owner batch 26 Aug 2026: "paisay online aa rahay hain" marker — the
         // proof bill prints ONLINE instead of NOT PAID and the bill cannot be
         // finalized until the counter confirms the payment landed.
@@ -38,6 +38,12 @@ class RestaurantOrder extends Model
         'edit_revision',
         'last_edit_uuid',
     ];
+
+    public function allowsHeldBillingStream(string $stream): bool
+    {
+        return $stream === 'both' || $this->held_billing_stream === null
+            || $this->held_billing_stream === $stream;
+    }
 
     protected $casts = [
         // int casts: live cPanel PDO returns uncast int columns as STRINGS

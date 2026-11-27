@@ -142,7 +142,7 @@ class AiPageCreditService
             'purchased'           => self::purchasedBalance($company),
             'total_remaining'     => self::totalRemaining($company),
             'resets_on'           => now()->startOfMonth()->addMonth()->format('d M Y'),
-            'packs'               => self::PACKS,
+            'packs'               => array_replace(self::PACKS, [500 => self::packPrice(500)]),
         ];
     }
 
@@ -314,6 +314,12 @@ class AiPageCreditService
     /** Price of a pack, or null when the size is not on sale. */
     public static function packPrice(int $pages): ?int
     {
+        if ($pages === 500) {
+            $price = (int) \App\Models\SystemSetting::get('di_ai_500_page_pack_price', self::PACKS[500]);
+
+            return $price > 0 ? $price : self::PACKS[500];
+        }
+
         return self::PACKS[$pages] ?? null;
     }
 }

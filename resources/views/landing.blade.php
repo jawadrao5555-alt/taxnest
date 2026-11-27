@@ -58,6 +58,7 @@
             --teal: #117d73;
             --muted: #526769;
             --line: #dce5e1;
+            --focus-ring: #075952;
         }
         body {
             font-family: Inter, system-ui, sans-serif;
@@ -67,7 +68,9 @@
         }
         h1, h2 { font-family: 'Playfair Display', Georgia, serif; }
         [x-cloak] { display: none !important; }
-        a:focus-visible, button:focus-visible { outline: 2px solid #4fd6bd; outline-offset: 3px; }
+        :is(.public-nav, .public-hero, footer) { --focus-ring: #4fd6bd; }
+        :is(a, button):focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 3px; }
+        .public-overview footer :is(h4, p) { color: #b8cfcb; }
         .public-width { width: min(100% - 2rem, 74rem); margin-inline: auto; }
         .public-nav { background: var(--petrol); border-bottom: 1px solid #ffffff1f; color: #eef6f3; }
         .public-nav-bar { display: flex; align-items: center; justify-content: space-between; gap: .8rem; min-height: 4.75rem; }
@@ -188,9 +191,17 @@
     @endunless
 
 </head>
-<body>
+<body class="public-overview">
     <div id="tn-boot" aria-hidden="true"><span>Tax<b>Nest</b></span></div>
-    <header class="public-nav sticky top-0 z-50" x-data="{ mobileOpen: false }" @keydown.escape.window="mobileOpen = false">
+    <header class="public-nav sticky top-0 z-50"
+        x-data="{
+            mobileOpen: false,
+            closeMenu() {
+                if (!this.mobileOpen) return;
+                this.mobileOpen = false;
+                this.$refs.menuToggle.focus();
+            }
+        }" @keydown.escape.window="closeMenu()">
         <nav class="public-width" aria-label="Main navigation">
             <div class="public-nav-bar">
                 <a href="{{ url('/') }}" class="flex-shrink-0">
@@ -208,7 +219,7 @@
                 <div class="public-actions">
                     <a href="/login" class="hidden text-sm font-semibold sm:inline">Log In</a>
                     <a href="/register" class="public-button public-button-primary">Get Started</a>
-                    <button type="button" @click="mobileOpen = !mobileOpen" class="xl:hidden public-button public-menu-toggle" aria-label="Menu" aria-controls="public-mobile-menu" :aria-expanded="mobileOpen">
+                    <button type="button" x-ref="menuToggle" @click="mobileOpen = !mobileOpen" class="xl:hidden public-button public-menu-toggle" aria-label="Menu" aria-controls="public-mobile-menu" :aria-expanded="mobileOpen">
                         <span aria-hidden="true" x-text="mobileOpen ? 'Close' : 'Menu'">Menu</span>
                     </button>
                 </div>

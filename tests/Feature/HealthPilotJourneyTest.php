@@ -612,7 +612,8 @@ class HealthPilotJourneyTest extends TestCase
     public function test_lab_workspace_enforces_module_and_role_and_isolates_layouts(): void
     {
         $this->actingAs($this->owner, 'health');
-        $this->get(route('health.lab'))->assertOk()->assertSee('data-lab-layout="modern"', false);
+        $this->get(route('health.lab'))->assertOk()->assertSee('data-lab-layout="modern"', false)
+            ->assertSee('href="'.route('health.billing').'"', false);
         $this->post(route('health.lab.layout'), ['layout' => 'classic'])->assertRedirect(route('health.lab'));
         $this->get(route('health.lab'))->assertOk()->assertSee('data-lab-layout="classic"', false);
         $this->postJson(route('health.lab.layout'), ['layout' => 'unknown'])->assertUnprocessable();
@@ -632,6 +633,11 @@ class HealthPilotJourneyTest extends TestCase
 
         $this->actingAs($this->owner, 'health');
         $this->get(route('health.lab'))->assertOk()->assertSee('data-lab-layout="classic"', false);
+        $this->company->update(['health_modules' => json_encode(['lab'])]);
+        HealthModuleService::forget();
+        $this->get(route('health.lab'))->assertOk()->assertDontSee('href="'.route('health.billing').'"', false);
+        $this->get(route('health.billing'))->assertForbidden();
+
         $this->company->update(['health_modules' => json_encode(['opd'])]);
         HealthModuleService::forget();
         $this->get(route('health.lab'))->assertForbidden();

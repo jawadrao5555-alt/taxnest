@@ -3,6 +3,10 @@
     <h1 class="text-2xl font-bold text-white mb-1">Support &amp; Payment Settings</h1>
     <p class="text-xs text-gray-500 dark:text-gray-400 mb-6">Configure the global WhatsApp support number and the bank / payment account details shown to companies whose free trial has ended.</p>
 
+    @if(auth('admin')->user()?->canManageRelease())
+    <a href="{{ route('saas.admin.website-clients.index') }}" class="mb-5 inline-block text-sm text-emerald-300 underline">Website Clients</a>
+    @endif
+
     @if(!$canManageSensitiveConfiguration)
     <div class="bg-amber-950/40 border border-amber-800 rounded-xl p-5 text-sm text-amber-100">
         <p class="font-semibold">Sensitive configuration is read-only for this account.</p>

@@ -13,8 +13,10 @@ class LabWorkspaceController extends Controller
 
     public function index(Request $request)
     {
+        $layout = $request->session()->get($this->preferenceKey());
+
         return view('health.lab.index', [
-            'layout' => $request->session()->get($this->preferenceKey(), 'modern'),
+            'layout' => in_array($layout, self::LAYOUTS, true) ? $layout : 'modern',
             'layouts' => self::LAYOUTS,
         ]);
     }

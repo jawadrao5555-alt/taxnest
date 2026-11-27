@@ -660,6 +660,8 @@
         </div>
     </section>
 
+    <x-website-clients product="di" />
+
     <!-- Singular Testimonial -->
     <section class="py-24 bg-white border-b border-gray-200">
         <div class="max-w-[800px] mx-auto px-4 text-center reveal-on-scroll">

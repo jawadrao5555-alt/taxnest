@@ -13,6 +13,9 @@
                     </select>
                 </label>
                 <button class="rounded-lg bg-teal-700 px-4 py-2 font-semibold text-white" type="submit">{{ __('lab_workspace.apply') }}</button>
+                @error('layout')
+                    <p role="alert" class="w-full text-sm text-red-700 dark:text-red-400">{{ $message }}</p>
+                @enderror
             </form>
         </div>
 
@@ -25,7 +28,7 @@
             @if(in_array('patients.view', $healthCapabilities ?? [], true))
                 <a href="{{ route('health.patients') }}" @class(['rounded-xl border border-gray-300 p-4 font-semibold dark:border-gray-700', 'bg-teal-50 dark:bg-teal-900/30' => $layout === 'fast_reception'])>{{ __('health.nav_patients') }}</a>
             @endif
-            @if(in_array('billing.view', $healthCapabilities ?? [], true))
+            @if(in_array('accounts', $healthModules ?? [], true) && in_array('billing.view', $healthCapabilities ?? [], true))
                 <a href="{{ route('health.billing') }}" class="rounded-xl border border-gray-300 p-4 font-semibold dark:border-gray-700">{{ __('health.nav_billing') }}</a>
             @endif
         </div>

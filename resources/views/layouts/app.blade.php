@@ -291,6 +291,13 @@
                             </x-dropdown>
                         </div>
                     </div>
+                    @if($diUpdateCompany?->product_type === 'di')
+                        <div data-di-fbr-environment class="border-t border-gray-100 dark:border-gray-800 px-4 py-1 text-xs font-semibold text-gray-700 dark:text-gray-200 sm:px-6">
+                            FBR {{ match ($diUpdateCompany->fbr_environment ?? 'sandbox') {
+                                'sandbox' => 'Sandbox', 'production' => 'Production', default => 'environment unknown',
+                            } }}
+                        </div>
+                    @endif
                 </header>
 
                 @if(auth()->check() && auth()->user()->company_id)

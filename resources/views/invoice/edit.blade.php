@@ -539,7 +539,7 @@
                     const rate = branchServicesRates[branchId] ?? companyServicesRate;
                     defaultTaxRates.services = rate;
                     this.items.forEach((item, idx) => {
-                        if (item.schedule_type === 'services') {
+                        if (item.schedule_type === 'services' && !item.di_tax_profile_revision) {
                             item.tax_rate = rate;
                             this.calcTax(idx);
                         }
@@ -695,9 +695,19 @@
                     let item = this.items[index];
                     if (!item.hs_code || item.hs_code.length < 4) return;
                     if (item.product_id && !forceProductLookup) return;
+                    const lookupHs = item.hs_code;
+                    const lookupProduct = item.product_id;
                     try {
                         let res = await fetch('/api/hs-lookup?hs_code=' + encodeURIComponent(item.hs_code));
                         let data = await res.json();
+                        if (item.hs_code !== lookupHs || item.product_id !== lookupProduct) return;
+                        if (item.di_tax_profile_revision) {
+                            item.show_st_withheld = !!data.st_withheld_applicable;
+                            item.show_petroleum_levy = !!data.petroleum_levy_applicable;
+                            if (!item.show_st_withheld) item.st_withheld_at_source = false;
+                            if (!item.show_petroleum_levy) item.petroleum_levy = '';
+                            return;
+                        }
                         item.hsUnmapped = !!data.hs_unmapped;
                         if (data && data.pct_code) {
                             item.pct_code = data.pct_code;
@@ -870,6 +880,8 @@
                     item.source_invoice_item_id = '';
                     item.price_includes_tax = false;
                     item.product_id = product.id;
+                    item.di_tax_profile_revision = product.di_tax_profile_revision || '';
+                    item.fbr_reference_checked = Boolean(item.di_tax_profile_revision);
                     item.packings = product.selling_packings || [];
                     item.selling_packing_id = '';
                     item.packing_history = null;
@@ -880,15 +892,18 @@
                     item.description = product.name;
                     item.price = parseFloat(product.default_price);
                     item.schedule_type = product.schedule_type || 'standard';
-                    item.tax_rate = Math.round(parseFloat(product.default_tax_rate));
+                    item.tax_rate = parseFloat(product.default_tax_rate);
                     this.applyScheduleRules(item);
-                    if (product.sro_reference) item.sro_schedule_no = product.sro_reference;
-                    if (product.serial_number) item.serial_no = product.serial_number;
+                    item.sro_schedule_no = product.sro_reference || '';
+                    item.serial_no = product.serial_number || '';
                     if (product.mrp) {
                         item.mrp = product.mrp;
                         item.mrpManual = (parseFloat(product.mrp) !== parseFloat(product.default_price));
                     }
                     item.default_uom = this.mapUom(product.uom);
+                    item.di_tax_profile_values = item.di_tax_profile_revision
+                        ? JSON.stringify([item.hs_code, item.pct_code, item.default_uom, item.schedule_type, Number(item.tax_rate), item.sro_schedule_no, item.serial_no])
+                        : '';
                     item.productSearch = product.name;
                     item.showDropdown = false;
                     item.hsLookupInfo = 'From product: ' + product.name + ' | Schedule: ' + item.schedule_type;

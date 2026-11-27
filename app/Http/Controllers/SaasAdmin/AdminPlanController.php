@@ -7,9 +7,11 @@ use App\Models\PricingPlan;
 use App\Models\AdminAuditLog;
 use App\Services\PlanLadderGuard;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Database\Eloquent\Collection;
 use App\Services\PosAddonPricingService;
+use App\Services\PosFederalAddonAccess;
 use App\Services\PosPlanComparisonService;
 use App\Support\NestErps;
 use App\Support\ProductCatalog;
@@ -52,7 +54,7 @@ class AdminPlanController extends Controller
         // silently until the next deploy gate run (Task 1455).
         $ladderWarnings = PlanLadderGuard::allCurrentProblems();
 
-        $posAddons = array_intersect_key(PosAddonPricingService::catalog(), PosAddonPricingService::ADDONS);
+        $posAddons = PosAddonPricingService::catalog(includeUnpricedFederal: true);
 
         return view('saas-admin.plans', compact('diPlans', 'posPlans', 'fbrposPlans', 'erpsPlans', 'erpsVerticals', 'ladderWarnings', 'posAddons'));
     }
@@ -68,22 +70,27 @@ class AdminPlanController extends Controller
                 $rules["addons.{$code}.{$cycle}"] = ['required', 'numeric', 'min:0', 'max:999999999'];
             }
         }
+        foreach (PosFederalAddonAccess::CODES as $code) {
+            $rules["addons.{$code}.annual"] = ['sometimes', 'required', 'integer', 'min:0', 'max:999999999'];
+        }
 
         $data = $request->validate($rules);
-        $before = PosAddonPricingService::catalog();
-        PosAddonPricingService::save($data['addons']);
-        $after = PosAddonPricingService::catalog();
-
         $auditShape = fn (array $catalog) => collect($catalog)->mapWithKeys(fn ($row, $code) => [
             $code => collect(PosAddonPricingService::CYCLES)
                 ->mapWithKeys(fn ($cycle) => [$cycle => $row["{$cycle}_price"] ?? null])
                 ->all(),
         ])->all();
 
-        AdminAuditLog::log(auth('admin')->id(), 'PRA POS add-on pricing updated', 'SystemSetting', null, [
-            'old' => $auditShape($before),
-            'new' => $auditShape($after),
-        ]);
+        DB::transaction(function () use ($data, $auditShape) {
+            $before = PosAddonPricingService::catalog(includeUnpricedFederal: true);
+            PosAddonPricingService::save($data['addons']);
+            $after = PosAddonPricingService::catalog(includeUnpricedFederal: true);
+
+            AdminAuditLog::log(auth('admin')->id(), 'PRA POS add-on pricing updated', 'SystemSetting', null, [
+                'old' => $auditShape($before),
+                'new' => $auditShape($after),
+            ]);
+        });
 
         return back()->with('success', 'PRA POS add-on rates saved successfully.');
     }

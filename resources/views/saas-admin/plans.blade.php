@@ -55,8 +55,14 @@
                     <div>
                         <label class="text-[10px] text-gray-500 uppercase">
                             Annual (PKR)
-                            <input type="number" name="addons[{{ $code }}][annual]" value="{{ old("addons.{$code}.annual", $addon['annual_price']) }}" min="0" max="999999999" step="1" required class="mt-1 w-full bg-gray-900 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500">
+                            <input type="number" name="addons[{{ $code }}][annual]" value="{{ old("addons.{$code}.annual", $addon['annual_price']) }}" aria-label="{{ $addon['label'] }} annual price (PKR)" min="0" max="999999999" step="1" required class="mt-1 w-full bg-gray-900 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500">
                         </label>
+                        @if(\App\Services\PosFederalAddonAccess::isFederalCode($code))
+                        <p class="mt-1 text-xs text-gray-400">Enter 0 to stop new purchases.</p>
+                        @endif
+                        @error("addons.{$code}.annual")
+                        <p class="mt-1 text-xs text-red-400">{{ $message }}</p>
+                        @enderror
                     </div>
                 </div>
                 @endforeach

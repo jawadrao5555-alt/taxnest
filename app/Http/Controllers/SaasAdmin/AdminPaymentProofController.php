@@ -568,12 +568,12 @@ class AdminPaymentProofController extends Controller
 
             // Re-check eligibility HERE, not just at submission. A request can
             // sit in the queue for days: in that window the shop may have
-            // downgraded to Starter, switched to FBR, or let the package lapse.
+            // changed to an ineligible package, switched to FBR, or let the package lapse.
             // Approving any of those would mint an entitlement the shop is not
             // entitled to — and, with no live package to date it against, one
             // with an invented expiry.
             \App\Services\PosAddonService::flushCache();
-            $eligibility = \App\Services\PosAddonService::purchaseEligibility($company);
+            $eligibility = \App\Services\PosAddonService::purchaseEligibility($company, $codes);
             if (!($eligibility['allowed'] ?? false)) {
                 return ['outcome' => 'not_eligible'];
             }

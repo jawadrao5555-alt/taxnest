@@ -13,6 +13,60 @@
 </datalist>
 
 <script>
+    window.diProductProfileCheck = () => {
+        let key = '';
+        let sequence = 0;
+        let timer;
+        let context;
+        const endpoint = @js(route('invoice.fbr-reference-options', [], false));
+        return {
+            message: '',
+            retryable: false,
+            queue(value) {
+                const next = JSON.stringify(value);
+                if (key === next) return;
+                key = next;
+                context = value;
+                this.retry();
+            },
+            retry() {
+                const request = ++sequence;
+                clearTimeout(timer);
+                this.retryable = false;
+                this.message = '';
+                if (!context?.[2]) return;
+                const [product_id, profile_revision, invoice_date, branch, matches] = context;
+                if (!matches) {
+                    this.message = 'Tax fields differ from the saved product defaults. The invoice line will be checked before FBR submission.';
+                    return;
+                }
+                const params = new URLSearchParams({product_id, profile_revision, invoice_date});
+                if (branch) params.set('branch_id', branch);
+                this.message = 'Checking saved product tax defaults…';
+                timer = setTimeout(async () => {
+                    try {
+                        const response = await fetch(endpoint + '?' + params, {headers: {Accept: 'application/json'}});
+                        if (!response.ok) throw new Error('Reference check unavailable');
+                        const {errors, province} = await response.json();
+                        if (request !== sequence) return;
+                        this.message = errors.length
+                            ? errors.join(' ') + ' Review the line using Search FBR tax references.'
+                            : 'Saved product tax defaults confirmed for ' + province + ' on ' + invoice_date + '.';
+                    } catch {
+                        if (request !== sequence) return;
+                        this.message = 'Unable to recheck saved product tax defaults. Keep the draft and retry.';
+                        this.retryable = true;
+                    }
+                }, 350);
+            },
+            destroy() {
+                clearTimeout(timer);
+                sequence++;
+            },
+        };
+    };
+
+
     window.dsiReferencePicker = (() => {
         const catalogs = @js(array_intersect_key($catalogs, array_flip(['hs', 'sale_type', 'rate', 'sro', 'serial', 'uom'])));
         const schedules = new Map([

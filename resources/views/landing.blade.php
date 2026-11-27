@@ -732,6 +732,8 @@
     </section>
 
     <!-- Footer -->
+    <x-website-clients />
+
     @include('partials.product-guide-link', ['productGuideKey' => ''])
     <x-site-footer />
 

@@ -632,6 +632,8 @@
         </div>
     </section>
 
+    <x-website-clients product="fbrpos" />
+
     <!-- Testimonial -->
     <section class="py-24 bg-[#052730] border-y border-[#0A4D5C]">
         <div class="max-w-[1000px] mx-auto px-4 sm:px-6 lg:px-8 text-center fade-in-up">

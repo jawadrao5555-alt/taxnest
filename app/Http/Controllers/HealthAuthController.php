@@ -197,11 +197,11 @@ class HealthAuthController extends Controller
             return $this->redirectToPortal();
         }
 
-        $picked = RequestedPackageService::resolvePlan(request('plan'), HealthPanel::PRODUCT_TYPE);
+        $picked = RequestedPackageService::resolvePlan(request('plan'), HealthPanel::PRODUCT_TYPE, HealthPanel::ownsErpRecord(...));
 
         return view('health.auth.register', [
             'pickedPlanName' => $picked?->name,
-            'registrationPlans' => \App\Services\ProspectiveSubscriptionPolicy::registrationPlans(HealthPanel::PRODUCT_TYPE),
+            'registrationPlans' => \App\Services\ProspectiveSubscriptionPolicy::registrationPlans(HealthPanel::PRODUCT_TYPE, HealthPanel::ownsErpRecord(...)),
             'orgTypes' => HealthPanel::ORG_TYPES,
         ]);
     }
@@ -247,7 +247,7 @@ class HealthAuthController extends Controller
 
         $orgType = HealthPanel::normalizeOrgType($request->input('org_type'));
 
-        $selectedPlan=\App\Services\ProspectiveSubscriptionPolicy::resolveRegistrationSelection($request,HealthPanel::PRODUCT_TYPE);
+        $selectedPlan = \App\Services\ProspectiveSubscriptionPolicy::resolveRegistrationSelection($request, HealthPanel::PRODUCT_TYPE, HealthPanel::ownsErpRecord(...));
         \App\Services\ProspectiveSubscriptionPolicy::requireSelection($selectedPlan);
         $requestedPackage = RequestedPackageService::companyAttributes($selectedPlan);
 

@@ -69,7 +69,7 @@
                             $signupSelectedPlan
                         );
                         $signupAllowedByPlan = ($plans ?? collect())->mapWithKeys(fn ($plan) => [
-                            (string) $plan->id => \App\Services\PosAddonService::purchasableCodesForPlan($plan),
+                            (string) $plan->id => \App\Services\PosAddonService::publicCodesForPlan($plan),
                         ])->all();
                         $signupAddonPrices = collect(\App\Services\PosAddonPricingService::catalog())
                             ->mapWithKeys(fn ($item, $code) => [$code => (int) $item['annual_price']])->all();

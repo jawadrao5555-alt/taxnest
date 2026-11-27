@@ -6,6 +6,7 @@ use App\Models\Company;
 use App\Models\PosDiSandboxSubmission;
 use App\Models\PosDiSandboxProfile;
 use App\Models\PosTransaction;
+use App\Services\PosFederalAddonAccess;
 use App\Services\PraDiSandboxService;
 use App\Support\PraDiSandboxGate;
 use Illuminate\Http\Request;
@@ -35,6 +36,7 @@ class PraDiSandboxController extends Controller
     public function setup(Request $request)
     {
         $company = $this->company($request, true);
+        abort_unless(PosFederalAddonAccess::allows($company, 'federal_di'), 403);
         $profile = PosDiSandboxProfile::where('company_id', $company->id)->first();
         $scenarios = PosDiSandboxSubmission::where('company_id', $company->id)->where('environment', 'sandbox')
             ->where('state', 'accepted')->get()->map(fn ($record) => $record->payload['scenarioId'] ?? null)->filter()->unique()->values();

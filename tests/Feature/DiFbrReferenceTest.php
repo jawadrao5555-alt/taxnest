@@ -5,6 +5,8 @@ namespace Tests\Feature;
 use App\Http\Controllers\DiFbrReferenceController;
 use App\Models\Branch;
 use App\Models\Company;
+use App\Models\Product;
+use App\Http\Controllers\ProductController;
 use App\Services\DiFbrReferences;
 use App\Services\FbrService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -82,6 +84,52 @@ class DiFbrReferenceTest extends TestCase
         $this->assertSame(['7%'], array_column($response['options']['rates'], 'label'));
         $this->expectException(\Illuminate\Database\Eloquent\ModelNotFoundException::class);
         $lookup($foreign->id);
+    }
+
+    public function test_saved_product_defaults_are_scoped_and_rechecked_for_date_and_branch(): void
+    {
+        $this->travelTo(now()->setDate(2026, 8, 1));
+        $this->fakeReferences();
+        $company = $this->company();
+        $foreignCompany = $this->company('7654321');
+        app()->instance('currentCompanyId', $company->id);
+        $controller = app(ProductController::class);
+        $defaults = [
+            'name' => 'Synthetic verified product', 'hs_code' => '0101.2100', 'pct_code' => '0101.2100',
+            'default_tax_rate' => 5, 'uom' => 'Kilograms', 'default_price' => 100,
+            'schedule_type' => 'reduced', 'sro_reference' => 'Synthetic Schedule', 'serial_number' => '70',
+        ];
+
+        $controller->store(Request::create('/products', 'POST', $defaults + ['verify_di_tax' => 1]));
+        $product = Product::where('company_id', $company->id)->sole();
+        $this->assertSame('2026-08-01', $product->di_tax_verification['date']);
+        $this->assertSame('Punjab', $product->di_tax_verification['province']);
+
+        $result = $controller->search(Request::create('/products/search', 'GET', ['q' => 'Synthetic verified']))->getData(true)[0];
+        $this->assertArrayNotHasKey('di_tax_verification', $result);
+        $revision = $result['di_tax_profile_revision'];
+
+        $lookup = fn (string $date, ?int $branch = null) => app(DiFbrReferenceController::class)(
+            Request::create('/invoice/fbr-reference-options', 'GET', array_filter([
+                'invoice_date' => $date, 'branch_id' => $branch, 'product_id' => $product->id, 'profile_revision' => $revision,
+            ])),
+            app(DiFbrReferences::class),
+            app(FbrService::class)
+        )->getData(true);
+
+        $this->assertSame([], $lookup('2026-08-01')['errors']);
+        $this->assertNotEmpty($lookup('2026-07-31')['errors']);
+        $sindh = Branch::forceCreate(['company_id' => $company->id, 'name' => 'Synthetic Sindh', 'province' => 'Sindh']);
+        $this->assertNotEmpty($lookup('2026-08-01', $sindh->id)['errors']);
+
+        $controller->update(Request::create('/products/'.$product->id, 'PUT', array_replace($defaults, ['default_tax_rate' => 7])), $product);
+        $this->assertNull($product->fresh()->di_tax_verification);
+        $this->assertStringContainsString('defaults have changed', $lookup('2026-08-01')['errors'][0]);
+
+        app()->instance('currentCompanyId', $foreignCompany->id);
+        $this->assertSame([], $controller->search(Request::create('/products/search', 'GET', ['q' => 'Synthetic verified']))->getData(true));
+        $this->expectException(\Illuminate\Database\Eloquent\ModelNotFoundException::class);
+        $lookup('2026-08-01');
     }
 
     public function test_failed_lookup_is_distinct_from_no_choices_and_retries(): void

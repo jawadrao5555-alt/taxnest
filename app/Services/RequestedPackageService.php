@@ -31,7 +31,7 @@ class RequestedPackageService
      * Name matching happens in PHP (not SQL) so it stays case-insensitive
      * regardless of the database collation.
      */
-    public static function resolvePlan(?string $name, string $productType): ?PricingPlan
+    public static function resolvePlan(?string $name, string $productType, ?callable $eligible = null): ?PricingPlan
     {
         $name = trim((string) $name);
         if ($name === '') {
@@ -43,7 +43,8 @@ class RequestedPackageService
         $plan = PricingPlan::whereIn('product_type', \App\Support\NestErps::storedTypesFor($productType))
             ->where('is_trial', false)
             ->get()
-            ->first(fn (PricingPlan $plan) => mb_strtolower($plan->name) === mb_strtolower($name));
+            ->first(fn (PricingPlan $plan) => mb_strtolower($plan->name) === mb_strtolower($name)
+                && ($eligible === null || $eligible($plan)));
 
         // A retired package must never come back through a stale ?plan= link on
         // a signup form — whichever product line retired it.

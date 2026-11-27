@@ -40,7 +40,7 @@ class HealthPlatformService
         // Tolerant of the value rows held before the Nest ERPS umbrella
         // existed — see NestErps::PRODUCT_TYPES.
         return $company !== null
-            && HealthPanel::isProductType($company->product_type ?? null);
+            && HealthPanel::ownsErpRecord($company);
     }
 
     /**
@@ -197,7 +197,7 @@ class HealthPlatformService
                 ->where('is_trial', false)
                 ->orderBy('price')
                 ->get()
-                ->filter(fn (PricingPlan $plan) => PlanSellabilityService::isSellable($plan))
+                ->filter(fn (PricingPlan $plan) => HealthPanel::ownsErpRecord($plan) && PlanSellabilityService::isSellable($plan))
                 ->values();
         } catch (\Throwable $e) {
             return collect();

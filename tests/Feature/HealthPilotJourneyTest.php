@@ -609,7 +609,57 @@ class HealthPilotJourneyTest extends TestCase
 
     /* ─────────────────────────── helpers ──────────────────────────────────── */
 
-    private function makeHospital(string $name, string $ntn): Company
+    public function test_lab_workspace_enforces_module_and_role_and_isolates_layouts(): void
+    {
+        $this->actingAs($this->owner, 'health');
+        $this->get(route('health.lab'))->assertOk()->assertSee('data-lab-layout="modern"', false)
+            ->assertSee('href="'.route('health.billing').'"', false);
+        $this->post(route('health.lab.layout'), ['layout' => 'classic'])->assertRedirect(route('health.lab'));
+        $this->get(route('health.lab'))->assertOk()->assertSee('data-lab-layout="classic"', false);
+        $this->postJson(route('health.lab.layout'), ['layout' => 'unknown'])->assertUnprocessable();
+
+        $lab = $this->makeHospital('Synthetic Standalone Lab', 'PILOT-LAB-2', 'lab');
+        $labOwner = $this->makeUser($lab, 'synthetic.lab.owner@example.test', HealthAccessService::ROLE_OWNER);
+        $this->actingAs($labOwner, 'health');
+        $this->get(route('health.lab'))->assertOk()->assertSee('data-lab-layout="modern"', false)
+            ->assertDontSee(route('health.ipd'));
+        $this->post(route('health.lab.layout'), ['layout' => 'fast_reception'])->assertRedirect(route('health.lab'));
+        $this->get(route('health.lab'))->assertOk()->assertSee('data-lab-layout="fast_reception"', false)
+            ->assertSee('href="'.route('health.patients.create').'"', false);
+
+        $technician = $this->makeUser($lab, 'synthetic.lab.tech@example.test', 'health_lab_tech');
+        $this->actingAs($technician, 'health');
+        $this->post(route('health.lab.layout'), ['layout' => 'fast_reception'])->assertRedirect(route('health.lab'));
+        $this->get(route('health.lab'))->assertOk()->assertDontSee('href="'.route('health.patients.create').'"', false);
+
+        $this->actingAs($labOwner, 'health')->withSession(['health.lab_layout.'.$lab->id.'.'.$labOwner->id => 'retired_layout']);
+        $this->get(route('health.lab'))->assertOk()->assertSee('data-lab-layout="modern"', false);
+
+        $accountant = $this->makeUser($this->company, 'synthetic.accountant@example.test', 'health_accountant');
+        $this->actingAs($accountant, 'health');
+        $this->get(route('health.lab'))->assertForbidden();
+        $this->post(route('health.lab.layout'), ['layout' => 'fast_reception'])->assertForbidden();
+
+        $this->actingAs($this->owner, 'health');
+        $this->get(route('health.lab'))->assertOk()->assertSee('data-lab-layout="classic"', false);
+        $this->company->update(['health_modules' => json_encode(['lab'])]);
+        HealthModuleService::forget();
+        $this->get(route('health.lab'))->assertOk()->assertDontSee('href="'.route('health.billing').'"', false);
+        $this->get(route('health.billing'))->assertForbidden();
+
+        $this->company->update(['health_modules' => json_encode(['opd'])]);
+        HealthModuleService::forget();
+        $this->get(route('health.lab'))->assertForbidden();
+        $this->post(route('health.lab.layout'), ['layout' => 'modern'])->assertForbidden();
+
+        $subscription = Subscription::where('company_id', $lab->id)->where('active', true)->sole();
+        $subscription->pricingPlan->update(['health_modules' => json_encode(['accounts'])]);
+        HealthModuleService::forget();
+        $this->actingAs($labOwner, 'health');
+        $this->get(route('health.lab'))->assertForbidden();
+    }
+
+    private function makeHospital(string $name, string $ntn, string $orgType = 'hospital'): Company
     {
         $company = Company::create([
             'name' => $name,
@@ -618,8 +668,8 @@ class HealthPilotJourneyTest extends TestCase
             NestErps::VERTICAL_COLUMN => NestErps::HEALTH,
             'status' => 'approved',
             'company_status' => 'active',
-            'health_org_type' => 'hospital',
-            'health_modules' => json_encode(HealthModuleService::MODULES),
+            'health_org_type' => $orgType,
+            'health_modules' => json_encode(($orgType === 'lab' ? ['lab', 'accounts'] : HealthModuleService::MODULES)),
         ]);
 
         $plan = PricingPlan::create([

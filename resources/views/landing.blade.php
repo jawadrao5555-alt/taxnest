@@ -1,131 +1,152 @@
+@php
+    $comparisonPage = $comparisonPage ?? false;
+    $title = $comparisonPage ? 'Compare TaxNest products' : 'TaxNest | Invoicing, POS and ERP for Pakistan';
+    $description = $comparisonPage
+        ? 'Find the right TaxNest product for FBR Digital Invoicing, PRA POS, FBR POS or Healthcare ERP.'
+        : 'TaxNest provides FBR Digital Invoicing, PRA POS, FBR POS and ERP workspaces for businesses in Pakistan.';
+    $canonical = $comparisonPage ? route('public.compare') : url('/');
+    $products = [
+        [
+            'name' => 'TaxNest Digital Invoice', 'shortName' => 'Digital Invoice', 'url' => route('di.landing'),
+            'summary' => 'Issue and track FBR digital invoices.',
+            'audience' => 'Businesses that issue sales tax invoices.',
+            'workflow' => 'Create or import invoice drafts, review FBR references, submit invoices and track acknowledgement.',
+            'pricing' => route('di.landing').'#pricing',
+        ],
+        [
+            'name' => 'TaxNest PRA POS', 'shortName' => 'PRA POS', 'url' => route('pos.landing'),
+            'summary' => 'Run retail or restaurant counters with PRA reporting.',
+            'audience' => 'Retailers and restaurants using PRA-integrated billing.',
+            'workflow' => 'Record counter sales, manage restaurant orders and check fiscal submission and offline sync status.',
+            'pricing' => route('pos.landing').'#pricing',
+        ],
+        [
+            'name' => 'TaxNest FBR POS', 'shortName' => 'FBR POS', 'url' => route('fbrpos.landing'),
+            'summary' => 'Track counter sales, stock and FBR submissions.',
+            'audience' => 'Retailers using FBR POS and dedicated collection desks.',
+            'workflow' => 'Record sales and returns, track stock and review fiscal acknowledgements through the configured route.',
+            'pricing' => route('fbrpos.landing').'#pricing',
+        ],
+        [
+            'name' => \App\Support\NestErps::LABEL, 'shortName' => 'ERP', 'url' => route('erps.landing'),
+            'summary' => 'Explore Healthcare ERP and request an ERP for your industry.',
+            'audience' => 'Clinics, hospitals, laboratories and pharmacies.',
+            'workflow' => 'See the current Healthcare workspace, including patient, pharmacy and accounts workflows. Other sectors are scoped on request.',
+            'pricing' => route('erps.landing'),
+        ],
+    ];
+@endphp
 <!DOCTYPE html>
 <html lang="en" class="scroll-smooth">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <meta name="theme-color" content="#052730">
+    <meta name="theme-color" content="#092A33">
     <link rel="icon" type="image/svg+xml" href="/images/brand/taxnest-mark.svg">
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
-    <title>TaxNest — Tax Compliance Platform for Pakistan</title>
-    <meta name="description" content="TaxNest is Pakistan's all-in-one FBR and PRA compliance platform — digital invoicing, POS billing, and audit-ready reporting for businesses of every size.">
-    @include('partials.meta-og', [
-        'ogTitle'       => 'TaxNest — Tax Compliance Platform for Pakistan',
-        'ogDescription' => 'Pakistan\'s all-in-one FBR and PRA compliance platform. Issue FBR Digital Invoices and PRA-integrated POS receipts — all from one account.',
-        'ogUrl'         => 'https://taxnest.pk/',
-    ])
-    <link rel="canonical" href="https://taxnest.pk/">
-    {{-- Fonts: non-blocking loader — never link a font stylesheet directly (see partials/font-css). --}}
-    @include('partials.font-css', ['fontFamilies' => 'playfair-display:400,600,700|inter:400,500,600,700,800'])
-    @include('partials.fast-first-paint')
+    <title>{{ $title }}</title>
+    <meta name="description" content="{{ $description }}">
+    <link rel="canonical" href="{{ $canonical }}">
+    @include('partials.meta-og', ['ogTitle' => $title, 'ogDescription' => $description, 'ogUrl' => $canonical])
+    @include('partials.font-css', ['fontFamilies' => 'playfair-display:400,600,700|inter:400,500,600,700'])
+    @include('partials.fast-first-paint', ['bootBg' => '#092A33'])
+    @include('partials.urdu-font')
     <style>
         :root {
-            --teal-dark: #052730;
-            --teal-main: #0A4D5C;
-            --teal-light: #1B7C8C;
-            --gold: #E7BF3B;
-            --paper: #FDFBF7;
-            --ink: #1F2937;
+            --petrol: #092a33;
+            --paper: #f7f8f5;
+            --teal: #117d73;
+            --muted: #526769;
+            --line: #dce5e1;
         }
-        body { 
-            font-family: 'Inter', system-ui, -apple-system, sans-serif; 
-            background-color: var(--paper);
-            color: var(--ink);
+        body {
+            font-family: Inter, system-ui, sans-serif;
+            color: var(--petrol);
+            background: var(--paper);
             -webkit-font-smoothing: antialiased;
         }
-        h1, h2, h3, .font-serif {
-            font-family: 'Playfair Display', serif;
-        }
+        h1, h2 { font-family: 'Playfair Display', Georgia, serif; }
         [x-cloak] { display: none !important; }
-        
-        .fade-in-up {
-            opacity: 0;
-            transform: translateY(20px);
-            transition: opacity 0.8s ease-out, transform 0.8s ease-out;
-        }
-        .fade-in-up.is-visible {
-            opacity: 1;
-            transform: translateY(0);
-        }
-
-        /* Solid components, neutral shadows */
-        .card-solid {
-            background: #FFFFFF;
-            border: 1px solid rgba(0,0,0,0.08);
-            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03);
-            transition: transform 0.2s ease, box-shadow 0.2s ease;
-        }
-        .card-solid:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.08), 0 4px 6px -2px rgba(0,0,0,0.04);
-        }
-
-        .btn-solid {
+        a:focus-visible, button:focus-visible { outline: 2px solid #4fd6bd; outline-offset: 3px; }
+        .public-width { width: min(100% - 2rem, 74rem); margin-inline: auto; }
+        .public-nav { background: var(--petrol); border-bottom: 1px solid #ffffff1f; color: #eef6f3; }
+        .public-nav-bar { display: flex; align-items: center; justify-content: space-between; gap: .8rem; min-height: 4.75rem; }
+        .public-nav-links { align-items: center; gap: clamp(.75rem, 1.5vw, 1.5rem); font-size: .875rem; }
+        .public-nav-links a { min-height: 2.75rem; display: flex; align-items: center; }
+        .public-nav-links a:hover, .public-nav-links a[aria-current] { color: #9de8d7; }
+        .public-actions { display: flex; align-items: center; gap: .75rem; }
+        .public-menu { max-height: calc(100dvh - 4.75rem); overflow-y: auto; padding: .5rem 0 .75rem; border-top: 1px solid #ffffff1f; }
+        .public-menu a { display: block; padding: .7rem .6rem; border-radius: .4rem; font-size: .9rem; }
+        .public-menu a:hover { background: #ffffff12; }
+        .public-button {
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            padding: 0.75rem 1.5rem;
-            font-weight: 600;
-            font-size: 0.875rem;
-            border-radius: 0.375rem;
-            transition: all 0.2s ease;
-        }
-        .btn-primary {
-            background-color: var(--teal-dark);
-            color: #FFFFFF;
+            min-height: 2.75rem;
+            padding: .65rem 1rem;
             border: 1px solid transparent;
+            border-radius: .55rem;
+            font-size: .875rem;
+            font-weight: 700;
+            white-space: nowrap;
         }
-        .btn-primary:hover {
-            background-color: var(--teal-main);
+        .public-button-primary { background: var(--teal); color: #fff; }
+        .public-button-primary:hover { background: #0d695f; }
+        .public-hero { background: radial-gradient(ellipse at 85% 40%, #175359 0, var(--petrol) 65%); color: #fff; }
+        .public-hero-inner {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr);
+            align-items: center;
+            gap: clamp(1.75rem, 5vw, 4rem);
+            padding-block: clamp(2.4rem, 7vw, 5.75rem);
         }
-        .btn-secondary {
-            background-color: #FFFFFF;
-            color: var(--teal-dark);
-            border: 1px solid rgba(0,0,0,0.15);
-            box-shadow: 0 1px 2px 0 rgba(0,0,0,0.05);
+        .public-hero h1, .public-compare-intro h1 { margin: 0; font-size: clamp(2.4rem, 5.6vw, 4.65rem); line-height: 1.08; letter-spacing: -.045em; font-weight: 600; }
+        .public-hero p { margin: 1.2rem 0 1.45rem; max-width: 42ch; color: #dfefea; font-size: clamp(1rem, 2vw, 1.13rem); line-height: 1.65; }
+        .public-hero .public-button { background: var(--paper); color: var(--petrol); }
+        .public-hero .public-button:hover { background: #d7eee5; }
+        .public-preview { margin: 0; padding: .4rem; background: #ffffff1f; border: 1px solid #ffffff36; border-radius: .9rem; box-shadow: 0 22px 55px #041a2366; }
+        .public-preview img { display: block; width: 100%; height: auto; border-radius: .55rem; }
+        .public-preview figcaption { padding: .4rem .45rem .15rem; color: #dceee8; font-size: .76rem; }
+        .public-products { padding-block: clamp(2.2rem, 5vw, 3.65rem); }
+        .public-products h2 { margin: 0 0 1.1rem; font-size: clamp(1.7rem, 3vw, 2.55rem); line-height: 1.2; font-weight: 600; }
+        .public-cards { display: grid; grid-template-columns: minmax(0, 1fr); gap: .85rem; }
+        .public-card {
+            display: flex;
+            flex-direction: column;
+            gap: .45rem;
+            min-width: 0;
+            padding: 1.12rem;
+            background: #fff;
+            border: 1px solid var(--line);
+            border-radius: .8rem;
         }
-        .btn-secondary:hover {
-            background-color: #F9FAFB;
-            border-color: rgba(0,0,0,0.25);
+        a.public-card:hover { background: #edf6f0; border-color: #88b9ac; }
+        .public-card strong { display: flex; align-items: center; justify-content: space-between; gap: .5rem; font-size: 1rem; }
+        .public-card strong span { color: var(--teal); }
+        .public-card p, .public-card dd { margin: 0; color: var(--muted); font-size: .91rem; line-height: 1.55; }
+        .public-details { display: flex; align-items: baseline; flex-wrap: wrap; gap: .65rem 1.2rem; margin-top: 1.2rem; }
+        .public-details a { padding: .35rem 0; color: #0a625c; font-size: .9rem; font-weight: 700; text-decoration: underline; text-underline-offset: 4px; }
+        #products, #compare { scroll-margin-top: 6rem; }
+        .public-compare-intro { padding-top: clamp(2.2rem, 6vw, 4.5rem); }
+        .public-compare-intro h1 { max-width: 20ch; font-size: clamp(2.2rem, 5vw, 3.75rem); }
+        .public-compare-intro p { margin: .8rem 0 0; max-width: 56ch; color: var(--muted); line-height: 1.6; }
+        .public-compare h2 { margin-bottom: .35rem; font-size: 1.4rem; }
+        .public-compare .public-card dl { display: grid; gap: .3rem; margin: 0 0 .65rem; }
+        .public-compare .public-card dt { margin-top: .35rem; font-weight: 700; font-size: .78rem; }
+        .public-compare .public-details { margin-top: auto; }
+        @media (min-width: 38rem) {
+            .public-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
         }
-
-        /* Product Accents */
-        .accent-emerald { color: #059669; }
-        .bg-accent-emerald { background-color: #059669; }
-        .border-accent-emerald { border-color: #059669; }
-        
-        .accent-purple { color: #7C3AED; }
-        .bg-accent-purple { background-color: #7C3AED; }
-        .border-accent-purple { border-color: #7C3AED; }
-        
-        .accent-blue { color: #2563EB; }
-        .bg-accent-blue { background-color: #2563EB; }
-        .border-accent-blue { border-color: #2563EB; }
-
-        /* Grid Backgrounds */
-        .bg-grid-pattern {
-            background-image: linear-gradient(rgba(0,0,0,0.03) 1px, transparent 1px),
-                              linear-gradient(90deg, rgba(0,0,0,0.03) 1px, transparent 1px);
-            background-size: 40px 40px;
+        @media (min-width: 60rem) {
+            .public-hero-inner { grid-template-columns: minmax(0, .98fr) minmax(0, 1.02fr); }
+            .public-cards { grid-template-columns: repeat(4, minmax(0, 1fr)); }
         }
-        .bg-grid-pattern-dark {
-            background-image: linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
-                              linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
-            background-size: 40px 40px;
-        }
-
-        /* Nav Transition */
-        .nav-scrolled {
-            background-color: rgba(253, 251, 247, 0.95);
-            backdrop-filter: blur(8px);
-            border-bottom: 1px solid rgba(0,0,0,0.05);
-            box-shadow: 0 1px 3px 0 rgba(0,0,0,0.05);
-        }
-        .nav-transparent {
-            background-color: transparent;
-            border-bottom: 1px solid transparent;
+        @media (min-width: 1280px) {
+            .public-nav .public-menu-toggle { display: none; }
         }
     </style>
 
+    @unless($comparisonPage)
     <!-- Structured Data -->
     <script type="application/ld+json">
     {
@@ -140,7 +161,7 @@
                     "@@type": "ImageObject",
                     "url": "https://taxnest.pk/images/brand/taxnest-logo.svg"
                 },
-                "description": "Pakistan's FBR and PRA compliant tax, invoicing, and point-of-sale platform for retailers, restaurants, and wholesalers.",
+                "description": "Digital invoicing, point of sale and ERP software for businesses in Pakistan.",
                 "areaServed": "PK",
                 "foundingLocation": { "@@type": "Country", "name": "Pakistan" }
             },
@@ -157,606 +178,119 @@
                 "name": "TaxNest",
                 "applicationCategory": "BusinessApplication",
                 "operatingSystem": "Web",
-                "description": "Pakistan's FBR and PRA compliant tax, invoicing, and point-of-sale platform for retailers, restaurants, and wholesalers.",
-                "offers": { "@@type": "Offer", "price": "0", "priceCurrency": "PKR" },
+                "description": "Digital invoicing, point of sale and ERP software for businesses in Pakistan.",
                 "url": "https://taxnest.pk/",
                 "publisher": { "@@id": "https://taxnest.pk/#organization" }
             }
         ]
     }
     </script>
-    <script type="application/ld+json">
-    {
-        "@@context": "https://schema.org",
-        "@@type": "FAQPage",
-        "mainEntity": [
-            {
-                "@@type": "Question",
-                "name": "Is there a free trial?",
-                "acceptedAnswer": {
-                    "@@type": "Answer",
-                    "text": "Digital Invoice, PRA POS and FBR POS offer a 3-day trial after approval. Check the Healthcare ERP page for packages and enquiries."
-                }
-            },
-            {
-                "@@type": "Question",
-                "name": "Are the products connected to each other?",
-                "acceptedAnswer": {
-                    "@@type": "Answer",
-                    "text": "No — by design. Digital Invoice, TaxNest PRA POS, FBR POS and TaxNest ERP each have their own login, their own data and their own panel. Nothing leaks between products, which keeps every regulator's records clean."
-                }
-            },
-            {
-                "@@type": "Question",
-                "name": "What happens after I register?",
-                "acceptedAnswer": {
-                    "@@type": "Answer",
-                    "text": "Your company goes to our team for a quick review. While pending you can look around the whole panel; once approved, everything unlocks and your trial begins."
-                }
-            },
-            {
-                "@@type": "Question",
-                "name": "Does the POS keep working if the internet drops?",
-                "acceptedAnswer": {
-                    "@@type": "Answer",
-                    "text": "Supported POS counters can queue sales offline. After reconnection, check the sync status and the authority acknowledgement."
-                }
-            },
-            {
-                "@@type": "Question",
-                "name": "Can I run branches and multiple staff accounts?",
-                "acceptedAnswer": {
-                    "@@type": "Answer",
-                    "text": "Yes. Plans include multiple users and branches with role-based access — cashiers, managers and admins each see exactly what they should, and supported billing and account events are recorded in audit logs."
-                }
-            }
-        ]
-    }
-    </script>
-    {{-- Urdu-script font (Task 1287) — inert unless the app locale is ever 'ur'. --}}
-    @include('partials.urdu-font')
+    @endunless
+
 </head>
-<body x-data="{ scrolled: false, mobileOpen: false }" @scroll.window="scrolled = (window.pageYOffset > 20)">
+<body>
     <div id="tn-boot" aria-hidden="true"><span>Tax<b>Nest</b></span></div>
-
-    <!-- Navigation -->
-    <nav :class="(scrolled || mobileOpen) ? 'nav-scrolled' : 'nav-transparent'" class="fixed top-0 w-full z-50 transition-all duration-300">
-        <div class="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex items-center justify-between h-20">
-                <a href="/" class="flex-shrink-0">
-                    <img src="{{ asset('images/brand/taxnest-logo.svg') }}" x-show="scrolled || mobileOpen" alt="TaxNest" class="h-8 w-auto">
-                    <img src="{{ asset('images/brand/taxnest-logo-white.svg') }}" x-show="!scrolled && !mobileOpen" alt="TaxNest" class="h-8 w-auto">
+    <header class="public-nav sticky top-0 z-50" x-data="{ mobileOpen: false }" @keydown.escape.window="mobileOpen = false">
+        <nav class="public-width" aria-label="Main navigation">
+            <div class="public-nav-bar">
+                <a href="{{ url('/') }}" class="flex-shrink-0">
+                    <img src="{{ asset('images/brand/taxnest-logo-white.svg') }}" width="92" height="32" alt="TaxNest" class="h-8 w-auto">
                 </a>
-                <div class="hidden xl:flex items-center gap-5">
-                    <a href="/digital-invoice" class="text-sm font-medium transition-colors" :class="scrolled ? 'text-gray-600 hover:text-gray-900' : 'text-gray-200 hover:text-white'">TaxNest Digital Invoice</a>
-                    <a href="/pos" class="text-sm font-medium transition-colors" :class="scrolled ? 'text-gray-600 hover:text-gray-900' : 'text-gray-200 hover:text-white'">TaxNest PRA POS</a>
-                    <a href="/fbr-pos-landing" class="text-sm font-medium transition-colors" :class="scrolled ? 'text-gray-600 hover:text-gray-900' : 'text-gray-200 hover:text-white'">TaxNest FBR POS</a>
-                    <a href="{{ \App\Support\NestErps::LANDING_PATH }}" class="text-sm font-medium transition-colors" :class="scrolled ? 'text-gray-600 hover:text-gray-900' : 'text-gray-200 hover:text-white'">{{ \App\Support\NestErps::LABEL }}</a>
-                    <a href="#compare" class="text-sm font-medium transition-colors" :class="scrolled ? 'text-gray-600 hover:text-gray-900' : 'text-gray-200 hover:text-white'">Compare</a>
-                    <a href="/download" class="text-sm font-medium transition-colors" :class="scrolled ? 'text-gray-600 hover:text-gray-900' : 'text-gray-200 hover:text-white'">Downloads</a>
-                    <a href="/tutorials" class="text-sm font-medium transition-colors" :class="scrolled ? 'text-gray-600 hover:text-gray-900' : 'text-gray-200 hover:text-white'">Tutorials</a>
-                    <a href="/contact" class="text-sm font-medium transition-colors" :class="scrolled ? 'text-gray-600 hover:text-gray-900' : 'text-gray-200 hover:text-white'">Contact</a>
+                <div class="public-nav-links hidden xl:flex">
+                    @foreach($products as $product)
+                        <a href="{{ $product['url'] }}">{{ $product['shortName'] }}</a>
+                    @endforeach
+                    <a href="{{ route('public.compare') }}" @if($comparisonPage) aria-current="page" @endif>Compare</a>
+                    <a href="/tutorials">Tutorials</a>
+                    <a href="/download">Downloads</a>
+                    <a href="/contact">Contact</a>
                 </div>
-                <div class="flex items-center space-x-4">
-                    <a href="/login" class="hidden sm:inline text-sm font-medium transition-colors" :class="scrolled ? 'text-gray-600 hover:text-gray-900' : 'text-gray-200 hover:text-white'">Log In</a>
-                    <a href="/register" class="btn-solid" :class="scrolled ? 'btn-primary' : 'bg-white text-[#052730] hover:bg-gray-100'">Get Started</a>
-                    <button @click="mobileOpen = !mobileOpen" class="xl:hidden p-2 -mr-2" aria-label="Menu" :aria-expanded="mobileOpen">
-                        <svg x-show="!mobileOpen" class="w-6 h-6" :class="scrolled ? 'text-gray-800' : 'text-white'" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
-                        <svg x-show="mobileOpen" x-cloak class="w-6 h-6 text-gray-800" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                <div class="public-actions">
+                    <a href="/login" class="hidden text-sm font-semibold sm:inline">Log In</a>
+                    <a href="/register" class="public-button public-button-primary">Get Started</a>
+                    <button type="button" @click="mobileOpen = !mobileOpen" class="xl:hidden public-button public-menu-toggle" aria-label="Menu" aria-controls="public-mobile-menu" :aria-expanded="mobileOpen">
+                        <span aria-hidden="true" x-text="mobileOpen ? 'Close' : 'Menu'">Menu</span>
                     </button>
                 </div>
             </div>
-            <div x-show="mobileOpen" x-cloak @click.away="mobileOpen = false" class="xl:hidden max-h-[calc(100dvh-5rem)] overflow-y-auto border-t border-gray-200 py-4 space-y-1 bg-[#FDFBF7]">
-                <a href="/digital-invoice" class="block px-2 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded">TaxNest Digital Invoice</a>
-                <a href="/pos" class="block px-2 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded">TaxNest PRA POS</a>
-                <a href="/fbr-pos-landing" class="block px-2 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded">TaxNest FBR POS</a>
-                <a href="{{ \App\Support\NestErps::LANDING_PATH }}" class="block px-2 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded">{{ \App\Support\NestErps::LABEL }}</a>
-                <a href="#compare" @click="mobileOpen = false" class="block px-2 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded">Compare Products</a>
-                <a href="/tutorials" class="block px-2 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded">Tutorials</a>
-                <a href="/download" class="block px-2 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded">Downloads</a>
-                <a href="/contact" class="block px-2 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded">Contact</a>
-                <a href="/login" class="block px-2 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded">Log In</a>
+            <div id="public-mobile-menu" x-show="mobileOpen" x-cloak class="xl:hidden public-menu">
+                @foreach($products as $product)
+                    <a href="{{ $product['url'] }}">{{ $product['name'] }}</a>
+                @endforeach
+                <a href="{{ route('public.compare') }}" @if($comparisonPage) aria-current="page" @endif>Compare Products</a>
+                <a href="/tutorials">Tutorials</a>
+                <a href="/download">Downloads</a>
+                <a href="/contact">Contact</a>
+                <a href="/login">Log In</a>
             </div>
-        </div>
-    </nav>
-
-    <!-- Hero Section -->
-    <section class="relative bg-[#052730] pt-32 pb-20 lg:pt-40 lg:pb-28 overflow-hidden border-b border-[#0A4D5C]">
-        <div class="absolute inset-0 bg-grid-pattern-dark opacity-50"></div>
-        <div class="absolute -top-32 -right-24 w-[520px] h-[520px] rounded-full pointer-events-none" style="background: radial-gradient(circle, rgba(231,191,59,0.10), transparent 62%);"></div>
-        <div class="absolute top-1/3 -left-40 w-[460px] h-[460px] rounded-full pointer-events-none" style="background: radial-gradient(circle, rgba(27,124,140,0.20), transparent 62%);"></div>
-
-        <div class="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-            <div class="grid lg:grid-cols-12 gap-12 lg:gap-10 items-center">
-
-                <!-- Copy -->
-                <div class="lg:col-span-6">
-                    <div class="inline-flex items-center px-3 py-1 bg-white/5 border border-white/10 rounded-full text-xs font-medium text-white/80 tracking-wide uppercase mb-8">
-                        <span class="w-1.5 h-1.5 rounded-full bg-[#E7BF3B] mr-2"></span>
-                        Tax Compliance Platform · Pakistan
+        </nav>
+    </header>
+    <main>
+        @if($comparisonPage)
+            <section class="public-width public-compare-intro" aria-labelledby="compare-title">
+                <h1 id="compare-title">Which TaxNest product fits your business?</h1>
+                <p>Compare who each product is built for and what it helps you do each day.</p>
+            </section>
+            <section class="public-width public-products public-compare" aria-label="Product comparison">
+                <div class="public-cards">
+                    @foreach($products as $product)
+                        <article class="public-card">
+                            <h2>{{ $product['name'] }}</h2>
+                            <dl>
+                                <dt>Built for</dt>
+                                <dd>{{ $product['audience'] }}</dd>
+                                <dt>How it works</dt>
+                                <dd>{{ $product['workflow'] }}</dd>
+                            </dl>
+                            <div class="public-details">
+                                @if($product['pricing'] === $product['url'])
+                                    <a href="{{ $product['url'] }}">Explore ERP and packages</a>
+                                @else
+                                    <a href="{{ $product['url'] }}" aria-label="Explore {{ $product['name'] }}">Explore</a>
+                                    <a href="{{ $product['pricing'] }}" aria-label="View {{ $product['name'] }} pricing">View pricing</a>
+                                @endif
+                            </div>
+                        </article>
+                    @endforeach
+                </div>
+                <div class="public-details"><a href="{{ route('product-guide') }}">Read the product guide</a></div>
+            </section>
+        @else
+            <section class="public-hero" aria-labelledby="home-title">
+                <div class="public-width public-hero-inner">
+                    <div>
+                        <h1 id="home-title">Invoicing, POS and ERP for Pakistan</h1>
+                        <p>Issue FBR digital invoices, run your counters and manage your operations in the TaxNest workspace built for your business.</p>
+                        <a href="#products" class="public-button">Explore products</a>
                     </div>
-                    <h1 class="text-4xl sm:text-5xl lg:text-6xl font-serif text-white leading-[1.1] mb-8">
-                        Compliance,<br>
-                        <span class="text-white/80 italic">structured for Pakistan.</span>
-                    </h1>
-                    <p class="text-lg text-white/70 leading-relaxed mb-10 max-w-xl font-light">
-                        TaxNest brings Digital Invoice, PRA POS, FBR POS and TaxNest ERP together on one platform. Each product has its own workspace. Explore Healthcare ERP for clinics, hospitals, laboratories and pharmacies. Other ERP sectors are scoped on request.
-                    </p>
-                    <div class="flex flex-col sm:flex-row items-start gap-4 mb-10">
-                        <a href="#products" class="btn-solid bg-[#E7BF3B] text-[#052730] hover:bg-[#F2D06B]">
-                            Explore the Platform
+                    <figure class="public-preview" data-hero-vignette>
+                        <img src="{{ asset('images/screenshots/di-dash.jpg') }}" width="1280" height="720" fetchpriority="high" alt="TaxNest Digital Invoice dashboard">
+                        <figcaption>Inside TaxNest Digital Invoice</figcaption>
+                    </figure>
+                </div>
+            </section>
+
+            <section id="products" class="public-width public-products" aria-labelledby="products-title">
+                <h2 id="products-title">Choose a TaxNest product</h2>
+                <div class="public-cards">
+                    @foreach($products as $product)
+                        <a href="{{ $product['url'] }}" class="public-card">
+                            <strong>{{ $product['name'] }} <span aria-hidden="true">→</span></strong>
+                            <p>{{ $product['summary'] }}</p>
                         </a>
-                        <a href="/register" class="btn-solid border border-white/25 text-white hover:bg-white/5">
-                            Start Free Trial
-                        </a>
-                    </div>
-                    <div class="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-white/50">
-                        <span class="flex items-center gap-1.5"><svg class="w-4 h-4 text-[#E7BF3B]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> 3-day free trial</span>
-                        <span class="flex items-center gap-1.5"><svg class="w-4 h-4 text-[#E7BF3B]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> No credit card</span>
-                        <span class="flex items-center gap-1.5"><svg class="w-4 h-4 text-[#E7BF3B]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> FBR &amp; PRA integrated</span>
-                    </div>
+                    @endforeach
                 </div>
+                <div id="compare" class="public-details">
+                    <a href="{{ route('public.compare') }}">Compare products</a>
+                    <a href="{{ route('product-guide') }}">Read the product guide</a>
+                </div>
+            </section>
 
-                <!-- Product vignette -->
-                <div data-hero-vignette class="lg:col-span-6 relative hidden lg:block">
-                    <div class="relative mx-auto max-w-lg">
-                        <div class="absolute -top-6 -right-4 w-full h-full rounded-xl bg-white/5 border border-white/10 rotate-3"></div>
-                        <div class="relative rounded-xl bg-white shadow-2xl border border-white/10 overflow-hidden">
-                            <div class="flex items-center gap-1.5 px-4 py-3 bg-gray-100 border-b border-gray-200">
-                                <span class="w-2.5 h-2.5 rounded-full bg-red-400"></span>
-                                <span class="w-2.5 h-2.5 rounded-full bg-yellow-400"></span>
-                                <span class="w-2.5 h-2.5 rounded-full bg-green-400"></span>
-                                <span class="ml-3 text-[11px] text-gray-400 font-medium">app.taxnest — Digital Invoice</span>
-                            </div>
-                            <img src="{{ asset('images/screenshots/di-dash.jpg') }}" alt="TaxNest Digital Invoice dashboard" class="w-full h-auto" onerror="this.closest('[data-hero-vignette]').style.display='none'">
-                        </div>
-                        <div class="mt-4 w-fit max-w-full bg-white rounded-lg shadow-xl border border-gray-100 px-4 py-3 flex items-center gap-3">
-                            <span class="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
-                                <svg class="w-4 h-4 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
-                            </span>
-                            <div>
-                                <p class="text-xs font-bold text-gray-900 leading-none">Invoice submitted</p>
-                                <p class="text-[11px] text-gray-400 mt-1">Example Digital Invoice status</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+            <x-website-clients />
+        @endif
+    </main>
 
-            </div>
-        </div>
-    </section>
-
-    @if(isset($stats['total_invoices']) && $stats['total_invoices'] > 0 || isset($stats['total_companies']) && $stats['total_companies'] > 0)
-    <!-- Real Platform Facts -->
-    <section class="border-b border-gray-200 bg-white">
-        <div class="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
-            <div class="flex flex-wrap items-center justify-between text-sm font-medium text-gray-500 uppercase tracking-widest gap-8">
-                @if(isset($stats['total_companies']) && $stats['total_companies'] > 0)
-                <div class="flex items-center gap-3">
-                    <span class="text-gray-900 font-bold text-lg">{{ $stats['total_companies'] }}</span>
-                    <span>Companies Active</span>
-                </div>
-                @endif
-                @if(isset($stats['total_invoices']) && $stats['total_invoices'] > 0)
-                <div class="flex items-center gap-3">
-                    <span class="text-gray-900 font-bold text-lg">{{ number_format($stats['total_invoices']) }}</span>
-                    <span>Invoices Processed</span>
-                </div>
-                @endif
-                <div class="flex items-center gap-3">
-                    <span class="w-2 h-2 rounded-full bg-green-500"></span>
-                    <span>PRAL API Integrated</span>
-                </div>
-                <div class="flex items-center gap-3">
-                    <span class="w-2 h-2 rounded-full bg-green-500"></span>
-                    <span>PRA IMS Integrated</span>
-                </div>
-            </div>
-        </div>
-    </section>
-    @endif
-
-    <!-- The Products Intro -->
-    <section id="products" class="py-24 bg-grid-pattern">
-        <div class="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="max-w-3xl mb-16 fade-in-up">
-                <h2 class="text-sm font-bold tracking-widest uppercase text-gray-500 mb-4">The Suite</h2>
-                <h3 class="text-3xl sm:text-4xl font-serif text-[#052730] mb-6">Four products. <br>One TaxNest platform.</h3>
-                <p class="text-gray-600 leading-relaxed text-lg">
-                    TaxNest isn't a generic SaaS tool. It's a suite of compliance products designed specifically for Pakistan's regulatory requirements. Every module operates with complete isolation—ensuring role-based access, multi-branch integrity, and audit logs for supported events.
-                </p>
-            </div>
-
-            <div class="space-y-24">
-                
-                <!-- Digital Invoice -->
-                <div class="flex flex-col lg:flex-row gap-12 items-center fade-in-up">
-                    <div class="w-full lg:w-1/2">
-                        <div class="rounded-xl bg-white p-2 border border-gray-200 shadow-xl transition-transform duration-300 hover:-translate-y-1">
-                            <img src="{{ asset('images/screenshots/di-dash.jpg') }}" alt="Digital Invoice Dashboard" class="w-full h-auto rounded border border-gray-300 shadow-sm" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIHZpZXdCb3g9IjAgMCA4MDAgNTAwIj48cmVjdCBmaWxsPSIjZjNmMTRiIiB3aWR0aD0iODAwIiBoZWlnaHQ9IjUwMCIvPjx0ZXh0IGZpbGw9IiM5Y2EzYWYiIGZvbnQtZmFtaWx5PSJzYW5zLXNlcmlmIiBmb250LXNpemU9IjMwIiBkeT0iMTAuNSIgZm9udC13ZWlnaHQ9ImJvbGQiIHg9IjUwJSIgeT0iNTAlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5EaWdpdGFsIEludm9pY2UgU2NyZWVuc2hvdDwvdGV4dD48L3N2Zz4='">
-                        </div>
-                    </div>
-                    <div class="w-full lg:w-1/2 lg:pl-10">
-                        <div class="inline-block px-3 py-1 mb-6 bg-emerald-50 border border-emerald-100 rounded-full text-xs font-semibold uppercase tracking-widest accent-emerald">
-                            FBR Digital Invoicing
-                        </div>
-                        <h4 class="text-3xl font-serif text-[#052730] mb-4">TaxNest Digital Invoice</h4>
-                        <p class="text-gray-600 mb-6 leading-relaxed">
-                            Prepare a draft or import invoice rows. Review buyer details, search FBR references and track the response to each submission.
-                        </p>
-                        <ul class="space-y-3 mb-8">
-                            <li class="flex items-start">
-                                <span class="accent-emerald mr-3 text-lg leading-none">•</span>
-                                <span class="text-gray-700 text-sm">Sandbox & Production environments</span>
-                            </li>
-                            <li class="flex items-start">
-                                <span class="accent-emerald mr-3 text-lg leading-none">•</span>
-                                <span class="text-gray-700 text-sm">Search FBR references by HS code, rate, schedule and unit</span>
-                            </li>
-                            <li class="flex items-start">
-                                <span class="accent-emerald mr-3 text-lg leading-none">•</span>
-                                <span class="text-gray-700 text-sm">Customer ledgers and invoice PDFs with saved selling-pack quantities</span>
-                            </li>
-                            <li class="flex items-start">
-                                <span class="accent-emerald mr-3 text-lg leading-none">•</span>
-                                <span class="text-gray-700 text-sm">One-click FBR Audit Pack — 6-year audit-ready archive</span>
-                            </li>
-                            <li class="flex items-start">
-                                <span class="accent-emerald mr-3 text-lg leading-none">•</span>
-                                <span class="text-gray-700 text-sm">Bulk Excel invoice import &amp; AI-powered invoice parsing</span>
-                            </li>
-                        </ul>
-                        <div class="flex gap-4">
-                            <a href="/digital-invoice" class="btn-solid btn-primary">Learn More</a>
-                            <a href="/digital-invoice#pricing" class="btn-solid btn-secondary">View Pricing</a>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent"></div>
-
-                <!-- TaxNest PRA POS -->
-                <div class="flex flex-col lg:flex-row-reverse gap-12 items-center fade-in-up">
-                    <div class="w-full lg:w-1/2">
-                        <div class="rounded-xl bg-white p-2 border border-gray-200 shadow-xl transition-transform duration-300 hover:-translate-y-1">
-                            <img src="{{ asset('images/screenshots/pos-sale.jpg') }}" alt="TaxNest PRA POS Sale Screen" class="w-full h-auto rounded border border-gray-300 shadow-sm" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIHZpZXdCb3g9IjAgMCA4MDAgNTAwIj48cmVjdCBmaWxsPSIjZjNmMTRiIiB3aWR0aD0iODAwIiBoZWlnaHQ9IjUwMCIvPjx0ZXh0IGZpbGw9IiM5Y2EzYWYiIGZvbnQtZmFtaWx5PSJzYW5zLXNlcmlmIiBmb250LXNpemU9IjMwIiBkeT0iMTAuNSIgZm9udC13ZWlnaHQ9ImJvbGQiIHg9IjUwJSIgeT0iNTAlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5OZXN0UE9TIFNjcmVlbnNob3Q8L3RleHQ+PC9zdmc+'">
-                            <div class="grid grid-cols-3 gap-2 mt-2">
-                                <img src="{{ asset('images/screenshots/pos-tables.jpg') }}?v=1" alt="TaxNest PRA POS restaurant tables board" loading="lazy" class="w-full h-auto rounded border border-gray-300 shadow-sm">
-                                <img src="{{ asset('images/screenshots/pos-dash.jpg') }}?v=1" alt="TaxNest PRA POS dashboard with profit and BI" loading="lazy" class="w-full h-auto rounded border border-gray-300 shadow-sm">
-                                <img src="{{ asset('images/screenshots/pos-tx.jpg') }}?v=1" alt="TaxNest PRA POS transactions list with PRA status" loading="lazy" class="w-full h-auto rounded border border-gray-300 shadow-sm">
-                            </div>
-                        </div>
-                    </div>
-                    <div class="w-full lg:w-1/2 lg:pr-10">
-                        <div class="inline-block px-3 py-1 mb-6 bg-purple-50 border border-purple-100 rounded-full text-xs font-semibold uppercase tracking-widest accent-purple">
-                            Punjab Revenue Authority POS
-                        </div>
-                        <h4 class="text-3xl font-serif text-[#052730] mb-4">TaxNest PRA POS <span class="text-xl text-gray-500 font-sans font-medium">— PRA POS</span></h4>
-                        <p class="text-gray-600 mb-6 leading-relaxed">
-                            A fast, keyboard-first point of sale built specifically for PRA fiscal integration. Designed for retail and restaurants in Punjab that demand speed at the counter without sacrificing compliance.
-                        </p>
-                        <ul class="space-y-3 mb-8">
-                            <li class="flex items-start">
-                                <span class="accent-purple mr-3 text-lg leading-none">•</span>
-                                <span class="text-gray-700 text-sm">PRA fiscal integration (cloud & fiscal-device modes)</span>
-                            </li>
-                            <li class="flex items-start">
-                                <span class="accent-purple mr-3 text-lg leading-none">•</span>
-                                <span class="text-gray-700 text-sm">Full restaurant suite — tables, kitchen display, waiter tablets &amp; QR menu</span>
-                            </li>
-                            <li class="flex items-start">
-                                <span class="accent-purple mr-3 text-lg leading-none">•</span>
-                                <span class="text-gray-700 text-sm">Delivery riders with live map tracking, staff hazri &amp; deals</span>
-                            </li>
-                            <li class="flex items-start">
-                                <span class="accent-purple mr-3 text-lg leading-none">•</span>
-                                <span class="text-gray-700 text-sm">Customer khata (credit ledger), receipt themes &amp; Urdu / Roman Urdu interface</span>
-                            </li>
-                            <li class="flex items-start">
-                                <span class="accent-purple mr-3 text-lg leading-none">•</span>
-                                <span class="text-gray-700 text-sm">Desktop &amp; mobile apps, offline auto-sync, Madadgar AI support</span>
-                            </li>
-                        </ul>
-                        <div class="flex gap-4">
-                            <a href="/pos" class="btn-solid btn-primary">Learn More</a>
-                            <a href="/pos#pricing" class="btn-solid btn-secondary">View Pricing</a>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- TaxNest PRA POS Promo Video -->
-                <div class="fade-in-up" x-data="{ playing: false }">
-                    <div class="max-w-3xl mx-auto text-center mb-8">
-                        <div class="inline-block px-3 py-1 mb-4 bg-purple-50 border border-purple-100 rounded-full text-xs font-semibold uppercase tracking-widest accent-purple">
-                            90-Second Overview
-                        </div>
-                        <h4 class="text-2xl sm:text-3xl font-serif text-[#052730]">See TaxNest in action &mdash; POS, FBR POS &amp; Digital Invoicing</h4>
-                    </div>
-                    <div class="max-w-4xl mx-auto">
-                        <div class="rounded-xl bg-white p-2 border border-gray-200 shadow-xl">
-                            <div class="relative rounded overflow-hidden border border-gray-300" style="aspect-ratio: 16/9; background: #052730;">
-                                <video x-ref="promoVideo" class="w-full h-full" controls playsinline preload="none"
-                                       poster="{{ asset('images/promo-poster.jpg') }}"
-                                       x-show="playing" x-cloak>
-                                    <source src="{{ asset('videos/taxnest-overview.mp4') }}?v=2" type="video/mp4">
-                                </video>
-                                <button x-show="!playing" type="button" aria-label="Play video"
-                                        @click="playing = true; $nextTick(() => { $refs.promoVideo.play(); })"
-                                        class="absolute inset-0 w-full h-full group cursor-pointer">
-                                    <img src="{{ asset('images/promo-poster.jpg') }}" alt="TaxNest PRA POS promo video" loading="lazy" class="absolute inset-0 w-full h-full object-cover">
-                                    <span class="absolute inset-0 bg-black/20 group-hover:bg-black/30 transition-colors"></span>
-                                    <span class="absolute inset-0 flex items-center justify-center">
-                                        <span class="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-white/95 shadow-xl flex items-center justify-center group-hover:scale-105 transition-transform">
-                                            <svg class="w-7 h-7 sm:w-8 sm:h-8 text-[#052730] ml-1" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
-                                        </span>
-                                    </span>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent"></div>
-
-                <!-- FBR POS -->
-                <div id="fbr-pos" class="flex flex-col lg:flex-row gap-12 items-center fade-in-up">
-                    <div class="w-full lg:w-1/2">
-                        <div class="rounded-xl bg-white p-2 border border-gray-200 shadow-xl transition-transform duration-300 hover:-translate-y-1">
-                            <img src="{{ asset('images/screenshots/fbr-sale.jpg') }}" alt="FBR POS Sale Screen" class="w-full h-auto rounded border border-gray-300 shadow-sm" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIHZpZXdCb3g9IjAgMCA4MDAgNTAwIj48cmVjdCBmaWxsPSIjZjNmMTRiIiB3aWR0aD0iODAwIiBoZWlnaHQ9IjUwMCIvPjx0ZXh0IGZpbGw9IiM5Y2EzYWYiIGZvbnQtZmFtaWx5PSJzYW5zLXNlcmlmIiBmb250LXNpemU9IjMwIiBkeT0iMTAuNSIgZm9udC13ZWlnaHQ9ImJvbGQiIHg9IjUwJSIgeT0iNTAlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5GQlIgUE9TIFNjcmVlbnNob3Q8L3RleHQ+PC9zdmc+'">
-                            <div class="grid grid-cols-3 gap-2 mt-2">
-                                <img src="{{ asset('images/screenshots/fbr-reports.jpg') }}?v=1" alt="FBR POS sales reports and analytics" loading="lazy" class="w-full h-auto rounded border border-gray-300 shadow-sm">
-                                <img src="{{ asset('images/screenshots/fbr-products.jpg') }}?v=1" alt="FBR POS products page with per-product tax setup" loading="lazy" class="w-full h-auto rounded border border-gray-300 shadow-sm">
-                                <img src="{{ asset('images/screenshots/fbr-stock.jpg') }}?v=1" alt="FBR POS stock and purchase page" loading="lazy" class="w-full h-auto rounded border border-gray-300 shadow-sm">
-                            </div>
-                        </div>
-                    </div>
-                    <div class="w-full lg:w-1/2 lg:pl-10">
-                        <div class="inline-block px-3 py-1 mb-6 bg-blue-50 border border-blue-100 rounded-full text-xs font-semibold uppercase tracking-widest accent-blue">
-                            FBR Point of Sale
-                        </div>
-                        <h4 class="text-3xl font-serif text-[#052730] mb-4">TaxNest FBR POS</h4>
-                        <p class="text-gray-600 mb-6 leading-relaxed">
-                            Record counter sales, stock movements and returns. Track fiscal submissions through the configured cloud or local device route.
-                        </p>
-                        <ul class="space-y-3 mb-8">
-                            <li class="flex items-start">
-                                <span class="accent-blue mr-3 text-lg leading-none">•</span>
-                                <span class="text-gray-700 text-sm">Direct FBR submission — cloud API or fiscal-device local mode</span>
-                            </li>
-                            <li class="flex items-start">
-                                <span class="accent-blue mr-3 text-lg leading-none">•</span>
-                                <span class="text-gray-700 text-sm">School fee and hospital payment receipts in dedicated collection workspaces</span>
-                            </li>
-                            <li class="flex items-start">
-                                <span class="accent-blue mr-3 text-lg leading-none">•</span>
-                                <span class="text-gray-700 text-sm">Inventory &amp; stock, product Excel import/export, deals &amp; promotions</span>
-                            </li>
-                            <li class="flex items-start">
-                                <span class="accent-blue mr-3 text-lg leading-none">•</span>
-                                <span class="text-gray-700 text-sm">Offline billing with auto-sync, khata, loyalty &amp; delivery riders</span>
-                            </li>
-                            <li class="flex items-start">
-                                <span class="accent-blue mr-3 text-lg leading-none">•</span>
-                                <span class="text-gray-700 text-sm">Analytics, Z-reports &amp; shifts, multi-branch, Android mobile app</span>
-                            </li>
-                        </ul>
-                        <div class="flex gap-4">
-                            <a href="/fbr-pos-landing" class="btn-solid btn-primary">Learn More</a>
-                            <a href="/fbr-pos-landing#pricing" class="btn-solid btn-secondary">View Pricing</a>
-                        </div>
-                    </div>
-                </div>
-
-                {{-- Nest ERPS (Task 1568): a deliberately compact strip, not a
-                     fourth full-size product block. The line is sold on
-                     enquiry, so it carries no price and no feature ladder that
-                     would compete with the three regulator products above. --}}
-                <div class="card-solid rounded-lg p-8 lg:p-10 fade-in-up border-l-4 border-[#0A4D5C]">
-                    <div class="flex flex-col lg:flex-row lg:items-center gap-6">
-                        <div class="flex-1">
-                            <span class="inline-block text-[11px] font-bold tracking-widest uppercase text-[#0A4D5C] mb-3">Also from TaxNest</span>
-                            <h3 class="text-2xl font-serif text-[#052730] mb-3">{{ \App\Support\NestErps::LABEL }}</h3>
-                            <p class="text-sm text-gray-600 leading-relaxed max-w-2xl">
-                                {{ \App\Support\NestErps::TAGLINE }}. Not a tax product — a line of full ERPs, one per
-                                kind of organisation.
-                                <span class="text-[#052730] font-semibold">{{ \App\Support\NestErps::verticalLabel(\App\Support\NestErps::HEALTH) }}</span>
-                                is live today for clinics, hospitals, laboratories and pharmacies; the rest are built on demand.
-                            </p>
-                        </div>
-                        <div class="flex gap-4 flex-shrink-0">
-                            <a href="{{ \App\Support\NestErps::LANDING_PATH }}" class="btn-solid btn-primary">Explore the line</a>
-                        </div>
-                    </div>
-                </div>
-
-            </div>
-        </div>
-    </section>
-
-    <!-- Architecture & Features -->
-    <section class="py-24 bg-white border-t border-gray-200">
-        <div class="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="text-center max-w-2xl mx-auto mb-16 fade-in-up">
-                <h2 class="text-sm font-bold tracking-widest uppercase text-gray-500 mb-4">Foundation</h2>
-                <h3 class="text-3xl font-serif text-[#052730]">Built for accountable billing.</h3>
-            </div>
-            
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-                <div class="card-solid p-8 rounded-lg fade-in-up">
-                    <div class="w-10 h-10 bg-gray-100 rounded mb-6 flex items-center justify-center">
-                        <svg class="w-5 h-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
-                    </div>
-                    <h4 class="font-serif text-xl text-[#052730] mb-3">Invoice history</h4>
-                    <p class="text-sm text-gray-600 leading-relaxed">
-                        Review recorded invoice events and verify the integrity of locked invoices.
-                    </p>
-                </div>
-                <div class="card-solid p-8 rounded-lg fade-in-up" style="transition-delay: 100ms;">
-                    <div class="w-10 h-10 bg-gray-100 rounded mb-6 flex items-center justify-center">
-                        <svg class="w-5 h-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
-                    </div>
-                    <h4 class="font-serif text-xl text-[#052730] mb-3">Multi-Branch Support</h4>
-                    <p class="text-sm text-gray-600 leading-relaxed">
-                        Manage a national footprint from a single account. Define branches, assign role-based access, and consolidate reporting across the entire organization.
-                    </p>
-                </div>
-                <div class="card-solid p-8 rounded-lg fade-in-up" style="transition-delay: 200ms;">
-                    <div class="w-10 h-10 bg-gray-100 rounded mb-6 flex items-center justify-center">
-                        <svg class="w-5 h-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-                    </div>
-                    <h4 class="font-serif text-xl text-[#052730] mb-3">Offline Resilience</h4>
-                    <p class="text-sm text-gray-600 leading-relaxed">
-                        Supported POS counters can queue sales during an outage. Check the saved fiscal status after reconnection.
-                    </p>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Product Comparison -->
-    <section id="compare" class="py-24 bg-grid-pattern border-t border-gray-200">
-        <div class="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="text-center max-w-2xl mx-auto mb-16 fade-in-up">
-                <h2 class="text-sm font-bold tracking-widest uppercase text-gray-500 mb-4">Compare</h2>
-                <h3 class="text-3xl font-serif text-[#052730]">Which product fits your business?</h3>
-            </div>
-            <div class="overflow-x-auto fade-in-up">
-                <table class="w-full min-w-[640px] bg-white border border-gray-200 rounded-lg text-sm">
-                    <thead>
-                        <tr class="border-b border-gray-200">
-                            <th class="text-left p-5 font-semibold text-gray-500 uppercase tracking-wider text-xs w-1/4"></th>
-                            <th class="text-left p-5">
-                                <span class="block font-serif text-lg text-[#052730]">TaxNest Digital Invoice</span>
-                                <span class="text-xs font-medium accent-emerald uppercase tracking-wider">FBR e-Invoicing</span>
-                            </th>
-                            <th class="text-left p-5">
-                                <span class="block font-serif text-lg text-[#052730]">TaxNest PRA POS</span>
-                                <span class="text-xs font-medium accent-purple uppercase tracking-wider">PRA Point of Sale</span>
-                            </th>
-                            <th class="text-left p-5">
-                                <span class="block font-serif text-lg text-[#052730]">TaxNest FBR POS</span>
-                                <span class="text-xs font-medium accent-blue uppercase tracking-wider">FBR Point of Sale</span>
-                            </th>
-                        </tr>
-                    </thead>
-                    <tbody class="text-gray-700">
-                        <tr class="border-b border-gray-100">
-                            <td class="p-5 font-semibold text-gray-500 text-xs uppercase tracking-wider">Regulator</td>
-                            <td class="p-5">FBR — via PRAL API</td>
-                            <td class="p-5">Punjab Revenue Authority</td>
-                            <td class="p-5">FBR — direct submission</td>
-                        </tr>
-                        <tr class="border-b border-gray-100">
-                            <td class="p-5 font-semibold text-gray-500 text-xs uppercase tracking-wider">Built for</td>
-                            <td class="p-5">Businesses issuing sales tax invoices</td>
-                            <td class="p-5">Retail &amp; restaurants in Punjab</td>
-                            <td class="p-5">Retail counters and collection desks</td>
-                        </tr>
-                        <tr class="border-b border-gray-100">
-                            <td class="p-5 font-semibold text-gray-500 text-xs uppercase tracking-wider">Billing</td>
-                            <td class="p-5"><a class="underline" href="/digital-invoice#pricing">View billing periods</a></td>
-                            <td class="p-5"><a class="underline" href="/pos#pricing">View billing periods</a></td>
-                            <td class="p-5"><a class="underline" href="/fbr-pos-landing#pricing">View billing periods</a></td>
-                        </tr>
-                        <tr class="border-b border-gray-100">
-                            <td class="p-5 font-semibold text-gray-500 text-xs uppercase tracking-wider">Starting at</td>
-                            <td class="p-5 font-bold text-[#052730]"><a href="/digital-invoice#pricing">See current DI prices</a></td>
-                            <td class="p-5 font-bold text-[#052730]">@php($publicPraStart = \Illuminate\Support\Facades\Schema::hasTable('pricing_plans') ? \App\Services\PosPlanComparisonService::plans()->sortBy(fn ($plan) => (float) $plan->sale_price)->first() : null)
-                            @if($publicPraStart) PKR {{ number_format((float) $publicPraStart->sale_price) }} / year @else See PRA pricing @endif</td>
-                            <td class="p-5 font-bold text-[#052730]"><a href="/fbr-pos-landing#pricing">See current FBR POS prices</a></td>
-                        </tr>
-                        <tr class="border-b border-gray-100">
-                            <td class="p-5 font-semibold text-gray-500 text-xs uppercase tracking-wider">Standout features</td>
-                            <td class="p-5">HS code intelligence, AI invoice parsing, buyer delivery via WhatsApp &amp; email, consultant console</td>
-                            <td class="p-5">Restaurant suite, delivery riders with live tracking, khata, Urdu interface, desktop &amp; mobile apps</td>
-                            <td class="p-5">Inventory, fiscal receipt tracking, returns and standalone collections</td>
-                        </tr>
-                        <tr>
-                            <td class="p-5"></td>
-                            <td class="p-5"><a href="/digital-invoice" class="btn-solid btn-primary w-full">Explore DI</a></td>
-                            <td class="p-5"><a href="/pos" class="btn-solid btn-primary w-full">Explore TaxNest PRA POS</a></td>
-                            <td class="p-5"><a href="/fbr-pos-landing" class="btn-solid btn-primary w-full">Explore FBR POS</a></td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-            <p class="text-center text-sm text-gray-500 mt-6 fade-in-up">See each product page for trial and registration options.</p>
-        </div>
-    </section>
-
-    <!-- FAQ -->
-    <section class="py-24 bg-white border-t border-gray-200">
-        <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="text-center mb-12 fade-in-up">
-                <h2 class="text-sm font-bold tracking-widest uppercase text-gray-500 mb-4">Questions</h2>
-                <h3 class="text-3xl font-serif text-[#052730]">Frequently asked questions</h3>
-            </div>
-            <div class="space-y-3 fade-in-up" x-data="{ open: null }">
-                <div class="card-solid rounded-lg">
-                    <button @click="open = (open === 1 ? null : 1)" class="w-full flex items-center justify-between p-5 text-left">
-                        <span class="font-semibold text-[#052730]">Is there a free trial?</span>
-                        <svg class="w-4 h-4 text-gray-400 transition-transform flex-shrink-0 ml-4" :class="open === 1 ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
-                    </button>
-                    <div x-show="open === 1" x-collapse class="px-5 pb-5 text-sm text-gray-600 leading-relaxed">Digital Invoice, PRA POS and FBR POS offer a 3-day trial after approval. Check the Healthcare ERP page for packages and enquiries.</div>
-                </div>
-                <div class="card-solid rounded-lg">
-                    <button @click="open = (open === 2 ? null : 2)" class="w-full flex items-center justify-between p-5 text-left">
-                        <span class="font-semibold text-[#052730]">Are the products connected to each other?</span>
-                        <svg class="w-4 h-4 text-gray-400 transition-transform flex-shrink-0 ml-4" :class="open === 2 ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
-                    </button>
-                    <div x-show="open === 2" x-collapse class="px-5 pb-5 text-sm text-gray-600 leading-relaxed">No — by design. Digital Invoice, TaxNest PRA POS, FBR POS and TaxNest ERP each have their own login, their own data and their own panel. Nothing leaks between products, which keeps every regulator's records clean.</div>
-                </div>
-                <div class="card-solid rounded-lg">
-                    <button @click="open = (open === 3 ? null : 3)" class="w-full flex items-center justify-between p-5 text-left">
-                        <span class="font-semibold text-[#052730]">What happens after I register?</span>
-                        <svg class="w-4 h-4 text-gray-400 transition-transform flex-shrink-0 ml-4" :class="open === 3 ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
-                    </button>
-                    <div x-show="open === 3" x-collapse class="px-5 pb-5 text-sm text-gray-600 leading-relaxed">Your company goes to our team for a quick review. While pending you can look around the whole panel; once approved, everything unlocks and your trial begins.</div>
-                </div>
-                <div class="card-solid rounded-lg">
-                    <button @click="open = (open === 4 ? null : 4)" class="w-full flex items-center justify-between p-5 text-left">
-                        <span class="font-semibold text-[#052730]">Does the POS keep working if the internet drops?</span>
-                        <svg class="w-4 h-4 text-gray-400 transition-transform flex-shrink-0 ml-4" :class="open === 4 ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
-                    </button>
-                    <div x-show="open === 4" x-collapse class="px-5 pb-5 text-sm text-gray-600 leading-relaxed">Supported POS counters can queue sales offline. After reconnection, check the sync status and the authority acknowledgement.</div>
-                </div>
-                <div class="card-solid rounded-lg">
-                    <button @click="open = (open === 5 ? null : 5)" class="w-full flex items-center justify-between p-5 text-left">
-                        <span class="font-semibold text-[#052730]">Can I run branches and multiple staff accounts?</span>
-                        <svg class="w-4 h-4 text-gray-400 transition-transform flex-shrink-0 ml-4" :class="open === 5 ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
-                    </button>
-                    <div x-show="open === 5" x-collapse class="px-5 pb-5 text-sm text-gray-600 leading-relaxed">Yes. Plans include multiple users and branches with role-based access — cashiers, managers and admins each see exactly what they should, and supported billing and account events are recorded in audit logs.</div>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Footer -->
-    <x-website-clients />
-
-    @include('partials.product-guide-link', ['productGuideKey' => ''])
     <x-site-footer />
-
-    <script>
-        // Intersection Observer for scroll animations
-        document.addEventListener('DOMContentLoaded', () => {
-            const observer = new IntersectionObserver((entries) => {
-                entries.forEach(entry => {
-                    if (entry.isIntersecting) {
-                        entry.target.classList.add('is-visible');
-                        observer.unobserve(entry.target);
-                    }
-                });
-            }, {
-                threshold: 0.1,
-                rootMargin: '0px 0px -50px 0px'
-            });
-
-            document.querySelectorAll('.fade-in-up').forEach(el => {
-                observer.observe(el);
-            });
-        });
-    </script>
     <x-whatsapp-support />
 </body>
 </html>

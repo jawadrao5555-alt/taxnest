@@ -188,6 +188,8 @@ return [
     'cap_lab_catalogue_manage' => 'Test catalogue manage karein',
     'cap_lab_verify' => 'Laboratory nateejon ki tasdeeq karein',
     'cap_lab_report' => 'Tasdeeq shuda laboratory reports kholen',
+    'cap_lab_operations_view' => 'Laboratory operations dekhein aur tadaad export karein',
+    'cap_lab_costing_view' => 'Laboratory ke kul kharch dekhein',
     'cap_billing_view' => 'Bill dekhna',
     'cap_billing_charge' => 'Raqam wusool karna',
     'cap_accounts_view' => 'Hisaab dekhna',

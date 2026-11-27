@@ -89,6 +89,7 @@ class HealthLabWorkflow
                     'test_code' => $test->code,
                     'test_name' => $test->name,
                     'price_paisa' => $test->price_paisa,
+                    'unit_cost_paisa' => $test->unit_cost_paisa,
                 ]);
                 $this->newSpecimen($item, 1);
             }

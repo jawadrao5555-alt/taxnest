@@ -17,24 +17,42 @@ use Illuminate\Validation\ValidationException;
 /** A read-only estimate. Settling an upgrade requires its own verified workflow. */
 final class ErpUpgradeQuote
 {
-    public function hospitalPlans(): Collection
+    public static function targetVertical(Company $source): ?string
     {
-        return $this->hospitalPlanQuery()->orderBy('name')->orderBy('id')->get()
-            ->filter($this->canSellHospitalPlan(...));
+        $school = $source->isSchoolFeePilot();
+        $hospital = $source->isHospitalCollectionPilot();
+
+        return match (true) {
+            $school && !$hospital => NestErps::SCHOOL,
+            $hospital && !$school => NestErps::HEALTH,
+            default => null,
+        };
     }
 
-    private function hospitalPlanQuery(): Builder
+    public function plansFor(Company $source): Collection
     {
-        return PricingPlan::query()
+        $vertical = self::targetVertical($source);
+
+        return $vertical === null ? collect() : $this->planQuery($vertical)->orderBy('name')->orderBy('id')->get()
+            ->filter(fn (PricingPlan $plan) => $this->canSellPlan($plan, $vertical));
+    }
+
+    private function planQuery(string $vertical): Builder
+    {
+        $plans = PricingPlan::query()
             ->whereIn('product_type', NestErps::PRODUCT_TYPES)
-            ->where('is_trial', false)->where('price', '>', 0)
-            ->where(fn ($q) => $q->where('erps_vertical', NestErps::HEALTH)->orWhereNull('erps_vertical')->orWhere('erps_vertical', ''));
+            ->where('is_trial', false)->where('price', '>', 0);
+
+        return $vertical === NestErps::SCHOOL
+            ? $plans->where(NestErps::VERTICAL_COLUMN, NestErps::SCHOOL)
+            : $plans->where(fn (Builder $query) => $query->where(NestErps::VERTICAL_COLUMN, NestErps::HEALTH)
+                ->orWhereNull(NestErps::VERTICAL_COLUMN)->orWhere(NestErps::VERTICAL_COLUMN, ''));
     }
 
-    private function canSellHospitalPlan(PricingPlan $plan): bool
+    private function canSellPlan(PricingPlan $plan, string $vertical): bool
     {
         return PlanSellabilityService::isSellable($plan)
-            && in_array('ipd', HealthModuleService::normalize($plan->health_modules), true);
+            && ($vertical === NestErps::SCHOOL || in_array('ipd', HealthModuleService::normalize($plan->health_modules), true));
     }
 
     public function preview(
@@ -46,14 +64,17 @@ final class ErpUpgradeQuote
     ): array
     {
         $asOf = ($asOf ?? CarbonImmutable::now())->setTimezone(config('app.timezone'));
-        if (!$source->isHospitalCollectionPilot() || $source->company_status !== 'active'
+        $vertical = self::targetVertical($source);
+        if ($vertical === null || $source->company_status !== 'active'
             || $source->status !== 'approved' || $source->suspended_at) {
-            $this->unavailable('Choose an active Hospital Collections POS account.');
+            $this->unavailable('Choose an active School or Hospital Collections POS account.');
         }
 
-        $plan = $this->hospitalPlanQuery()->when($lockEvidence, fn ($query) => $query->lockForUpdate())->find($planId);
-        if (!$plan || !$this->canSellHospitalPlan($plan)) {
-            throw ValidationException::withMessages(['pricing_plan_id' => 'Choose an available Healthcare package with inpatient care.']);
+        $plan = $this->planQuery($vertical)->when($lockEvidence, fn ($query) => $query->lockForUpdate())->find($planId);
+        if (!$plan || !$this->canSellPlan($plan, $vertical)) {
+            $message = $vertical === NestErps::SCHOOL ? 'Choose an available School ERP package.'
+                : 'Choose an available Healthcare package with inpatient care.';
+            throw ValidationException::withMessages(['pricing_plan_id' => $message]);
         }
         $targetPrice = $this->paisa(SubscriptionAssignmentService::computePrice($plan, $cycle)['final_price']);
         if ($targetPrice <= 0) {

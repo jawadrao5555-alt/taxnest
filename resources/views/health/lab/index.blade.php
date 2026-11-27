@@ -27,6 +27,9 @@
                 @if(in_array('lab.catalogue.manage', $healthCapabilities ?? [], true))
                     <a href="{{ route('health.lab.catalogue') }}" class="rounded-lg border border-gray-300 px-4 py-2 font-semibold dark:border-gray-600">{{ __('lab_workflow.catalogue') }}</a>
                 @endif
+                @if(in_array('lab.operations.view', $healthCapabilities ?? [], true))
+                    <a href="{{ route('health.lab.operations') }}" class="rounded-lg border border-gray-300 px-4 py-2 font-semibold dark:border-gray-600">{{ __('lab_operations.title') }}</a>
+                @endif
             </div>
 
             <form method="GET" action="{{ route('health.lab') }}" class="flex flex-wrap items-end gap-2">

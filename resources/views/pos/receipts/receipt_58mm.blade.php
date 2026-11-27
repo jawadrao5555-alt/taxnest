@@ -592,8 +592,6 @@
         @endif
     </table>
 
-    <div class="separator"></div>
-
     @php
         // Owner decision (Jul 2026): toggle OFF hides subtotal + tax on ALL receipts
         // (incl. PRA fiscal) — customer copy shows grand total only. Item Rate/Amt
@@ -618,6 +616,9 @@
                 ? round((float) $transaction->subtotal + (float) $transaction->tax_amount, 2)
                 : (float) $transaction->subtotal);
     @endphp
+    @if($optionVisible('show_separators'))
+    <div class="separator" data-item-table-separator="top"></div>
+    @endif
     <table class="items-table">
         <thead>
             <tr>
@@ -664,12 +665,13 @@
         </tbody>
     </table>
 
-    @if(!empty($transaction->notes) && $optionVisible('show_bill_notes'))
-    <div class="separator"></div>
-    <div style="font-size:9px; font-weight:normal; color:#000; padding:1px 0;">{{ __('pos.receipt_note') }}: {!! nl2br(e($transaction->notes)) !!}</div>
+    @if($optionVisible('show_separators'))
+    <div class="separator" data-item-table-separator="bottom"></div>
     @endif
-
+    @if(!empty($transaction->notes) && $optionVisible('show_bill_notes'))
+    <div style="font-size:9px; font-weight:normal; color:#000; padding:1px 0;">{{ __('pos.receipt_note') }}: {!! nl2br(e($transaction->notes)) !!}</div>
     <div class="separator"></div>
+    @endif
 
     <table class="totals-table">
         @if(($showTaxLines || $rcptCardSave) && $optionVisible('show_subtotal'))

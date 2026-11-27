@@ -130,7 +130,7 @@
     <section id="verticals" class="erp-hub-width erp-hub-section" aria-labelledby="erp-options-heading">
         <h2 id="erp-options-heading">ERP options</h2>
         <div class="erp-hub-grid">
-            <article id="hospital-erp" class="erp-hub-card" aria-labelledby="hospital-erp-title">
+            <article id="hospital-erp" data-erp-signup="{{ $canStartHealthcare ? 'open' : 'closed' }}" class="erp-hub-card" aria-labelledby="hospital-erp-title">
                 <h3 id="hospital-erp-title">Hospital ERP</h3>
                 <p class="erp-hub-status">Healthcare panel</p>
                 <p class="erp-hub-muted">Patient records, outpatient and inpatient work, pharmacy and billing, with modules set by your package.</p>
@@ -142,7 +142,7 @@
                     @endif
                 </div>
             </article>
-            <article id="lab-erp" class="erp-hub-card" aria-labelledby="lab-erp-title">
+            <article id="lab-erp" data-erp-signup="{{ $canStartHealthcare ? 'open' : 'closed' }}" class="erp-hub-card" aria-labelledby="lab-erp-title">
                 <h3 id="lab-erp-title">Lab ERP</h3>
                 <p class="erp-hub-status">Shared Healthcare workspace</p>
                 <p class="erp-hub-muted">A lab workspace for standalone laboratories and hospital labs with the relevant package and roles.</p>
@@ -154,7 +154,7 @@
                     @endif
                 </div>
             </article>
-            <article id="school-erp" class="erp-hub-card" aria-labelledby="school-erp-title">
+            <article id="school-erp" data-erp-signup="{{ $canStartSchool ? 'open' : 'closed' }}" class="erp-hub-card" aria-labelledby="school-erp-title">
                 <h3 id="school-erp-title">School ERP</h3>
                 <p class="erp-hub-status">{{ $canStartSchool ? 'Registration available' : 'Enquiry only for new schools' }}</p>
                 <p class="erp-hub-muted">Student records, admissions, attendance and fees across school campuses.</p>

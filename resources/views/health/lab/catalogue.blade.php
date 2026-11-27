@@ -22,6 +22,16 @@
                     {{ __('lab_workflow.price') }}
                     <input name="price" value="{{ old('price', $editTest ? number_format($editTest->price_paisa / 100, 2, '.', '') : '') }}" inputmode="decimal" class="mt-1 block w-full rounded-lg border-gray-300 bg-white dark:border-gray-600 dark:bg-gray-800" dir="ltr" required>
                 </label>
+                @if($canEditCost)
+                    <label class="text-sm font-medium">
+                        {{ __('lab_operations.unit_cost') }}
+                        <input name="unit_cost" value="{{ old('unit_cost', $editTest?->unit_cost_paisa !== null ? number_format($editTest->unit_cost_paisa / 100, 2, '.', '') : '') }}" inputmode="decimal" class="mt-1 block w-full rounded-lg border-gray-300 bg-white dark:border-gray-600 dark:bg-gray-800" dir="ltr">
+                        <span class="text-xs text-gray-600 dark:text-gray-300">{{ __('lab_operations.unit_cost_hint') }}</span>
+                        @error('unit_cost')
+                            <span role="alert" class="block text-sm text-red-700 dark:text-red-400">{{ $message }}</span>
+                        @enderror
+                    </label>
+                @endif
             </div>
             <label class="flex items-center gap-2 text-sm">
                 <input type="hidden" name="is_active" value="0">

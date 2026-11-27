@@ -143,7 +143,7 @@ final class TwoStepController extends Controller
         [$guard,$actor] = $this->actor($panel);
         $actor = TwoStepLogin::consultantPrincipal($request, $guard, $actor);
         if (! TwoStepLogin::credential($actor)) {
-            return redirect($this->home($panel));
+            return redirect($this->home($panel, $actor));
         }
 
         return response()->view('auth.two-step', ['panel' => $panel, 'enabled' => true, 'challenge' => true, 'secret' => null, 'recoveryCodes' => []])
@@ -160,7 +160,7 @@ final class TwoStepController extends Controller
         }
         TwoStepLogin::markVerified($request, $guard, $actor);
 
-        return redirect($this->home($panel));
+        return redirect($this->home($panel, $actor));
     }
 
     public function disable(Request $request, string $panel)
@@ -204,10 +204,10 @@ final class TwoStepController extends Controller
             : ($panel === 'di' ? '/login' : '/'.($panel === 'fbrpos' ? 'fbr-pos' : $panel).'/login'));
     }
 
-    private function home(string $panel): string
+    private function home(string $panel, object $actor): string
     {
         return $panel === SchoolErpPanel::GUARD
-            ? SchoolErpPanel::DASHBOARD_PATH
+            ? SchoolErpPanel::homeFor($actor)
             : ($panel === 'di' ? '/dashboard' : '/'.($panel === 'fbrpos' ? 'fbr-pos' : $panel).'/dashboard');
     }
 }

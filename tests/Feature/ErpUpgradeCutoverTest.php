@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Http\Controllers\FbrPosHospitalController;
+use App\Http\Controllers\FbrPosSchoolFeeController;
 use App\Models\AdminUser;
 use App\Models\Branch;
 use App\Models\Company;
@@ -216,16 +217,82 @@ final class ErpUpgradeCutoverTest extends TestCase
         $this->assertEquals($original, DB::table('hospital_payments')->where('id', $first['receipt_id'])->first());
     }
 
-    private function prepare(int $price = 90000): void
+    public function test_school_cutover_requires_clear_fee_balances_and_charges_only_the_difference(): void
+    {
+        Http::fake();
+        $this->prepare(school: true);
+        $hospital = PricingPlan::create(['name' => 'Fictional Hospital-only offer', 'product_type' => NestErps::PRODUCT_TYPE,
+            'erps_vertical' => NestErps::HEALTH, 'health_modules' => ['ipd', 'accounts'], 'price' => 50000, 'invoice_limit' => 100]);
+        $estimate = route('saas.admin.companies.erpUpgradeQuote', $this->source);
+        $this->actingAs($this->admin, 'admin')->get($estimate)->assertOk()->assertSee('School ERP upgrade')
+            ->assertSee($this->erpPlan->name)->assertDontSee($hospital->name);
+        $this->getJson($estimate.'?pricing_plan_id='.$hospital->id.'&billing_cycle=annual')
+            ->assertUnprocessable()->assertJsonValidationErrors('pricing_plan_id');
+        $this->get($estimate.'?pricing_plan_id='.$this->erpPlan->id.'&billing_cycle=annual')
+            ->assertOk()->assertSee('PKR 71,900.00');
+        $this->postJson(route('saas.admin.companies.erpUpgradeFreeze', $this->source), [
+            'destination_company_id' => $this->destination->id, 'pricing_plan_id' => $this->erpPlan->id,
+            'billing_cycle' => 'annual', 'owner_authorization_reference' => 'Fictional School owner approval',
+            'expected_package_paisa' => 9000000, 'expected_credit_paisa' => 1810000,
+        ])->assertRedirect();
+        $settlement = ErpUpgradeSettlement::sole();
+        $settleUrl = route('saas.admin.companies.erpUpgradeSettle', [$this->source, $settlement]);
+        $this->postJson($settleUrl, ['verified_received_amount' => '90000.00', 'payment_reference' => 'Fictional gross transfer'])
+            ->assertUnprocessable()->assertJsonValidationErrors('verified_received_amount');
+        $this->postJson($settleUrl, ['verified_received_amount' => '71900.00', 'payment_reference' => 'Fictional School transfer'])
+            ->assertRedirect();
+
+        $this->actingAs($this->sourceOwner, 'fbrpos');
+        app()->instance('currentCompanyId', $this->source->id);
+        app()->instance('currentBranchId', $this->sourceBranch->id);
+        $controller = app(FbrPosSchoolFeeController::class);
+        $payload = ['request_key' => (string) Str::uuid(), 'expected_branch_key' => $this->sourceBranch->id,
+            'student_reference' => 'Fictional School student', 'student_name' => 'Fictional name', 'fee_period' => '2027-02',
+            'fee_lines' => [['fee_head' => 'tuition', 'amount' => '1000.00']], 'amount' => '400.00',
+            'payment_method' => 'cash', 'cash_confirmed' => '1'];
+        $path = '/fbr-pos/school-fees';
+        $first = $controller->store($this->collectionRequest($payload, $path))->getData(true);
+        $original = DB::table('school_fee_receipts')->where('id', $first['receipt_id'])->first();
+        $this->expectValidation('source_term', fn () => $this->activate($settlement));
+        $this->assertDatabaseMissing('subscriptions', ['company_id' => $this->destination->id]);
+
+        $controller->store($this->collectionRequest(array_replace($payload, [
+            'request_key' => (string) Str::uuid(), 'account_id' => $original->account_id, 'amount' => '600.00',
+        ]), $path));
+        $this->actingAs($this->admin, 'admin')->postJson(
+            route('saas.admin.companies.erpUpgradeActivate', [$this->source, $settlement]),
+            ['branch_map' => [$this->sourceBranch->id => $this->destinationBranch->id], 'activation_reference' => 'Fictional cutover approval'],
+        )->assertRedirect();
+        $this->assertSame($settlement->id, $this->activate($settlement)->id);
+        $invoice = SubscriptionInvoice::where('company_id', $this->destination->id)->sole();
+        $this->assertSame(71900.0, $invoice->amount);
+        $this->assertSame(71900.0, $invoice->payments()->sole()->amount);
+        $this->assertSame(NestErps::SCHOOL, $invoice->subscription->entitlementPlan()->erps_vertical);
+        $this->assertTrue($this->source->fresh()->agent_enabled);
+        $this->actingAs($this->sourceOwner, 'fbrpos');
+        $this->assertStringContainsString(__('school_ledger.erp_cutover_closed'), $controller->index()->getContent());
+
+        $replay = $controller->store($this->collectionRequest($payload, $path))->getData(true);
+        $this->assertSame($first['receipt_id'], $replay['receipt_id']);
+        $this->expectValidation('amount', fn () => $controller->store($this->collectionRequest(
+            array_replace($payload, ['request_key' => (string) Str::uuid()]), $path
+        )));
+        $this->assertDatabaseCount('school_fee_receipts', 2);
+        $this->assertEquals($original, DB::table('school_fee_receipts')->where('id', $first['receipt_id'])->first());
+    }
+
+    private function prepare(int $price = 90000, bool $school = false): void
     {
         $this->travelTo(CarbonImmutable::parse('2026-08-01 09:00:00', 'Asia/Karachi'));
         $this->admin = AdminUser::create(['name' => 'Fictional ERP owner admin', 'email' => 'cutover-admin@example.invalid',
             'role' => 'super_admin', 'password' => 'SyntheticOnly123!']);
         $status = ['status' => 'approved', 'company_status' => 'active'];
+        $sourceCategory = $school ? 'education' : 'hospital';
+        $vertical = $school ? NestErps::SCHOOL : NestErps::HEALTH;
         $this->source = Company::create($status + ['name' => 'Fictional source POS', 'ntn' => 'SYN-ERP-SOURCE',
-            'product_type' => 'fbrpos', 'pos_type' => 'hospital', 'business_category' => 'hospital', 'agent_enabled' => true]);
+            'product_type' => 'fbrpos', 'pos_type' => $sourceCategory, 'business_category' => $sourceCategory, 'agent_enabled' => true]);
         $this->destination = Company::create($status + ['name' => 'Fictional destination ERP', 'ntn' => 'SYN-ERP-DESTINATION',
-            'product_type' => NestErps::PRODUCT_TYPE, 'erps_vertical' => NestErps::HEALTH, 'health_org_type' => 'hospital']);
+            'product_type' => NestErps::PRODUCT_TYPE, 'erps_vertical' => $vertical, 'health_org_type' => $school ? null : 'hospital']);
         $owner = ['name' => 'Fictional migrating owner', 'email' => 'cutover-owner@example.invalid',
             'role' => 'company_admin', 'is_active' => true, 'password' => 'SyntheticOnly123!'];
         $this->sourceOwner = User::create($owner + ['company_id' => $this->source->id]);
@@ -243,8 +310,8 @@ final class ErpUpgradeCutoverTest extends TestCase
             'verified_by' => $this->admin->id, 'verified_at' => now(), 'amount' => 36500,
             'payment_method' => 'bank_transfer', 'reference' => 'Fictional source bank payment', 'proof_path' => 'synthetic-proof']);
         DB::transaction(fn () => VerifiedSubscriptionDocuments::record($proof, $active, 36500));
-        $this->erpPlan = PricingPlan::create(['name' => 'Fictional Hospital ERP package', 'product_type' => NestErps::PRODUCT_TYPE,
-            'erps_vertical' => NestErps::HEALTH, 'health_modules' => ['opd', 'ipd', 'accounts'],
+        $this->erpPlan = PricingPlan::create(['name' => $school ? 'Fictional School ERP package' : 'Fictional Hospital ERP package',
+            'product_type' => NestErps::PRODUCT_TYPE, 'erps_vertical' => $vertical, 'health_modules' => $school ? null : ['opd', 'ipd', 'accounts'],
             'is_trial' => false, 'price' => $price, 'branch_limit' => 3, 'invoice_limit' => 100]);
         $this->travelTo(CarbonImmutable::parse('2027-02-01 09:00:00', 'Asia/Karachi'));
     }
@@ -273,9 +340,9 @@ final class ErpUpgradeCutoverTest extends TestCase
         );
     }
 
-    private function collectionRequest(array $payload): Request
+    private function collectionRequest(array $payload, string $path = '/fbr-pos/hospital'): Request
     {
-        $request = Request::create('/fbr-pos/hospital', 'POST', $payload, server: ['HTTP_ACCEPT' => 'application/json']);
+        $request = Request::create($path, 'POST', $payload, server: ['HTTP_ACCEPT' => 'application/json']);
         $request->setLaravelSession(app('session.store'));
         app()->instance('request', $request);
 

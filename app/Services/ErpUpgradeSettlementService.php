@@ -12,13 +12,15 @@ use App\Models\SignupPackageRequest;
 use App\Models\Subscription;
 use App\Models\User;
 use App\Support\NestErps;
+use App\Support\SchoolErpPanel;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Records a reviewed Hospital upgrade as its own financial event. A normal
+ * Records a reviewed ERP upgrade as its own financial event. A normal
  * subscription payment would treat the applied credit as cash or an unpaid
  * balance, and would activate access before migration is approved.
  */
@@ -168,7 +170,7 @@ final class ErpUpgradeSettlementService
             throw new \LogicException('ERP upgrade company locks require an active transaction.');
         }
         if ($sourceId === $destinationId) {
-            $this->invalid('destination_company_id', 'Choose a separate Hospital ERP company for the upgrade.');
+            $this->invalid('destination_company_id', 'Choose a separate ERP company for the upgrade.');
         }
         $companies = Company::whereIn('id', [$sourceId, $destinationId])->orderBy('id')->lockForUpdate()->get()->keyBy('id');
         $source = $companies->get($sourceId);
@@ -177,7 +179,7 @@ final class ErpUpgradeSettlementService
             $this->invalid('source_term', 'The source company is unavailable.');
         }
         if (!$destination) {
-            $this->invalid('destination_company_id', 'Choose an active Hospital ERP company.');
+            $this->invalid('destination_company_id', 'Choose an active ERP company.');
         }
 
         return [$source, $destination];
@@ -200,14 +202,24 @@ final class ErpUpgradeSettlementService
 
     private function eligibleDestinationScope(Company $source, Company $destination): array
     {
-        if ((int) $source->id === (int) $destination->id
-            || !NestErps::isProductType($destination->product_type)
-            || NestErps::verticalOf($destination) !== NestErps::HEALTH
-            || $destination->health_org_type !== 'hospital'
+        $vertical = ErpUpgradeQuote::targetVertical($source);
+        $matches = match ($vertical) {
+            NestErps::SCHOOL => SchoolErpPanel::ownsCompany($destination),
+            NestErps::HEALTH => NestErps::isProductType($destination->product_type)
+                && NestErps::verticalOf($destination) === NestErps::HEALTH && $destination->health_org_type === 'hospital',
+            default => false,
+        };
+        if ((int) $source->id === (int) $destination->id || !$matches
             || $destination->status !== 'approved'
             || $destination->company_status !== 'active'
             || $destination->suspended_at) {
-            $this->invalid('destination_company_id', 'Choose an active Hospital ERP company.');
+            $this->invalid('destination_company_id', $vertical === NestErps::SCHOOL
+                ? 'Choose an active School ERP company.' : 'Choose an active Hospital ERP company.');
+        }
+        if ($vertical === NestErps::SCHOOL && (!Schema::hasTable('school_fee_accounts') || DB::table('school_fee_accounts')
+            ->where('company_id', $source->id)->whereColumn('payable_paisa', '>', 'paid_paisa')
+            ->lockForUpdate()->first(['id']))) {
+            $this->invalid('source_term', 'Reconcile outstanding School Collections balances before switching. Prior receipts remain in the source account.');
         }
 
         $ownerScope = $this->ownerScope($source, $destination);

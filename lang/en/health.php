@@ -190,6 +190,8 @@ return [
     'cap_lab_catalogue_manage' => 'Manage the test catalogue',
     'cap_lab_verify' => 'Verify laboratory results',
     'cap_lab_report' => 'Open verified laboratory reports',
+    'cap_lab_operations_view' => 'View laboratory operations and export counts',
+    'cap_lab_costing_view' => 'View laboratory cost totals',
     'cap_billing_view' => 'See bills',
     'cap_billing_charge' => 'Take payments',
     'cap_accounts_view' => 'See accounts',

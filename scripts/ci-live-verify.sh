@@ -8,7 +8,8 @@
 # Verifies (beyond HTTP 200):
 #   1. Live git HEAD == EXPECTED_SHA (SSH with taxnest-production-deploy)
 #   2. Public /up health endpoint is 200
-#   3. NestPOS QA login + feature markers on the standing live QA company
+#   3. Public ERP navigation, cards and the displayed signup/sign-in routes
+#   4. NestPOS QA login + feature markers on the standing live QA company
 #      (same company as scripts/live-screen-smoke.sh — fictional QA, not a customer)
 #
 # Safety:
@@ -119,9 +120,15 @@ if [ "$UP_CODE" != "200" ]; then
 fi
 ok "/up HTTP 200"
 
-# --------------------------------------------------------------------------- 3) NestPOS QA smoke (markers, not merely 200)
+# --------------------------------------------------------------------------- 3) Public ERP and 4) NestPOS QA smoke
 TMPD=$(mktemp -d /tmp/ci-live-verify.XXXXXX)
 trap 'cleanup_key; rm -rf "$TMPD"' EXIT
+
+say "Public ERP site and forms"
+# shellcheck source=scripts/lib/ci-live-verify-erp.sh
+source "$ROOT/scripts/lib/ci-live-verify-erp.sh"
+verify_public_erp
+
 JAR="$TMPD/jar"
 CURL=(curl -sS --max-time 40 -b "$JAR" -c "$JAR")
 
@@ -269,5 +276,5 @@ if [ "$FAIL" -ne 0 ]; then
   echo "Cloud Agent: do NOT claim LIVE VERIFIED. Collect Actions logs, fix locally, new cursor/* or replit/* PR." >&2
   exit 1
 fi
-echo "CI LIVE VERIFY: PASS — SHA matched and NestPOS markers present (profile=${PROFILE})."
+echo "CI LIVE VERIFY: PASS — SHA matched, public ERP pages verified and NestPOS markers present (profile=${PROFILE})."
 exit 0

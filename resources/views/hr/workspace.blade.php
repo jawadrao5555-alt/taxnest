@@ -16,6 +16,12 @@
         @if ($allows('attendance.approve') || $allows('self.attendance'))
             <a href="{{ route('hr.field-duty.index', compact('organization')) }}">Field-duty requests</a>
         @endif
+        @if ($allows('payroll.read'))
+            <a href="{{ route('hr.payroll.index', compact('organization')) }}">Payroll</a>
+        @endif
+        @if ($allows('self.read'))
+            <a href="{{ route('hr.payroll.own', compact('organization')) }}">My payslips</a>
+        @endif
     </div>
 
     @if ($employees)

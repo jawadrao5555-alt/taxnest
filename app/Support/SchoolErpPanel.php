@@ -16,6 +16,10 @@ final class SchoolErpPanel
 
     public const DASHBOARD_PATH = '/school-erp/dashboard';
 
+    public const FAMILY_PATH = '/school-erp/family';
+
+    public const FAMILY_ROLE = 'school_family';
+
     public static function ownsCompany(?Company $company): bool
     {
         return $company
@@ -25,7 +29,17 @@ final class SchoolErpPanel
 
     public static function maySignIn(User $user): bool
     {
-        return $user->is_active && in_array($user->role, ['company_admin', 'employee', 'viewer'], true);
+        return $user->is_active && in_array($user->role, ['company_admin', 'employee', 'viewer', self::FAMILY_ROLE], true);
+    }
+
+    public static function isFamily(User $user): bool
+    {
+        return $user->role === self::FAMILY_ROLE;
+    }
+
+    public static function homeFor(User $user): string
+    {
+        return self::isFamily($user) ? self::FAMILY_PATH : self::DASHBOARD_PATH;
     }
 
     public static function registrationOpen(): bool

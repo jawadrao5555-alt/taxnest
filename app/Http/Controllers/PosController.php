@@ -28,7 +28,10 @@ use App\Services\PosFeatureService;
 use App\Services\PosPlanComparisonService;
 use App\Services\RestaurantOrderPaymentCalculator;
 use App\Support\PosPaymentBuckets;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -7334,6 +7337,23 @@ class PosController extends Controller
             $canExportsPlan = PosFeatureService::planAllows($company, 'reports_enabled');
 
             return view('pos.reports-items', compact('itemSales', 'tab', 'selectedCashier', 'teamMembers', 'isCashier', 'canExportsPlan'));
+        }
+
+        if ($request->boolean('top_customers')) {
+            abort_if($user->posCustomAllows('reports') === false || !PosFeatureService::planAllows($company, 'analytics_enabled'), 403);
+            [$from, $to] = array_map(fn ($date) => $date->toDateString(), $this->resolveReportRange($request));
+            $search = trim($request->validate(['customer' => ['nullable', 'string', 'max:255']])['customer'] ?? '');
+            $selectedCashier = $cashierFilter;
+            $scope = ['tab' => $tab, 'cashier' => $selectedCashier, 'from' => $from, 'to' => $to];
+            $ranked = $this->rankReportCustomers(
+                $this->reportRangeSalesQuery($companyId, $from, $to, $tab, $cashierFilter, $user)
+                    ->get(['customer_id', 'customer_name', 'customer_phone', 'total_amount'])
+            )->when($search !== '', fn ($rows) => $rows->filter(fn ($row) => mb_stripos($row->name, $search) !== false));
+            $page = LengthAwarePaginator::resolveCurrentPage();
+            $customers = new LengthAwarePaginator($ranked->forPage($page, 25), $ranked->count(), 25, $page, ['path' => $request->url()]);
+            $customers->appends($scope + ['top_customers' => 1, 'customer' => $search]);
+
+            return view('pos.reports-customers', compact('customers', 'search', 'scope', 'tab', 'selectedCashier', 'teamMembers', 'isCashier'));
         }
 
         $modeFilter = function ($q) use ($tab, $cashierFilter, $user) {
@@ -15540,6 +15560,33 @@ class PosController extends Controller
         ];
     }
 
+    private function reportRangeSalesQuery(int $companyId, string $from, string $to, string $tab, $cashierFilter, $user): Builder
+    {
+        // Range rankings describe gross sales. Returns stay in net reporting.
+        return PosTransaction::where('company_id', $companyId)
+            ->where('status', 'completed')
+            ->when(Schema::hasColumn('pos_transactions', 'transaction_type'), fn ($query) => $query->where(
+                fn ($sale) => $sale->whereNull('transaction_type')->orWhere('transaction_type', '!=', 'return')
+            ))
+            ->tap(fn ($query) => $this->applyReportFilters($query, $tab, $cashierFilter, $user))
+            ->whereBetween('business_date', [$from, $to]);
+    }
+
+    private function rankReportCustomers(Collection $transactions): Collection
+    {
+        return $transactions
+            ->filter(fn ($t) => $t->customer_id || !empty($t->customer_phone) || trim((string) $t->customer_name) !== '')
+            ->groupBy(fn ($t) => $t->customer_id ?: ($t->customer_phone ?: mb_strtolower(trim((string) $t->customer_name))))
+            ->map(function ($group) {
+                $bill = $group->first();
+                return (object) [
+                    'name' => trim((string) $bill->customer_name) !== '' ? $bill->customer_name : ($bill->customer_phone ?: ('Customer #' . $bill->customer_id)),
+                    'count' => $group->count(),
+                    'revenue' => (float) $group->sum('total_amount'),
+                ];
+            })->sortByDesc('revenue')->values();
+    }
+
     /**
      * Range analytics for the POS Reports page (owner request Jul 2026):
      * date-window deep dive — category breakdown w/ product drill-down, profit
@@ -15552,20 +15599,7 @@ class PosController extends Controller
     {
         $isAdminView = (bool) ($user?->isPosAdmin());
 
-        $transactions = PosTransaction::where('company_id', $companyId)
-            ->where('status', 'completed')
-            // Range analytics are GROSS sales analytics (categories, profit,
-            // hourly, cashier ranking) — return/credit-note rows are EXCLUDED
-            // here (like topItems), not netted; netted figures live in the
-            // reports() headline queries and day-close. Schema-guarded.
-            ->when(\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'transaction_type'), function ($q) {
-                $q->where(function ($w) {
-                    $w->whereNull('transaction_type')->orWhere('transaction_type', '!=', 'return');
-                });
-            })
-            // Task 1186: derived viewers' own cross-stream rows join the analytics.
-            ->tap(fn ($q) => $this->applyReportFilters($q, $tab, $cashierFilter, $user))
-            ->whereBetween('business_date', [$from->toDateString(), $to->toDateString()])
+        $transactions = $this->reportRangeSalesQuery($companyId, $from->toDateString(), $to->toDateString(), $tab, $cashierFilter, $user)
             ->get(array_merge(
                 ['id', 'created_at', 'business_date', 'created_by', 'customer_id', 'customer_name', 'customer_phone', 'subtotal', 'total_amount', 'tax_amount', 'discount_amount', 'payment_method'],
                 // Schema-guarded: order_type column added Jul 2026; pre-migration PROD
@@ -15773,17 +15807,7 @@ class PosController extends Controller
                 ->sortByDesc('revenue')->values();
         }
 
-        $topCustomers = $transactions
-            ->filter(fn ($t) => $t->customer_id || !empty($t->customer_phone) || trim((string) $t->customer_name) !== '')
-            ->groupBy(fn ($t) => $t->customer_id ?: ($t->customer_phone ?: mb_strtolower(trim((string) $t->customer_name))))
-            ->map(function ($g) {
-                $t0 = $g->first();
-                return (object) [
-                    'name' => trim((string) $t0->customer_name) !== '' ? $t0->customer_name : ($t0->customer_phone ?: ('Customer #' . $t0->customer_id)),
-                    'count' => $g->count(),
-                    'revenue' => (float) $g->sum('total_amount'),
-                ];
-            })->sortByDesc('revenue')->take(10)->values();
+        $topCustomers = $this->rankReportCustomers($transactions)->take(10);
 
         $payments = $transactions->groupBy('payment_method')->map(function ($g) {
             return (object) [

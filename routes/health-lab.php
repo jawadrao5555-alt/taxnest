@@ -1,16 +1,25 @@
 <?php
 
 use App\Http\Controllers\Health\HealthLabCatalogueController;
+use App\Http\Controllers\Health\HealthLabOperationsController;
 use App\Http\Controllers\Health\HealthLabOrderController;
 use App\Http\Controllers\Health\LabWorkspaceController;
 use App\Http\Middleware\HealthSubscriptionLock;
 use Illuminate\Support\Facades\Route;
+
+Route::get('/lab/costs', [HealthLabOperationsController::class, 'costs'])
+    ->middleware(['health.module:lab', 'health.can:lab.costing.view'])->name('health.lab.costs');
 
 Route::middleware(['health.module:lab', 'health.can:lab.view'])->group(function () {
     Route::get('/lab', [LabWorkspaceController::class, 'index'])->name('health.lab');
     Route::post('/lab/layout', [LabWorkspaceController::class, 'saveLayout'])->name('health.lab.layout');
 
     Route::prefix('lab')->name('health.lab.')->group(function () {
+        Route::middleware('health.can:lab.operations.view')->group(function () {
+            Route::get('/operations', [HealthLabOperationsController::class, 'index'])->name('operations');
+            Route::get('/operations/export', [HealthLabOperationsController::class, 'export'])->name('operations.export');
+        });
+
         Route::middleware('health.can:lab.catalogue.manage')->group(function () {
             Route::get('/catalogue', [HealthLabCatalogueController::class, 'index'])->name('catalogue');
             Route::post('/catalogue', [HealthLabCatalogueController::class, 'store'])->name('catalogue.store');

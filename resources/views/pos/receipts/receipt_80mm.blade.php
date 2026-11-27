@@ -663,8 +663,6 @@ html body { width: auto; max-width: 180mm; margin: 0 auto; padding: 0; }
         @endif
     </table>
 
-    <div class="separator"></div>
-
     @php
         // Owner decision (Jul 2026): the "Show Tax on Receipt" toggle applies to ALL
         // receipts, including PRA fiscal ones. When OFF the customer copy shows only
@@ -693,6 +691,9 @@ html body { width: auto; max-width: 180mm; margin: 0 auto; padding: 0; }
                 ? round((float) $transaction->subtotal + (float) $transaction->tax_amount, 2)
                 : (float) $transaction->subtotal);
     @endphp
+    @if($optionVisible('show_separators'))
+    <div class="separator" data-item-table-separator="top"></div>
+    @endif
     <table class="items-table">
         <thead>
             <tr>
@@ -742,12 +743,13 @@ html body { width: auto; max-width: 180mm; margin: 0 auto; padding: 0; }
         </tbody>
     </table>
 
-    @if(!empty($transaction->notes) && $optionVisible('show_bill_notes'))
-    <div class="separator"></div>
-    <div style="font-size:10px; font-weight:normal; color:#000; padding:2px 0;">{{ __('pos.receipt_note') }}: {!! nl2br(e($transaction->notes)) !!}</div>
+    @if($optionVisible('show_separators'))
+    <div class="separator" data-item-table-separator="bottom"></div>
     @endif
-
+    @if(!empty($transaction->notes) && $optionVisible('show_bill_notes'))
+    <div style="font-size:10px; font-weight:normal; color:#000; padding:2px 0;">{{ __('pos.receipt_note') }}: {!! nl2br(e($transaction->notes)) !!}</div>
     <div class="separator"></div>
+    @endif
 
     <table class="totals-table">
         @if(($showTaxLines || $rcptCardSave) && $optionVisible('show_subtotal'))

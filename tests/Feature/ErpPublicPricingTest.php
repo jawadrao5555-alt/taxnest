@@ -47,6 +47,9 @@ final class ErpPublicPricingTest extends TestCase
         ]));
 
         $this->get('/nest-erps')->assertOk()
+            ->assertSee('id="hospital-erp" data-erp-signup="open"', false)
+            ->assertSee('id="lab-erp" data-erp-signup="open"', false)
+            ->assertSee('id="school-erp" data-erp-signup="open"', false)
             ->assertSee('/health/register?org_type=hospital')
             ->assertSee('/health/register?org_type=lab')
             ->assertSee(route('school-erp.register'));
@@ -54,7 +57,8 @@ final class ErpPublicPricingTest extends TestCase
         $this->get('/health/register?org_type=unknown')->assertOk()->assertViewHas('pickedOrgType', 'clinic');
 
         config(['school-erp.registration_open' => false]);
-        $this->get('/nest-erps')->assertOk()->assertDontSee(route('school-erp.register'))->assertSee('Synthetic School offer');
+        $this->get('/nest-erps')->assertOk()->assertDontSee(route('school-erp.register'))->assertSee('Synthetic School offer')
+            ->assertSee('id="school-erp" data-erp-signup="closed"', false);
         $this->actingAs($this->admin(), 'admin')->get(route('saas.admin.settings'))
             ->assertOk()->assertSee('ERP website availability')->assertSee('Signup available · 1 published package')
             ->assertSee('Signup closed · 1 published package');

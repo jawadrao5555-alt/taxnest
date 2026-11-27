@@ -308,18 +308,32 @@ class PosReceiptOptionalControlsTest extends TestCase
         }
     }
 
-    public function test_separator_toggle_and_compact_delivery_payment_apply_to_both_papers(): void
+    public function test_only_the_two_item_table_separators_follow_the_saved_stream_setting(): void
     {
         $company = Company::findOrFail($this->companyId);
-        $company->invoice_display_prefs = ['receipt_options' => ['pra' => ['show_separators' => 'hide']]];
+        $company->invoice_display_prefs = ['receipt_options' => [
+            'pra' => ['show_separators' => 'hide'],
+            'local' => ['show_separators' => 'show', 'design' => 'compact'],
+        ]];
         foreach (['80mm', '58mm'] as $paper) {
             $bill = $this->bill($company, 'submitted');
             $bill->order_type = 'delivery';
-            $html = view('pos.receipts.receipt_'.$paper, compact('company', 'bill') + ['transaction' => $bill])->render();
-            $this->assertStringContainsString('.separator{display:none !important;}', $html);
+            $bill->notes = 'Synthetic order note';
+            $html = view('pos.receipts.receipt_'.$paper, ['company' => $company, 'transaction' => $bill])->render();
+            $this->assertStringNotContainsString('.separator{display:none', $html);
+            $this->assertStringNotContainsString('.items-table tbody tr{border-bottom:0', $html);
+            $this->assertStringNotContainsString('data-item-table-separator', $html);
+            $this->assertMatchesRegularExpression('/Synthetic order note<\/div>\s*<div class="separator"><\/div>/', $html);
+            $this->assertStringContainsString('Synthetic full product name', $html);
+            $this->assertStringContainsString('Subtotal', $html);
+            $this->assertStringContainsString('580.00', $html);
             $this->assertStringContainsString('fiscal-qr-payment', $html);
             $this->assertStringContainsString('compact-payment', $html);
             $this->assertStringNotContainsString('class="edge-box"', $html);
+
+            $local = view('pos.receipts.receipt_'.$paper, ['company' => $company, 'transaction' => $this->bill($company)])->render();
+            $this->assertMatchesRegularExpression('/data-item-table-separator="top"><\/div>\s*<table class="items-table">/', $local);
+            $this->assertMatchesRegularExpression('/<\/tbody>\s*<\/table>\s*<div class="separator" data-item-table-separator="bottom">/', $local);
         }
     }
 
@@ -403,7 +417,8 @@ class PosReceiptOptionalControlsTest extends TestCase
         $before = Company::findOrFail($this->companyId)->getAttributes();
         $this->actingAs(\App\Models\User::findOrFail($this->adminUserId), 'pos')->get('/pos/receipt-settings')
             ->assertSee('/js/pos-print-design-preview.js?v=20261031-b03', false)
-            ->assertOk()->assertSee('receipt_options_local[show_terminal]', false)->assertSee('receipt_options_pra[show_waiter]', false);
+            ->assertOk()->assertSee('receipt_options_local[show_terminal]', false)->assertSee('receipt_options_pra[show_waiter]', false)
+            ->assertSee('Dotted lines above and below items');
         $this->assertSame($before, Company::findOrFail($this->companyId)->getAttributes());
     }
     public function test_all_nine_designs_render_both_receipt_streams_and_widths_without_changing_financial_snapshots(): void
@@ -443,6 +458,8 @@ class PosReceiptOptionalControlsTest extends TestCase
                 $response=$this->get($url)->assertOk()->assertSee('DESIGN PREVIEW');
                 $this->assertStringContainsString('sandbox',$response->headers->get('Content-Security-Policy'));
                 $this->assertStringNotContainsString('<script',$response->getContent());
+                if ($kind === 'receipt') $response->assertSee('data-item-table-separator="top"', false)->assertSee('data-item-table-separator="bottom"', false);
+                else $response->assertDontSee('data-item-table-separator', false);
                 if ($design!=='inherit') $response->assertSee('b03-'.$kind.'-design:'.$design,false);
                 $this->assertSame($before,$company->fresh()->invoice_display_prefs);
             }

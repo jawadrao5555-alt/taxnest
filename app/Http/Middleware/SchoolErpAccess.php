@@ -10,7 +10,7 @@ use Illuminate\Http\Request;
 
 final class SchoolErpAccess
 {
-    public function handle(Request $request, Closure $next)
+    public function handle(Request $request, Closure $next, string $audience = 'staff')
     {
         $guard = auth(SchoolErpPanel::GUARD);
         $user = $guard->user()?->fresh();
@@ -22,6 +22,9 @@ final class SchoolErpAccess
             return redirect()->away(SchoolErpPanel::LOGIN_PATH);
         }
 
+        $isFamily = SchoolErpPanel::isFamily($user);
+        abort_unless($isFamily === ($audience === 'family'), 403);
+        abort_if($isFamily && ($company->status !== 'approved' || $company->company_status !== 'active'), 403);
         abort_if(in_array($company->status, ['suspended', 'rejected'], true)
             || in_array($company->company_status, ['suspended', 'rejected', 'deleted'], true), 403);
         if ($challenge = TwoStepLogin::challenge($request, SchoolErpPanel::GUARD)) {

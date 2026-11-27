@@ -670,8 +670,8 @@
             }
         @endphp
 
-        @if(auth('admin')->user()?->isSuperAdmin() && $company->isHospitalCollectionPilot())
-            <a href="{{ route('saas.admin.companies.erpUpgradeQuote', $company) }}" class="block text-sm text-indigo-300 underline mb-3">Preview Hospital ERP price difference</a>
+        @if(auth('admin')->user()?->isSuperAdmin() && ($upgradeVertical = \App\Services\ErpUpgradeQuote::targetVertical($company)))
+            <a href="{{ route('saas.admin.companies.erpUpgradeQuote', $company) }}" class="block text-sm text-indigo-300 underline mb-3">Preview {{ $upgradeVertical === \App\Support\NestErps::SCHOOL ? 'School' : 'Hospital' }} ERP price difference</a>
         @endif
         @if($canManageCompanyLifecycle)
         <form method="POST" action="{{ route('saas.admin.companies.cloneProduct', $company->id) }}"

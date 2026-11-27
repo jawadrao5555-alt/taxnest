@@ -12,6 +12,7 @@ use App\Services\ErpUpgradeCutoverService;
 use App\Services\ErpUpgradeQuote;
 use App\Services\ErpUpgradeSettlementService;
 use App\Services\SubscriptionAssignmentService;
+use App\Support\NestErps;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -22,9 +23,11 @@ final class ErpUpgradeQuoteController extends Controller
     public function __invoke(Request $request, Company $company, ErpUpgradeQuote $quotes)
     {
         AdminUser::requireSuperAdministrator();
-        abort_unless($company->isHospitalCollectionPilot(), 404);
-
-        $plans = $quotes->hospitalPlans();
+        $vertical = ErpUpgradeQuote::targetVertical($company);
+        abort_if($vertical === null, 404);
+        $school = $vertical === NestErps::SCHOOL;
+        $erpName = $school ? 'School ERP' : 'Hospital ERP';
+        $plans = $quotes->plansFor($company);
         $cycles = $plans->flatMap(fn ($plan) => SubscriptionAssignmentService::cyclesForPlan($plan))->unique()->all();
         $quote = null;
         $quoteError = null;
@@ -61,14 +64,14 @@ final class ErpUpgradeQuoteController extends Controller
         }
 
         return response()->view('saas-admin.companies.erp-upgrade-quote', compact(
-            'company', 'plans', 'cycles', 'quote', 'quoteError', 'planId', 'cycle', 'settlement', 'settlements', 'branches'
+            'company', 'school', 'erpName', 'plans', 'cycles', 'quote', 'quoteError', 'planId', 'cycle', 'settlement', 'settlements', 'branches'
         ))->header('Cache-Control', 'private, no-store');
     }
 
     public function freeze(Request $request, Company $company, ErpUpgradeSettlementService $upgrades)
     {
         $admin = AdminUser::requireSuperAdministrator();
-        abort_unless($company->isHospitalCollectionPilot(), 404);
+        abort_if(ErpUpgradeQuote::targetVertical($company) === null, 404);
         $input = $request->validate([
             'destination_company_id' => ['required', 'integer', 'min:1'],
             'pricing_plan_id' => ['required', 'integer', 'min:1'],
@@ -96,7 +99,7 @@ final class ErpUpgradeQuoteController extends Controller
     public function settle(Request $request, Company $company, int $upgrade, ErpUpgradeSettlementService $upgrades)
     {
         $admin = AdminUser::requireSuperAdministrator();
-        abort_unless($company->isHospitalCollectionPilot(), 404);
+        abort_if(ErpUpgradeQuote::targetVertical($company) === null, 404);
         $input = $request->validate([
             'verified_received_amount' => ['required', 'string', 'max:14'],
             'payment_reference' => ['nullable', 'string', 'max:120'],
@@ -111,7 +114,8 @@ final class ErpUpgradeQuoteController extends Controller
     public function activate(Request $request, Company $company, int $upgrade, ErpUpgradeCutoverService $cutover)
     {
         $admin = AdminUser::requireSuperAdministrator();
-        abort_unless($company->isHospitalCollectionPilot(), 404);
+        $vertical = ErpUpgradeQuote::targetVertical($company);
+        abort_if($vertical === null, 404);
         $input = $request->validate([
             'branch_map' => ['nullable', 'array'],
             'branch_map.*' => ['required', 'integer', 'min:1'],
@@ -121,7 +125,8 @@ final class ErpUpgradeQuoteController extends Controller
             $company->id, $upgrade, $input['branch_map'] ?? [], $input['activation_reference'], $admin->id
         );
 
-        return $this->result($company, $settlement, 'Hospital ERP package activated.');
+        return $this->result($company, $settlement, $vertical === NestErps::SCHOOL
+            ? 'School ERP package activated.' : 'Hospital ERP package activated.');
     }
 
     private function result(Company $company, ErpUpgradeSettlement $settlement, string $message)

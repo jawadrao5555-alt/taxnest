@@ -191,6 +191,8 @@ return [
     'cap_lab_catalogue_manage' => 'ٹیسٹوں کی فہرست سنبھالنا',
     'cap_lab_verify' => 'لیبارٹری نتائج کی تصدیق کرنا',
     'cap_lab_report' => 'تصدیق شدہ لیبارٹری رپورٹس کھولنا',
+    'cap_lab_operations_view' => 'لیبارٹری کے کام کا خلاصہ دیکھنا اور گنتی برآمد کرنا',
+    'cap_lab_costing_view' => 'لیبارٹری کے مجموعی اخراجات دیکھنا',
     'cap_billing_view' => 'بل دیکھنا',
     'cap_billing_charge' => 'رقم وصول کرنا',
     'cap_accounts_view' => 'حساب دیکھنا',

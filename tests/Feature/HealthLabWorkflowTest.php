@@ -287,6 +287,176 @@ class HealthLabWorkflowTest extends TestCase
         $this->getJson($createUrl)->assertNotFound();
     }
 
+    public function test_lab_operations_uses_one_scoped_nonclinical_summary_for_the_page_and_csv(): void
+    {
+        $company = $this->makeWorkspace('hospital', 'LAB-OPERATIONS');
+        $foreign = $this->makeWorkspace('lab', 'LAB-OPERATIONS-OTHER');
+        $branch = Branch::create(['company_id' => $company->id, 'name' => '=Synthetic main', 'is_active' => true]);
+        $second = Branch::create(['company_id' => $company->id, 'name' => 'Secondary private branch', 'is_active' => true]);
+        $foreignBranch = Branch::create(['company_id' => $foreign->id, 'name' => 'Foreign branch', 'is_active' => true]);
+        $department = HealthDepartment::create([
+            'company_id' => $company->id, 'branch_id' => $branch->id, 'name' => 'Synthetic section', 'type' => 'lab', 'is_active' => true,
+        ]);
+        $anotherDepartment = HealthDepartment::create([
+            'company_id' => $company->id, 'branch_id' => $branch->id, 'name' => 'Another section', 'type' => 'lab', 'is_active' => true,
+        ]);
+        $owner = $this->staff($company, HealthAccessService::ROLE_OWNER);
+        $supervisor = $this->staff($company, 'health_lab_supervisor');
+        $technician = $this->staff($company, 'health_lab_tech');
+        $foreignOwner = $this->staff($foreign, HealthAccessService::ROLE_OWNER);
+        $supervisor->forceFill(['health_department_id' => $department->id])->save();
+        DB::table('branch_user')->insert(['branch_id' => $branch->id, 'user_id' => $supervisor->id]);
+        $patient = $this->patient($company, 'ADMIN-DEMO-001', $branch);
+        $confidential = $this->patient($company, 'ADMIN-DEMO-002', $branch, true);
+        $otherPatient = $this->patient($company, 'ADMIN-DEMO-003', $second);
+        $foreignPatient = $this->patient($foreign, 'ADMIN-DEMO-004', $foreignBranch);
+        $this->operationsOrder($owner, $patient, '2026-08-01 00:00:00', $department->id, true);
+        $this->operationsOrder($owner, $patient, '2026-08-02 23:59:59', $department->id);
+        $this->operationsOrder($owner, $patient, '2026-08-03 00:00:00', $department->id);
+        $this->operationsOrder($owner, $patient, '2026-08-02 00:00:00', $anotherDepartment->id);
+        $this->operationsOrder($owner, $confidential, '2026-08-02 00:00:00', $department->id);
+        $this->operationsOrder($owner, $otherPatient, '2026-08-01 00:00:00');
+        $this->operationsOrder($foreignOwner, $foreignPatient, '2026-08-01 00:00:00');
+
+        $filters = ['from' => '2026-08-01', 'through' => '2026-08-02'];
+        $url = route('health.lab.operations', $filters);
+        $exportUrl = route('health.lab.operations.export', $filters);
+        $this->actingAs($supervisor, 'health');
+        $this->get(route('health.lab'))->assertOk()->assertSee('Laboratory operations');
+        $page = $this->get($url)->assertOk()->assertSee('=Synthetic main')->assertDontSee('Secondary private branch')
+            ->assertDontSee($patient->mrn)->assertDontSee($confidential->mrn);
+        $this->assertStringContainsString('no-store', (string) $page->headers->get('Cache-Control'));
+        $row = $page->viewData('rows')->sole();
+        $this->assertSame([2, 1, 1, 2, 1, 1], array_map('intval', [
+            $row->orders, $row->ready_orders, $row->open_orders,
+            $row->ordered_tests, $row->verified_tests, $row->rejected_specimens,
+        ]));
+        $response = $this->get($exportUrl)->assertOk()->assertDownload('laboratory-operations-2026-08-01-2026-08-02.csv');
+        $csv = $response->streamedContent();
+        $this->assertStringContainsString("2026-08-01,2026-08-02,{$branch->id},\"'=Synthetic main\",2,1,1,2,1,1", $csv);
+        foreach ([$patient->mrn, $confidential->mrn, 'Synthetic result text', 'Secondary private branch', 'Foreign branch'] as $private) {
+            $this->assertStringNotContainsString($private, $csv);
+        }
+        $this->assertDatabaseHas('health_audit_events', ['company_id' => $company->id, 'event' => 'lab.operations_exported']);
+        $this->getJson(route('health.lab.operations', $filters + ['branch_id' => $second->id]))->assertForbidden();
+        $this->getJson(route('health.lab.operations.export', $filters + ['branch_id' => $foreignBranch->id]))->assertForbidden();
+        $this->getJson(route('health.lab.operations', ['from' => '2026-08-01']))->assertUnprocessable()->assertJsonValidationErrors('through');
+        $this->getJson(route('health.lab.operations', ['from' => '2026-01-01', 'through' => '2026-08-02']))
+            ->assertUnprocessable()->assertJsonValidationErrors('through');
+
+        $this->actingAs($technician, 'health');
+        $this->get(route('health.lab'))->assertOk()->assertDontSee('Laboratory operations');
+        $this->getJson($url)->assertForbidden();
+        $this->getJson($exportUrl)->assertForbidden();
+
+        $this->actingAs($owner, 'health');
+        $selectedBranch = $this->get(route('health.lab.operations', $filters + ['branch_id' => $second->id]))->assertOk();
+        $this->assertEquals($second->id, $selectedBranch->viewData('rows')->sole()->branch_id);
+        $this->assertSame(1, (int) $selectedBranch->viewData('rows')->sole()->orders);
+
+        $this->actingAs($foreignOwner, 'health');
+        $standalone = $this->get($url)->assertOk()->assertSee('Foreign branch')->assertDontSee('=Synthetic main');
+        $this->assertSame(1, (int) $standalone->viewData('rows')->sole()->orders);
+        $foreign->update(['health_modules' => json_encode(['accounts'])]);
+        HealthModuleService::forget();
+        $this->getJson($exportUrl)->assertForbidden();
+    }
+
+    public function test_lab_costs_freeze_at_order_placement_and_stay_visible_only_to_authorized_finance_roles(): void
+    {
+        $company = $this->makeWorkspace('lab', 'LAB-COSTING');
+        $branch = Branch::create(['company_id' => $company->id, 'name' => 'Costing branch', 'is_active' => true]);
+        $second = Branch::create(['company_id' => $company->id, 'name' => 'Other costing branch', 'is_active' => true]);
+        $owner = $this->staff($company, HealthAccessService::ROLE_OWNER);
+        $admin = $this->staff($company, 'health_admin');
+        $accountant = $this->staff($company, 'health_accountant');
+        $supervisor = $this->staff($company, 'health_lab_supervisor');
+        DB::table('branch_user')->insert(['branch_id' => $branch->id, 'user_id' => $accountant->id]);
+        $patient = $this->patient($company, 'COST-QA-01', $branch);
+        $otherPatient = $this->patient($company, 'COST-QA-02', $second);
+        $fixture = ['code' => 'COST-QA', 'name' => 'Fictional costed test', 'price' => '900.00', 'is_active' => true];
+        $this->operationsOrder($owner, $patient, now()->toDateTimeString());
+        $this->operationsOrder($owner, $otherPatient, now()->toDateTimeString());
+
+        $this->actingAs($owner, 'health');
+        $this->get(route('health.lab.catalogue'))->assertOk()->assertSee('Estimated cost per test (PKR)');
+        $this->postJson(route('health.lab.catalogue.store'), $fixture + ['unit_cost' => '10.501'])
+            ->assertUnprocessable()->assertJsonValidationErrors('unit_cost');
+        $this->post(route('health.lab.catalogue.store'), $fixture + ['unit_cost' => '125.51'])
+            ->assertRedirect(route('health.lab.catalogue'));
+        $test = HealthLabTest::query()->sole();
+        $request = ['patient_id' => $patient->id, 'branch_id' => $branch->id, 'test_ids' => [$test->id]];
+        $place = function (int $expectedCost) use ($request) {
+            $this->post(route('health.lab.orders.store'), $request + ['request_key' => (string) Str::uuid()])->assertRedirect();
+            $item = HealthLabOrder::query()->latest('id')->firstOrFail()->items()->sole();
+            $this->assertSame($expectedCost, $item->unit_cost_paisa);
+            $this->assertSame(90000, $item->price_paisa);
+            $this->assertArrayNotHasKey('unit_cost_paisa', $item->toArray());
+
+            return $item;
+        };
+        $first = $place(12551);
+        $this->patch(route('health.lab.catalogue.update', $test), $fixture + ['unit_cost' => '25.09'])
+            ->assertRedirect(route('health.lab.catalogue'));
+        $place(2509);
+        $this->assertSame(12551, $first->fresh()->unit_cost_paisa);
+        $this->assertDatabaseHas('health_audit_events', ['company_id' => $company->id, 'event' => 'lab.catalogue_cost_changed']);
+
+        $this->actingAs($admin, 'health');
+        $this->get(route('health.lab.catalogue.edit', $test))->assertOk()->assertDontSee('Estimated cost per test');
+        $this->patchJson(route('health.lab.catalogue.update', $test), $fixture + ['unit_cost' => null])->assertForbidden();
+        $this->patch(route('health.lab.catalogue.update', $test), $fixture)->assertRedirect(route('health.lab.catalogue'));
+        $this->assertSame(2509, $test->fresh()->unit_cost_paisa);
+        $this->getJson(route('health.lab.costs'))->assertForbidden();
+
+        $this->actingAs($supervisor, 'health');
+        $this->getJson(route('health.lab.costs'))->assertForbidden();
+        $this->get(route('health.lab.operations'))->assertOk()->assertDontSee('Recorded cost estimates')->assertDontSee('150.60');
+        $this->assertStringNotContainsString('150.60', $this->get(route('health.lab.operations.export'))->streamedContent());
+
+        $this->actingAs($accountant, 'health');
+        $summary = $this->get(route('health.lab.costs'))->assertOk()
+            ->assertSee('PKR 150.60')->assertDontSee($patient->mrn)->assertDontSee('Other costing branch');
+        $row = $summary->viewData('rows')->sole();
+        $this->assertSame([15060, 2, 1], array_map('intval', [$row->known_cost_paisa, $row->costed_tests, $row->uncosted_tests]));
+        $this->getJson(route('health.lab.costs', ['branch_id' => $second->id]))->assertForbidden();
+        $this->getJson(route('health.lab'))->assertForbidden();
+
+        $this->actingAs($owner, 'health');
+        $unknown = $this->get(route('health.lab.costs', ['branch_id' => $second->id]))->assertOk()->assertSee('Unrecorded');
+        $this->assertNull($unknown->viewData('rows')->sole()->known_cost_paisa);
+    }
+
+    private function operationsOrder(User $owner, HealthPatient $patient, string $created, ?int $department = null, bool $verified = false): void
+    {
+        $order = HealthLabOrder::create([
+            'company_id' => $owner->company_id, 'branch_id' => $patient->branch_id, 'health_department_id' => $department,
+            'health_patient_id' => $patient->id, 'order_no' => Str::random(12), 'request_key' => (string) Str::uuid(),
+            'request_fingerprint' => str_repeat('a', 64), 'ordered_by' => $owner->id,
+        ]);
+        $order->forceFill(['created_at' => $created])->save();
+        $item = $order->items()->create([
+            'company_id' => $owner->company_id, 'health_lab_test_id' => 1,
+            'test_code' => 'DEMO', 'test_name' => 'Synthetic report fixture', 'price_paisa' => 1000,
+        ]);
+        $item->specimens()->create([
+            'company_id' => $owner->company_id, 'sequence' => 1, 'barcode' => Str::random(20),
+            'status' => $verified ? 'rejected' : 'pending',
+        ]);
+        if (!$verified) {
+            return;
+        }
+        $specimen = $item->specimens()->create([
+            'company_id' => $owner->company_id, 'sequence' => 2, 'barcode' => Str::random(20), 'status' => 'collected',
+        ]);
+        foreach ([1, 2] as $revision) {
+            $item->results()->create([
+                'company_id' => $owner->company_id, 'health_lab_specimen_id' => $specimen->id, 'revision' => $revision,
+                'value' => 'Synthetic result text', 'entered_by' => $owner->id, 'verified_at' => $revision === 1 ? now() : null,
+            ]);
+        }
+    }
+
     private function makeWorkspace(string $type, string $name, array $modules = ['lab', 'accounts']): Company
     {
         $company = Company::create([

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Company;
+use App\Services\ErpUpgradeCutoverService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -65,6 +66,7 @@ class FbrPosSchoolFeeController extends Controller
     {
         $request ??= request();
         $company = $this->company();
+        $erpCutover = ErpUpgradeCutoverService::sourceIsCutOver((int) $company->id);
         return response()->view('fbr-pos.school-fees.index', [
             'company' => $company,
             'studentReferences' => $this->receipts($company)->select('student_reference')->distinct()->orderBy('student_reference')->limit(100)->pluck('student_reference'),
@@ -72,7 +74,8 @@ class FbrPosSchoolFeeController extends Controller
             'receipts' => $this->receipts($company)->orderByDesc('id')->paginate(20),
             'requestKey' => (string) Str::uuid(),
             'feeHeads' => $this->feeHeads($company)->where('active', true),
-            'collectionClosed' => DB::table('school_fee_day_closes')->where('company_id', $company->id)
+            'erpCutover' => $erpCutover,
+            'collectionClosed' => $erpCutover || DB::table('school_fee_day_closes')->where('company_id', $company->id)
                 ->where('branch_key', $this->branchId() ?? 0)->where('report_date', today()->toDateString())->exists(),
         ])->withHeaders(['Cache-Control' => 'no-store']);
     }
@@ -356,6 +359,9 @@ class FbrPosSchoolFeeController extends Controller
                     throw ValidationException::withMessages(['request_key' => __('pos.school_retry_conflict')]);
                 }
                 return $existing->id;
+            }
+            if (ErpUpgradeCutoverService::sourceIsCutOver((int) $company->id, lock: true)) {
+                throw ValidationException::withMessages(['amount' => __('school_ledger.erp_cutover_closed')]);
             }
             // Require a real operator-entered bank/card reference only for NEW
             // payments. Historical exact retries remain retrievable unchanged.

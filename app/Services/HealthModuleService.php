@@ -97,7 +97,7 @@ class HealthModuleService
         ],
         'lab' => [
             'lab.view', 'lab.orders.manage', 'lab.catalogue.manage',
-            'lab.collect', 'lab.result', 'lab.verify', 'lab.report',
+            'lab.collect', 'lab.result', 'lab.verify', 'lab.report', 'lab.operations.view', 'lab.costing.view',
         ],
         'accounts' => [
             // `accounts.approve` is the accountant's ceiling, not their right.

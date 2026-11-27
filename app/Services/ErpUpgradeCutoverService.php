@@ -12,6 +12,7 @@ use App\Models\Scopes\CompanyScope;
 use App\Models\Subscription;
 use App\Models\SubscriptionInvoice;
 use App\Models\SubscriptionPayment;
+use App\Support\NestErps;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -68,7 +69,7 @@ final class ErpUpgradeCutoverService
                 return $settlement;
             }
             if (self::sourceIsCutOver($sourceCompanyId, lock: true)) {
-                $this->invalid('source_term', 'This Hospital Collections account already has an activated ERP upgrade.');
+                $this->invalid('source_term', 'This Collections account already has an activated ERP upgrade.');
             }
 
             // The money was settled against the paid source as of the verified
@@ -87,8 +88,9 @@ final class ErpUpgradeCutoverService
             }
             $plan = PricingPlan::whereKey($settlement->pricing_plan_id)->lockForUpdate()->firstOrFail();
             $this->settlements->assertDestination($source, $destination, $plan, $snapshot);
-            if (!in_array('accounts', HealthModuleService::normalize($plan->health_modules), true)
-                || !in_array('accounts', HealthModuleService::companyModules($destination), true)) {
+            $school = ErpUpgradeQuote::targetVertical($source) === NestErps::SCHOOL;
+            if (!$school && (!in_array('accounts', HealthModuleService::normalize($plan->health_modules), true)
+                || !in_array('accounts', HealthModuleService::companyModules($destination), true))) {
                 $this->invalid('destination_company_id', 'Enable the ERP Accounts module on an eligible package before switching new collections.');
             }
             $this->assertBranchMap($source, $destination, $plan, $branchMap);
@@ -105,7 +107,7 @@ final class ErpUpgradeCutoverService
                 'activated_at' => $activatedAt,
                 'activation_reference' => $approvalReference,
             ])->save();
-            AdminAuditLog::log($adminId, 'Hospital ERP cutover activated', 'ErpUpgradeSettlement', $settlement->id, [
+            AdminAuditLog::log($adminId, $school ? 'School ERP cutover activated' : 'Hospital ERP cutover activated', 'ErpUpgradeSettlement', $settlement->id, [
                 'source_company_id' => $sourceCompanyId,
                 'destination_company_id' => (int) $destination->id,
                 'destination_subscription_id' => (int) $subscription->id,
@@ -159,6 +161,9 @@ final class ErpUpgradeCutoverService
     {
         $sourceIds = $this->activeBranches((int) $source->id, lock: true)->pluck('id')->map(fn ($id) => (int) $id)->all();
         $destinationIds = $this->activeBranches((int) $destination->id, lock: true)->pluck('id')->map(fn ($id) => (int) $id)->all();
+        if (ErpUpgradeQuote::targetVertical($source) === NestErps::SCHOOL && $destinationIds === []) {
+            $this->invalid('branch_map', 'Create an active destination campus before switching School Collections.');
+        }
         if ($sourceIds !== array_keys($branchMap)) {
             $this->invalid('branch_map', 'Map every active source branch before activating the cutover.');
         }

@@ -378,31 +378,14 @@ $presentation = \App\Services\PosReportPresentation::forView($financialHistory ?
                 @endif
             </div>
             <div>
-                <h4 class="text-sm font-semibold text-gray-900 dark:text-white mb-2">{{ __('pos.top_customers') }}</h4>
-                <div class="overflow-x-auto">
-                    <table class="w-full text-sm table-cards">
-                        <thead>
-                            <tr class="text-left text-xs text-gray-500 uppercase border-b border-gray-200 dark:border-gray-700">
-                                <th class="pb-2">#</th>
-                                <th class="pb-2">{{ __('pos.customer_word') }}</th>
-                                <th class="pb-2 text-right">{{ __('pos.th_visits') }}</th>
-                                <th class="pb-2 text-right">{{ __('pos.th_spent') }}</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @forelse($ra->top_customers as $i => $cu)
-                            <tr class="border-b border-gray-50 dark:border-gray-800">
-                                <td class="py-2.5 text-gray-400">{{ $i + 1 }}</td>
-                                <td class="py-2.5 font-medium text-gray-900 dark:text-white">{{ $cu->name }}</td>
-                                <td class="py-2.5 text-right text-gray-700 dark:text-gray-300">{{ $cu->count }}</td>
-                                <td class="py-2.5 text-right font-medium text-gray-900 dark:text-white">PKR {{ number_format($cu->revenue) }}</td>
-                            </tr>
-                            @empty
-                            <tr><td colspan="4" class="py-6 text-center text-gray-400">{{ __('pos.walk_in_only_no_named') }}</td></tr>
-                            @endforelse
-                        </tbody>
-                    </table>
+                <div class="mb-2 flex items-center justify-between gap-2">
+                    <h4 class="text-sm font-semibold text-gray-900 dark:text-white">{{ __('pos.top_customers') }}</h4>
+                    @if($ra->top_customers->isNotEmpty())
+                        <a href="{{ route('pos.reports', ['tab' => $tab, 'from' => $ra->from, 'to' => $ra->to, 'cashier' => $selectedCashier, 'top_customers' => 1]) }}"
+                           class="text-xs font-semibold text-purple-700 underline dark:text-purple-300">{{ __('pos.view_all_caps') }}</a>
+                    @endif
                 </div>
+                @include('pos.partials.report-customer-rankings', ['rankings' => $ra->top_customers, 'firstRank' => 1])
             </div>
         </div>
 

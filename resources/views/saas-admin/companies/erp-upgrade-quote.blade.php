@@ -1,15 +1,18 @@
 <x-admin-layout>
     <div class="p-4 sm:p-6 max-w-3xl mx-auto space-y-4">
         <a href="{{ route('saas.admin.companies.show', $company) }}" class="text-sm text-indigo-300 underline">Back to company</a>
-        <h1 class="text-2xl font-bold">Hospital ERP upgrade</h1>
+        <h1 class="text-2xl font-bold">{{ $erpName }} upgrade</h1>
         <p class="text-sm">{{ $company->name }} · {{ $company->account_code ?: $company->id }}</p>
         <p class="text-sm">Estimate the difference between the destination package and the unused part of the source account’s verified package payment. This estimate does not collect payment or change either account.</p>
+        @if($school)
+            <p class="text-sm">Reconcile source fee balances and set up the destination campuses and students before switching. Earlier receipts stay available in School Collections.</p>
+        @endif
 
         @if ($plans->isEmpty())
-            <p>No paid Healthcare package with inpatient care is available for this estimate.</p>
+            <p>{{ $school ? 'No paid School ERP package is available for this estimate.' : 'No paid Healthcare package with inpatient care is available for this estimate.' }}</p>
         @else
             <form class="space-y-4 border rounded-lg p-4" method="GET" action="{{ route('saas.admin.companies.erpUpgradeQuote', $company) }}">
-                <label class="block text-sm">Hospital ERP package
+                <label class="block text-sm">{{ $erpName }} package
                     <select name="pricing_plan_id" class="block w-full bg-gray-950 border border-gray-700 rounded p-2 text-white" required>
                         <option value="">Choose a package</option>
                         @foreach ($plans as $plan)
@@ -47,7 +50,7 @@
                     <input type="hidden" name="billing_cycle" value="{{ $cycle }}">
                     <input type="hidden" name="expected_package_paisa" value="{{ $quote['target_price_paisa'] }}">
                     <input type="hidden" name="expected_credit_paisa" value="{{ $quote['credit_paisa'] }}">
-                    <label class="block text-sm">Destination Hospital ERP company ID
+                    <label class="block text-sm">Destination {{ $erpName }} company ID
                         <input type="number" name="destination_company_id" min="1" value="{{ old('destination_company_id') }}" class="block w-full rounded border-gray-500 bg-transparent" required>
                     </label>
                     <label class="block text-sm">Company owner’s approval reference
@@ -88,7 +91,7 @@
                         <label class="block text-sm">Cutover approval reference
                             <input type="text" name="activation_reference" maxlength="150" value="{{ old('activation_reference') }}" class="block w-full rounded border-gray-500 bg-transparent" required>
                         </label>
-                        <button type="submit" class="rounded bg-indigo-600 px-4 py-2 text-white">Activate Hospital ERP package</button>
+                        <button type="submit" class="rounded bg-indigo-600 px-4 py-2 text-white">Activate {{ $erpName }} package</button>
                     </form>
                 @else
                     <p class="text-sm">Valid on {{ $settlement->quoted_on->toDateString() }}. Verify only the difference shown above.</p>

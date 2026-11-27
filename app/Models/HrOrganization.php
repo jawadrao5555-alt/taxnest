@@ -12,4 +12,5 @@ class HrOrganization extends Model
     public function employees(): HasMany { return $this->hasMany(HrEmployee::class, 'organization_id'); }
     public function memberships(): HasMany { return $this->hasMany(HrOrganizationMembership::class, 'organization_id'); }
     public function policyVersions(): HasMany { return $this->hasMany(HrPolicyVersion::class, 'organization_id'); }
+    public function payrollPeriods(): HasMany { return $this->hasMany(HrPayrollPeriod::class, 'organization_id'); }
 }

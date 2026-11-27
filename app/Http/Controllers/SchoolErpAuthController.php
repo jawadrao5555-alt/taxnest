@@ -29,8 +29,8 @@ final class SchoolErpAuthController extends Controller
     public function showLogin()
     {
         $guard = auth(SchoolErpPanel::GUARD);
-        if ($guard->check()) {
-            return redirect()->away(SchoolErpPanel::DASHBOARD_PATH);
+        if ($user = $guard->user()) {
+            return redirect()->away(SchoolErpPanel::homeFor($user));
         }
 
         return response()->view('school-erp.login')->header('Cache-Control', 'private, no-store');
@@ -50,7 +50,7 @@ final class SchoolErpAuthController extends Controller
         auth(SchoolErpPanel::GUARD)->login($user);
         $request->session()->regenerate();
 
-        return redirect()->away(SchoolErpPanel::DASHBOARD_PATH);
+        return redirect()->away(SchoolErpPanel::homeFor($user));
     }
 
     public function showRegister(Request $request)

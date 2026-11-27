@@ -8,13 +8,20 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class HealthLabOrderItem extends Model
 {
-    protected $fillable = ['company_id', 'health_lab_test_id', 'test_code', 'test_name', 'price_paisa'];
+    protected $fillable = ['company_id', 'health_lab_test_id', 'test_code', 'test_name', 'price_paisa', 'unit_cost_paisa'];
 
-    protected $casts = ['price_paisa' => 'integer'];
+    protected $casts = ['price_paisa' => 'integer', 'unit_cost_paisa' => 'integer'];
+
+    protected $hidden = ['unit_cost_paisa'];
 
     protected static function booted(): void
     {
         static::addGlobalScope(new CompanyScope);
+        static::updating(function (self $item): void {
+            if ($item->isDirty('unit_cost_paisa')) {
+                throw new \LogicException('The laboratory order cost is fixed at placement.');
+            }
+        });
     }
 
     public function specimens(): HasMany

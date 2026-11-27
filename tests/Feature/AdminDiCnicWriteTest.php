@@ -170,7 +170,7 @@ class AdminDiCnicWriteTest extends TestCase
 
     public function test_admin_store_normalizes_cnic_to_digits(): void
     {
-        $this->actingAsAdmin()
+        $response = $this->actingAsAdmin()
             ->post('/admin/companies', [
                 'name' => 'Fresh Co', 'owner_name' => 'O', 'product_type' => 'di',
                 'email' => 'fresh@taxnest.test', 'status' => 'approved',
@@ -180,7 +180,11 @@ class AdminDiCnicWriteTest extends TestCase
             ])
             ->assertSessionMissing('errors');
 
-        $this->assertSame('3740511122234', DB::table('companies')->where('name', 'Fresh Co')->value('cnic'));
+        $company = DB::table('companies')->where('name', 'Fresh Co')->sole();
+        $response->assertRedirect(route('saas.admin.companies.show', $company->id))->assertSessionHas('success');
+        $this->assertSame('3740511122234', $company->cnic);
+        $this->assertDatabaseHas('users', ['company_id' => $company->id, 'email' => 'fresh-admin@taxnest.test', 'role' => 'company_admin']);
+        $this->assertDatabaseHas('subscriptions', ['company_id' => $company->id, 'billing_cycle' => 'monthly', 'active' => true]);
     }
 
     // ── DI panel: /company/profile ───────────────────────────────────────
@@ -340,6 +344,9 @@ class AdminDiCnicWriteTest extends TestCase
             $t->id();
             $t->unsignedBigInteger('company_id');
             $t->unsignedBigInteger('pricing_plan_id')->nullable();
+            $t->string('billing_cycle', 20)->default('monthly');
+            $t->decimal('discount_percent', 5, 2)->default(0);
+            $t->decimal('final_price', 12, 2)->nullable();
             $t->boolean('active')->default(true);
             $t->date('start_date')->nullable();
             $t->date('end_date')->nullable();

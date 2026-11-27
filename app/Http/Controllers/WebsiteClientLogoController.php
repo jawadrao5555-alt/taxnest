@@ -8,8 +8,8 @@ class WebsiteClientLogoController extends Controller
 {
     public function __invoke(int $client, int $revision)
     {
-        $entry = WebsiteClient::query()->whereKey($client)->where('revision', $revision)
-            ->whereNotNull('published_at')->whereNotNull('logo_data')->firstOrFail();
+        $entry = WebsiteClient::query()->published()->whereKey($client)->where('revision', $revision)
+            ->whereNotNull('logo_data')->firstOrFail();
 
         return self::imageResponse($entry);
     }

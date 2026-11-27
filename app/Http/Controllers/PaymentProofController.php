@@ -7,7 +7,9 @@ use App\Models\PricingPlan;
 use App\Services\ErpPublicPricing;
 use App\Services\PendingSubscriptionSelection;
 use App\Services\PlanCompanyCompatibility;
+use App\Services\PosSignupBundle;
 use App\Support\NestErps;
+use App\Support\SchoolErpPanel;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
@@ -95,7 +97,9 @@ class PaymentProofController extends Controller
                 ->with('payment_proof', 'error');
         }
 
+        $signup = PosSignupBundle::pending($company);
         if (!PendingSubscriptionSelection::quote($company, $plan, $validated['billing_cycle'])) {
+            if ($signup) return $this->signupBundleUnavailable();
             if (NestErps::isProductType($productType) && !ErpPublicPricing::availableForPurchase($plan)) {
                 return back()->withErrors(['pricing_plan_id' => 'This ERP package is not open for online purchase.'])
                     ->withInput()->with('payment_proof', 'error');
@@ -105,7 +109,7 @@ class PaymentProofController extends Controller
 
         // Private (non-public) disk: receipts are downloadable by admins only.
         $path = $request->file('proof')->store('payment-proofs/' . $companyId, 'local');
-        $result = DB::transaction(function () use ($companyId, $plan, $validated, $path) {
+        $result = DB::transaction(function () use ($companyId, $plan, $validated, $path, $signup) {
             $lockedCompany = \App\Models\Company::whereKey($companyId)->lockForUpdate()->firstOrFail();
             if (PaymentProof::subscriptionKind()->where('company_id',$companyId)->where('status','pending')->exists()) {
                 return null;
@@ -119,6 +123,9 @@ class PaymentProofController extends Controller
             }
 
             $savedQuote = PendingSubscriptionSelection::quote($lockedCompany, $plan, $validated['billing_cycle']);
+            if ($signup && (!isset($savedQuote[PosSignupBundle::KEY]) || $savedQuote != $signup->quote_snapshot)) {
+                return false;
+            }
             if ($erp && !$savedQuote && !ErpPublicPricing::availableForPurchase($plan)) {
                 return false;
             }
@@ -159,6 +166,7 @@ class PaymentProofController extends Controller
         if (!$result) {
             Storage::disk('local')->delete($path);
             if ($result === false) {
+                if ($signup) return $this->signupBundleUnavailable();
                 return back()->withErrors(['pricing_plan_id' => 'This ERP package is not open for online purchase.'])
                     ->withInput()->with('payment_proof', 'error');
             }
@@ -174,7 +182,7 @@ class PaymentProofController extends Controller
         // locked company submits a proof it gets 10 days of temporary access
         // while an admin verifies. Safeguard: a company with ANY previously
         // rejected proof gets NO auto access on re-upload (admin must decide).
-        $granted = $this->grantInstantAccess($company, $proof);
+        $granted = !$signup && $originGuard !== SchoolErpPanel::GUARD && $this->grantInstantAccess($company, $proof);
 
         $this->alertAdmins($company, $plan, $proof);
 
@@ -185,6 +193,12 @@ class PaymentProofController extends Controller
 
         return back()->with('success', 'Payment proof submitted! Your account will be unlocked once our team verifies it.')
             ->with('payment_proof', 'submitted');
+    }
+
+    private function signupBundleUnavailable()
+    {
+        return back()->withErrors(['pricing_plan_id' => 'Use the original PRA signup package and billing period.'])
+            ->withInput()->with('payment_proof', 'error');
     }
 
     /**
@@ -800,7 +814,13 @@ class PaymentProofController extends Controller
     private function originGuard(): string
     {
         $name = (string) request()->route()?->getName();
-        return str_starts_with($name, 'health.') ? 'health' : (str_starts_with($name, 'fbrpos.') ? 'fbrpos' : (str_starts_with($name, 'pos.') ? 'pos' : 'web'));
+        $panel = explode('.', $name, 2)[0];
+
+        return match ($panel) {
+            'school-erp' => SchoolErpPanel::GUARD,
+            'health', 'fbrpos', 'pos' => $panel,
+            default => 'web',
+        };
     }
 
     private function resolveCompanyId(): ?int

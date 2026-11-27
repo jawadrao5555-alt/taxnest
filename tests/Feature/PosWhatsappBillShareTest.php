@@ -637,6 +637,45 @@ class PosWhatsappBillShareTest extends TestCase
             ->get("/pos/invoice/share/{$token}")->assertOk();
     }
 
+    public function test_public_whatsapp_receipt_renders_a_final_dine_in_bill_for_both_papers(): void
+    {
+        Schema::table('companies', function (Blueprint $table) {
+            $table->string('receipt_printer_size')->nullable();
+            $table->json('invoice_display_prefs')->nullable();
+        });
+        Schema::table('pos_transactions', fn (Blueprint $table) => $table->string('order_type')->nullable());
+        $companyId = $this->makeCompany([
+            'invoice_display_prefs' => json_encode(['receipt_options' => ['pra' => ['show_payment' => 'show']]]),
+        ]);
+        $token = bin2hex(random_bytes(32));
+        DB::table('pos_transactions')->insert([
+            'company_id' => $companyId,
+            'invoice_number' => 'SAMPLE-240',
+            'business_date' => now()->toDateString(),
+            'status' => 'completed',
+            'invoice_mode' => 'pra',
+            'pra_status' => 'submitted',
+            'pra_invoice_number' => 'SYNTHETIC-FISCAL-2240',
+            'order_type' => 'dine_in',
+            'subtotal' => 100,
+            'total_amount' => 100,
+            'payment_method' => 'cash',
+            'share_token' => $token,
+            'share_token_created_at' => now(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        foreach (['58mm', '80mm'] as $paper) {
+            DB::table('companies')->where('id', $companyId)->update(['receipt_printer_size' => $paper]);
+            $pdf = $this->withHeader('X-Forwarded-Proto', 'https')
+                ->get("/pos/invoice/share/{$token}")
+                ->assertOk()
+                ->assertHeader('Content-Type', 'application/pdf');
+            $this->assertStringStartsWith('%PDF-', $pdf->getContent());
+        }
+    }
+
     public function test_todays_bills_feature_off_hides_wa_phone_everywhere(): void
     {
         $companyId = $this->makeCompany(['pos_whatsapp_bill_enabled' => false]);

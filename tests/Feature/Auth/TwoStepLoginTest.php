@@ -26,7 +26,7 @@ class TwoStepLoginTest extends TestCase
     {
         parent::setUp();
         Mail::fake();
-        foreach (['di' => 'auth', 'pos' => 'pos.auth', 'fbrpos' => 'fbrpos.auth', 'health' => 'health.auth', 'admin' => 'admin.auth', 'franchise' => 'franchise.auth'] as $panel => $middleware) {
+        foreach (['di' => 'auth', 'pos' => 'pos.auth', 'fbrpos' => 'fbrpos.auth', 'health' => 'health.auth', 'schoolerp' => \App\Http\Middleware\SchoolErpAccess::class, 'admin' => 'admin.auth', 'franchise' => 'franchise.auth'] as $panel => $middleware) {
             Route::middleware(['web', $middleware])->match(['GET', 'POST'], '/two-step-test/'.$panel, fn () => response('Protected handler reached'));
         }
     }
@@ -41,12 +41,14 @@ class TwoStepLoginTest extends TestCase
             return Franchise::create(['name' => 'Fictional franchise', 'email' => 'factor-franchise@example.invalid',
                 'password' => 'Synthetic123!', 'status' => 'active']);
         }
+        $erpPanel = in_array($panel, ['health', 'schoolerp'], true);
         $company = Company::create(['name' => 'Fictional factor '.$panel, 'ntn' => uniqid('factor'),
-            'product_type' => $panel === 'health' ? 'erps' : $panel, 'fbr_pos_enabled' => $panel === 'fbrpos',
-            'status' => 'approved', 'company_status' => 'active']);
+            'product_type' => $erpPanel ? \App\Support\NestErps::PRODUCT_TYPE : $panel, 'fbr_pos_enabled' => $panel === 'fbrpos',
+            'status' => 'approved', 'company_status' => 'active',
+            'erps_vertical' => $panel === 'schoolerp' ? \App\Support\NestErps::SCHOOL : null]);
 
         return User::factory()->create(['company_id' => $company->id, 'role' => 'company_admin', 'is_active' => true,
-            'product_type' => $panel === 'health' ? 'erps' : $panel, 'password' => 'Synthetic123!']);
+            'product_type' => $erpPanel ? \App\Support\NestErps::PRODUCT_TYPE : $panel, 'password' => 'Synthetic123!']);
     }
 
     private function install(object $actor, ?int $last = null): void

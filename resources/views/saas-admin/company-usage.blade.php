@@ -113,6 +113,12 @@
                                 <h3 class="mt-3 font-semibold">Same period last year</h3>
                                 @include('saas-admin.partials.erp-financial-summary', ['summary' => $erpComparison->get($stat->company_id)])
                             @endif
+                            <a class="mt-3 inline-block text-sm underline" href="{{ request()->fullUrlWithQuery([
+                                'export' => 'erp_csv',
+                                'company_id' => $stat->company_id,
+                                'as_of' => $filters['date_to'] ?? null,
+                                'page' => 1,
+                            ]) }}">Download ERP billing and collections (CSV)</a>
                         </td></tr>
                     @endif
                     @if($stat->local_collections)

@@ -56,9 +56,17 @@ return [
             'driver' => 'session',
             'provider' => 'users',
         ],
+        'schoolerp' => [
+            'driver' => 'session',
+            'provider' => 'users',
+        ],
         'admin' => [
             'driver' => 'session',
             'provider' => 'admin_users',
+        ],
+        'hr' => [
+            'driver' => 'session',
+            'provider' => 'users',
         ],
         'franchise' => [
             'driver' => 'session',

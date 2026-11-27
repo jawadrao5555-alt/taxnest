@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Schema;
 
 final class TwoStepLogin
 {
-    public const PANELS = ['di' => 'web', 'pos' => 'pos', 'fbrpos' => 'fbrpos', 'health' => 'health', 'admin' => 'admin', 'franchise' => 'franchise'];
+    public const PANELS = ['di' => 'web', 'pos' => 'pos', 'fbrpos' => 'fbrpos', 'health' => 'health', 'schoolerp' => 'schoolerp', 'admin' => 'admin', 'franchise' => 'franchise', 'hr' => 'hr'];
 
     public static function secret(): string
     {

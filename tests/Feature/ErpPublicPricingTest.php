@@ -36,6 +36,61 @@ final class ErpPublicPricingTest extends TestCase
             ->assertDontSee('Plan your ERP move')->assertDontSee('unrecognised-enquiry');
     }
 
+    public function test_published_erp_products_have_separate_signup_links_and_admin_sees_website_availability(): void
+    {
+        $this->withoutVite();
+        config(['health.registration_open' => true, 'school-erp.registration_open' => true]);
+        PricingPlan::create(array_replace($this->planFields(), ['erp_website_price_visible' => true]));
+        PricingPlan::create(array_replace($this->planFields(), [
+            'name' => 'Synthetic School offer', 'erps_vertical' => NestErps::SCHOOL,
+            'health_modules' => [], 'erp_website_price_visible' => true,
+        ]));
+
+        $this->get('/nest-erps')->assertOk()
+            ->assertSee('/health/register?org_type=hospital')
+            ->assertSee('/health/register?org_type=lab')
+            ->assertSee(route('school-erp.register'));
+        $this->get('/health/register?org_type=lab')->assertOk()->assertViewHas('pickedOrgType', 'lab');
+        $this->get('/health/register?org_type=unknown')->assertOk()->assertViewHas('pickedOrgType', 'clinic');
+
+        config(['school-erp.registration_open' => false]);
+        $this->get('/nest-erps')->assertOk()->assertDontSee(route('school-erp.register'))->assertSee('Synthetic School offer');
+        $this->actingAs($this->admin(), 'admin')->get(route('saas.admin.settings'))
+            ->assertOk()->assertSee('ERP website availability')->assertSee('Signup available · 1 published package')
+            ->assertSee('Signup closed · 1 published package');
+        $this->get(route('saas.admin.plans', ['product' => 'erps']))
+            ->assertOk()->assertSee("activeTab: 'erps'", false);
+    }
+
+    public function test_only_super_admin_can_change_each_erp_web_signup_gate_after_publishing_a_package(): void
+    {
+        $this->withoutVite();
+        config(['health.registration_open' => true, 'school-erp.registration_open' => false]);
+        $admin = $this->admin();
+        $manager = AdminUser::create([
+            'name' => 'Configuration administrator', 'email' => 'erp-configuration@example.test',
+            'password' => 'synthetic-password', 'role' => 'admin',
+        ]);
+        $settingsRoute = route('saas.admin.settings.erp-registration');
+        $this->actingAs($manager, 'admin')->post($settingsRoute, ['vertical' => NestErps::HEALTH, 'open' => 0])->assertForbidden();
+        $this->actingAs($admin, 'admin')->postJson($settingsRoute, ['vertical' => NestErps::SCHOOL, 'open' => 1])
+            ->assertUnprocessable()->assertJsonValidationErrors('vertical');
+        $this->assertNull(SystemSetting::get(SystemSetting::ERP_SCHOOL_SIGNUP));
+        PricingPlan::create(array_replace($this->planFields(), [
+            'name' => 'Published School offer', 'erps_vertical' => NestErps::SCHOOL,
+            'health_modules' => [], 'erp_website_price_visible' => true,
+        ]));
+
+        $this->post($settingsRoute, ['vertical' => NestErps::SCHOOL, 'open' => 1])
+            ->assertSessionHasNoErrors()->assertRedirect(route('saas.admin.settings'));
+        $this->get('/school-erp/register')->assertOk()->assertSee('Published School offer');
+        $this->post($settingsRoute, ['vertical' => NestErps::HEALTH, 'open' => 0])
+            ->assertSessionHasNoErrors()->assertRedirect(route('saas.admin.settings'));
+        $this->postJson('/health/register', [])->assertNotFound();
+        $this->get('/nest-erps')->assertOk()->assertSee(route('school-erp.register'))->assertDontSee('/health/register');
+        $this->assertDatabaseHas('admin_audit_logs', ['admin_id' => $admin->id, 'action' => 'ERP public signup updated']);
+    }
+
     public function test_billing_admin_can_publish_and_hide_exact_erp_prices_without_opening_pre_pilot_signup(): void
     {
         $this->withoutVite();

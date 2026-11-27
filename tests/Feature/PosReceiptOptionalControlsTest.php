@@ -323,6 +323,42 @@ class PosReceiptOptionalControlsTest extends TestCase
         }
     }
 
+    public function test_configured_payment_moves_to_the_fiscal_qr_or_compact_fallback_in_either_width(): void
+    {
+        $company = Company::findOrFail($this->companyId);
+        foreach (['80mm', '58mm'] as $paper) {
+            $bill = $this->bill($company, 'submitted');
+            $bill->order_type = 'dine_in';
+            $company->invoice_display_prefs = ['receipt_options' => ['pra' => ['show_payment' => 'show']]];
+            $render = fn () => view('pos.receipts.receipt_'.$paper, ['company' => $company, 'transaction' => $bill])->render();
+
+            $fiscal = $render();
+            $this->assertMatchesRegularExpression('/class="fiscal-qr-payment"[\s\S]*?<img[^>]+alt="PRA[^"]+"[\s\S]*?class="compact-payment"/', $fiscal);
+            $this->assertStringNotContainsString(__('pos.receipt_payment_mode').':</td>', $fiscal);
+
+            $bill->pra_status = null;
+            $bill->pra_invoice_number = null;
+            $company->invoice_display_prefs = ['receipt_options' => ['local' => ['show_payment' => 'show', 'show_menu_qr' => 'hide']]];
+            $local = $render();
+            $this->assertStringContainsString('class="compact-payment"', $local);
+            $this->assertStringNotContainsString('class="fiscal-qr-payment"', $local);
+            $this->assertStringNotContainsString(__('pos.receipt_payment_mode').':</td>', $local);
+
+            $bill->pra_status = 'submitted';
+            $bill->pra_invoice_number = 'SYNTHETIC-FISCAL-2240';
+            $company->invoice_display_prefs = ['receipt_options' => ['pra' => ['show_payment' => 'hide']]];
+            $hidden = $render();
+            $this->assertStringContainsString('SYNTHETIC-FISCAL-2240', $hidden);
+            $this->assertStringNotContainsString('class="fiscal-qr-payment"', $hidden);
+            $this->assertStringNotContainsString('class="compact-payment"', $hidden);
+
+            $company->invoice_display_prefs = [];
+            $inherited = $render();
+            $this->assertStringContainsString(__('pos.receipt_payment_mode').':</td>', $inherited);
+            $this->assertStringNotContainsString('class="compact-payment"', $inherited);
+        }
+    }
+
     public function test_options_use_existing_fiscal_local_exempt_and_pending_stream_rules(): void
     {
         $company = Company::findOrFail($this->companyId);

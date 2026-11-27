@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\AdminUser;
 use App\Models\Branch;
 use App\Models\Company;
+use App\Services\CompanyProductId;
 use App\Services\Reporting\ErpAdminFinancialSummary;
 use App\Support\NestErps;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -134,6 +135,57 @@ final class ErpAdminFinancialSummaryTest extends TestCase
         $this->getJson($url.'?'.http_build_query($from + ['branch_id' => $foreign->id]))
             ->assertUnprocessable()->assertJsonValidationErrors('branch_id');
         $this->getJson(route('saas.admin.live-ops.erp-company', $pos->id))->assertNotFound();
+    }
+
+    public function test_company_usage_exports_each_erp_ledger_with_its_own_totals_and_reporting_period(): void
+    {
+        $erp = $this->company('Fictional Lab', 'health');
+        $school = $this->company('Fictional School', NestErps::PRODUCT_TYPE, NestErps::SCHOOL);
+        $pos = $this->company('Fictional POS', 'fbrpos');
+        $branch = Branch::create(['company_id' => $erp->id, 'name' => 'Fictional Lab Branch', 'code' => 'LAB-A']);
+        $foreign = Branch::create(['company_id' => $school->id, 'name' => 'Fictional Campus', 'code' => 'SCH-A']);
+        $reference = CompanyProductId::display($erp);
+        $currentInvoice = $this->packageInvoice($erp, 'CSV-ERP-CURRENT', 900, '2026-11-27');
+        $priorInvoice = $this->packageInvoice($erp, 'CSV-ERP-PRIOR', 700, '2025-11-27');
+        $this->packageReceipt($currentInvoice, 'CSV-CURRENT-R', 300, '2026-11-27');
+        $this->packageReceipt($priorInvoice, 'CSV-PRIOR-R', 550, '2025-11-27');
+        $this->healthBill($erp, 'CSV-HEALTH-BILL', 123.45, 23.45, branch: $branch->id);
+        $this->healthPayment($erp, 'CSV-HEALTH-PAYMENT', 100, branch: $branch->id);
+        $this->healthPayment($erp, 'CSV-HEALTH-REFUND', 10, kind: 'refund', branch: $branch->id);
+        $this->healthBill($school, 'CSV-OTHER-BILL', 98.76, 98.76, branch: $foreign->id);
+        $admin = AdminUser::create(['name' => 'Fictional reviewer', 'email' => 'erp-csv@example.invalid',
+            'password' => 'ExamplePassword123!', 'role' => 'super_admin']);
+
+        $url = route('saas.admin.usage');
+        $filters = ['period' => 'two_year', 'as_of' => '2026-11-27', 'company_id' => $reference];
+        $this->actingAs($admin, 'admin')->get($url.'?'.http_build_query($filters))->assertOk()
+            ->assertSee('Download ERP billing and collections (CSV)');
+
+        $export = $filters + ['export' => 'erp_csv', 'product_scope' => NestErps::PRODUCT_TYPE];
+        $response = $this->get($url.'?'.http_build_query($export))->assertOk()->assertDownload('erp-financials-'.$erp->id.'.csv');
+        $csv = $response->streamedContent();
+        $this->assertStringNotContainsString('Private sample payer', $csv);
+        $this->assertStringNotContainsString('CSV-HEALTH-BILL', $csv);
+        $this->assertStringNotContainsString('98.76', $csv);
+        $this->assertSame([
+            'company_id,company_reference,branch_or_campus_id,period,date_from,date_to,ledger,coverage,invoice_count,invoiced_pkr,receipt_count,received_pkr,refunds_or_reversals_pkr,net_received_pkr,outstanding_pkr',
+            "$erp->id,$reference,all,current,2026-01-01,2026-11-27,taxnest_package,available,1,900.00,1,300.00,,,",
+            "$erp->id,$reference,all,current,2026-01-01,2026-11-27,healthcare_operations,available,1,123.45,1,100.00,10.00,90.00,23.45",
+            "$erp->id,$reference,all,prior_year,2025-01-01,2025-11-27,taxnest_package,available,1,700.00,1,550.00,,,",
+            "$erp->id,$reference,all,prior_year,2025-01-01,2025-11-27,healthcare_operations,available,0,0.00,0,0.00,0.00,0.00,0.00",
+        ], explode("\n", trim($csv)));
+
+        $scoped = $this->get($url.'?'.http_build_query($export + ['branch_id' => $branch->id]))->assertOk()->streamedContent();
+        $this->assertStringContainsString("$erp->id,$reference,$branch->id,current,2026-01-01,2026-11-27,taxnest_package,company_wide_only,,,,,,,", $scoped);
+        $this->assertStringContainsString("$erp->id,$reference,$branch->id,current,2026-01-01,2026-11-27,healthcare_operations,available,1,123.45,1,100.00,10.00,90.00,23.45", $scoped);
+        $this->getJson($url.'?'.http_build_query($export + ['branch_id' => $foreign->id]))
+            ->assertUnprocessable()->assertJsonValidationErrors('branch_id');
+        $this->getJson($url.'?'.http_build_query(['company_id' => $pos->id, 'export' => 'erp_csv']))->assertNotFound();
+
+        $schoolCsv = $this->get($url.'?'.http_build_query(['company_id' => $school->id, 'export' => 'erp_csv',
+            'date_from' => '2026-11-27', 'date_to' => '2026-11-27']))->assertOk()->streamedContent();
+        $this->assertStringContainsString('school_erp_fees,available,0,0.00,0,0.00,0.00,0.00,0.00', $schoolCsv);
+        $this->assertStringNotContainsString('healthcare_operations', $schoolCsv);
     }
 
     private function company(string $name, string $product, string $vertical = 'health'): Company

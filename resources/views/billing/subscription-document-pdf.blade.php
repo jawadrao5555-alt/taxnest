@@ -63,6 +63,14 @@
         <tr><td>ERP package price</td><td class="amount">PKR {{ number_format($snapshot['erp_upgrade']['gross_package_paisa'] / 100, 2) }}</td></tr>
         <tr><td>Credit from existing paid term</td><td class="amount">PKR {{ number_format($snapshot['erp_upgrade']['applied_credit_paisa'] / 100, 2) }}</td></tr>
     @endif
+    @if($bundle = $snapshot[\App\Services\PosSignupBundle::KEY] ?? null)
+        @if($bundle['federal'])
+            <tr><td>{{ \App\Services\PosAddonPricingService::definitions()[$bundle['federal']]['label'] }}</td><td class="amount">PKR {{ number_format($bundle['federal_amount'], 2) }}</td></tr>
+        @endif
+        @if($bundle['branch_slots'] > 0)
+            <tr><td>Extra branches × {{ $bundle['branch_slots'] }}</td><td class="amount">PKR {{ number_format($bundle['branch_amount'], 2) }}</td></tr>
+        @endif
+    @endif
     @unless($historical)
         <tr><td>Invoice amount</td><td class="amount">PKR {{ number_format((float) ($snapshot['amount_due'] ?? $invoice->amount), 2) }}</td></tr>
     @endunless

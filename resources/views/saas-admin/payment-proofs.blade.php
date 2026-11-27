@@ -15,6 +15,8 @@
         @php
             $tabs = ['pending' => 'Pending', 'verified' => 'Verified', 'rejected' => 'Rejected', 'all' => 'All'];
             $activeTab = in_array($status ?? 'pending', array_keys($tabs), true) ? ($status ?? 'pending') : 'pending';
+            $productFilter = $product === null ? [] : ['product' => $product];
+            $companyFilter = $companyReference === '' ? [] : ['company_id' => $companyReference];
         @endphp
 
         <form method="GET" action="{{ route('saas.admin.payment-proofs') }}" class="mb-4 flex flex-wrap gap-3 items-end">
@@ -22,12 +24,20 @@
             <label class="block text-sm font-semibold text-gray-900 dark:text-gray-100">Company ID or account code
                 <input type="text" name="company_id" maxlength="32" value="{{ $companyReference }}" class="block mt-1 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border border-gray-400">
             </label>
-            <button type="submit" class="px-3 py-2 rounded-lg bg-indigo-700 text-white font-semibold">Filter company</button>
-            <a class="underline text-sm text-gray-900 dark:text-gray-100" href="{{ route('saas.admin.payment-proofs', ['status' => $status]) }}">All companies</a>
+            <label class="block text-sm font-semibold text-gray-900 dark:text-gray-100">Product
+                <select name="product" class="block mt-1 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border border-gray-400">
+                    <option value="">All products</option>
+                    @foreach(\App\Support\ProductCatalog::options() as $key => $name)
+                        <option value="{{ $key }}" @selected($product === $key)>{{ $name }}</option>
+                    @endforeach
+                </select>
+            </label>
+            <button type="submit" class="px-3 py-2 rounded-lg bg-indigo-700 text-white font-semibold">Filter proofs</button>
+            <a class="underline text-sm text-gray-900 dark:text-gray-100" href="{{ route('saas.admin.payment-proofs', ['status' => $status] + $productFilter) }}">All companies</a>
         </form>
         <div class="flex flex-wrap gap-2 mb-5">
             @foreach($tabs as $key => $label)
-                <a href="{{ route('saas.admin.payment-proofs', $companyReference === '' ? ['status' => $key] : ['status' => $key, 'company_id' => $companyReference]) }}"
+                <a href="{{ route('saas.admin.payment-proofs', ['status' => $key] + $companyFilter + $productFilter) }}"
                    class="px-3 py-1.5 rounded-lg text-xs font-semibold transition {{ $activeTab === $key ? 'admin-btn text-white' : 'bg-gray-800 text-gray-400 hover:text-gray-200' }}">
                     {{ $label }}
                 </a>
@@ -58,12 +68,20 @@
                             $validFrozenQuote = is_array($frozenQuote) && $proof->company && $proof->pricingPlan
                                 && !\App\Services\DistributorDiscountService::validateSnapshot($frozenQuote, $proof->company, $proof->pricingPlan, $reqCycle)
                                 ? $frozenQuote : null;
+                            $rowPlans = $plansByProof->get($proof->id, collect());
+                            $canAssignPackage = $rowPlans->isNotEmpty() && (!$frozenQuote || $validFrozenQuote);
                         @endphp
                         <tr class="hover:bg-gray-800/50 align-top" x-data="{ panel: null }">
                             <td class="px-4 py-3 text-white font-medium">
                                 {{ $proof->company->name ?? ('#' . $proof->company_id) }}
                                 @if($proof->company)
                                     <span class="block text-xs font-mono">{{ \App\Services\CompanyProductId::display($proof->company) }}</span>
+                                    @php
+                                        $companyProduct = \App\Services\PlanCompanyCompatibility::productKey($proof->company->product_type);
+                                    @endphp
+                                    @if(\App\Support\ProductCatalog::isKnown($companyProduct))
+                                        <span class="block text-xs text-gray-400">{{ \App\Support\ProductCatalog::label($companyProduct, \App\Support\NestErps::verticalOf($proof->company)) }}</span>
+                                    @endif
                                 @endif
                                 @if($proof->notes)
                                     <p class="text-xs text-gray-500 dark:text-gray-400 mt-1 max-w-[220px]">{{ $proof->notes }}</p>
@@ -122,6 +140,7 @@
                                         {{ \App\Models\Subscription::getCycleLabel($reqCycle) }}
                                         @if($validFrozenQuote)
                                             · Saved quote PKR {{ number_format((float) $validFrozenQuote['net_quote'], 2) }}
+                                            @include('billing._pra-signup-bundle', ['bundle' => $validFrozenQuote[\App\Services\PosSignupBundle::KEY] ?? null])
                                         @elseif(is_array($frozenQuote))
                                             · Review the original payment proof
                                         @elseif($reqPriced)
@@ -190,7 +209,11 @@
                             </td>
                             <td class="px-4 py-3 text-center whitespace-nowrap">
                                 @if($proof->status === 'pending' && $canManageBilling)
-                                    <button @click="panel = (panel === 'approve' ? null : 'approve')" class="text-xs text-emerald-400 hover:text-emerald-300 mr-2">Approve</button>
+                                    @if($proof->kind() !== 'subscription' || $canAssignPackage)
+                                        <button @click="panel = (panel === 'approve' ? null : 'approve')" class="text-xs text-emerald-400 hover:text-emerald-300 mr-2">Approve</button>
+                                    @else
+                                        <p class="mb-1 whitespace-normal text-xs text-gray-400">No compatible package can be assigned to this proof.</p>
+                                    @endif
                                     <button @click="panel = (panel === 'reject' ? null : 'reject')" class="text-xs text-red-400 hover:text-red-300">Reject</button>
 
                                     @if($proof->isPosAddon())
@@ -300,7 +323,7 @@
                                             <button type="submit" class="w-full px-3 py-2 tn-admin-action tn-admin-action--confirm text-xs font-semibold rounded-lg transition">Approve Extra Branch</button>
                                         </form>
                                     </div>
-                                    @else
+                                    @elseif($canAssignPackage)
                                     <div x-show="panel === 'approve'" x-cloak class="mt-3 text-left bg-gray-800/60 border border-gray-700 rounded-lg p-3 space-y-2 min-w-[240px] max-w-[280px]">
                                         @php
                                             $reqCycleSel = $reqCycle;
@@ -319,13 +342,17 @@
                                             $ebReview = \App\Services\BranchAddonService::renewalReview(
                                                 $proof->company, $reviewPlan, $reqCycleSel, $proof->amount, $validFrozenQuote
                                             );
+                                            $frozenPraBundle = isset($validFrozenQuote[\App\Services\PosSignupBundle::KEY]);
+                                            if ($frozenPraBundle) {
+                                                $ebReview['applies'] = false;
+                                            }
 
                                             // Har qabil-e-intikhab package ka base aur har slot-ginti ka
                                             // add-on SERVER par — screen wahi raqam dikhaye jo approve hone
                                             // par charge hogi, chahe admin package ya cycle badal de.
                                             $ebPlanRows = [];
                                             if ($ebReview['applies']) {
-                                                foreach ($plans as $ebPlan) {
+                                                foreach ($rowPlans as $ebPlan) {
                                                     if (!\App\Services\BranchAddonService::supportsPlan($ebPlan)) {
                                                         continue;
                                                     }
@@ -357,7 +384,7 @@
                                             }
                                         @endphp
                                         @if($proof->pricingPlan)
-                                            <p class="text-[11px] text-gray-400 mb-1">Requested: <span class="text-gray-200 font-medium">{{ $proof->pricingPlan->name }}</span> · {{ \App\Models\Subscription::getCycleLabel($reqCycleSel) }}. Approve as-is or change below.</p>
+                                            <p class="text-[11px] text-gray-400 mb-1">Requested: <span class="text-gray-200 font-medium">{{ $proof->pricingPlan->name }}</span> · {{ \App\Models\Subscription::getCycleLabel($reqCycleSel) }}.</p>
                                         @else
                                             <p class="text-[11px] text-gray-400 mb-1">No package requested — choose one to assign.</p>
                                         @endif
@@ -405,10 +432,24 @@
                                         @endif
                                         <form method="POST" action="{{ route('saas.admin.payment-proofs.approve', $proof->id) }}" class="space-y-2">
                                             @csrf
+                                            @if($frozenPraBundle)
+                                                <input type="hidden" name="pricing_plan_id" value="{{ $proof->pricing_plan_id }}">
+                                                <input type="hidden" name="billing_cycle" value="{{ $reqCycleSel }}">
+                                                <p class="text-xs text-white">{{ $validFrozenQuote['plan_snapshot']['name'] ?? $proof->pricingPlan->name }} · {{ \App\Models\Subscription::getCycleLabel($reqCycleSel) }} · PKR {{ number_format($validFrozenQuote['net_quote'], 2) }}</p>
+                                                <p class="text-[11px] text-gray-400">Original signup package and add-ons</p>
+                                            @else
                                             <select name="pricing_plan_id" x-model="plan" required class="w-full bg-gray-900 border border-gray-700 rounded-lg text-white text-xs px-2 py-2">
                                                 <option value="">Select Plan</option>
-                                                @foreach($plans as $p)
-                                                    <option value="{{ $p->id }}" @selected($proof->pricing_plan_id == $p->id)>{{ $p->name }} — {{ strtoupper($p->product_type ?? 'di') }} (PKR {{ number_format($p->price) }})</option>
+                                                @foreach($rowPlans as $p)
+                                                    @php
+                                                        $productKey = \App\Services\PlanCompanyCompatibility::productKey($p->product_type);
+                                                        $packageProduct = \App\Support\ProductCatalog::isKnown($productKey)
+                                                            ? \App\Support\ProductCatalog::label($productKey, \App\Support\NestErps::verticalOf($p))
+                                                            : ucfirst($productKey);
+                                                        $packageName = $validFrozenQuote['plan_snapshot']['name'] ?? $p->name;
+                                                        $packageAmount = $validFrozenQuote['net_quote'] ?? $p->price;
+                                                    @endphp
+                                                    <option value="{{ $p->id }}" @selected($proof->pricing_plan_id == $p->id)>{{ $packageName }} — {{ $packageProduct }} (PKR {{ number_format($packageAmount, $validFrozenQuote ? 2 : 0) }})</option>
                                                 @endforeach
                                             </select>
                                             <select name="billing_cycle" x-model="cycle" required class="w-full bg-gray-900 border border-gray-700 rounded-lg text-white text-xs px-2 py-2">
@@ -422,6 +463,7 @@
                                                     <option value="{{ $reqCycleSel }}" selected>{{ \App\Models\Subscription::getCycleLabel($reqCycleSel) }} (frozen quote)</option>
                                                 @endif
                                             </select>
+                                            @endif
                                             <div>
                                                 <label class="block text-[11px] text-gray-400 mb-1">Amount verified in bank/receipt (PKR)</label>
                                                 <input type="number" name="verified_received_amount"

@@ -134,6 +134,12 @@
                 <h3 class="font-semibold">Healthcare company billing</h3>
                 @include('saas-admin.partials.erp-financial-amounts', ['lane' => $erpTotals['operations'], 'isSubscription' => false])
             </div>
+            @if($erpTotals['school_fees'] !== null)
+                <div class="border rounded-lg p-4 min-w-0">
+                    <h3 class="font-semibold">School ERP fees</h3>
+                    @include('saas-admin.partials.erp-financial-amounts', ['lane' => $erpTotals['school_fees'], 'isSubscription' => false, 'reversalLabel' => 'Receipt reversals'])
+                </div>
+            @endif
         </div>
         <p class="text-sm mt-3"><a class="underline" href="{{ route('saas.admin.usage', ['product_scope' => $erpType] + $erpFilters) }}">View ERP company reports</a></p>
     </section>

@@ -53,8 +53,13 @@
                     @include('saas-admin.partials.erp-financial-amounts', ['lane' => $summary['subscription'] ?? null, 'isSubscription' => true])
                 </section>
                 <section>
-                    <h3 class="font-semibold">Healthcare company billing</h3>
-                    @include('saas-admin.partials.erp-financial-amounts', ['lane' => $summary['operations'] ?? null, 'isSubscription' => false])
+                    @if(($summary['school_fees'] ?? null) !== null)
+                        <h3 class="font-semibold">School ERP fees</h3>
+                        @include('saas-admin.partials.erp-financial-amounts', ['lane' => $summary['school_fees'], 'isSubscription' => false, 'reversalLabel' => 'Receipt reversals'])
+                    @else
+                        <h3 class="font-semibold">Healthcare company billing</h3>
+                        @include('saas-admin.partials.erp-financial-amounts', ['lane' => $summary['operations'] ?? null, 'isSubscription' => false])
+                    @endif
                 </section>
             </div>
             <div class="mt-2 flex flex-wrap gap-3 text-sm">

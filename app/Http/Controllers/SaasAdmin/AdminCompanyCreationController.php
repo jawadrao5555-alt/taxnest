@@ -7,6 +7,7 @@ use App\Models\AdminAuditLog;
 use App\Models\Franchise;
 use App\Models\User;
 use App\Services\CredentialLedgerService;
+use App\Services\ErpDemoCompanyProvisioner;
 use App\Services\HealthModuleService;
 use App\Services\TrialSubscriptionService;
 use App\Support\HealthPanel;
@@ -41,6 +42,10 @@ class AdminCompanyCreationController extends AdminCompanyController
 
     public function store(Request $request)
     {
+        if ($request->boolean('create_erp_demo')) {
+            return $this->storeErpDemo($request);
+        }
+
         $currentAdmin = \App\Models\AdminUser::requireBillingAdministrator();
         // Which POS panel (if any) owns the selected business type.
         $posPanel = match ($request->input('product_type')) {
@@ -216,6 +221,23 @@ class AdminCompanyCreationController extends AdminCompanyController
         });
 
         return redirect()->route('saas.admin.companies.show', $company->id)->with('success', "Company '{$company->name}' created successfully with admin account.");
+    }
+
+    private function storeErpDemo(Request $request)
+    {
+        $admin = \App\Models\AdminUser::requireSuperAdministrator();
+        $input = $request->validateWithBag('erpDemo', [
+            'demo_type' => ['required', Rule::in(array_keys(ErpDemoCompanyProvisioner::TYPES))],
+            'demo_request_key' => ['required', 'uuid'],
+            'password' => ['required', 'string', 'min:16', 'max:72', 'confirmed'],
+        ]);
+        $company = app(ErpDemoCompanyProvisioner::class)->provision(
+            $admin, $input['demo_type'], $input['demo_request_key'], $input['password']
+        );
+        $path = ErpDemoCompanyProvisioner::loginPath($company);
+
+        return redirect()->route('saas.admin.companies.show', $company->id)
+            ->with('success', "ERP demo {$company->name} (company #{$company->id}). Sign in at {$path} as {$company->email}.");
     }
 
 }

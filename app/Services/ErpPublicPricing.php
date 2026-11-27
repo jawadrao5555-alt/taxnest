@@ -6,6 +6,7 @@ use App\Models\PricingPlan;
 use App\Models\SystemSetting;
 use App\Support\HealthPanel;
 use App\Support\NestErps;
+use App\Support\SchoolErpPanel;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
@@ -26,7 +27,9 @@ final class ErpPublicPricing
             && !$plan->is_trial
             && (float) $plan->price > 0
             && NestErps::hasVertical($vertical)
-            && NestErps::verticalValue($vertical, 'live', false);
+            && ($vertical === NestErps::SCHOOL
+                ? $plan->erp_website_price_visible === true
+                : NestErps::verticalValue($vertical, 'live', false));
     }
 
     public static function packages(?string $vertical = null): Collection
@@ -55,14 +58,20 @@ final class ErpPublicPricing
             ->groupBy(fn (PricingPlan $plan) => NestErps::verticalOf($plan));
     }
 
-    public static function availableForRegistration(PricingPlan $plan): bool
+    public static function availableForRegistration(PricingPlan $plan, string $vertical = HealthPanel::VERTICAL): bool
     {
-        return HealthPanel::ownsErpRecord($plan) && self::availableForPurchase($plan);
+        $matches = $vertical === HealthPanel::VERTICAL
+            ? HealthPanel::ownsErpRecord($plan)
+            : $plan->getAttribute(NestErps::VERTICAL_COLUMN) === $vertical;
+
+        return $matches && ($vertical !== NestErps::SCHOOL || SchoolErpPanel::registrationOpen())
+            && self::availableForPurchase($plan);
     }
 
-    public static function registrationPackages(): Collection
+    public static function registrationPackages(string $vertical = HealthPanel::VERTICAL): Collection
     {
-        return self::packages(HealthPanel::VERTICAL)->filter(self::availableForRegistration(...))->values();
+        return $vertical === NestErps::SCHOOL && !SchoolErpPanel::registrationOpen()
+            ? collect() : self::packages($vertical);
     }
 
     /** Use the same price and cycle policy as selection, proof and approval. */

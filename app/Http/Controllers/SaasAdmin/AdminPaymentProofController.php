@@ -9,8 +9,14 @@ use App\Models\Notification;
 use App\Models\PaymentProof;
 use App\Models\PricingPlan;
 use App\Services\CompanyProductId;
+use App\Services\PlanCompanyCompatibility;
+use App\Services\PlanSellabilityService;
+use App\Services\PosSignupBundle;
 use App\Services\SubscriptionAssignmentService;
+use App\Support\NestErps;
+use App\Support\ProductCatalog;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
@@ -24,16 +30,30 @@ class AdminPaymentProofController extends Controller
         if (!Schema::hasTable('payment_proofs')) {
             return view('saas-admin.payment-proofs', [
                 'proofs' => collect(),
-                'plans' => collect(),
                 'status' => 'pending',
                 'tableMissing' => true,
             ]);
         }
 
-        $companyReference = trim($request->validate(['company_id' => ['nullable', 'string']])['company_id'] ?? '');
+        $input = $request->validate([
+            'company_id' => ['nullable', 'string'],
+            'product' => ['nullable', 'string', ProductCatalog::validationRule()],
+        ]);
+        $companyReference = trim($input['company_id'] ?? '');
+        $product = ProductCatalog::normalize($input['product'] ?? null);
         $status = $request->get('status', 'pending');
 
         $query = PaymentProof::with(['company', 'pricingPlan'])->orderByDesc('created_at');
+        if ($product !== null) {
+            $productCompanies = Company::withTrashed()->select('companies.id')
+                ->where(function ($companies) use ($product) {
+                    $companies->whereIn('product_type', NestErps::storedTypesFor($product));
+                    if ($product === ProductCatalog::DI) {
+                        $companies->orWhereNull('product_type')->orWhere('product_type', '');
+                    }
+                });
+            $query->whereIn('company_id', $productCompanies);
+        }
         if ($companyReference !== '') {
             if (ctype_digit($companyReference)) {
                 // Historical proofs can still carry the numeric ID after a company is removed.
@@ -49,17 +69,35 @@ class AdminPaymentProofController extends Controller
         }
 
         $proofs = $query->paginate(20)->appends($request->all());
-        $plans = PricingPlan::where('is_trial', false)->orderBy('price')->get()
-            ->reject(fn (PricingPlan $plan) => \App\Services\PlanSellabilityService::isRetired($plan))
-            ->values();
+        $pendingSubscriptions = $proofs->getCollection()->filter(
+            fn (PaymentProof $proof) => $proof->status === 'pending' && $proof->kind() === 'subscription'
+        );
+        $plans = $pendingSubscriptions->isEmpty() ? collect() : PricingPlan::where('is_trial', false)->orderBy('price')->get()
+            ->reject(fn (PricingPlan $plan) => PlanSellabilityService::isRetired($plan));
+        $plansByProof = $pendingSubscriptions->mapWithKeys(
+            fn (PaymentProof $proof) => [$proof->id => $this->compatibleReviewPlans($proof, $plans)]
+        );
 
         return view('saas-admin.payment-proofs', [
             'proofs' => $proofs,
-            'plans' => $plans,
+            'plansByProof' => $plansByProof,
             'status' => $status,
             'companyReference' => $companyReference,
+            'product' => $product,
             'tableMissing' => false,
         ]);
+    }
+
+    private function compatibleReviewPlans(PaymentProof $proof, Collection $plans): Collection
+    {
+        if (!$proof->company) {
+            return collect();
+        }
+
+        $requestedType = $proof->pricingPlan?->product_type;
+        return $plans->filter(fn (PricingPlan $plan) => PlanCompanyCompatibility::matches($proof->company, $plan)
+            && (!$requestedType || PlanCompanyCompatibility::productKey($requestedType) === PlanCompanyCompatibility::productKey($plan->product_type))
+            && (!$proof->distributor_quote_snapshot || (int) $proof->pricing_plan_id === (int) $plan->id));
     }
 
     public function approve(Request $request, $id)
@@ -117,6 +155,9 @@ class AdminPaymentProofController extends Controller
         // Fresh purchases use configured periods; persisted reviewed quotes retain their terms.
         $requestedCycle = SubscriptionAssignmentService::normalizeCycle($request->billing_cycle);
         $persistedQuote = $proof->distributor_quote_snapshot;
+        if (isset($persistedQuote[PosSignupBundle::KEY])) {
+            $request->validate(['verified_received_amount' => 'decimal:0,2']);
+        }
         $company = Company::findOrFail($proof->company_id);
         $reviewPlan = $plan;
         if (is_array($persistedQuote)) {
@@ -143,7 +184,10 @@ class AdminPaymentProofController extends Controller
         $review = \App\Services\BranchAddonService::renewalReview($company, $reviewPlan, $enforcedCycle, $proof->amount, is_array($persistedQuote) ? $persistedQuote : null);
 
         $slotsChosen = null;
-        if ($review['applies'] && \App\Services\BranchAddonService::slotsColumnExists()) {
+        if (isset($persistedQuote[PosSignupBundle::KEY]) && $request->filled('extra_branch_slots')) {
+            return back()->with('error', 'Signup branch slots are fixed in the original quote.');
+        }
+        if ($review['applies'] && !isset($persistedQuote[PosSignupBundle::KEY]) && \App\Services\BranchAddonService::slotsColumnExists()) {
             $raw = $request->input('extra_branch_slots');
             if ($raw !== null && $raw !== '') {
                 $slotsChosen = (int) $raw;
@@ -188,6 +232,8 @@ class AdminPaymentProofController extends Controller
                     ];
                 }
             }
+
+            PosSignupBundle::guardSettlement($attributedCompany, $discountSnapshot, $netReceived);
 
             $slotsBefore = null;
             $slotsAfter = null;
@@ -240,6 +286,10 @@ class AdminPaymentProofController extends Controller
             \App\Services\AdminPackageSettlement::attributeFranchise($attributedCompany, $locked);
             $locked->update($proofAttrs);
             $document = \App\Services\VerifiedSubscriptionDocuments::record($locked, $sub, $netReceived);
+            if (isset($discountSnapshot[PosSignupBundle::KEY])) {
+                abort_unless($document, 503, 'Signup bundle document storage is unavailable.');
+                PosSignupBundle::activate($attributedCompany, $sub, $locked);
+            }
             if ($document && Schema::hasTable('signup_package_requests')) {
                 $signup = \App\Models\SignupPackageRequest::where('company_id', $attributedCompany->id)
                     ->where('status', 'pending')->lockForUpdate()->first();

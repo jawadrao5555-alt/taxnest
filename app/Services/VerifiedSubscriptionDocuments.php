@@ -81,6 +81,9 @@ final class VerifiedSubscriptionDocuments
             'remaining_balance' => number_format($balance, 2, '.', ''),
             // Evidence only: this is NOT an automatic reusable credit/refund.
             'unallocated_excess' => number_format($excess, 2, '.', '')];
+        if (isset($quote[PosSignupBundle::KEY])) {
+            $common[PosSignupBundle::KEY] = $quote[PosSignupBundle::KEY];
+        }
         if ($paidOn !== null) {
             $common['payment_date'] = $paidOn->toDateString();
             $common['payment_origin'] = $proof->admin_settlement_origin ?: 'verified_proof';

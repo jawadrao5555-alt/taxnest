@@ -1,8 +1,9 @@
 <x-admin-layout>
 @php
     $canManageBilling = auth('admin')->user() instanceof \App\Models\AdminUser && auth('admin')->user()->canManageBilling();
+    $initialTab = \App\Support\ProductCatalog::normalize(request()->string('product')->toString()) ?? \App\Support\ProductCatalog::DI;
 @endphp
-<div class="p-4 sm:p-6 max-w-7xl mx-auto" x-data="{ activeTab: 'di' }">
+<div class="p-4 sm:p-6 max-w-7xl mx-auto" x-data="{ activeTab: '{{ $initialTab }}' }">
     <div class="flex items-center justify-between mb-6">
         <div>
             <h1 class="text-2xl font-bold text-white">Subscription Plans</h1>

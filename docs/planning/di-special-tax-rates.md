@@ -59,3 +59,17 @@ Production sending validates the assembled special-rate payload against the FBR 
 - [ ] Review any FBR rejection and correct the mapping before using that treatment to send a production invoice.
 
 IRIS Annex-C verification is tracked in [#442](https://github.com/jawadrao5555-alt/taxnest/pull/442).
+
+## Authorized Sandbox evidence for the bulk release
+
+The bulk checkpoint passed the guarded local financial and withholding browser fixtures. The financial fixture created and reopened a retail-packed cement draft, checked the persisted total and confirmed that the fixture produced no fiscal submission. The actual Sandbox scenarios remain in the field checklist below.
+
+Use the deployed TaxNest revision and an authorized FBR Sandbox profile for the three supported treatments. Record the invoice date, scenario, effective reference selections and redacted validation outcome. Include the exact HS, sale type, rate label, reporting quantity and UOM, SRO and serial when applicable, and the stored totals and payload amounts.
+
+| Treatment | Compare against the accepted Sandbox case |
+| --- | --- |
+| SN022 potassium chlorate | Verify the selected HS and mixed rate, the applied quantity and the combined `salesTaxApplicable` amount. |
+| SN021 bulk hydraulic cement | Verify the selected UOM, the per-unit amount in `fedPayable` and the sales-tax base used for the bulk line. |
+| SN021 retail-packed hydraulic cement | Verify selling-pack conversion, the basis in `fixedNotifiedValueOrRetailPrice`, `salesTaxApplicable` and `fedPayable`. |
+
+Record validation status and fiscal acknowledgement individually. The operator can review the accepted trace privately. The bulk PR needs the scenario outcome, any field mismatch and the follow-up decision, with identifiers redacted.

@@ -171,7 +171,7 @@ class AgentCommissionService
         $rate = $legacyProof
             ? (float) ($type === 'new' ? $agent->rate_new : $agent->rate_renewal)
             : \App\Services\DistributorPolicyService::rateForYear($year);
-        $base = (float) ($proof->distributor_net_amount ?? $proof->amount);
+        $base = (float) ($proof->distributor_net_amount ?? $proof->amount) - PosSignupBundle::federalAmount($proof->distributor_quote_snapshot);
         if ($rate <= 0) {
             $skipAttrs = [
                 'agent_id'=>$agent->id, 'company_id'=>$company->id, 'company_name'=>$company->name,

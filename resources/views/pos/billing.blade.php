@@ -65,6 +65,17 @@
                 </section>
             @endif
 
+            @php
+                $pendingBundle = $billingUser?->isCompanyAdmin() ? \App\Services\PosSignupBundle::pending($company) : null;
+            @endphp
+            @if($pendingBundle)
+                <section class="rounded-xl border p-4 mb-5" aria-label="{{ __('pos_federal_addons.signup_heading') }}">
+                    <p class="font-semibold">{{ $pendingBundle->plan_name }} · PKR {{ number_format($pendingBundle->quoted_amount, 2) }}</p>
+                    @include('billing._pra-signup-bundle', ['bundle' => $pendingBundle->quote_snapshot[\App\Services\PosSignupBundle::KEY]])
+                    <a class="underline" href="{{ route('pos.package-checkout', ['plan_id' => $pendingBundle->pricing_plan_id]) }}">{{ __('pos_federal_addons.review_signup') }}</a>
+                </section>
+            @endif
+
             @php $annualDiscount = 6; @endphp
 
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">

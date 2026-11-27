@@ -22,30 +22,32 @@ final class SchoolAdmissionsService
             $student = DB::table('school_erp_students')->where('company_id', $companyId)
                 ->where('id', $studentId)->lockForUpdate()->first();
             if (!$student) {
-                throw ValidationException::withMessages(['student_id' => 'Choose a student from this school.']);
+                throw ValidationException::withMessages(['student_id' => __('school_erp.student_unavailable')]);
             }
 
             $term = DB::table('school_erp_terms')->where('company_id', $companyId)
                 ->where('id', $termId)->lockForUpdate()->first();
             if (!$term) {
-                throw ValidationException::withMessages(['term_id' => 'Choose a term from this school.']);
+                throw ValidationException::withMessages(['term_id' => __('school_erp.term_unavailable')]);
             }
 
             $identity = ['company_id' => $companyId, 'student_id' => $studentId, 'term_id' => $termId];
             $existing = DB::table('school_erp_enrollments')->where($identity)->first();
             if ($existing) {
                 if ($existing->admitted_on !== $admittedOn) {
-                    throw ValidationException::withMessages(['admitted_on' => 'This student is already enrolled in the term with a different admission date.']);
+                    throw ValidationException::withMessages(['admitted_on' => __('school_erp.admission_exists')]);
                 }
 
                 return (int) $existing->id;
             }
 
             if ($admittedOn < $term->starts_on || $admittedOn > $term->ends_on) {
-                throw ValidationException::withMessages(['admitted_on' => 'The admission date must fall within the selected term.']);
+                throw ValidationException::withMessages(['admitted_on' => __('school_erp.admission_date_invalid')]);
             }
 
-            return DB::table('school_erp_enrollments')->insertGetId($identity + [
+            $campus = isset($student->campus_id) ? ['campus_id' => $student->campus_id] : [];
+
+            return DB::table('school_erp_enrollments')->insertGetId($identity + $campus + [
                 'admitted_on' => $admittedOn,
                 'created_at' => now(),
                 'updated_at' => now(),

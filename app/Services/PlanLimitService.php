@@ -491,7 +491,7 @@ class PlanLimitService
             return ['allowed' => false, 'reason' => 'No active subscription.'];
         }
 
-        $limit = $sub->entitlementPlan()->user_limit;
+        $limit = $sub->entitlementPlan()?->user_limit;
         if ($limit === null || $limit === -1) {
             return ['allowed' => true];
         }
@@ -568,7 +568,7 @@ class PlanLimitService
             return ['allowed' => false, 'reason' => 'No active subscription.'];
         }
 
-        $included = $sub->entitlementPlan()->branch_limit;
+        $included = $sub->entitlementPlan()?->branch_limit;
         if ($included === null || $included === -1) {
             return ['allowed' => true];
         }

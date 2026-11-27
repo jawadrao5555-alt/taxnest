@@ -6,7 +6,7 @@
                     <th scope="col" class="px-4 py-3">Company</th>
                     <th scope="col" class="px-4 py-3">Status</th>
                     <th scope="col" class="px-4 py-3">TaxNest subscriptions</th>
-                    <th scope="col" class="px-4 py-3">Healthcare billing</th>
+                    <th scope="col" class="px-4 py-3">Company billing</th>
                 </tr>
             </thead>
             <tbody class="divide-y divide-gray-800/50">
@@ -27,8 +27,12 @@
                         <td class="px-4 py-3 align-top" data-label="TaxNest subscriptions">
                             @include('saas-admin.partials.erp-financial-amounts', ['lane' => $summary['subscription'] ?? null, 'isSubscription' => true])
                         </td>
-                        <td class="px-4 py-3 align-top" data-label="Healthcare billing">
-                            @include('saas-admin.partials.erp-financial-amounts', ['lane' => $summary['operations'] ?? null, 'isSubscription' => false])
+                        <td class="px-4 py-3 align-top" data-label="Company billing">
+                            @if($isHealthcare)
+                                @include('saas-admin.partials.erp-financial-amounts', ['lane' => $summary['operations'] ?? null, 'isSubscription' => false])
+                            @else
+                                @include('saas-admin.partials.erp-financial-amounts', ['lane' => $summary['school_fees'] ?? null, 'isSubscription' => false, 'reversalLabel' => 'Receipt reversals'])
+                            @endif
                         </td>
                     </tr>
                 @empty
@@ -37,9 +41,10 @@
             </tbody>
         </table>
     </div>
-    @if($stats['erp_companies'] > $erpCompaniesList->count())
-        <div class="px-4 py-3 border-t border-gray-800 text-center">
+    <div class="flex flex-wrap gap-4 px-4 py-3 border-t border-gray-800">
+        <a href="{{ route('saas.admin.subscriptions', ['product' => $erpType]) }}" class="text-sm underline">ERP subscriptions</a>
+        @if($stats['erp_companies'] > $erpCompaniesList->count())
             <a href="{{ route('saas.admin.companies', ['product_type' => $erpType]) }}" class="text-sm underline">View all ERP companies</a>
-        </div>
-    @endif
+        @endif
+    </div>
 </div>

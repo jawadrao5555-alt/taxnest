@@ -14,6 +14,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class AdminUsageController extends Controller
 {
@@ -27,8 +28,8 @@ class AdminUsageController extends Controller
         $productScopes += ['school' => 'School POS', 'hospital' => 'Hospital POS'];
         $customDates = ($request->input('period') ?? 'custom') === 'custom';
         $filters = $request->validate([
-            'export' => 'nullable|in:local_csv,pra_csv,fbr_csv,di_csv',
-            'company_id' => ['required_if:export,local_csv,pra_csv,fbr_csv,di_csv', 'nullable', 'max:32', 'regex:/\A(?:[0-9]*[1-9][0-9]*|[A-Z][A-Z0-9-]+)\z/i'],
+            'export' => 'nullable|in:local_csv,pra_csv,fbr_csv,di_csv,erp_csv',
+            'company_id' => ['required_if:export,local_csv,pra_csv,fbr_csv,di_csv,erp_csv', 'nullable', 'max:32', 'regex:/\A(?:[0-9]*[1-9][0-9]*|[A-Z][A-Z0-9-]+)\z/i'],
             'branch_id' => 'nullable|integer|min:0',
             'product_scope' => ['nullable', Rule::in(array_keys($productScopes))],
             'period' => 'nullable|in:custom,daily,monthly,yearly,two_year',
@@ -98,6 +99,12 @@ class AdminUsageController extends Controller
                 }
             }
         }
+        if (($filters['export'] ?? null) === 'erp_csv') {
+            $company = $companyQuery->whereIn('product_type', NestErps::PRODUCT_TYPES)->firstOrFail();
+
+            return $this->erpCsv($company, $filters);
+        }
+
         $companies = $companyQuery->orderBy('name')->orderBy('id')->paginate(50)->withQueryString();
         $usageStats = CompanyUsageStat::snapshotsForCompanies($companies->getCollection(), $filters);
 
@@ -169,5 +176,62 @@ class AdminUsageController extends Controller
         return view('saas-admin.company-usage', compact(
             'usageStats', 'companies', 'filters', 'productScopes', 'erpFinancials', 'erpComparison'
         ));
+    }
+
+    private function erpCsv(Company $company, array $filters): StreamedResponse
+    {
+        $branchId = isset($filters['branch_id']) ? (int) $filters['branch_id'] : null;
+        if ($branchId > 0 && ! $company->branches()->whereKey($branchId)->exists()) {
+            throw ValidationException::withMessages(['branch_id' => 'Choose a branch or campus that belongs to this company.']);
+        }
+
+        $companyReference = CompanyProductId::display($company);
+        if (preg_match('/^[=+@\-\s]/', $companyReference)) {
+            $companyReference = "'".$companyReference;
+        }
+        $ledgers = ['subscription' => 'taxnest_package'] + match ($company->getAttribute(NestErps::VERTICAL_COLUMN)) {
+            NestErps::SCHOOL => ['school_fees' => 'school_erp_fees'],
+            NestErps::HEALTH, '', null => ['operations' => 'healthcare_operations'],
+            default => [],
+        };
+        $periods = ['current' => $filters];
+        if (isset($filters['comparison'])) {
+            $periods['prior_year'] = $filters['comparison'] + $filters;
+        }
+
+        $financials = app(ErpAdminFinancialSummary::class);
+        $money = static fn (?float $amount): ?string => $amount === null ? null : number_format($amount, 2, '.', '');
+        $rows = [];
+        foreach ($periods as $period => $range) {
+            $summary = $financials->forCompanies(collect([$company]), $range)->get($company->id);
+            foreach ($ledgers as $key => $ledger) {
+                $totals = $summary[$key];
+                $coverage = match (true) {
+                    $key === 'subscription' && $branchId !== null => 'company_wide_only',
+                    $totals === null => 'unavailable',
+                    default => 'available',
+                };
+                $rows[] = [
+                    $company->id, $companyReference, $branchId ?? 'all', $period,
+                    $range['date_from'] ?? null, $range['date_to'] ?? null, $ledger, $coverage,
+                    $totals['invoice_count'] ?? null, $money($totals['invoiced'] ?? null),
+                    $totals['receipt_count'] ?? null, $money($totals['received'] ?? null),
+                    $money($totals['refunds'] ?? null), $money($totals['net_received'] ?? null), $money($totals['outstanding'] ?? null),
+                ];
+            }
+        }
+
+        return response()->streamDownload(function () use ($rows) {
+            $stream = fopen('php://output', 'wb');
+            fputcsv($stream, [
+                'company_id', 'company_reference', 'branch_or_campus_id', 'period', 'date_from', 'date_to', 'ledger',
+                'coverage', 'invoice_count', 'invoiced_pkr', 'receipt_count', 'received_pkr', 'refunds_or_reversals_pkr',
+                'net_received_pkr', 'outstanding_pkr',
+            ], ',', '"', '');
+            foreach ($rows as $row) {
+                fputcsv($stream, $row, ',', '"', '');
+            }
+            fclose($stream);
+        }, 'erp-financials-'.$company->id.'.csv', ['Content-Type' => 'text/csv', 'Cache-Control' => 'private, no-store']);
     }
 }

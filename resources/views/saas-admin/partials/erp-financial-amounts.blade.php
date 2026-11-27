@@ -11,7 +11,7 @@
             <dd class="font-semibold">PKR {{ number_format($lane['received'], 2) }}</dd>
         </div>
         @unless($isSubscription)
-            <div class="flex flex-wrap justify-between gap-2"><dt>Refunds</dt><dd>PKR {{ number_format($lane['refunds'], 2) }}</dd></div>
+            <div class="flex flex-wrap justify-between gap-2"><dt>{{ $reversalLabel ?? 'Refunds' }}</dt><dd>PKR {{ number_format($lane['refunds'], 2) }}</dd></div>
             <div class="flex flex-wrap justify-between gap-2"><dt>Net collections</dt><dd>PKR {{ number_format($lane['net_received'], 2) }}</dd></div>
             <div class="flex flex-wrap justify-between gap-2"><dt>Open balance on selected invoices</dt><dd>PKR {{ number_format($lane['outstanding'], 2) }}</dd></div>
         @endunless

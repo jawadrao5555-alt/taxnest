@@ -1478,9 +1478,16 @@ class PosKotDeltaQtyCarryTest extends TestCase
     {
             [, $table] = $this->mixedContext();
             $payload = $this->mixedPayload($table, array_map(fn ($m) => $this->bottle(1, ['fulfillment' => $m, 'line_uid' => $m]), ['dine_in', 'takeaway', 'delivery']));
+            $payload['delivery_collection_mode'] = $mode;
             $res = $this->historicalMixedHold($payload); $this->assertSame(200, $res->getStatusCode(), $res->getContent()); $id = $res->getData(true)['order']['id'];
-            $request = Request::create('/pay', 'POST', ['payment_method' => 'cash', 'delivery_collection_mode' => $mode, 'pay_uuid' => (string) \Illuminate\Support\Str::uuid()]);
-            $pay = app(RestaurantPosController::class)->payOrder($request, $id);
+            $controller = app(RestaurantPosController::class);
+            $quote = $controller->paymentQuote(Request::create('/payment-quote', 'GET', ['payment_method' => 'cash']), $id);
+            $this->assertSame(200, $quote->getStatusCode(), $quote->getContent());
+            $this->assertSame($mode, $quote->getData(true)['delivery_collection_mode']);
+            $this->assertEquals(300 - $due, $quote->getData(true)['counter_cash_due']);
+
+            $request = Request::create('/pay', 'POST', ['payment_method' => 'cash', 'pay_uuid' => (string) \Illuminate\Support\Str::uuid()]);
+            $pay = $controller->payOrder($request, $id);
             $this->assertSame(200, $pay->getStatusCode(), $pay->getContent());
             $tx = \App\Models\PosTransaction::findOrFail(RestaurantOrder::find($id)->pos_transaction_id);
             $this->assertSame('dine_in', $tx->order_type); $this->assertTrue($tx->has_delivery_items);

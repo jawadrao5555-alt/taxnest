@@ -4,12 +4,17 @@
     use App\Services\HealthModuleService;
     use App\Support\HealthPanel;
     use App\Support\NestErps;
+    use App\Support\SchoolErpPanel;
 
     $healthUser = auth('health')->user();
     $healthOwner = in_array($healthUser?->role, ['company_admin', 'super_admin'], true);
     $healthLogin = url(NestErps::loginPath(NestErps::HEALTH));
     $healthSignup = NestErps::registerPath(NestErps::HEALTH);
     $canStartHealthcare = !$healthUser && HealthPanel::registrationOpen() && $publicPlans->get(NestErps::HEALTH, collect())->isNotEmpty();
+    $schoolUser = auth(SchoolErpPanel::GUARD)->user();
+    $schoolOwner = $schoolUser?->isCompanyAdmin();
+    $canStartSchool = !$schoolUser && SchoolErpPanel::registrationOpen()
+        && $publicPlans->get(NestErps::SCHOOL, collect())->isNotEmpty();
 @endphp
 <!DOCTYPE html>
 <html lang="en">
@@ -18,7 +23,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#092a33">
     <title>{{ NestErps::LABEL }} — Hospital, Laboratory and School</title>
-    <meta name="description" content="Explore {{ NestErps::LABEL }} for hospitals and laboratories, see published Healthcare packages, and enquire about School ERP or a migration.">
+    <meta name="description" content="Explore {{ NestErps::LABEL }} for hospitals, laboratories and schools, see published packages, and plan a move to ERP.">
     @include('partials.font-css', ['fontFamilies' => 'inter:400,500,600,700|playfair-display:600,700'])
     @vite(['resources/css/app.css'])
     <style>
@@ -109,7 +114,7 @@
     <section class="erp-hub-hero" aria-labelledby="erp-hub-heading">
         <div class="erp-hub-width">
             <h1 id="erp-hub-heading">ERP for hospitals, labs and schools</h1>
-            <p>Use the Healthcare panel for hospitals, labs, clinics and pharmacies. Enquire about School ERP or plan a move from standalone to ERP.</p>
+            <p>Run your hospital or lab in the Healthcare panel, or manage admissions, attendance and fees in the School workspace.</p>
             <div class="erp-hub-actions">
                 <a href="#pricing" class="erp-hub-button">See ERP packages</a>
                 <a href="#erp-upgrade" class="erp-hub-button erp-hub-button-outline">Plan an ERP move</a>
@@ -132,6 +137,9 @@
                 <div class="erp-hub-actions">
                     <a href="#pricing" class="erp-hub-text-link">Healthcare packages</a>
                     <a href="{{ $healthLogin }}" class="erp-hub-text-link">{{ $healthUser ? 'Open Healthcare' : 'Hospital login' }}</a>
+                    @if($canStartHealthcare)
+                        <a href="{{ route('health.register', ['org_type' => 'hospital']) }}" class="erp-hub-text-link">Hospital signup</a>
+                    @endif
                 </div>
             </article>
             <article id="lab-erp" class="erp-hub-card" aria-labelledby="lab-erp-title">
@@ -141,13 +149,21 @@
                 <div class="erp-hub-actions">
                     <a href="#pricing" class="erp-hub-text-link">Healthcare packages</a>
                     <a href="{{ $healthLogin }}" class="erp-hub-text-link">{{ $healthUser ? 'Open Healthcare' : 'Lab login' }}</a>
+                    @if($canStartHealthcare)
+                        <a href="{{ route('health.register', ['org_type' => 'lab']) }}" class="erp-hub-text-link">Lab signup</a>
+                    @endif
                 </div>
             </article>
             <article id="school-erp" class="erp-hub-card" aria-labelledby="school-erp-title">
                 <h3 id="school-erp-title">School ERP</h3>
-                <p class="erp-hub-status">Enquiry only</p>
-                <p class="erp-hub-muted">Talk to us about student records, admissions, terms and campuses.</p>
+                <p class="erp-hub-status">{{ $canStartSchool ? 'Registration available' : 'Enquiry only for new schools' }}</p>
+                <p class="erp-hub-muted">Student records, admissions, attendance and fees across school campuses.</p>
                 <div class="erp-hub-actions">
+                    <a href="{{ route('school-erp.login') }}" class="erp-hub-text-link">School login</a>
+                    @if($canStartSchool)
+                        <a href="{{ route('school-erp.register') }}" class="erp-hub-text-link">School signup</a>
+                        <a href="#erp-package-{{ NestErps::SCHOOL }}" class="erp-hub-text-link">School packages</a>
+                    @endif
                     <a href="{{ route('contact') }}" class="erp-hub-text-link">Enquire about School ERP</a>
                 </div>
             </article>
@@ -182,6 +198,8 @@
                                         $periodLink = match (true) {
                                             $vertical === NestErps::HEALTH && $healthOwner => route('health.package-checkout', $selection),
                                             $vertical === NestErps::HEALTH && $canStartHealthcare => url($healthSignup).'?'.http_build_query($selection),
+                                            $vertical === NestErps::SCHOOL && $schoolOwner => route('school-erp.package-checkout', $selection),
+                                            $vertical === NestErps::SCHOOL && $canStartSchool => route('school-erp.register', $selection),
                                             default => null,
                                         };
                                     @endphp

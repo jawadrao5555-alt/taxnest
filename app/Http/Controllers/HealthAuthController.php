@@ -192,7 +192,7 @@ class HealthAuthController extends Controller
         return $resolved['user'];
     }
 
-    public function showRegister()
+    public function showRegister(Request $request)
     {
         $this->assertRegistrationOpen();
 
@@ -201,8 +201,8 @@ class HealthAuthController extends Controller
         }
 
         $packages = ErpPublicPricing::registrationPackages();
-        $picked = $packages->firstWhere('id', request()->integer('plan_id'))
-            ?? $packages->firstWhere('name', request()->query('plan'));
+        $picked = $packages->firstWhere('id', $request->integer('plan_id'))
+            ?? $packages->firstWhere('name', $request->query('plan'));
         $signupPeriods = $packages->mapWithKeys(fn ($plan) => [
             $plan->id => collect(ErpPublicPricing::prices($plan))->map(fn ($total, $cycle) => [
                 'cycle' => $cycle,
@@ -216,6 +216,7 @@ class HealthAuthController extends Controller
             'registrationPlans' => $packages,
             'signupPeriods' => $signupPeriods,
             'orgTypes' => HealthPanel::ORG_TYPES,
+            'pickedOrgType' => HealthPanel::normalizeOrgType($request->string('org_type')->toString()),
         ]);
     }
 

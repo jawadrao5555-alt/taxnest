@@ -3,8 +3,10 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Models\HrOrganizationMembership;
 use App\Services\TwoStepLogin;
 use App\Services\FranchiseSession;
+use App\Support\SchoolErpPanel;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
@@ -24,11 +26,19 @@ final class TwoStepController extends Controller
                 FranchiseSession::revokeCurrent(request());
                 abort(403);
             }
+        } elseif ($guard === 'hr') {
+            abort_unless($actor->is_active && HrOrganizationMembership::query()->where('user_id', $actor->id)
+                ->where('active', true)->whereHas('organization', fn ($query) => $query->where('status', 'active'))->exists(), 403);
         } elseif ($guard !== 'admin') {
             abort_unless($actor->is_active, 403);
             $company = \App\Models\Company::find($actor->company_id);
             $expected = $panel === 'health' ? 'erps' : $panel;
-            abort_unless(($company && \App\Support\NestErps::canonicalProductType($company->product_type) === $expected)
+            $matches = match ($panel) {
+                SchoolErpPanel::GUARD => SchoolErpPanel::ownsCompany($company),
+                'health' => $company && \App\Support\HealthPanel::ownsErpRecord($company),
+                default => $company && \App\Support\NestErps::canonicalProductType($company->product_type) === $expected,
+            };
+            abort_unless($matches
                 || ($panel === 'di' && ! $actor->company_id && \App\Services\ConsultantService::activeProfileFor($actor->id)), 403);
         }
 
@@ -189,11 +199,15 @@ final class TwoStepController extends Controller
         auth($guard)->logoutCurrentDevice();
         $request->session()->forget(['two_step_verified.'.$guard, $this->key($guard)]);
 
-        return redirect($panel === 'di' ? '/login' : '/'.($panel === 'fbrpos' ? 'fbr-pos' : $panel).'/login');
+        return redirect($panel === SchoolErpPanel::GUARD
+            ? SchoolErpPanel::LOGIN_PATH
+            : ($panel === 'di' ? '/login' : '/'.($panel === 'fbrpos' ? 'fbr-pos' : $panel).'/login'));
     }
 
     private function home(string $panel): string
     {
-        return $panel === 'di' ? '/dashboard' : '/'.($panel === 'fbrpos' ? 'fbr-pos' : $panel).'/dashboard';
+        return $panel === SchoolErpPanel::GUARD
+            ? SchoolErpPanel::DASHBOARD_PATH
+            : ($panel === 'di' ? '/dashboard' : '/'.($panel === 'fbrpos' ? 'fbr-pos' : $panel).'/dashboard');
     }
 }

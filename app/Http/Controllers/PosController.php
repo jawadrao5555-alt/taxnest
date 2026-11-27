@@ -31,6 +31,7 @@ use App\Support\PosPaymentBuckets;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Log;
 
 class PosController extends Controller
@@ -7326,6 +7327,15 @@ class PosController extends Controller
             ->orderBy('name')
             ->get(['id', 'name', 'pos_role']);
 
+        if ($request->boolean('top_items')) {
+            abort_if($user->posCustomAllows('reports') === false, 403);
+            $itemSales = $this->reportItemSales($request, $companyId, $tab, $cashierFilter, $user);
+            $selectedCashier = $cashierFilter;
+            $canExportsPlan = PosFeatureService::planAllows($company, 'reports_enabled');
+
+            return view('pos.reports-items', compact('itemSales', 'tab', 'selectedCashier', 'teamMembers', 'isCashier', 'canExportsPlan'));
+        }
+
         $modeFilter = function ($q) use ($tab, $cashierFilter, $user) {
             // Task 1186: derived viewers see their own cross-stream rows too
             // (cashier reports are already forced to created_by = self, so the
@@ -7376,32 +7386,6 @@ class PosController extends Controller
             ->orderByDesc('total_revenue')
             ->take(10)
             ->get();
-
-        // Dashboard best-seller cards link here with top_items=1. Deliberately
-        // use the same report range, stream/cashier and branch choke point as
-        // every other report query. Unlike the monthly summary above, detailed
-        // mode has no presentation limit: every matching product is shown.
-        $topItemsDetailed = null;
-        $topItemsRange = null;
-        if ($request->boolean('top_items')) {
-            [$topItemsFrom, $topItemsTo] = $this->resolveReportRange($request);
-            $topItemsRange = (object) ['from' => $topItemsFrom, 'to' => $topItemsTo];
-            $topItemsDetailed = PosTransactionItem::whereHas('transaction', function ($q) use ($companyId, $tab, $cashierFilter, $typeReady, $user, $topItemsFrom, $topItemsTo) {
-                $q->where('company_id', $companyId)
-                    ->where('status', 'completed')
-                    ->whereBetween('business_date', [$topItemsFrom->toDateString(), $topItemsTo->toDateString()]);
-                if ($typeReady) {
-                    $q->where(function ($w) {
-                        $w->whereNull('transaction_type')->orWhere('transaction_type', '!=', 'return');
-                    });
-                }
-                $this->applyReportFilters($q, $tab, $cashierFilter, $user);
-            })
-                ->selectRaw('item_name, SUM(quantity) as total_qty, SUM(subtotal) as total_revenue')
-                ->groupBy('item_name')
-                ->orderByDesc('total_revenue')
-                ->get();
-        }
 
         $monthlyTrend = PosTransaction::where('company_id', $companyId)
             ->where('status', 'completed')
@@ -7456,7 +7440,7 @@ class PosController extends Controller
         $financialHistory = \App\Services\PosFinancialHistory::report($companyId, $historyFrom->toDateString(), $historyTo->toDateString(), $tab, $cashierFilter, $user,
             fn ($q) => $this->applyReportFilters($q, $tab, $cashierFilter, $user));
 
-        return view('pos.reports', compact('financialHistory', 'dailySales', 'paymentSummary', 'topItems', 'topItemsDetailed', 'topItemsRange', 'monthlyTrend', 'tab', 'hasPinSet', 'localCount', 'user', 'teamMembers', 'isCashier', 'selectedCashier', 'localBills', 'monthStart', 'rangeAnalytics', 'reportBusinessDate'));
+        return view('pos.reports', compact('financialHistory', 'dailySales', 'paymentSummary', 'topItems', 'monthlyTrend', 'tab', 'hasPinSet', 'localCount', 'user', 'teamMembers', 'isCashier', 'selectedCashier', 'localBills', 'monthStart', 'rangeAnalytics', 'reportBusinessDate'));
     }
 
     /**
@@ -7491,6 +7475,89 @@ class PosController extends Controller
             compact('company', 'analytics', 'tab', 'financialHistory'),
             'Sales-Analytics-' . $analytics->from . '-to-' . $analytics->to . '.pdf'
         );
+    }
+
+    public function reportsItemsPdf(Request $request)
+    {
+        if ($r = $this->planGate('reports_enabled')) {
+            return $r;
+        }
+        $companyId = (int) app('currentCompanyId');
+        $company = Company::findOrFail($companyId);
+        $user = auth('pos')->user();
+        abort_if($user->posCustomAllows('reports') === false, 403);
+        $request->validate(['cashier' => ['nullable', 'regex:/^(all|[1-9][0-9]*)$/']]);
+        $cashierFilter = ($user->pos_role ?? 'pos_admin') === 'pos_cashier'
+            ? (string) $user->id : ($request->input('cashier') ?? 'all');
+        $tab = $this->salesReportTab($request, $user);
+        $itemSales = $this->reportItemSales($request, $companyId, $tab, $cashierFilter, $user);
+
+        return $this->renderReportPdf(
+            'pos.reports-items-pdf',
+            compact('company', 'itemSales', 'tab'),
+            'Sales-Items-'.$itemSales['from'].'-to-'.$itemSales['to'].'.pdf'
+        );
+    }
+
+    private function reportItemSales(Request $request, int $companyId, string $tab, $cashierFilter, $user): array
+    {
+        $filters = $request->validate([
+            'item' => ['nullable', 'string', 'max:255'],
+            'category' => ['nullable', 'string', 'max:255'],
+        ]);
+        [$from, $to] = $this->resolveReportRange($request);
+        $first = $from->toDateString();
+        $last = $to->toDateString();
+        $item = trim($filters['item'] ?? '');
+        $category = trim($filters['category'] ?? '');
+
+        $typeReady = Schema::hasColumn('pos_transactions', 'transaction_type');
+        $sales = PosTransactionItem::whereHas('transaction', function ($q) use ($companyId, $tab, $cashierFilter, $typeReady, $user, $first, $last) {
+            $q->where('company_id', $companyId)
+                ->where('status', 'completed')
+                ->whereBetween('business_date', [$first, $last]);
+            // The top-selling report ranks sales; refunded lines stay out of the ranking.
+            if ($typeReady) {
+                $q->where(fn ($w) => $w->whereNull('transaction_type')->orWhere('transaction_type', '!=', 'return'));
+            }
+            $this->applyReportFilters($q, $tab, $cashierFilter, $user);
+        });
+        if ($item !== '') {
+            $pattern = '%'.strtr($item, ['!' => '!!', '%' => '!%', '_' => '!_']).'%';
+            $sales->whereRaw("item_name ".\App\Helpers\DbCompat::like()." ? ESCAPE '!'", [$pattern]);
+        }
+
+        // Category follows the company's current catalog; saved line names
+        // remain searchable even when their original product no longer exists.
+        $catalog = Schema::hasColumns('pos_products', ['company_id', 'category'])
+            ? PosProduct::where('company_id', $companyId)->whereNotNull('category')->where('category', '<>', '')
+            : null;
+        if ($category !== '') {
+            if ($catalog === null) {
+                $sales->whereRaw('1 = 0');
+            } else {
+                $sales->where('item_type', 'product')
+                    ->whereIn('item_id', (clone $catalog)->where('category', $category)->select('id'));
+            }
+        }
+
+        $rows = $sales->selectRaw('item_name, SUM(quantity) as total_qty, SUM(subtotal) as total_revenue')
+            ->groupBy('item_name')
+            ->orderByDesc('total_revenue')
+            ->orderBy('item_name')
+            ->get();
+
+        return [
+            'rows' => $rows,
+            'subtotal' => $rows->sum('total_revenue'),
+            'quantity' => $rows->sum('total_qty'),
+            'from' => $first,
+            'to' => $last,
+            'item' => $item,
+            'category' => $category,
+            'categories' => $catalog?->distinct()->orderBy('category')->pluck('category') ?? collect(),
+            'cashier' => $cashierFilter === 'all' ? null : User::where('company_id', $companyId)->whereKey($cashierFilter)->value('name'),
+        ];
     }
 
     public function exportReportCsv(Request $request)

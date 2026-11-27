@@ -46,6 +46,7 @@ final class AdminPackageSettlement
             if (!is_array($quote)) self::invalid('The original signup quote is missing. Review the request.');
             if ($error = DistributorDiscountService::validateSnapshot($quote, $company, $plan, $cycle)) self::invalid($error);
             self::requireFullAmount($data, $quote['net_quote']);
+            PosSignupBundle::guardSettlement($company, $quote, (float) $data['verified_received_amount']);
             $subscription = SubscriptionAssignmentService::assign($companyId, $planId, $cycle,
                 paidRenewal: true, approvedQuote: $quote, verifiedReceived: (float) $data['verified_received_amount']);
             $document = self::collect($company, $subscription, $data, $adminId, $origin, $fingerprint, $quote);
@@ -223,6 +224,7 @@ final class AdminPackageSettlement
         $proof->save();
         $document = VerifiedSubscriptionDocuments::record($proof, $sub, (float) $data['verified_received_amount'], $proof->payment_date, $legacy);
         if (!$document) self::invalid('Subscription document storage is unavailable.');
+        if ($origin === 'signup') PosSignupBundle::activate($company, $sub, $proof);
         AgentCommissionService::recordForProof($proof, atomic: true);
         FranchiseCommissionService::recordForProof($proof, atomic: true);
         AdminAuditLog::log($adminId, 'Admin package payment recorded', 'PaymentProof', $proof->id, [

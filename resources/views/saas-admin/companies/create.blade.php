@@ -231,5 +231,48 @@
             <a href="{{ route('saas.admin.companies') }}" class="px-6 py-2.5 bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm rounded-lg transition">Cancel</a>
         </div>
     </form>
+
+    @if(auth('admin')->user()?->isSuperAdmin())
+        <form method="POST" action="{{ route('saas.admin.companies.store') }}" class="mt-8 space-y-4 bg-gray-900 border border-gray-800 rounded-xl p-5" id="erp-demo">
+            @csrf
+            <input type="hidden" name="create_erp_demo" value="1">
+            <input type="hidden" name="demo_request_key" value="{{ old('demo_request_key', (string) \Illuminate\Support\Str::uuid()) }}">
+            <div>
+                <h2 class="text-sm font-semibold text-white">Create an ERP demo</h2>
+                <p class="mt-1 text-xs text-gray-400">Creates a fictional company with 14 days of demo access. Sign-in details appear on the company page.</p>
+            </div>
+            @foreach($errors->erpDemo->all() as $error)
+                <p class="text-sm text-red-300">{{ $error }}</p>
+            @endforeach
+            @error('demo_type')
+                <p class="text-sm text-red-300">{{ $message }}</p>
+            @enderror
+            <div class="grid gap-4 sm:grid-cols-3">
+                <label class="block text-sm text-gray-300">
+                    ERP demo
+                    <select name="demo_type" required class="mt-1 w-full rounded-lg border-gray-700 bg-gray-800 text-white">
+                        <option value="">Select ERP</option>
+                        @foreach(\App\Services\ErpDemoCompanyProvisioner::TYPES as $kind => $label)
+                            <option value="{{ $kind }}" @selected(old('demo_type') === $kind)>{{ $label }}</option>
+                        @endforeach
+                    </select>
+                </label>
+                <label class="block text-sm text-gray-300">
+                    Demo password
+                    <input type="password" name="password" minlength="16" maxlength="72" required autocomplete="new-password"
+                           class="mt-1 w-full rounded-lg border-gray-700 bg-gray-800 text-white" aria-describedby="demo-password-hint">
+                </label>
+                <label class="block text-sm text-gray-300">
+                    Confirm demo password
+                    <input type="password" name="password_confirmation" minlength="16" maxlength="72" required autocomplete="new-password"
+                           class="mt-1 w-full rounded-lg border-gray-700 bg-gray-800 text-white">
+                </label>
+            </div>
+            <p id="demo-password-hint" class="text-xs text-gray-400">Use a new password of at least 16 characters.</p>
+            <button type="submit" class="px-6 py-2.5 rounded-lg bg-teal-700 font-semibold text-sm text-white hover:bg-teal-800">
+                Create demo company
+            </button>
+        </form>
+    @endif
 </div>
 </x-admin-layout>

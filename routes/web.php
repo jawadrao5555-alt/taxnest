@@ -6,7 +6,7 @@ use Illuminate\Support\Facades\Route;
 
 // Exact-guard authorization lives in the controller so the challenge cannot
 // redirect back into its own protected middleware. All writes retain web CSRF.
-Route::prefix('security/two-step/{panel}')->where(['panel' => 'di|pos|fbrpos|health|admin|franchise'])
+Route::prefix('security/two-step/{panel}')->where(['panel' => 'di|pos|fbrpos|health|schoolerp|admin|franchise|hr'])
     ->controller(\App\Http\Controllers\Auth\TwoStepController::class)->group(function () {
         Route::get('/', 'settings')->name('two-step.settings');
         Route::get('/challenge', 'challenge')->name('two-step.challenge');
@@ -1079,6 +1079,7 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     Route::get('/tax-reports/csv', [PosController::class, 'exportTaxReportCsv'])->name('pos.tax-reports.csv');
     Route::get('/tax-reports/pdf', [PosController::class, 'exportTaxReportPdf'])->name('pos.tax-reports.pdf');
     Route::get('/reports/analytics-pdf', [PosController::class, 'reportsAnalyticsPdf'])->name('pos.reports.analytics-pdf');
+    Route::get('/reports/items-pdf', [PosController::class, 'reportsItemsPdf'])->name('pos.reports.items-pdf');
     // Task 705: khufia key (Ctrl+Alt+Shift+L) — no visible UI by design.
     // Manager/owner: session-only "local check mode" toggle (cashier = 403).
     // LOCAL-scoped cashier: station identity switch to the owner-linked PRA
@@ -1908,6 +1909,7 @@ Route::prefix('admin')->middleware(['admin.auth'])->group(function () {
     Route::post('/system-control/{key}/toggle', [AdminSystemController::class, 'toggle'])->name('saas.admin.system.toggle');
     Route::get('/settings', [AdminSettingsController::class, 'index'])->name('saas.admin.settings');
     Route::post('/settings', [AdminSettingsController::class, 'update'])->name('saas.admin.settings.update');
+    Route::post('/settings/erp-registration', [AdminSettingsController::class, 'updateErpRegistration'])->name('saas.admin.settings.erp-registration');
     Route::post('/settings/test-email', [AdminSettingsController::class, 'sendTestEmail'])->middleware('throttle:5,1')->name('saas.admin.settings.test-email');
     Route::post('/settings/smtp', [AdminSettingsController::class, 'updateSmtp'])->name('saas.admin.settings.smtp');
     Route::post('/settings/whatsapp', [AdminSettingsController::class, 'updateWhatsApp'])->name('saas.admin.settings.whatsapp');
@@ -2021,10 +2023,7 @@ Route::prefix('health')->middleware(['health.auth', 'company.approval'])->group(
     Route::get('/', fn () => redirect()->route('health.dashboard'));
     Route::get('/dashboard', [HealthController::class, 'dashboard'])->name('health.dashboard');
 
-    Route::middleware(['health.module:lab', 'health.can:lab.view'])->group(function () {
-        Route::get('/lab', [\App\Http\Controllers\Health\LabWorkspaceController::class, 'index'])->name('health.lab');
-        Route::post('/lab/layout', [\App\Http\Controllers\Health\LabWorkspaceController::class, 'saveLayout'])->name('health.lab.layout');
-    });
+    require __DIR__.'/health-lab.php';
 
     // Per-user display preferences — every signed-in member owns their own.
     Route::post('/set-dark-mode', [HealthController::class, 'toggleDarkMode'])->name('health.set-dark-mode');
@@ -3226,6 +3225,9 @@ Route::get('/api/fbr/item-sr-search', [\App\Http\Controllers\FbrReferenceControl
 Route::get('/api/fbr/hs-detail', [\App\Http\Controllers\FbrReferenceController::class, 'hsDetail'])->name('fbr.api.hs-detail');
 
 require __DIR__.'/auth.php';
+require __DIR__.'/school-erp.php';
+require __DIR__.'/school-erp-fees.php';
+require __DIR__.'/hr.php';
 
 // Owner Deployment Approval Relay. Browser routes are admin-session protected;
 // machine routes use a signed GitHub Actions OIDC JWT (never a shared secret).

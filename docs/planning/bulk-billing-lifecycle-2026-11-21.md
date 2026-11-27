@@ -14,6 +14,8 @@ The admin payment proof queue renders the feature add-on approval form independe
 
 The payment proof queue shows the saved validated amount for existing quotes, including a removed catalogue period. For proofs without a saved quote, the current rate is labelled separately from the submitted amount.
 
+PRA POS signup can reserve one priced federal connector on an annual package and extra branch slots on a package with a fixed branch limit. The immutable signup quote carries the itemized total into checkout, the Cash/Card confirmation or uploaded-proof review, and a single invoice and receipt. The fictional route scenarios in `PraSignupBundleTest` exercise both settlement paths, price changes, short payment, replays, and federal access after the existing paid-term start. The shared rollout, lifecycle and commercial acceptance in the table remain open.
+
 1. Reconcile the three source contracts against deployed code. Pin implementation, tests and live evidence for each delivered requirement. Prioritize company overview and usage as read-only views and validate permission and export scope.
 2. Verify existing period selection and quotes on fictional tenants. Fill verified gaps in selectors, admin assignment, entitlement and renewal, then verify cutover with legacy monthly terms and pending proofs. Use approved rates and an explicit rollout decision for shared periods and monthly retirement.
 3. Complete lifecycle decisions and financial flows. Keep #422's Cash/Card receipts and historical reprints tied to the original collection. Add only missing cases for partial payment, credit, refund/reversal, discounts/referrals and commission, with the established approval path for commercial rules.

@@ -41,6 +41,11 @@ class PlanSellabilityService
             return false;
         }
 
+        // Demo entitlements never enter normal package assignment or checkout.
+        if (($plan->features['erp_demo_access'] ?? false) === true) {
+            return true;
+        }
+
         $type = $plan->product_type ?? null;
 
         // Nest ERPS keeps NO retirement allowlist yet: the line is sold on

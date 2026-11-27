@@ -76,7 +76,7 @@
                         @foreach($orgTypes as $type)
                             <label class="cursor-pointer">
                                 <input type="radio" name="org_type" value="{{ $type }}" class="peer sr-only"
-                                       @checked(old('org_type', HealthPanel::DEFAULT_ORG_TYPE) === $type)>
+                                       @checked(old('org_type', $pickedOrgType) === $type)>
                                 <span class="block text-center px-3 py-2.5 rounded-xl border-2 border-gray-200 text-sm font-bold text-gray-600
                                              peer-checked:border-teal-600 peer-checked:bg-teal-50 peer-checked:text-teal-800 transition">
                                     {{ __(HealthPanel::orgTypeLabelKey($type)) }}

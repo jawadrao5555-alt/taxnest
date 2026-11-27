@@ -26,8 +26,9 @@ final class ErpAdminFinancialSummary
         $ids = $this->erpCompanies()->whereIn('id', $companies->pluck('id'));
         $subscriptions = $this->subscriptionRows($ids, $filters, grouped: true);
         $operations = $this->operatingRows($this->healthCompanies(clone $ids), $filters, grouped: true);
+        $school = $this->schoolRows($this->schoolCompanies(clone $ids), $filters, grouped: true);
 
-        return $companies->mapWithKeys(function (Company $company) use ($subscriptions, $operations) {
+        return $companies->mapWithKeys(function (Company $company) use ($subscriptions, $operations, $school) {
             $id = $company->id;
             $vertical = $company->getAttribute(NestErps::VERTICAL_COLUMN);
 
@@ -35,6 +36,7 @@ final class ErpAdminFinancialSummary
                 'subscription' => $this->subscriptionTotals($subscriptions, $id),
                 'operations' => in_array($vertical, [NestErps::HEALTH, '', null], true)
                     ? $this->operatingTotals($operations, $id) : null,
+                'school_fees' => $vertical === NestErps::SCHOOL ? $this->operatingTotals($school, $id) : null,
             ]];
         });
     }
@@ -49,6 +51,7 @@ final class ErpAdminFinancialSummary
         return [
             'subscription' => $this->subscriptionTotals($this->subscriptionRows($ids, $filters, grouped: false)),
             'operations' => $this->operatingTotals($this->operatingRows($this->healthCompanies(clone $ids), $filters, grouped: false)),
+            'school_fees' => $this->operatingTotals($this->schoolRows($this->schoolCompanies(clone $ids), $filters, grouped: false)),
         ];
     }
 
@@ -66,6 +69,11 @@ final class ErpAdminFinancialSummary
         }
 
         return $companies;
+    }
+
+    private function schoolCompanies(Builder $companies): Builder
+    {
+        return $companies->where(NestErps::VERTICAL_COLUMN, NestErps::SCHOOL);
     }
 
     private function subscriptionRows(Builder $companies, array $filters, bool $grouped): ?array
@@ -140,6 +148,45 @@ final class ErpAdminFinancialSummary
             $this->sums($bills, 'company_id', 'COUNT(*) AS invoice_count, SUM(total_amount) AS invoiced, SUM(outstanding_amount) AS outstanding', $grouped),
             $this->sums($payments, 'receipt.company_id', '', $grouped),
         ];
+    }
+
+    private function schoolRows(Builder $companies, array $filters, bool $grouped): ?array
+    {
+        if (!Schema::hasColumn('companies', NestErps::VERTICAL_COLUMN)
+            || !Schema::hasTable('school_erp_fee_invoices') || !Schema::hasTable('school_erp_fee_payments')
+            || !Schema::hasTable('school_erp_fee_reversals')) {
+            return null;
+        }
+        $invoices = DB::table('school_erp_fee_invoices as invoice')->whereIn('invoice.company_id', $companies);
+        if (isset($filters['branch_id'])) {
+            $this->branch($invoices, 'invoice.campus_id', (int) $filters['branch_id']);
+        }
+
+        $receipts = (clone $invoices)->join('school_erp_fee_payments as payment', fn ($join) => $join
+            ->on('payment.company_id', '=', 'invoice.company_id')->on('payment.invoice_id', '=', 'invoice.id'));
+        $reversals = (clone $receipts)->join('school_erp_fee_reversals as reversal', fn ($join) => $join
+            ->on('reversal.company_id', '=', 'payment.company_id')->on('reversal.payment_id', '=', 'payment.id'));
+        $openPayments = (clone $receipts)->whereNotExists(fn ($q) => $q->selectRaw('1')
+            ->from('school_erp_fee_reversals as cancelled')->whereColumn('cancelled.company_id', 'payment.company_id')
+            ->whereColumn('cancelled.payment_id', 'payment.id'))
+            ->selectRaw('invoice.company_id, invoice.id, SUM(payment.amount_paisa) as paid')
+            ->groupBy('invoice.company_id', 'invoice.id');
+        $invoices->leftJoinSub($openPayments, 'settled', fn ($join) => $join
+            ->on('settled.company_id', '=', 'invoice.company_id')->on('settled.id', '=', 'invoice.id'));
+        $issued = $this->sums($this->dates($invoices, 'invoice.created_at', $filters), 'invoice.company_id',
+            'COUNT(*) AS invoice_count, SUM(invoice.amount_paisa) / 100.0 AS invoiced,
+             SUM(invoice.amount_paisa - COALESCE(settled.paid, 0)) / 100.0 AS outstanding', $grouped);
+        $recorded = $this->sums($this->dates($receipts, 'payment.created_at', $filters), 'invoice.company_id',
+            'COUNT(*) AS receipt_count, SUM(payment.amount_paisa) / 100.0 AS received', $grouped);
+        $reversed = $this->sums($this->dates($reversals, 'reversal.created_at', $filters), 'invoice.company_id',
+            'SUM(payment.amount_paisa) / 100.0 AS refunds', $grouped);
+        foreach ($reversed as $key => $row) {
+            $record = $recorded->get($key, new \stdClass);
+            $record->refunds = $row->refunds;
+            $recorded->put($key, $record);
+        }
+
+        return [$issued, $recorded];
     }
 
     private function dates(Builder $query, string $column, array $filters): Builder

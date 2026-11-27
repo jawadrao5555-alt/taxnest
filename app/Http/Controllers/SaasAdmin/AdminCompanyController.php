@@ -1328,6 +1328,8 @@ class AdminCompanyController extends Controller
             'health_visit_attachments', 'health_prescription_items', 'health_prescriptions',
             'health_visits', 'health_appointments', 'health_doctor_slots', 'health_doctors',
             'health_patients', 'health_number_sequences',
+            'health_lab_results', 'health_lab_specimens', 'health_lab_order_items',
+            'health_lab_orders', 'health_lab_tests',
             // Healthcare IPD, wards, beds, stay charges and theatre. Same rule:
             // company_id with NO FK cascade, so each one is purged by hand.
             // Deepest children first — team and consumables before the
@@ -1337,6 +1339,10 @@ class AdminCompanyController extends Controller
             'health_operation_theatres', 'health_procedures',
             'health_admission_payments', 'health_admission_charges', 'health_admission_events',
             'health_admissions', 'health_beds', 'health_rooms', 'health_wards',
+            // School ERP retains financial and enrollment evidence until the approved hard purge.
+            'school_erp_fee_reversals', 'school_erp_fee_payments', 'school_erp_fee_invoices', 'school_erp_fee_schedules',
+            'school_erp_grades', 'school_erp_assessments', 'school_erp_class_students', 'school_erp_classes',
+            'school_erp_attendance', 'school_erp_campus_transfers', 'school_erp_enrollments', 'school_erp_students', 'school_erp_terms',
             // Unified healthcare billing: same company_id / no-FK-cascade rule.
             // Deepest children first — FBR submission evidence and receipts
             // before the bill, bill lines before the bill, adjustments before

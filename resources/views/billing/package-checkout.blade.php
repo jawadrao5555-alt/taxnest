@@ -1,11 +1,19 @@
-<x-dynamic-component :component="$layout">
+<x-dynamic-component :component="$layout" title="Package selection and payment review">
     <main class="max-w-5xl mx-auto p-4 space-y-6" id="package-checkout" data-company-billing>
         <h1 class="text-2xl font-bold">Package selection and payment review</h1>
-        <p>Select an available package and billing period, then upload evidence of a payment already made. This page does not charge a payment method or activate a subscription. Selection alone does not change access. Receipt uploads remain subject to the existing review and temporary-access policy.</p>
+        @php
+            $frozenPraBundle = $quote[\App\Services\PosSignupBundle::KEY] ?? null;
+        @endphp
+        @if($frozenPraBundle)
+            <p>Upload evidence for your original signup total. The verified payment reserves your selected add-ons for the paid term.</p>
+        @else
+            <p>Select an available package and billing period, then upload evidence of a payment already made. This page does not charge a payment method or activate a subscription. Selection alone does not change access. Receipt uploads remain subject to the existing review and temporary-access policy.</p>
+        @endif
         @include('billing._policy-status')
         @if($errors->any())
         <div role="alert" class="border border-red-400 p-3">{{ $errors->first() }}</div>
         @endif
+        @unless($frozenPraBundle)
         <section class="grid grid-cols-1 sm:grid-cols-2 gap-4" aria-label="Available packages">
         @foreach($plans as $plan)
             @php
@@ -30,14 +38,21 @@
             </form>
         @endforeach
         </section>
+        @endunless
         @if($layout === 'health-layout' && $plans->isEmpty() && !$quote)
             <p>No Healthcare packages are currently available for online purchase. <a href="{{ url('/contact') }}" class="underline">Request a quote</a>.</p>
+        @endif
+        @if($layout === 'school-erp-layout' && $plans->isEmpty() && !$quote)
+            <p>No School packages are currently available for online purchase. <a href="{{ url('/contact') }}" class="underline">Request a quote</a>.</p>
         @endif
         @if($selectedPlan && $quote)
         <section id="selected-package-quote" class="rounded-xl border p-4 space-y-3">
             <h2 class="font-bold">Selected package: {{ $selectedPlan->name }}</h2>
             <p>{{ \App\Models\Subscription::getCycleLabel($quote['cycle']) }} · Payable total: PKR {{ number_format($quote['net_quote'], 2) }}</p>
-            <p>This saved quote is used for the receipt review. Submitting evidence does not confirm payment; the existing review and temporary-access policy still applies.</p>
+            @include('billing._pra-signup-bundle', ['bundle' => $frozenPraBundle])
+            @unless($frozenPraBundle)
+                <p>This saved quote is used for the receipt review. Submitting evidence does not confirm payment; the existing review and temporary-access policy still applies.</p>
+            @endunless
             <form method="POST" action="{{ route($proofRoute) }}" enctype="multipart/form-data" class="space-y-3">
                 @csrf
                 <input type="hidden" name="pricing_plan_id" value="{{ $selectedPlan->id }}">

@@ -5,6 +5,7 @@
         <div class="rounded-lg bg-gray-900 border border-gray-700 p-4">
             <p class="font-semibold">{{ $sale->plan_name }} · {{ \App\Models\Subscription::getCycleLabel($sale->billing_cycle) }}</p>
             <p>Quoted amount <strong>Rs {{ number_format($sale->quoted_amount, 2) }}</strong></p>
+            @include('billing._pra-signup-bundle', ['bundle' => $sale->quote_snapshot[\App\Services\PosSignupBundle::KEY] ?? null])
             <p class="text-sm text-gray-300">{{ $sale->quote_source === 'signup' ? 'Quoted at signup' : 'Quoted at admin review' }} · {{ $sale->created_at?->format('d M Y') }} · {{ ucfirst($sale->status) }}</p>
         </div>
         @if($sale->status === 'pending')

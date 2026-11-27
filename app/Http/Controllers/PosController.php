@@ -2147,13 +2147,7 @@ class PosController extends Controller
                 ->value('c');
         }
 
-        // Same pattern as DI dashboard: unread company notifications, 30-day auto-expiry.
-        $notifications = \App\Models\Notification::where('company_id', $companyId)
-            ->where('read', false)
-            ->where('created_at', '>=', now()->subDays(30))
-            ->orderBy('created_at', 'desc')
-            ->take(5)
-            ->get();
+        $notifications = \App\Models\Notification::forPosDashboard($company);
 
         // Opening Cash Balance (Jul 2026): today's drawer opening — card on the
         // dashboard prompts entry at day start; locked once today is closed.

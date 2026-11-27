@@ -22,6 +22,7 @@ The [per-PR history](taxnest-pr-history-001-476.md) records 437 PRs and 39 separ
 - Website Clients can find existing cards and candidates from the same search, filter by product and see paid eligibility at review. Product pages show all eligible approved cards. The POS product page also displays approved Standalone POS clients. The homepage keeps its six-card preview. Public cards require a linked eligible paid company and explicit approval of the public details.
 - Admin Deploy Approvals and PR History use higher-contrast labels, inputs and keyboard focus. Earlier product website and Admin contrast coverage is recorded in [website-controls-contrast.md](../qa/website-controls-contrast.md).
 - The Audit UI company search found one ZFC result. The other two requested public names showed no exact Companies search results. Account mapping, publication approvals and public visibility still need verification. Use account codes where public names differ.
+- #476 carries the School and Hospital Collections upgrade rules. They credit the verified unused balance and charge the remaining difference, including the Hospital zero-balance case. Verify the live preview and the expected package, dates and rates through the authorised demo journey.
 - Verify live demo account names and access for Hospital, Lab and School. Use synthetic fixtures for any operation that creates invoices, orders or payments. Keep existing production demo companies available for owner review.
 
 ## Source closure

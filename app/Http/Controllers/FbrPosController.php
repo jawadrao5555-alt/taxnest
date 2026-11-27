@@ -755,13 +755,7 @@ class FbrPosController extends Controller
         $allowedStyles = ['default', 'toast', 'lightspeed', 'clover', 'oscar', 'shopify'];
         $dashboardStyle = in_array($company->pos_dashboard_style, $allowedStyles) ? $company->pos_dashboard_style : 'default';
 
-        // Same pattern as DI dashboard: unread company notifications, 30-day auto-expiry.
-        $notifications = \App\Models\Notification::where('company_id', $companyId)
-            ->where('read', false)
-            ->where('created_at', '>=', now()->subDays(30))
-            ->orderBy('created_at', 'desc')
-            ->take(5)
-            ->get();
+        $notifications = \App\Models\Notification::forPosDashboard($company);
 
         // 💊 Pharmacy: "Expire ho rahi hain" tile — pharmacy mode + batch
         // tracking only, manager/owner only, branch-scoped like the report,

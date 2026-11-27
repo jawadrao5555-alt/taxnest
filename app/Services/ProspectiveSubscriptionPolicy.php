@@ -19,26 +19,30 @@ final class ProspectiveSubscriptionPolicy
         return Schema::hasColumn('subscriptions', 'lifecycle_snapshot');
     }
 
-    public static function registrationPlans(string $product)
+    public static function registrationPlans(string $product, ?callable $eligible = null)
     {
         if (! Schema::hasTable('pricing_plans')) {
             return collect();
         }
 
-        return PricingPlan::whereIn('product_type', \App\Support\NestErps::storedTypesFor($product))->where('is_trial', false)->get()->filter(fn ($p) => ! PlanSellabilityService::isRetired($p))->values();
+        return PricingPlan::whereIn('product_type', \App\Support\NestErps::storedTypesFor($product))
+            ->where('is_trial', false)->get()
+            ->filter(fn ($plan) => ! PlanSellabilityService::isRetired($plan) && ($eligible === null || $eligible($plan)))
+            ->values();
     }
 
-    public static function resolveRegistrationSelection(\Illuminate\Http\Request $request, string $product): ?PricingPlan
+    public static function resolveRegistrationSelection(\Illuminate\Http\Request $request, string $product, ?callable $eligible = null): ?PricingPlan
     {
-        $plan = RequestedPackageService::resolvePlan($request->input('requested_plan'), $product);
-        if (! self::available()) {
+        $plan = RequestedPackageService::resolvePlan($request->input('requested_plan'), $product, $eligible);
+        $available = self::available();
+        if (! $available && $eligible === null) {
             return $plan;
         }
         if ($request->filled('requested_plan') && ! $plan) {
             throw ValidationException::withMessages(['requested_plan' => 'Select an available package for this product.']);
         }
         if ($request->filled('pricing_plan_id')) {
-            $idPlan = self::registrationPlans($product)->firstWhere('id', (int) $request->input('pricing_plan_id'));
+            $idPlan = self::registrationPlans($product, $eligible)->firstWhere('id', (int) $request->input('pricing_plan_id'));
             if (! $idPlan || ($plan && (int) $plan->id !== (int) $idPlan->id)) {
                 throw ValidationException::withMessages(['pricing_plan_id' => 'The selected package must match this product and selection.']);
             }

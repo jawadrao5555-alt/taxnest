@@ -2015,6 +2015,11 @@ Route::prefix('health')->middleware(['health.auth', 'company.approval'])->group(
     Route::get('/', fn () => redirect()->route('health.dashboard'));
     Route::get('/dashboard', [HealthController::class, 'dashboard'])->name('health.dashboard');
 
+    Route::middleware(['health.module:lab', 'health.can:lab.view'])->group(function () {
+        Route::get('/lab', [\App\Http\Controllers\Health\LabWorkspaceController::class, 'index'])->name('health.lab');
+        Route::post('/lab/layout', [\App\Http\Controllers\Health\LabWorkspaceController::class, 'saveLayout'])->name('health.lab.layout');
+    });
+
     // Per-user display preferences — every signed-in member owns their own.
     Route::post('/set-dark-mode', [HealthController::class, 'toggleDarkMode'])->name('health.set-dark-mode');
     Route::post('/set-language', [HealthController::class, 'setLanguage'])->name('health.set-language');

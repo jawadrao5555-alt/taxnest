@@ -44,7 +44,7 @@
 
     <div class="tn-directory-filters bg-gray-900 border border-gray-800 rounded-xl p-4 mb-6">
         <form method="GET" class="grid grid-cols-1 sm:grid-cols-4 gap-3">
-            <input type="text" name="search" aria-label="Search companies" value="{{ request('search') }}" placeholder="Search name, NTN, owner..." class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-4 py-2 focus:ring-2 focus:ring-indigo-500">
+            <input type="text" name="search" aria-label="Search companies" value="{{ is_string(request('search')) ? request('search') : '' }}" placeholder="Search name, Company ID, account code, NTN, owner..." class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-4 py-2 focus:ring-2 focus:ring-indigo-500">
             <select name="product_type" aria-label="Company product type" class="bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-4 py-2 focus:ring-2 focus:ring-indigo-500">
                 <option value="">All Types</option>
                 <option value="di" {{ request('product_type') === 'di' ? 'selected' : '' }}>TaxNest Digital Invoice</option>
@@ -85,6 +85,9 @@
                     <tr class="hover:bg-gray-800/50">
                         <td class="px-4 py-3">
                             <a href="{{ route('saas.admin.companies.show', $company->id) }}" class="text-white font-medium hover:text-indigo-400 transition">{{ $company->name }}</a>
+                            @if($company->product_company_id ?? null)
+                                <span class="block font-mono text-xs text-gray-300" aria-label="Company ID {{ $company->product_company_id }}">{{ $company->product_company_id }}</span>
+                            @endif
                             @if($company->agentLongOffline())
                             <span class="inline-flex items-center gap-1 ml-1 px-1.5 py-0.5 rounded bg-red-900/40 text-red-400 text-xs font-bold" title="Desktop Agent offline > 2 hours — silent print shop on popup fallback. Last seen: {{ $company->agent_last_seen ? $company->agent_last_seen->format('d M, h:i A') : 'never' }}">
                                 <span class="w-1.5 h-1.5 rounded-full bg-red-500"></span> Agent Offline

@@ -8,6 +8,7 @@ use App\Models\Company;
 use App\Models\Notification;
 use App\Models\PaymentProof;
 use App\Models\PricingPlan;
+use App\Services\CompanyProductId;
 use App\Services\SubscriptionAssignmentService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -29,10 +30,20 @@ class AdminPaymentProofController extends Controller
             ]);
         }
 
-        $companyId = $request->validate(['company_id' => ['nullable', 'integer', 'min:1']])['company_id'] ?? null;
+        $companyReference = trim($request->validate(['company_id' => ['nullable', 'string']])['company_id'] ?? '');
         $status = $request->get('status', 'pending');
 
-        $query = PaymentProof::with(['company', 'pricingPlan'])->when($companyId, fn ($q) => $q->where('company_id', $companyId))->orderByDesc('created_at');
+        $query = PaymentProof::with(['company', 'pricingPlan'])->orderByDesc('created_at');
+        if ($companyReference !== '') {
+            if (ctype_digit($companyReference)) {
+                // Historical proofs can still carry the numeric ID after a company is removed.
+                $numericId = filter_var(ltrim($companyReference, '0'), FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+                $numericId === false ? $query->whereRaw('1 = 0') : $query->where('company_id', $numericId);
+            } else {
+                $matchingCompanies = CompanyProductId::matching(Company::withTrashed(), $companyReference)->select('companies.id');
+                $query->whereIn('company_id', $matchingCompanies);
+            }
+        }
         if (in_array($status, ['pending', 'verified', 'rejected'], true)) {
             $query->where('status', $status);
         }
@@ -46,7 +57,7 @@ class AdminPaymentProofController extends Controller
             'proofs' => $proofs,
             'plans' => $plans,
             'status' => $status,
-            'companyId' => $companyId,
+            'companyReference' => $companyReference,
             'tableMissing' => false,
         ]);
     }

@@ -12,6 +12,7 @@ use App\Models\LiveOpsRemediationRequest;
 use App\Services\LiveOps\LiveOpsDiagnosticsService;
 use App\Services\LiveOps\LiveOpsRemediationService;
 use App\Services\FbrPosReconciliationService;
+use App\Services\CompanyProductId;
 use App\Support\ProductCatalog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
@@ -67,10 +68,8 @@ class AdminLiveOpsController extends Controller
                     $q->where(function ($w) use ($search) {
                         $w->where('name', 'like', '%'.$search.'%')
                             ->orWhere('owner_name', 'like', '%'.$search.'%')
-                            ->orWhere('ntn', 'like', '%'.$search.'%');
-                        if (ctype_digit($search)) {
-                            $w->orWhere('id', (int) $search);
-                        }
+                            ->orWhere('ntn', 'like', '%'.$search.'%')
+                            ->orWhere(fn ($companies) => CompanyProductId::matching($companies, $search));
                         if (Schema::hasColumn('companies', 'account_code')) {
                             $w->orWhere('account_code', 'like', '%'.$search.'%');
                         }
@@ -81,6 +80,7 @@ class AdminLiveOpsController extends Controller
                 ->get(array_values(array_filter([
                     'id', 'name', 'status', 'product_type',
                     Schema::hasColumn('companies', 'account_code') ? 'account_code' : null,
+                    CompanyProductId::available((new Company)->getConnection()) ? 'product_company_id' : null,
                     Schema::hasColumn('companies', 'ntn') ? 'ntn' : null,
                 ])));
         }

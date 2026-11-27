@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Models\{AdminUser, Company, PaymentProof, PricingPlan, SignupPackageRequest, Subscription, SubscriptionInvoice, User};
+use App\Models\{AdminUser, Company, PaymentProof, PricingPlan, SignupPackageRequest, Subscription, SubscriptionInvoice, SystemSetting, User};
 use App\Support\NestErps;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -13,6 +13,28 @@ use Tests\TestCase;
 final class ErpPublicPricingTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_erp_hub_has_working_product_sections_and_assisted_move_enquiry(): void
+    {
+        $this->withoutVite();
+        config(['health.registration_open' => false]);
+        SystemSetting::set('contact_email', 'erp-team@example.test');
+        SystemSetting::set('support_whatsapp_number', '03001234567');
+
+        $this->get('/')->assertOk()->assertSee(NestErps::LANDING_PATH);
+        foreach (['/nest-erps', '/healthcare'] as $route) {
+            $this->get($route)->assertOk()
+                ->assertSee('id="hospital-erp"', false)->assertSee('id="lab-erp"', false)->assertSee('id="school-erp"', false)
+                ->assertSee('id="pricing"', false)->assertSee('id="erp-upgrade"', false)->assertSee(route('health.login'))
+                ->assertSee(route('contact', ['topic' => 'erp-upgrade']))->assertDontSee('/health/register');
+        }
+
+        $this->get('/contact?topic=erp-upgrade')->assertOk()->assertSee('Plan your ERP move')
+            ->assertSee('mailto:erp-team@example.test?subject=TaxNest%20ERP%20upgrade%20enquiry', false)
+            ->assertSee(urlencode('Hello, I would like to plan a move from my current TaxNest product to TaxNest ERP.'), false);
+        $this->get('/contact?topic=unrecognised-enquiry')->assertOk()->assertSee('Contact & Legal')
+            ->assertDontSee('Plan your ERP move')->assertDontSee('unrecognised-enquiry');
+    }
 
     public function test_billing_admin_can_publish_and_hide_exact_erp_prices_without_opening_pre_pilot_signup(): void
     {
@@ -127,7 +149,7 @@ final class ErpPublicPricingTest extends TestCase
         $plan = PricingPlan::create($this->planFields());
 
         $this->get('/nest-erps')->assertOk()->assertDontSee($plan->name)->assertDontSee('36,000.75')
-            ->assertSee('Request a quote');
+            ->assertSee('Request a quote')->assertDontSee('/health/register');
         $this->get('/health/register?plan_id='.$plan->id)->assertOk()->assertDontSee($plan->name)
             ->assertDontSee('36,000.75')->assertSee('Request a quote');
         $signup = [

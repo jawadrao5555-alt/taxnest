@@ -5,6 +5,11 @@
     $address = \App\Models\SystemSetting::get('contact_address', '');
     $hours = \App\Models\SystemSetting::get('support_hours', '');
     $waNumber = preg_replace('/\D/', '', (string) \App\Models\SystemSetting::get('support_whatsapp_number', ''));
+    $erpUpgrade = request()->query('topic') === 'erp-upgrade';
+    $contactMessage = $erpUpgrade
+        ? 'Hello, I would like to plan a move from my current TaxNest product to TaxNest ERP.'
+        : 'Hello, I need support with TaxNest.';
+    $emailSubject = $erpUpgrade ? '?subject='.rawurlencode('TaxNest ERP upgrade enquiry') : '';
 @endphp
 <!DOCTYPE html>
 <html lang="en" class="scroll-smooth">
@@ -14,7 +19,7 @@
     <meta name="theme-color" content="#052730">
     <link rel="icon" type="image/svg+xml" href="/images/brand/taxnest-mark.svg">
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
-    <title>Contact &amp; Legal — TaxNest</title>
+    <title>{{ $erpUpgrade ? 'Plan your ERP move' : 'Contact & Legal' }} — TaxNest</title>
     <meta name="description" content="Contact TaxNest support and review our Privacy Policy, Terms & Conditions, and the responsibilities of TaxNest versus your company.">
     @include('partials.meta-og', [
         'ogTitle'       => 'Contact & Legal — TaxNest',
@@ -60,8 +65,13 @@
             <div class="inline-flex items-center px-3 py-1 bg-white/5 border border-white/10 rounded-full text-xs font-medium text-white/80 tracking-wide uppercase mb-6">
                 <span class="w-1.5 h-1.5 rounded-full bg-[#E7BF3B] mr-2"></span> We're here to help
             </div>
-            <h1 class="text-4xl sm:text-5xl font-serif text-white mb-4">Contact &amp; Legal</h1>
-            <p class="text-white/70 text-lg font-light">Reach our team any time — and see exactly how TaxNest protects you and what each side is responsible for.</p>
+            @if($erpUpgrade)
+                <h1 class="text-4xl sm:text-5xl font-serif text-white mb-4">Plan your ERP move</h1>
+                <p class="text-white/90 text-lg">Tell us which TaxNest product you use, which ERP you need and how many branches you run.</p>
+            @else
+                <h1 class="text-4xl sm:text-5xl font-serif text-white mb-4">Contact &amp; Legal</h1>
+                <p class="text-white/70 text-lg font-light">Reach our team any time — and see exactly how TaxNest protects you and what each side is responsible for.</p>
+            @endif
         </div>
     </header>
 
@@ -71,17 +81,17 @@
         <section class="max-w-[1100px] mx-auto px-4 sm:px-6 lg:px-8 -mt-10 relative z-20">
             <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
                 @if($waNumber)
-                <a href="https://wa.me/{{ $waNumber }}?text={{ urlencode('Hello, I need support with TaxNest.') }}" target="_blank" rel="noopener"
+                <a href="https://wa.me/{{ $waNumber }}?text={{ urlencode($contactMessage) }}" target="_blank" rel="noopener"
                    class="bg-white rounded-xl border border-gray-200 shadow-sm p-6 hover:shadow-md hover:-translate-y-0.5 transition">
                     <div class="w-11 h-11 rounded-lg bg-[#25D366]/10 flex items-center justify-center mb-4">
                         <svg class="w-6 h-6 text-[#25D366]" fill="currentColor" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163a11.867 11.867 0 01-1.587-5.945C.16 5.335 5.495 0 12.05 0a11.817 11.817 0 018.413 3.488 11.824 11.824 0 013.48 8.414c-.003 6.557-5.338 11.892-11.893 11.892a11.9 11.9 0 01-5.688-1.448L.057 24zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884a9.86 9.86 0 001.515 5.26l-.999 3.648 3.973-1.715z"/></svg>
                     </div>
                     <h3 class="font-serif text-lg text-[#052730] mb-1">WhatsApp Support</h3>
-                    <p class="text-sm text-gray-500">Tap to chat with our team and describe your issue — we'll help you resolve it.</p>
+                    <p class="text-sm text-gray-500">{{ $erpUpgrade ? 'Ask our team about ERP options and onboarding.' : "Tap to chat with our team and describe your issue — we'll help you resolve it." }}</p>
                 </a>
                 @endif
                 @if($email)
-                <a href="mailto:{{ $email }}" class="bg-white rounded-xl border border-gray-200 shadow-sm p-6 hover:shadow-md hover:-translate-y-0.5 transition">
+                <a href="mailto:{{ $email }}{{ $emailSubject }}" class="bg-white rounded-xl border border-gray-200 shadow-sm p-6 hover:shadow-md hover:-translate-y-0.5 transition">
                     <div class="w-11 h-11 rounded-lg bg-[#0A4D5C]/10 flex items-center justify-center mb-4">
                         <svg class="w-6 h-6 text-[#0A4D5C]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
                     </div>

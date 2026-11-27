@@ -65,7 +65,9 @@
         <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
             <h3 class="text-sm font-semibold text-white mb-3">Company Details</h3>
             <div class="space-y-2 text-sm">
-                <div class="flex justify-between gap-2"><span class="text-gray-400">Company ID</span><span class="text-white tabular-nums">{{ $company->id }}</span></div>
+                @unless($company->product_company_id ?? null)
+                    <div class="flex justify-between gap-2"><span class="text-gray-400">Company ID</span><span class="text-white tabular-nums">{{ $company->id }}</span></div>
+                @endunless
                 <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">Name</span><span class="text-white font-medium text-right min-w-0 break-words">{{ $company->name }}</span></div>
                 <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">Owner</span><span class="text-white text-right min-w-0 break-words">{{ $company->owner_name ?? '—' }}</span></div>
                 <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">NTN</span><span class="text-white text-right min-w-0 break-all">{{ $company->ntn ?? '—' }}</span></div>

@@ -22,7 +22,7 @@
             <li class="flex flex-wrap items-center justify-between gap-2 py-3">
                 <div class="min-w-0 break-words">
                     <p class="font-semibold">{{ $candidate->name }}</p>
-                    <p class="text-sm">{{ \App\Models\WebsiteClient::PRODUCTS[$candidate->website_product] }} · Company ID {{ $candidate->id }}@if($candidate->account_code) · {{ $candidate->account_code }}@endif</p>
+                    <p class="text-sm">{{ \App\Models\WebsiteClient::PRODUCTS[$candidate->website_product] }} · Company ID {{ $candidate->product_company_id ?? $candidate->id }}@if($candidate->account_code) · {{ $candidate->account_code }}@endif</p>
                 </div>
                 <a href="{{ route('saas.admin.website-clients.create', ['company' => $candidate->id]) }}" class="tn-website-client-action" aria-label="Review {{ $candidate->name }}">Review candidate</a>
             </li>
@@ -39,7 +39,22 @@
         <div class="flex flex-wrap items-start justify-between gap-3">
             <div>
                 <h3 class="break-words font-semibold">{{ $entry->display_name }}</h3>
-                <p class="text-sm">{{ \App\Models\WebsiteClient::PRODUCTS[$entry->product] }} · {{ in_array($entry->id, $publicIds, true) ? 'Published' : ($entry->published_at ? 'Hidden' : 'Draft') }}</p>
+                <p class="text-sm">
+                    {{ \App\Models\WebsiteClient::PRODUCTS[$entry->product] }} &middot;
+                    @if(in_array($entry->id, $publicIds, true))
+                        Published
+                    @elseif(!$entry->company_id)
+                        Company link required
+                    @elseif(!$entry->published_at)
+                        Draft
+                    @elseif(in_array($entry->id, $pendingIds, true))
+                        Hidden &middot; Payment pending
+                    @elseif(in_array($entry->id, $approvedIds, true))
+                        Hidden &middot; No active paid subscription
+                    @else
+                        Hidden &middot; Company or product ineligible
+                    @endif
+                </p>
             </div>
             <a href="{{ route('saas.admin.website-clients.edit', $entry->id) }}" class="tn-website-client-action">Review / Edit</a>
         </div>

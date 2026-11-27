@@ -2,22 +2,39 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AdminUser;
 use App\Models\WebsiteClient;
+use App\Services\WebsiteClientLogo;
+use Illuminate\Http\Response;
 
 class WebsiteClientLogoController extends Controller
 {
-    public function __invoke(int $client, int $revision)
+    public function __invoke(int $client, int $revision): Response
     {
-        $entry = WebsiteClient::query()->published()->whereKey($client)->where('revision', $revision)
-            ->whereNotNull('logo_data')->firstOrFail();
+        $entry = WebsiteClient::publicEntry($client, $revision);
 
-        return self::imageResponse($entry);
+        return self::respond($entry ? WebsiteClientLogo::publicImage($entry) : null);
     }
 
-    public static function imageResponse(WebsiteClient $entry)
+    public function preview(int $company): Response
     {
-        return response(base64_decode($entry->logo_data, true), 200, [
-            'Content-Type' => $entry->logo_mime,
+        AdminUser::requireReleaseAdministrator();
+        $source = WebsiteClient::companySources()->addSelect('companies.product_type', 'companies.logo_path', 'companies.di_branding')
+            ->find($company);
+
+        return self::respond(WebsiteClientLogo::companyImage($source));
+    }
+
+    public static function imageResponse(WebsiteClient $entry): Response
+    {
+        return self::respond(WebsiteClientLogo::manualImage($entry));
+    }
+
+    /** @param array{bytes: string, mime: string}|null $image */
+    private static function respond(?array $image): Response
+    {
+        return response($image['bytes'] ?? '', $image ? 200 : 404, [
+            'Content-Type' => $image['mime'] ?? 'text/plain; charset=UTF-8',
             'Cache-Control' => 'no-store',
             'X-Content-Type-Options' => 'nosniff',
         ]);

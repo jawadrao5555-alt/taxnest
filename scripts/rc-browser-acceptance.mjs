@@ -2658,6 +2658,51 @@ async function deliveryAddressSnapshotWorkflow(page,t,v) {
   data.customer=corrected.customer;
   await page.waitForFunction(phone=>window.Alpine.$data(document.querySelector('[data-tn-sale-root]')).selectedCustomer?.phone===phone,correctedPhone);
   await saveEvidenceScreenshot(page,'customer-contact-corrected-'+v.width+'.png');
+
+  const addressPicker = page.locator('select[x-model="selectedDeliveryAddress"]');
+  await addressPicker.locator('..').getByRole('button', { name: '+ New', exact: true }).click();
+  const addressInput = page.locator('#tnNewAddrInput');
+  const addressError = page.locator('#tnNewAddrError');
+  const saveAddress = addressInput.locator('..').getByRole('button', { name: 'Save', exact: true });
+  const addressEndpoint = baseUrl+'/pos/api/customer-addresses';
+  let addressPosts = 0;
+  const countAddressPosts = request => {
+    if (request.url() === addressEndpoint && request.method() === 'POST') addressPosts++;
+  };
+  page.on('request', countAddressPosts);
+  await saveAddress.click();
+  await addressError.waitFor({ state: 'visible' });
+  if (!/required/i.test(await addressError.innerText()) || addressPosts !== 0) {
+    throw new Error('Blank delivery address did not show validation without posting');
+  }
+
+  const alternate = `Synthetic alternate delivery address ${v.width} near the main entrance\nSecond line with receiving instructions and gate reference`;
+  await page.locator('#tnNewAddrLabel').fill('Alternate entrance');
+  await addressInput.fill(alternate);
+  await addressError.waitFor({ state: 'hidden' });
+  const [savedAddressResponse] = await Promise.all([
+    page.waitForResponse(response => response.url() === addressEndpoint && response.request().method() === 'POST'),
+    saveAddress.click(),
+  ]);
+  page.off('request', countAddressPosts);
+  const savedAddress = await savedAddressResponse.json();
+  if (!savedAddressResponse.ok() || savedAddress.address?.address !== alternate || addressPosts !== 1) {
+    throw new Error('A single save did not persist the full address');
+  }
+  await addressInput.waitFor({ state: 'hidden' });
+  const preview = page.locator('p[x-text="selectedDeliveryAddress"]');
+  if (await addressPicker.inputValue() !== alternate || await preview.innerText() !== alternate) {
+    throw new Error('The saved address did not stay selected after its provisional picker option was replaced');
+  }
+  if (await preview.evaluate(element => element.scrollWidth > element.clientWidth || getComputedStyle(element).whiteSpace !== 'pre-wrap')) {
+    throw new Error('The selected full address could not wrap within the cart');
+  }
+  await addressPicker.selectOption(address);
+  await page.waitForFunction(value => document.querySelector('p[x-text="selectedDeliveryAddress"]')?.innerText === value, address);
+  await addressPicker.selectOption(alternate);
+  await page.waitForFunction(value => document.querySelector('p[x-text="selectedDeliveryAddress"]')?.innerText === value, alternate);
+  await addressPicker.selectOption(address);
+
   let release;const gate=new Promise(resolve=>release=resolve);
   const bookUrl=baseUrl+'/pos/api/customer-addresses?customer_id='+data.customer.id;
   await page.route(bookUrl,async route=>{await gate;await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({addresses:[{id:0,label:'Default',address}]})});});

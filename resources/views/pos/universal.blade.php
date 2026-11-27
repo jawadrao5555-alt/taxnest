@@ -1552,7 +1552,7 @@ window.addEventListener('popstate', function() {
                                     <select x-model="selectedDeliveryAddress" aria-label="{{ __('pos.ph_full_delivery_address') }}" @change="_deliveryAddressChoiceVersion = (_deliveryAddressChoiceVersion || 0) + 1" class="flex-1 min-w-0 text-sm font-medium rounded-md border-blue-200 dark:border-blue-800 dark:bg-gray-800 dark:text-white py-1.5 px-2 focus:ring-blue-500 focus:border-blue-400">
                                         <option value="">{{ __('pos.delivery_address_divider') }}</option>
                                         <template x-for="(a, ai) in customerAddresses" :key="a.id ?? ('t' + ai)">
-                                            <option :value="a.address" x-text="(a.label ? a.label + ': ' : '') + a.address"></option>
+                                            <option :value="a.address" :selected="a.address === selectedDeliveryAddress" x-text="(a.label ? a.label + ': ' : '') + a.address"></option>
                                         </template>
                                     </select>
                                     {{-- ZFC (Aug 2026): purana address wahin se DELETE bhi ho sake —

@@ -1843,6 +1843,7 @@ Route::prefix('admin')->middleware(['admin.auth'])->group(function () {
     Route::post('/companies/{id}/ai-pages', [AdminCompanyController::class, 'grantAiPages'])->name('saas.admin.companies.aiPages');
     Route::post('/companies/{id}/delete', [AdminCompanyController::class, 'softDelete'])->name('saas.admin.companies.delete');
     Route::get('/companies/{id}/product-review', [\App\Http\Controllers\SaasAdmin\AdminProductTransitionController::class, 'productReview'])->name('saas.admin.companies.productReview');
+    Route::get('/companies/{company}/erp-upgrade-quote', \App\Http\Controllers\SaasAdmin\ErpUpgradeQuoteController::class)->name('saas.admin.companies.erpUpgradeQuote');
     Route::post('/companies/{id}/change-type', [\App\Http\Controllers\SaasAdmin\AdminProductTransitionController::class, 'changeProductType'])->name('saas.admin.companies.changeType');
     Route::post('/companies/{id}/clone-product', [\App\Http\Controllers\SaasAdmin\AdminProductTransitionController::class, 'cloneToProduct'])->name('saas.admin.companies.cloneProduct');
     Route::post('/companies/{id}/reveal-access-code', [AdminCompanyController::class, 'revealFbrAccessCode'])->name('saas.admin.companies.revealAccessCode');

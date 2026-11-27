@@ -657,6 +657,9 @@
             }
         @endphp
 
+        @if(auth('admin')->user()?->isSuperAdmin() && $company->isHospitalCollectionPilot())
+            <a href="{{ route('saas.admin.companies.erpUpgradeQuote', $company) }}" class="block text-sm text-indigo-300 underline mb-3">Preview Hospital ERP price difference</a>
+        @endif
         @if($canManageCompanyLifecycle)
         <form method="POST" action="{{ route('saas.admin.companies.cloneProduct', $company->id) }}"
               onsubmit="return confirm('Create a separate account for this customer on the selected product(s)? Only the owner login is copied — team accounts are not.');">

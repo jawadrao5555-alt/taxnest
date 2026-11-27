@@ -163,6 +163,7 @@
     </script>
     {{-- Urdu-script font (Task 1287) — inert unless the app locale is ever 'ur'. --}}
     @include('partials.urdu-font')
+    <link rel="stylesheet" href="{{ asset('css/public-controls.css') }}?v={{ @filemtime(public_path('css/public-controls.css')) }}">
 </head>
 <body x-data="{ scrolled: false, mobileMenuOpen: false }" @scroll.window="scrolled = (window.pageYOffset > 20)">
     <div id="tn-boot" aria-hidden="true"><span>Nest<b>POS</b></span></div>
@@ -466,39 +467,39 @@
             </div>
             <div class="space-y-2" x-data="{ open: null }">
                 <div class="border-b border-gray-200">
-                    <button @click="open = (open === 1 ? null : 1)" class="w-full flex items-center justify-between py-6 text-left">
+                    <button type="button" @click="open = (open === 1 ? null : 1)" :aria-expanded="open === 1" aria-controls="pra-faq-answer-1" class="tn-public-control w-full flex items-center justify-between py-6 text-left">
                         <span class="font-serif text-lg text-gray-900">How does the PRA connection actually work?</span>
-                        <span class="text-gray-400 font-mono text-xl" x-text="open === 1 ? '-' : '+'">+</span>
+                        <span aria-hidden="true" class="tn-disclosure-indicator font-mono text-xl" x-text="open === 1 ? '-' : '+'">+</span>
                     </button>
-                    <div x-show="open === 1" x-collapse class="pb-6 text-gray-600 leading-relaxed font-light">Two modes. Cloud mode submits bills straight from our servers to PRA. Fiscal-device mode runs a small desktop agent on your counter PC for shops whose PRA registration requires the local fiscal service — the system queues bills and the agent fiscalizes them automatically.</div>
+                    <div id="pra-faq-answer-1" x-show="open === 1" x-collapse class="pb-6 text-gray-600 leading-relaxed font-light">Two modes. Cloud mode submits bills straight from our servers to PRA. Fiscal-device mode runs a small desktop agent on your counter PC for shops whose PRA registration requires the local fiscal service — the system queues bills and the agent fiscalizes them automatically.</div>
                 </div>
                 <div class="border-b border-gray-200">
-                    <button @click="open = (open === 2 ? null : 2)" class="w-full flex items-center justify-between py-6 text-left">
+                    <button type="button" @click="open = (open === 2 ? null : 2)" :aria-expanded="open === 2" aria-controls="pra-faq-answer-2" class="tn-public-control w-full flex items-center justify-between py-6 text-left">
                         <span class="font-serif text-lg text-gray-900">Does it work for restaurants?</span>
-                        <span class="text-gray-400 font-mono text-xl" x-text="open === 2 ? '-' : '+'">+</span>
+                        <span aria-hidden="true" class="tn-disclosure-indicator font-mono text-xl" x-text="open === 2 ? '-' : '+'">+</span>
                     </button>
-                    <div x-show="open === 2" x-collapse class="pb-6 text-gray-600 leading-relaxed font-light">Yes — a full restaurant module: dine-in / takeaway / delivery order types, table management, kitchen order tickets and held orders, all on the same keyboard-fast sale screen.</div>
+                    <div id="pra-faq-answer-2" x-show="open === 2" x-collapse class="pb-6 text-gray-600 leading-relaxed font-light">Yes — a full restaurant module: dine-in / takeaway / delivery order types, table management, kitchen order tickets and held orders, all on the same keyboard-fast sale screen.</div>
                 </div>
                 <div class="border-b border-gray-200">
-                    <button @click="open = (open === 3 ? null : 3)" class="w-full flex items-center justify-between py-6 text-left">
+                    <button type="button" @click="open = (open === 3 ? null : 3)" :aria-expanded="open === 3" aria-controls="pra-faq-answer-3" class="tn-public-control w-full flex items-center justify-between py-6 text-left">
                         <span class="font-serif text-lg text-gray-900">What if my internet goes down mid-day?</span>
-                        <span class="text-gray-400 font-mono text-xl" x-text="open === 3 ? '-' : '+'">+</span>
+                        <span aria-hidden="true" class="tn-disclosure-indicator font-mono text-xl" x-text="open === 3 ? '-' : '+'">+</span>
                     </button>
-                    <div x-show="open === 3" x-collapse class="pb-6 text-gray-600 leading-relaxed font-light">Keep selling. Bills print offline and sync to PRA automatically when the connection returns — no manual re-entry, no lost sales.</div>
+                    <div id="pra-faq-answer-3" x-show="open === 3" x-collapse class="pb-6 text-gray-600 leading-relaxed font-light">Keep selling. Bills print offline and sync to PRA automatically when the connection returns — no manual re-entry, no lost sales.</div>
                 </div>
                 <div class="border-b border-gray-200">
-                    <button @click="open = (open === 4 ? null : 4)" class="w-full flex items-center justify-between py-6 text-left">
+                    <button type="button" @click="open = (open === 4 ? null : 4)" :aria-expanded="open === 4" aria-controls="pra-faq-answer-4" class="tn-public-control w-full flex items-center justify-between py-6 text-left">
                         <span class="font-serif text-lg text-gray-900">What do the plans include?</span>
-                        <span class="text-gray-400 font-mono text-xl" x-text="open === 4 ? '-' : '+'">+</span>
+                        <span aria-hidden="true" class="tn-disclosure-indicator font-mono text-xl" x-text="open === 4 ? '-' : '+'">+</span>
                     </button>
-                    <div x-show="open === 4" x-collapse class="pb-6 text-gray-600 leading-relaxed font-light">The comparison table reads the current package limits and feature permissions directly from our package settings. Check its Restaurant / Kitchen, Attendance, QR Menu and WhatsApp rows for your chosen plan. Check the selected package for Rider Live Tracking and Caller ID eligibility before adding either to your quote. Extra branches are priced separately. Your business category and enabled settings also determine which screens appear.</div>
+                    <div id="pra-faq-answer-4" x-show="open === 4" x-collapse class="pb-6 text-gray-600 leading-relaxed font-light">The comparison table reads the current package limits and feature permissions directly from our package settings. Check its Restaurant / Kitchen, Attendance, QR Menu and WhatsApp rows for your chosen plan. Check the selected package for Rider Live Tracking and Caller ID eligibility before adding either to your quote. Extra branches are priced separately. Your business category and enabled settings also determine which screens appear.</div>
                 </div>
                 <div class="border-b border-gray-200">
-                    <button @click="open = (open === 5 ? null : 5)" class="w-full flex items-center justify-between py-6 text-left">
+                    <button type="button" @click="open = (open === 5 ? null : 5)" :aria-expanded="open === 5" aria-controls="pra-faq-answer-5" class="tn-public-control w-full flex items-center justify-between py-6 text-left">
                         <span class="font-serif text-lg text-gray-900">Is there a mobile app? Does it work in Urdu?</span>
-                        <span class="text-gray-400 font-mono text-xl" x-text="open === 5 ? '-' : '+'">+</span>
+                        <span aria-hidden="true" class="tn-disclosure-indicator font-mono text-xl" x-text="open === 5 ? '-' : '+'">+</span>
                     </button>
-                    <div x-show="open === 5" x-collapse class="pb-6 text-gray-600 leading-relaxed font-light">Yes to both. An Android app (see Downloads for current size) gives your whole team — owner, manager, waiter, cashier — the full POS on their phones, and delivery riders get their own app. The entire panel runs in Urdu, Roman Urdu or English, and each staff member picks their own language.</div>
+                    <div id="pra-faq-answer-5" x-show="open === 5" x-collapse class="pb-6 text-gray-600 leading-relaxed font-light">Yes to both. An Android app (see Downloads for current size) gives your whole team — owner, manager, waiter, cashier — the full POS on their phones, and delivery riders get their own app. The entire panel runs in Urdu, Roman Urdu or English, and each staff member picks their own language.</div>
                 </div>
             </div>
         </div>

@@ -14,7 +14,7 @@
             @endif
         </div>
         @if($canManageBilling ?? false)
-        <button @click="editing = !editing" class="text-xs px-2 py-1 rounded transition" :class="editing ? 'bg-red-600/20 text-red-400 hover:bg-red-600/30' : 'bg-indigo-600/20 text-indigo-400 hover:bg-indigo-600/30'" x-text="editing ? 'Cancel' : 'Edit'"></button>
+        <button type="button" @click="editing = !editing" :aria-expanded="editing" class="tn-admin-action text-xs px-2 py-1 rounded transition" x-text="editing ? 'Cancel' : 'Edit'">Edit</button>
         @endif
     </div>
 

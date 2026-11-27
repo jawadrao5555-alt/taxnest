@@ -106,6 +106,56 @@
     background-color: var(--tn-canvas);
 }
 
+.tn-premium-shell [data-company-billing] .tn-billing-plan {
+    background-color: var(--tn-surface-raised);
+    color: var(--tn-text);
+}
+
+.tn-premium-shell [data-company-billing] .tn-billing-saving,
+.tn-premium-shell [data-company-billing] .tn-billing-link {
+    color: var(--tn-brand-deep) !important;
+}
+
+.tn-premium-shell [data-company-billing] .tn-billing-muted {
+    color: var(--tn-muted) !important;
+}
+
+.tn-premium-shell [data-company-billing] .tn-billing-action {
+    background-color: #0a4d5c !important;
+    color: #fff !important;
+}
+
+.tn-premium-shell [data-company-billing] .tn-billing-action:hover {
+    background-color: #073943 !important;
+}
+
+.tn-premium-shell [data-company-billing] .tn-billing-field {
+    background-color: var(--tn-surface-raised) !important;
+    color: var(--tn-text) !important;
+    border-color: var(--tn-muted);
+}
+
+.dark .tn-premium-shell [data-company-billing] .tn-billing-field {
+    color-scheme: dark;
+}
+
+.tn-premium-shell [data-company-billing] :is(a, button, input, select):focus-visible {
+    outline: 2px solid var(--tn-brand-deep);
+    outline-offset: 2px;
+}
+
+.tn-premium-shell [data-company-billing] .tnpc-plan .tnpc-price {
+    color: #e9f2f0;
+}
+
+.tn-premium-shell [data-company-billing] .tnpc-addon {
+    color: #4b5563;
+}
+
+.dark .tn-premium-shell [data-company-billing] .tnpc-addon {
+    color: var(--tn-muted);
+}
+
 .tn-premium-shell .sidebar-link {
     border: 1px solid transparent;
     border-radius: var(--tn-radius-sm);

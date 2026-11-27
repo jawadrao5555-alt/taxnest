@@ -243,7 +243,7 @@
                                                 <input type="number" name="verified_received_amount" value="{{ old('verified_received_amount', $proof->amount) }}" step="0.01" min="0.01" required class="w-full bg-gray-900 border border-gray-700 rounded-lg text-white text-xs px-2 py-2">
                                                 <p class="text-[11px] text-gray-500 mt-1">Independent reviewer amount; the company-entered claim is not used as receipt evidence.</p>
                                             </div>
-                                            <button type="submit" class="w-full px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg transition">Approve Add-on</button>
+                                            <button type="submit" class="w-full px-3 py-2 tn-admin-action tn-admin-action--confirm text-xs font-semibold rounded-lg transition">Approve Add-on</button>
                                         </form>
                                     </div>
                                     @elseif($proof->isAiPages())
@@ -278,7 +278,7 @@
                                             @csrf
                                             <label class="block text-[11px] text-gray-400">Amount verified in bank/receipt (PKR)</label>
                                             <input type="number" name="verified_received_amount" value="{{ old('verified_received_amount', $proof->amount) }}" step="0.01" min="0.01" required class="w-full bg-gray-900 border border-gray-700 rounded-lg text-white text-xs px-2 py-2">
-                                            <button type="submit" class="w-full px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg transition">Add {{ number_format($aiQty) }} Pages</button>
+                                            <button type="submit" class="w-full px-3 py-2 tn-admin-action tn-admin-action--confirm text-xs font-semibold rounded-lg transition">Add {{ number_format($aiQty) }} Pages</button>
                                         </form>
                                     </div>
                                     @elseif($proof->isExtraBranch())
@@ -295,7 +295,7 @@
                                             <input type="number" name="extra_branch_qty" value="{{ $ebQtySel }}" min="1" max="{{ \App\Services\BranchAddonService::MAX_QTY }}" required class="w-full bg-gray-900 border border-gray-700 rounded-lg text-white text-xs px-2 py-2">
                                             <label class="block text-[11px] text-gray-400">Amount verified in bank/receipt (PKR)</label>
                                             <input type="number" name="verified_received_amount" value="{{ old('verified_received_amount', $proof->amount) }}" step="0.01" min="0.01" required class="w-full bg-gray-900 border border-gray-700 rounded-lg text-white text-xs px-2 py-2">
-                                            <button type="submit" class="w-full px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg transition">Approve Extra Branch</button>
+                                            <button type="submit" class="w-full px-3 py-2 tn-admin-action tn-admin-action--confirm text-xs font-semibold rounded-lg transition">Approve Extra Branch</button>
                                         </form>
                                     </div>
                                     @else
@@ -443,7 +443,7 @@
                                                 </p>
                                             </div>
                                             @endif
-                                            <button type="submit" class="w-full px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg transition">Approve &amp; Unlock</button>
+                                            <button type="submit" class="w-full px-3 py-2 tn-admin-action tn-admin-action--confirm text-xs font-semibold rounded-lg transition">Approve &amp; Unlock</button>
                                         </form>
                                         </div>
                                     </div>
@@ -453,7 +453,7 @@
                                         <form method="POST" action="{{ route('saas.admin.payment-proofs.reject', $proof->id) }}" class="space-y-2">
                                             @csrf
                                             <input type="text" name="reject_reason" maxlength="255" placeholder="Reason (optional)" class="w-full bg-gray-900 border border-gray-700 rounded-lg text-white text-xs px-2 py-2">
-                                            <button type="submit" class="w-full px-3 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded-lg transition">Confirm Reject</button>
+                                            <button type="submit" class="w-full px-3 py-2 tn-admin-action tn-admin-action--danger text-xs font-semibold rounded-lg transition">Confirm Reject</button>
                                         </form>
                                     </div>
                                 @else

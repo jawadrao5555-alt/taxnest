@@ -175,8 +175,8 @@ try {
   assert.equal(Number(await item('tax').inputValue()), 225);
   await page.getByRole('button', {name: /Create Invoice/i}).first().click();
   await page.waitForURL(url => url.pathname === '/invoices');
-  await page.getByRole('main').getByText('Invoice created successfully.', {exact: true}).waitFor();
   const cementRow = page.getByRole('row').filter({hasText: 'Synthetic cement buyer'});
+  await cementRow.getByText('PKR 1,235.00', {exact: true}).waitFor();
   const cementEdit = cementRow.locator('a[href^="/invoice/"][href$="/edit"]');
   await page.goto(base + await cementEdit.getAttribute('href'));
   await page.waitForFunction(() => window.Alpine && document.querySelector('form[x-data]')?._x_dataStack);

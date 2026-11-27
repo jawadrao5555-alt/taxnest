@@ -69,16 +69,17 @@ class PosAddonPricingService
         ];
     }
 
-    public static function catalog(): array
+    public static function catalog(bool $includeUnpricedFederal = false): array
     {
         $catalog = [];
 
         foreach (self::definitions() as $code => $addon) {
-            if (PosFederalAddonAccess::isFederalCode($code) && self::price($code) <= 0) {
+            $annualPrice = self::price($code);
+            if (!$includeUnpricedFederal && PosFederalAddonAccess::isFederalCode($code) && $annualPrice === 0) {
                 continue;
             }
             $catalog[$code] = array_merge($addon, [
-                'annual_price' => self::price($code, 'annual'),
+                'annual_price' => $annualPrice,
                 'quarterly_price' => self::price($code, 'quarterly'),
                 'monthly_price' => self::price($code, 'monthly'),
             ]);
@@ -123,8 +124,16 @@ class PosAddonPricingService
         };
 
         if (PosFederalAddonAccess::isFederalCode($code)) {
-            $price = config("pra_di_sandbox.paid_addon_annual_rates.{$code}");
-            return $cycle === 'annual' && is_numeric($price) ? max(0, (int) round((float) $price)) : 0;
+            if ($cycle !== 'annual') {
+                return 0;
+            }
+
+            $price = SystemSetting::get(
+                self::settingKey($code, $cycle),
+                config("pra_di_sandbox.paid_addon_annual_rates.{$code}")
+            );
+
+            return is_numeric($price) ? max(0, (int) round((float) $price)) : 0;
         }
 
         $default = self::ADDONS[$code][$cycle] ?? match ($cycle) {
@@ -145,7 +154,7 @@ class PosAddonPricingService
      */
     public static function save(array $prices): void
     {
-        foreach (self::ADDONS as $code => $addon) {
+        foreach (array_keys(self::definitions()) as $code) {
             foreach (self::CYCLES as $cycle) {
                 if (!array_key_exists($code, $prices) || !array_key_exists($cycle, $prices[$code])) {
                     continue;

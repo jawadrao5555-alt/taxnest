@@ -6,4 +6,5 @@ return [
     'annual' => 'PKR :amount saalana',
     'price_pending' => 'Qeemat ki setup baqi hai',
     'review_account' => 'Apni PRA POS billing dekhein',
+    'active' => 'Aap ke package par active hai',
 ];

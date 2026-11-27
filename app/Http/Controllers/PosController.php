@@ -13586,7 +13586,7 @@ class PosController extends Controller
             }
         }
         $addonCatalog = array_filter(
-            \App\Services\PosAddonPricingService::catalog(),
+            \App\Services\PosAddonPricingService::catalog(includeUnpricedFederal: true),
             fn (array $addon) => PosFeatureService::moduleRelevant($company, (string) ($addon['gate'] ?? ''))
         );
         $relevantAddonCodes = array_keys($addonCatalog);

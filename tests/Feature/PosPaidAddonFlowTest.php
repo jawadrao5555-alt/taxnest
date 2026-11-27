@@ -1063,11 +1063,38 @@ class PosPaidAddonFlowTest extends TestCase
         $this->actingAs($this->posUser($company), 'pos')->get('/pos/billing')->assertOk()
             ->assertSee('PRA POS ke FBR add-ons')->assertSee(__('pos_federal_addons.price_pending'));
 
-        config(['pra_di_sandbox.paid_addon_annual_rates' => ['federal_di' => 12000, 'federal_ims' => 18000]]);
+        $admin = $this->admin();
+        $rates = [
+            'rider_tracking' => ['annual' => 7999],
+            'caller_id' => ['annual' => 4999],
+            'federal_di' => ['annual' => 12000, 'monthly' => 500],
+            'federal_ims' => ['annual' => 18000],
+        ];
+        $this->actingAs($admin, 'admin')->post('/admin/plans/addons', ['addons' => $rates])
+            ->assertSessionHasNoErrors()->assertSessionHas('success');
+        $this->get('/admin/plans')->assertOk()
+            ->assertSee('name="addons[federal_di][annual]"', false)
+            ->assertSee('name="addons[federal_ims][annual]"', false);
+        $this->assertSame(0, PosAddonPricingService::price('federal_di', 'monthly'));
+        $this->assertDatabaseMissing('system_settings', ['key' => 'pos_addon_federal_di_monthly_price']);
+        $this->get('/pos')->assertOk()
+            ->assertSee(__('pos_federal_addons.annual', ['amount' => '12,000']))
+            ->assertSee(__('pos_federal_addons.annual', ['amount' => '18,000']));
         $this->get('/pos/billing')->assertOk()
             ->assertSee(__('pos_federal_addons.annual', ['amount' => '12,000']))
             ->assertSee(__('pos_federal_addons.annual', ['amount' => '18,000']))
             ->assertDontSee(__('pos_federal_addons.price_pending'));
+
+        config(['pra_di_sandbox.paid_addon_annual_rates.federal_ims' => 42000]);
+        $rates['federal_ims']['annual'] = 0;
+        $this->actingAs($admin, 'admin')->post('/admin/plans/addons', ['addons' => $rates])
+            ->assertSessionHasNoErrors()->assertSessionHas('success');
+        $billing = $this->get('/pos/billing')->assertOk()
+            ->assertSee('data-addon-code="federal_di"', false)
+            ->assertDontSee('data-addon-code="federal_ims"', false)
+            ->assertSee(__('pos_federal_addons.price_pending'));
+        $this->assertSame(12000, PosAddonPricingService::price('federal_di'));
+        $this->assertSame(0, PosAddonPricingService::price('federal_ims'));
     }
 
     public static function federalAddonChannels(): iterable
@@ -1111,7 +1138,11 @@ class PosPaidAddonFlowTest extends TestCase
         $this->assertFalse(PosFederalAddonAccess::allows($company, $selected));
         $this->assertFalse(PosFederalAddonAccess::allows($other, $selected));
 
-        config(['pra_di_sandbox.paid_addon_annual_rates.'.$selected => 16000]);
+        $this->actingAs($this->admin(), 'admin')->get('/admin/payment-proofs')->assertOk()
+            ->assertSee(PosAddonPricingService::definitions()[$selected]['label'])
+            ->assertSee('PKR 12,000');
+        PosAddonPricingService::save([$selected => ['annual' => 0]]);
+        $this->assertNotContains($selected, PosAddonService::purchasableCodes($other));
         $this->approve($proof, ['verified_received_amount' => 11999])->assertSessionHas('error');
         $this->assertDatabaseCount('pos_addons', 0);
         session()->forget('error');

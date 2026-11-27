@@ -173,6 +173,7 @@
 
                 @if(\App\Services\PosAddonService::isPraCompany($company ?? null))
                     <x-pos-federal-addon-options :billing="true"
+                        :active="$adActive" :pending="$adPending"
                         :codes="array_values(array_intersect($adFederalCodes, $adActive)) ?: $adFederalCodes" />
                 @endif
 

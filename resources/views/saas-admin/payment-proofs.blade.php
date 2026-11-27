@@ -73,7 +73,7 @@
                                         $paSnapshot = $proof->addonQuoteSnapshot();
                                         $paCodes = $paSnapshot['codes'] ?? $proof->addonCodeList();
                                         $paCycle = $paSnapshot['cycle'] ?? (\App\Services\PosAddonService::cycleForProof($proof) ?? 'annual');
-                                        $paCatalog = \App\Services\PosAddonPricingService::ADDONS;
+                                        $paCatalog = \App\Services\PosAddonPricingService::definitions();
                                         $paQuote = $paSnapshot ?? \App\Services\PosAddonService::quote($paCodes, $paCycle, $proof->company);
                                     @endphp
                                     <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-violet-900/40 text-violet-300 border border-violet-700/60">Feature add-on &times; {{ count($paCodes) }}</span>
@@ -200,7 +200,6 @@
                                             $paSnapshotSel = $proof->addonQuoteSnapshot();
                                             $paCodesSel = $paSnapshotSel['codes'] ?? $proof->addonCodeList();
                                             $paCycleSel = $paSnapshotSel['cycle'] ?? (\App\Services\PosAddonService::cycleForProof($proof) ?? 'annual');
-                                            $paCatalogSel = \App\Services\PosAddonPricingService::ADDONS;
                                             $paQuoteSel = $paSnapshotSel ?? \App\Services\PosAddonService::quote($paCodesSel, $paCycleSel, $proof->company);
                                             $paPaid = $proof->amount !== null ? (float) $proof->amount : null;
                                             $paShort = $paPaid !== null ? max(0, $paQuoteSel['total'] - $paPaid) : 0;
@@ -229,7 +228,7 @@
                                                 <label class="flex items-start gap-2 text-[11px] text-gray-300">
                                                     <input type="checkbox" name="addon_codes[]" value="{{ $paCode }}" checked class="mt-0.5 rounded bg-gray-900 border-gray-700">
                                                     <span>
-                                                        {{ $paCatalogSel[$paCode]['label'] ?? $paCode }}
+                                                        {{ $paCatalog[$paCode]['label'] ?? $paCode }}
                                                         <span class="block text-gray-500">PKR {{ number_format($paQuoteSel['lines'][$paCode] ?? 0) }}</span>
                                                     </span>
                                                 </label>

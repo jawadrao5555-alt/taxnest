@@ -157,6 +157,31 @@ try {
   await checkProductDefaults();
   await page.goto(base+'/invoice/create');
   await checkProductDefaults();
+
+  await page.goto(base+'/invoice/create');
+  await page.waitForFunction(() => window.Alpine && document.querySelector('form[x-data]')?._x_dataStack);
+  await page.locator('input[name="invoice_date"]').fill('2026-08-01');
+  await page.locator('input[name=buyer_name]').fill('Synthetic cement buyer');
+  await page.locator('[name=buyer_address]').fill('Synthetic local address');
+  await page.locator('[name=buyer_ntn]').fill('1234567');
+  await item('hs_code').fill('2523.2900');
+  await item('description').fill('Synthetic cement line');
+  await item('schedule_type').selectOption('di_cement_retail_kg');
+  assert.equal(await item('default_uom').inputValue(), 'Kilograms');
+  await item('quantity').fill('2.5');
+  await item('price').fill('400');
+  await item('mrp').fill('500');
+  await page.waitForFunction(() => Alpine.$data(document.querySelector('form[x-data]')).grandTotal() === '1235.00');
+  assert.equal(Number(await item('tax').inputValue()), 225);
+  await page.getByRole('button', {name: /Create Invoice/i}).first().click();
+  await page.waitForURL(url => url.pathname === '/invoices');
+  await page.getByRole('main').getByText('Invoice created successfully.', {exact: true}).waitFor();
+  await page.goto(base + await page.locator('a[href^="/invoice/"][href$="/edit"]').first().getAttribute('href'));
+  await page.waitForFunction(() => window.Alpine && document.querySelector('form[x-data]')?._x_dataStack);
+  assert.equal(await item('schedule_type').inputValue(), 'di_cement_retail_kg');
+  await item('mrp').fill('600');
+  await page.waitForFunction(() => Alpine.$data(document.querySelector('form[x-data]')).grandTotal() === '1280.00');
+  assert.equal(Number(await item('tax').inputValue()), 270);
  }
  assert.deepEqual(errors,[]);
  console.log('DI '+mode+' real form interaction and draft save passed.');

@@ -10,6 +10,7 @@ use App\Models\Subscription;
 use App\Services\DiSellingPacking;
 use App\Services\FbrService;
 use App\Services\IntegrityHashService;
+use App\Services\InvoicePdfService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -118,6 +119,106 @@ class DiSellingPackingTest extends TestCase
             $this->assertEquals($total, $payload['items'][0]['totalValues']);
         }
         Http::assertNothingSent();
+    }
+
+    #[DataProvider('specialRates')]
+    public function test_special_rates_reconcile_packed_and_direct_drafts_with_the_pdf_and_fbr_payload(
+        string $schedule, string $hs, string $gross, ?float $retailPrice, float $tax, float $fed,
+        float $notifiedValue, string $scenario, string $rateLabel
+    ): void {
+        $this->travelTo(now()->setDate(2026, 11, 27));
+        $this->company->update(['fbr_environment' => 'sandbox']);
+        [$product, $pack] = $this->product('KG', '5 kg pack', '5');
+        $product->update(['hs_code' => $hs]);
+
+        foreach ([true, false] as $packed) {
+            $input = $this->payload($product, $pack, '0.5', $gross);
+            $input['invoice_date'] = '2026-11-27';
+            $line = &$input['items'][0];
+            $line['schedule_type'] = $schedule;
+            $line['tax_rate'] = 0;
+            $line['tax'] = 0;
+            if ($packed) {
+                $line['price_includes_tax'] = true;
+                $line['mrp'] = $retailPrice === null ? null : $retailPrice * 5;
+            } else {
+                unset($line['selling_packing_id']);
+                $line['quantity'] = '2.5';
+                $line['price'] = '400';
+                $line['mrp'] = $retailPrice;
+            }
+            unset($line);
+
+            $this->withHeader('Authorization', 'Bearer '.$this->key)->postJson('/api/di/v1/invoices', $input)->assertCreated();
+            $invoice = Invoice::withoutGlobalScopes()->where('client_reference', $input['client_reference'])->sole()->load('items', 'company');
+            $item = $invoice->items->sole();
+            $this->assertSame(2.5, $item->quantity);
+            $this->assertSame(18.0, $item->tax_rate);
+            $this->assertSame($tax, $item->tax);
+            $this->assertSame($fed, $item->di_federal_excise);
+            $this->assertEquals(1000, $invoice->total_value_excluding_st);
+            $this->assertEquals(1000 + $fed + $tax, $invoice->total_amount);
+
+            $service = app(FbrService::class);
+            $payload = $service->buildPayload($invoice, true);
+            $this->assertSame($scenario, $payload['scenarioId']);
+            $this->assertSame($rateLabel, $payload['items'][0]['rate']);
+            $this->assertSame($tax, $payload['items'][0]['salesTaxApplicable']);
+            $this->assertSame($fed, $payload['items'][0]['fedPayable']);
+            $this->assertSame($notifiedValue, $payload['items'][0]['fixedNotifiedValueOrRetailPrice']);
+            $this->assertEquals($invoice->total_amount, $payload['items'][0]['totalValues']);
+            $this->assertSame($scenario === 'SN022' ? '56' : '', $payload['items'][0]['sroItemSerialNo']);
+            $invoice->company->fbr_environment = 'production';
+            $production = $service->buildPayload($invoice, true);
+            $this->assertArrayNotHasKey('scenarioId', $production);
+            $expectedProductionLine = $payload['items'][0];
+            if ($scenario === 'SN021') {
+                $this->assertSame('Cement /Concrete Block', $expectedProductionLine['saleType']);
+                $expectedProductionLine['saleType'] = 'Cement/Concrete Block';
+            }
+            $this->assertSame([$expectedProductionLine], $production['items']);
+
+            $html = view('invoice.pdf-bw', InvoicePdfService::buildData($invoice))->render();
+            $this->assertStringContainsString($rateLabel, $html);
+            $this->assertStringContainsString(number_format(1000 + $fed + $tax, 2), $html);
+            $fed === 0.0 ? $this->assertStringNotContainsString('Federal Excise Duty</td>', $html)
+                : $this->assertStringContainsString('Federal Excise Duty</td>', $html);
+        }
+        Http::assertNothingSent();
+    }
+
+    public static function specialRates(): array
+    {
+        return [
+            'mixed sales tax' => ['di_potassium_kg', '2829.1910', '2660', null, 330.0, 0.0, 0.0, 'SN022', '18% along with rupees 60 per kilogram'],
+            'bulk cement' => ['di_cement_kg', '2523.2900', '2383.60', null, 181.8, 10.0, 0.0, 'SN021', 'Rs.4'],
+            'retail-packed cement' => ['di_cement_retail_kg', '2523.2900', '2470', 500.0, 225.0, 10.0, 1250.0, 'SN021', 'Rs.4'],
+        ];
+    }
+
+    public function test_special_rates_reject_an_incompatible_hs_unit_date_or_missing_retail_price(): void
+    {
+        $this->travelTo(now()->setDate(2026, 11, 27));
+        [$product, $pack] = $this->product('KG', '5 kg pack', '5');
+        $input = $this->payload($product, $pack, '1', '500');
+        unset($input['items'][0]['selling_packing_id'], $input['items'][0]['product_id']);
+        $input['invoice_date'] = '2026-11-27';
+        $input['items'][0]['schedule_type'] = 'di_potassium_kg';
+        $api = $this->withHeader('Authorization', 'Bearer '.$this->key);
+        $api->postJson('/api/di/v1/invoices', $input)->assertUnprocessable();
+
+        $input['items'][0]['hs_code'] = '2829.1910';
+        $input['items'][0]['default_uom'] = 'Liter';
+        $api->postJson('/api/di/v1/invoices', $input)->assertUnprocessable();
+        $input['items'][0]['default_uom'] = 'KG';
+        $input['invoice_date'] = '2026-06-30';
+        $api->postJson('/api/di/v1/invoices', $input)->assertUnprocessable();
+
+        $input['invoice_date'] = '2026-11-27';
+        $input['items'][0]['hs_code'] = '2523.2900';
+        $input['items'][0]['schedule_type'] = 'di_cement_retail_kg';
+        $api->postJson('/api/di/v1/invoices', $input)->assertUnprocessable();
+        $this->assertSame(0, Invoice::withoutGlobalScopes()->where('company_id', $this->company->id)->count());
     }
 
     public function test_packing_return_uses_original_conversion_after_catalogue_edit_and_blocks_excess(): void

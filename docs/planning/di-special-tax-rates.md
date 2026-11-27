@@ -40,13 +40,22 @@ Sources
 - [FBR Pakistan Customs Tariff, chapters 28 and 31](https://download1.fbr.gov.pk/Docs/20258111683941732Tariff-2025-26.pdf)
 - [Public example requests for SN021 and SN022](https://tallied.pk/blog/fbr-digital-invoicing-sandbox-scenarios.html)
 
-## Verification and release
+## Implementation and field verification
 
-- [x] Inventory the checked-in workbook, isolate two statutory cases and record the scenario-specific evidence gaps.
-- [x] Extend the synthetic DI browser case to check that a reference response containing mixed and fixed rupee labels cannot replace the selected percentage rate. This is a local fixture, with regulator acceptance tracked separately below.
-- [ ] Obtain authorized Sandbox reference and validation evidence for SN022 and SN021. Use a matching taxpayer profile in the Sandbox and verify both header and item results. Capture validation separately from a numbered Sandbox submission if one is required. Do not put raw responses or tokens in GitHub.
-- [ ] Implement the accepted combinations in `DiInvoiceMath` and use the persisted fiscal values for both the invoice and the payload. The current payload builder emits a percentage label for taxable lines and derives monetary fields from percentage math. A mixed rate must preserve its verified label. FED and sales tax need separate persisted amounts wherever the scenario requires them. Preserve issued snapshots and the existing reference-only treatment for unverified combinations.
-- [ ] Compare Create and Edit, persisted values, PDF and payload. Use fictional examples with no further tax, withholding or discounts to isolate the components. Standard 18% on PKR 1,000 is PKR 180. The SN022 candidate on PKR 1,000 at 2.5 kg gives PKR 180 ad valorem and PKR 150 fixed, for PKR 330 tax. Use equivalent reporting quantities entered directly and through packing to verify the same result. The SN021 candidate on 2.5 kg gives PKR 10 FED before any sales tax. Verify decimal quantity, rounding at the half-cent boundary, and the sales-tax basis with accepted scenario data.
-- [ ] Run DI, browser and fiscal payload regression checks on the implementation head before requesting owner approval.
+The invoice editor and draft API support three explicit selections for sales dated from 1 July 2026. The sale must use the matching HS and a validated kilogram reporting unit. A selling pack is converted through its saved kilogram factor before tax is calculated. Both environments use the same calculation. A numbered submission continues to require FBR acknowledgement.
 
-**Status:** Research updated. The statutory examples are identified, and scenario-specific Sandbox evidence is still pending. Runtime implementation and release acceptance remain open. IRIS Annex-C verification remains tracked in [#442](https://github.com/jawadrao5555-alt/taxnest/pull/442).
+| Invoice treatment | Calculation and payload |
+| --- | --- |
+| Potassium chlorate | Eighth Schedule Table I serial 56. Apply the percentage to the sale value and the fixed amount to the reporting kilograms. Put the combined amount in `salesTaxApplicable`. This selection is for sales where both components apply. |
+| FED-liable bulk hydraulic cement | Calculate FED on the reporting kilograms. Calculate sales tax on the value including FED. Send the computed FED separately in `fedPayable`. |
+| FED-liable retail-packed hydraulic cement | Require the printed retail-price basis for the selling unit. Calculate sales tax on that basis and FED separately by reporting kilograms. |
+
+Production sending validates the assembled special-rate payload against the FBR validation endpoint before sending that same payload to the posting endpoint. A reference mismatch, invalid response or unavailable validation leaves the invoice unsubmitted and gives a correction path. Standard-rate invoices keep their existing flow. The current special schedules apply only to sale invoices. Their use in credit and debit notes requires the original fiscal treatment and separate acceptance.
+
+- [x] Check the workbook and document identification of SN021 and SN022.
+- [x] Calculate explicit special rates and review draft values, stored line amounts, PDF and payload with fictional test data.
+- [ ] Complete the authenticated browser and hosted regression checks for this implementation head.
+- [ ] Verify actual SN021 and SN022 responses on the deployed TaxNest panel using the authorized Sandbox profile. Compare the accepted rate descriptor, quantity and UOM, tax base, FED and sales-tax allocation, schedule and serial. Keep customer identifiers and credentials private.
+- [ ] Review any FBR rejection and correct the mapping before using that treatment to send a production invoice.
+
+IRIS Annex-C verification is tracked in [#442](https://github.com/jawadrao5555-alt/taxnest/pull/442).

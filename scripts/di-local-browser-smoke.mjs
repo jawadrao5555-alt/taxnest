@@ -176,7 +176,9 @@ try {
   await page.getByRole('button', {name: /Create Invoice/i}).first().click();
   await page.waitForURL(url => url.pathname === '/invoices');
   await page.getByRole('main').getByText('Invoice created successfully.', {exact: true}).waitFor();
-  await page.goto(base + await page.locator('a[href^="/invoice/"][href$="/edit"]').first().getAttribute('href'));
+  const cementRow = page.getByRole('row').filter({hasText: 'Synthetic cement buyer'});
+  const cementEdit = cementRow.locator('a[href^="/invoice/"][href$="/edit"]');
+  await page.goto(base + await cementEdit.getAttribute('href'));
   await page.waitForFunction(() => window.Alpine && document.querySelector('form[x-data]')?._x_dataStack);
   assert.equal(await item('schedule_type').inputValue(), 'di_cement_retail_kg');
   await item('mrp').fill('600');

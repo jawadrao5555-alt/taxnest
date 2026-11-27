@@ -247,6 +247,11 @@
                             {{-- Admin impersonation marker sits IN the bar (26 Aug 2026):
                                  as a floating pill it covered whatever was underneath it. --}}
                             @include('partials.impersonation-banner')
+                            @if($diUpdateCompany?->product_type === 'di')
+                                <span class="text-xs font-semibold whitespace-nowrap">FBR {{ match ($diUpdateCompany->fbr_environment ?? 'sandbox') {
+                                    'sandbox' => 'Sandbox', 'production' => 'Production', default => 'environment unknown',
+                                } }}</span>
+                            @endif
                             <span class="hidden sm:inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
                                 @if(auth()->user()->role === 'super_admin') bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300
                                 @elseif(auth()->user()->role === 'company_admin') bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300

@@ -120,7 +120,7 @@ class SubscriptionAssignmentService
             // in `price` (6% already baked in) — use it as-is, never × 12.
             return [
                 'cycle' => 'annual',
-                'final_price' => round((float) $plan->sale_price),
+                'final_price' => round((float) $plan->sale_price, NestErps::isProductType($type) ? 2 : 0),
                 'discount_percent' => 6.0,
             ];
         }

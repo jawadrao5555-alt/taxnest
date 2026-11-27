@@ -24,7 +24,7 @@ export async function billingSelectionWorkflow(page, t, v, {baseUrl, saveEvidenc
   pass('BILLING SELECTION PASS: '+v.width+': actual package selection, labelled receipt upload and unchanged paid package pending review');
 }
 
-async function signupFormsWorkflow(existingPage,t,v,{baseUrl,saveEvidenceScreenshot,pass}) {
+export async function signupFormsWorkflow(existingPage,t,v,{baseUrl,saveEvidenceScreenshot,pass}) {
   for(const [product,path] of [['di','/register'],['pos','/pos/register'],['fbrpos','/fbr-pos/register'],['erps','/health/register']]) {
     const context=await existingPage.context().browser().newContext({viewport:v});
     await context.route('**/*',r=>new URL(r.request().url()).origin===new URL(baseUrl).origin?r.continue():r.abort('blockedbyclient'));
@@ -33,12 +33,14 @@ async function signupFormsWorkflow(existingPage,t,v,{baseUrl,saveEvidenceScreens
       const entry=await page.goto(baseUrl+path,{waitUntil:'domcontentloaded'});
       if(!entry?.ok()||new URL(page.url()).pathname!==path)throw Error(product+' synthetic signup entry unavailable: HTTP '+entry?.status()+' path '+new URL(page.url()).pathname);
       const form=page.locator('form[method="POST"]').filter({has:page.locator('input[name="company_name"]')});
-      const picker=form.locator(product==='fbrpos'?'#requested-plan':'#required-signup-package');
+      const submitsPlanId = product === 'pos' || product === 'erps';
+      const field = submitsPlanId ? 'pricing_plan_id' : 'requested_plan';
+      const picker=form.locator('select[name="'+field+'"]');
       if(!await picker.evaluate(el=>el.required))throw Error(product+' signup package is not required');
       await picker.selectOption('');
       if(await picker.evaluate(el=>el.checkValidity()))throw Error(product+' signup accepted missing package');
       const chosen=t.billingSelection[v.width].publicPlans[product];
-      const chosenValue=product==='pos'?String(chosen.id):chosen.name;
+      const chosenValue=submitsPlanId ? String(chosen.id) : chosen.name;
       const available=await picker.locator('option').evaluateAll(options=>options.map(o=>o.value));
       if(!available.includes(chosenValue))throw Error(product+' synthetic signup package is not in the actual server catalogue');
       await picker.selectOption(chosenValue);
@@ -55,6 +57,9 @@ async function signupFormsWorkflow(existingPage,t,v,{baseUrl,saveEvidenceScreens
         page.waitForNavigation({waitUntil:'domcontentloaded'}),
         form.locator('button[type="submit"]').click()
       ]);
+      if (new URLSearchParams(response.request().postData() || '').get(field) !== chosenValue) {
+        throw Error(product+' signup did not submit the selected package in '+field);
+      }
       const location=response.headers().location||'';
       if(response.status()!==302||!location||new URL(location,baseUrl).pathname===path)
         throw Error('Actual '+product+' signup did not complete at '+v.width);

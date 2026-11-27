@@ -19,15 +19,15 @@
 
         <form method="GET" action="{{ route('saas.admin.payment-proofs') }}" class="mb-4 flex flex-wrap gap-3 items-end">
             <input type="hidden" name="status" value="{{ $status }}">
-            <label class="block text-sm font-semibold text-gray-900 dark:text-gray-100">Company ID
-                <input type="number" name="company_id" min="1" value="{{ $companyId ?? '' }}" class="block mt-1 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border border-gray-400">
+            <label class="block text-sm font-semibold text-gray-900 dark:text-gray-100">Company ID or account code
+                <input type="text" name="company_id" maxlength="32" value="{{ $companyReference }}" class="block mt-1 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border border-gray-400">
             </label>
             <button type="submit" class="px-3 py-2 rounded-lg bg-indigo-700 text-white font-semibold">Filter company</button>
             <a class="underline text-sm text-gray-900 dark:text-gray-100" href="{{ route('saas.admin.payment-proofs', ['status' => $status]) }}">All companies</a>
         </form>
         <div class="flex flex-wrap gap-2 mb-5">
             @foreach($tabs as $key => $label)
-                <a href="{{ route('saas.admin.payment-proofs', array_filter(['status' => $key, 'company_id' => $companyId ?? null])) }}"
+                <a href="{{ route('saas.admin.payment-proofs', $companyReference === '' ? ['status' => $key] : ['status' => $key, 'company_id' => $companyReference]) }}"
                    class="px-3 py-1.5 rounded-lg text-xs font-semibold transition {{ $activeTab === $key ? 'admin-btn text-white' : 'bg-gray-800 text-gray-400 hover:text-gray-200' }}">
                     {{ $label }}
                 </a>
@@ -62,6 +62,9 @@
                         <tr class="hover:bg-gray-800/50 align-top" x-data="{ panel: null }">
                             <td class="px-4 py-3 text-white font-medium">
                                 {{ $proof->company->name ?? ('#' . $proof->company_id) }}
+                                @if($proof->company)
+                                    <span class="block text-xs font-mono">{{ \App\Services\CompanyProductId::display($proof->company) }}</span>
+                                @endif
                                 @if($proof->notes)
                                     <p class="text-xs text-gray-500 dark:text-gray-400 mt-1 max-w-[220px]">{{ $proof->notes }}</p>
                                 @endif
@@ -73,7 +76,7 @@
                                         $paSnapshot = $proof->addonQuoteSnapshot();
                                         $paCodes = $paSnapshot['codes'] ?? $proof->addonCodeList();
                                         $paCycle = $paSnapshot['cycle'] ?? (\App\Services\PosAddonService::cycleForProof($proof) ?? 'annual');
-                                        $paCatalog = \App\Services\PosAddonPricingService::ADDONS;
+                                        $paCatalog = \App\Services\PosAddonPricingService::definitions();
                                         $paQuote = $paSnapshot ?? \App\Services\PosAddonService::quote($paCodes, $paCycle, $proof->company);
                                     @endphp
                                     <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-violet-900/40 text-violet-300 border border-violet-700/60">Feature add-on &times; {{ count($paCodes) }}</span>
@@ -200,7 +203,6 @@
                                             $paSnapshotSel = $proof->addonQuoteSnapshot();
                                             $paCodesSel = $paSnapshotSel['codes'] ?? $proof->addonCodeList();
                                             $paCycleSel = $paSnapshotSel['cycle'] ?? (\App\Services\PosAddonService::cycleForProof($proof) ?? 'annual');
-                                            $paCatalogSel = \App\Services\PosAddonPricingService::ADDONS;
                                             $paQuoteSel = $paSnapshotSel ?? \App\Services\PosAddonService::quote($paCodesSel, $paCycleSel, $proof->company);
                                             $paPaid = $proof->amount !== null ? (float) $proof->amount : null;
                                             $paShort = $paPaid !== null ? max(0, $paQuoteSel['total'] - $paPaid) : 0;
@@ -229,7 +231,7 @@
                                                 <label class="flex items-start gap-2 text-[11px] text-gray-300">
                                                     <input type="checkbox" name="addon_codes[]" value="{{ $paCode }}" checked class="mt-0.5 rounded bg-gray-900 border-gray-700">
                                                     <span>
-                                                        {{ $paCatalogSel[$paCode]['label'] ?? $paCode }}
+                                                        {{ $paCatalog[$paCode]['label'] ?? $paCode }}
                                                         <span class="block text-gray-500">PKR {{ number_format($paQuoteSel['lines'][$paCode] ?? 0) }}</span>
                                                     </span>
                                                 </label>
@@ -243,7 +245,7 @@
                                                 <input type="number" name="verified_received_amount" value="{{ old('verified_received_amount', $proof->amount) }}" step="0.01" min="0.01" required class="w-full bg-gray-900 border border-gray-700 rounded-lg text-white text-xs px-2 py-2">
                                                 <p class="text-[11px] text-gray-500 mt-1">Independent reviewer amount; the company-entered claim is not used as receipt evidence.</p>
                                             </div>
-                                            <button type="submit" class="w-full px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg transition">Approve Add-on</button>
+                                            <button type="submit" class="w-full px-3 py-2 tn-admin-action tn-admin-action--confirm text-xs font-semibold rounded-lg transition">Approve Add-on</button>
                                         </form>
                                     </div>
                                     @elseif($proof->isAiPages())
@@ -278,7 +280,7 @@
                                             @csrf
                                             <label class="block text-[11px] text-gray-400">Amount verified in bank/receipt (PKR)</label>
                                             <input type="number" name="verified_received_amount" value="{{ old('verified_received_amount', $proof->amount) }}" step="0.01" min="0.01" required class="w-full bg-gray-900 border border-gray-700 rounded-lg text-white text-xs px-2 py-2">
-                                            <button type="submit" class="w-full px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg transition">Add {{ number_format($aiQty) }} Pages</button>
+                                            <button type="submit" class="w-full px-3 py-2 tn-admin-action tn-admin-action--confirm text-xs font-semibold rounded-lg transition">Add {{ number_format($aiQty) }} Pages</button>
                                         </form>
                                     </div>
                                     @elseif($proof->isExtraBranch())
@@ -295,7 +297,7 @@
                                             <input type="number" name="extra_branch_qty" value="{{ $ebQtySel }}" min="1" max="{{ \App\Services\BranchAddonService::MAX_QTY }}" required class="w-full bg-gray-900 border border-gray-700 rounded-lg text-white text-xs px-2 py-2">
                                             <label class="block text-[11px] text-gray-400">Amount verified in bank/receipt (PKR)</label>
                                             <input type="number" name="verified_received_amount" value="{{ old('verified_received_amount', $proof->amount) }}" step="0.01" min="0.01" required class="w-full bg-gray-900 border border-gray-700 rounded-lg text-white text-xs px-2 py-2">
-                                            <button type="submit" class="w-full px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg transition">Approve Extra Branch</button>
+                                            <button type="submit" class="w-full px-3 py-2 tn-admin-action tn-admin-action--confirm text-xs font-semibold rounded-lg transition">Approve Extra Branch</button>
                                         </form>
                                     </div>
                                     @else
@@ -443,7 +445,7 @@
                                                 </p>
                                             </div>
                                             @endif
-                                            <button type="submit" class="w-full px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg transition">Approve &amp; Unlock</button>
+                                            <button type="submit" class="w-full px-3 py-2 tn-admin-action tn-admin-action--confirm text-xs font-semibold rounded-lg transition">Approve &amp; Unlock</button>
                                         </form>
                                         </div>
                                     </div>
@@ -453,7 +455,7 @@
                                         <form method="POST" action="{{ route('saas.admin.payment-proofs.reject', $proof->id) }}" class="space-y-2">
                                             @csrf
                                             <input type="text" name="reject_reason" maxlength="255" placeholder="Reason (optional)" class="w-full bg-gray-900 border border-gray-700 rounded-lg text-white text-xs px-2 py-2">
-                                            <button type="submit" class="w-full px-3 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded-lg transition">Confirm Reject</button>
+                                            <button type="submit" class="w-full px-3 py-2 tn-admin-action tn-admin-action--danger text-xs font-semibold rounded-lg transition">Confirm Reject</button>
                                         </form>
                                     </div>
                                 @else

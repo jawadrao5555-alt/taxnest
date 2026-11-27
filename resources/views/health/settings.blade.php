@@ -4,7 +4,7 @@
 
         <div>
             <h1 class="text-xl sm:text-2xl font-black tracking-tight">{{ __('health.settings_title') }}</h1>
-            <p class="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{{ __('health.settings_subtitle') }}</p>
+            <p class="text-sm text-gray-700 dark:text-gray-300 mt-0.5">{{ __('health.settings_subtitle') }}</p>
         </div>
 
         {{-- Organisation summary — read-only here; the type itself is changed on

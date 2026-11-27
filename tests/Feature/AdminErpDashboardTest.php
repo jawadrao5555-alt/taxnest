@@ -56,6 +56,7 @@ class AdminErpDashboardTest extends TestCase
         $dashboard = $this->get('/admin/dashboard?erp_from=2026-11-01&erp_to=2026-11-30')->assertOk()
             ->assertSee('data-company-tab="erps"', false)
             ->assertSee('data-dashboard-metric="erp_companies"', false)
+            ->assertSee('Company ID: '.$school->product_company_id)
             ->assertSee('Healthcare company billing')
             ->assertSee('PKR 400.00')->assertSee('PKR 323.00')->assertSee('PKR 203.00')
             ->assertDontSee('PRIVATE-TEST-NOTE');
@@ -65,10 +66,16 @@ class AdminErpDashboardTest extends TestCase
         $this->assertNull($dashboard->viewData('erpSummaries')->get($school->id)['operations']);
         $this->assertFalse($dashboard->viewData('erpSummaries')->has($di->id));
 
-        $detail = $this->get('/admin/dashboard/details/erp_companies?company_id='.$legacyLab->id.'&erp_from=2026-11-01&erp_to=2026-11-30')->assertOk()
+        $detail = $this->get('/admin/dashboard/details/erp_companies?company_id='.$legacyLab->product_company_id.'&erp_from=2026-11-01&erp_to=2026-11-30')->assertOk()
             ->assertSee('Synthetic legacy Lab')->assertDontSee('Synthetic Hospital')
             ->assertSee('PKR 81.00')->assertDontSee('PKR 122.00')->assertDontSee('PRIVATE-TEST-NOTE');
         $this->assertSame(81.0, $detail->viewData('erpSummaries')->get($legacyLab->id)['operations']['received']);
+
+        $usage = $this->get(route('saas.admin.usage', [
+            'company_id' => $legacyLab->product_company_id, 'product_scope' => NestErps::PRODUCT_TYPE,
+            'date_from' => '2026-11-01', 'date_to' => '2026-11-30',
+        ]))->assertOk()->assertSee($legacyLab->name)->assertDontSee($hospital->name);
+        $this->assertSame(81.0, $usage->viewData('erpFinancials')->get($legacyLab->id)['operations']['received']);
     }
 
     private function company(string $name, string $product, ?string $vertical): Company

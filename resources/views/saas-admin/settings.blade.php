@@ -4,7 +4,7 @@
     <p class="text-xs text-gray-500 dark:text-gray-400 mb-6">Configure the global WhatsApp support number and the bank / payment account details shown to companies whose free trial has ended.</p>
 
     @if(auth('admin')->user()?->canManageRelease())
-    <a href="{{ route('saas.admin.website-clients.index') }}" class="mb-5 inline-block text-sm text-emerald-300 underline">Website Clients</a>
+    <a href="{{ route('saas.admin.website-clients.index') }}" class="tn-website-client-action mb-5">Website Clients</a>
     @endif
 
     @if(!$canManageSensitiveConfiguration)
@@ -196,7 +196,7 @@
         </div>
 
         <div class="flex justify-end">
-            <button type="submit" class="px-5 py-2.5 rounded-lg text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-500 transition">
+            <button type="submit" class="px-5 py-2.5 rounded-lg text-sm font-semibold tn-admin-action tn-admin-action--confirm transition">
                 Save Settings
             </button>
         </div>
@@ -290,7 +290,7 @@
 
             <div class="flex items-center justify-between gap-3">
                 <p class="text-[11px] text-gray-500">The password is stored encrypted. After saving, click "Send Test Email" below to confirm delivery.</p>
-                <button type="submit" class="px-5 py-2.5 rounded-lg text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-500 transition shrink-0">
+                <button type="submit" class="px-5 py-2.5 rounded-lg text-sm font-semibold tn-admin-action tn-admin-action--confirm transition shrink-0">
                     Save Email Settings
                 </button>
             </div>
@@ -355,7 +355,7 @@
 
             <div class="flex items-center justify-between gap-3">
                 <p class="text-[11px] text-gray-500">The token is stored encrypted. Alerts try WhatsApp first; on any failure the email goes out as before.</p>
-                <button type="submit" class="px-5 py-2.5 rounded-lg text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-500 transition shrink-0">
+                <button type="submit" class="px-5 py-2.5 rounded-lg text-sm font-semibold tn-admin-action tn-admin-action--confirm transition shrink-0">
                     Save WhatsApp Settings
                 </button>
             </div>
@@ -370,7 +370,7 @@
         <p class="text-[11px] text-gray-500 mb-4">Payment-proof alerts and trial reminder emails depend on the server's SMTP settings. Click below to send a test email to your own address ({{ auth('admin')->user()->email }}) — if SMTP is misconfigured, the exact error appears here instead of failing silently.</p>
         <form method="POST" action="{{ route('saas.admin.settings.test-email') }}">
             @csrf
-            <button type="submit" class="px-5 py-2.5 rounded-lg text-sm font-semibold bg-amber-600 text-white hover:bg-amber-500 transition">
+            <button type="submit" class="px-5 py-2.5 rounded-lg text-sm font-semibold tn-admin-action tn-admin-action--caution transition">
                 Send Test Email
             </button>
         </form>

@@ -16,6 +16,9 @@
         @if($canManageBilling)
             <a class="text-sm text-indigo-400 underline" href="{{ route('saas.admin.companies.package-receipts', $company->id) }}">Package receipts</a>
         @endif
+        @if($canReviewWebsiteClient)
+            <a class="tn-website-client-action" href="{{ route('saas.admin.website-clients.create', ['company' => $company->id]) }}">Review for Our Clients</a>
+        @endif
         <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {{ $sc[$company->status] ?? 'bg-gray-800 text-gray-400' }}">{{ $company->status }}</span>
         <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase {{ \App\Support\ProductCatalog::chipClass($company->product_type) }}">{{ \App\Support\ProductCatalog::label($company->product_type, $erpsVertical) }}</span>
         @if(!$company->trashed())
@@ -62,6 +65,9 @@
         <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
             <h3 class="text-sm font-semibold text-white mb-3">Company Details</h3>
             <div class="space-y-2 text-sm">
+                @unless($company->product_company_id ?? null)
+                    <div class="flex justify-between gap-2"><span class="text-gray-400">Company ID</span><span class="text-white tabular-nums">{{ $company->id }}</span></div>
+                @endunless
                 <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">Name</span><span class="text-white font-medium text-right min-w-0 break-words">{{ $company->name }}</span></div>
                 <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">Owner</span><span class="text-white text-right min-w-0 break-words">{{ $company->owner_name ?? '—' }}</span></div>
                 <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">NTN</span><span class="text-white text-right min-w-0 break-all">{{ $company->ntn ?? '—' }}</span></div>
@@ -72,6 +78,12 @@
                 <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">Address</span><span class="text-white text-right min-w-0 break-words">{{ $company->address ?? '—' }}</span></div>
                 <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">Province</span><span class="text-white text-right min-w-0 break-words">{{ $company->province ?? '—' }}</span></div>
                 <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">Franchise</span><span class="text-white text-right min-w-0 break-words">{{ $company->franchise->name ?? 'None' }}</span></div>
+                @if($company->product_company_id ?? null)
+                    <div class="flex justify-between gap-2"><span class="text-gray-400">Company ID</span><span class="font-mono font-semibold text-white">{{ $company->product_company_id }}</span></div>
+                @endif
+                @if($company->account_code ?? null)
+                    <div class="flex justify-between gap-2"><span class="text-gray-400">Legacy account code</span><span class="font-mono text-white">{{ $company->account_code }}</span></div>
+                @endif
                 <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">Created</span><span class="text-white text-right min-w-0">{{ $company->created_at->format('d M Y, h:i A') }}</span></div>
             </div>
         </div>
@@ -329,7 +341,7 @@
             </div>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
-                    <label class="block text-xs text-gray-400 mb-1">Company ID</label>
+                    <label class="block text-xs text-gray-400 mb-1">Agent Company ID (numeric)</label>
                     <div class="flex gap-2">
                         <input type="text" readonly value="{{ $company->id }}" x-ref="cid" class="w-full min-w-0 rounded-lg bg-gray-800 border-gray-700 text-gray-200 text-xs font-mono">
                         <button type="button" @click="copy($refs.cid, $el)" class="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-200 text-xs rounded-lg">Copy</button>

@@ -55,8 +55,14 @@
                     <div>
                         <label class="text-[10px] text-gray-500 uppercase">
                             Annual (PKR)
-                            <input type="number" name="addons[{{ $code }}][annual]" value="{{ old("addons.{$code}.annual", $addon['annual_price']) }}" min="0" max="999999999" step="1" required class="mt-1 w-full bg-gray-900 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500">
+                            <input type="number" name="addons[{{ $code }}][annual]" value="{{ old("addons.{$code}.annual", $addon['annual_price']) }}" aria-label="{{ $addon['label'] }} annual price (PKR)" min="0" max="999999999" step="1" required class="mt-1 w-full bg-gray-900 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500">
                         </label>
+                        @if(\App\Services\PosFederalAddonAccess::isFederalCode($code))
+                        <p class="mt-1 text-xs text-gray-400">Enter 0 to stop new purchases.</p>
+                        @endif
+                        @error("addons.{$code}.annual")
+                        <p class="mt-1 text-xs text-red-400">{{ $message }}</p>
+                        @enderror
                     </div>
                 </div>
                 @endforeach
@@ -72,10 +78,10 @@
 
     @endif
     <div class="tn-admin-plan-tabs flex flex-wrap items-center gap-2 mb-6">
-        <button :aria-pressed="activeTab === 'di'" @click="activeTab = 'di'" :class="activeTab === 'di' ? 'bg-emerald-600 text-white' : 'bg-gray-800 text-gray-400 hover:text-white'" class="px-4 py-2 rounded-lg text-sm font-semibold transition">Digital Invoice Plans</button>
-        <button :aria-pressed="activeTab === 'pos'" @click="activeTab = 'pos'" :class="activeTab === 'pos' ? 'bg-purple-600 text-white' : 'bg-gray-800 text-gray-400 hover:text-white'" class="px-4 py-2 rounded-lg text-sm font-semibold transition">PRA POS Plans</button>
-        <button :aria-pressed="activeTab === 'fbrpos'" @click="activeTab = 'fbrpos'" :class="activeTab === 'fbrpos' ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-400 hover:text-white'" class="px-4 py-2 rounded-lg text-sm font-semibold transition">FBR POS Plans</button>
-        <button :aria-pressed="activeTab === 'erps'" @click="activeTab = 'erps'" :class="activeTab === 'erps' ? 'bg-teal-600 text-white' : 'bg-gray-800 text-gray-400 hover:text-white'" class="px-4 py-2 rounded-lg text-sm font-semibold transition">{{ \App\Support\NestErps::LABEL }} Plans</button>
+        <button :aria-pressed="activeTab === 'di'" @click="activeTab = 'di'" class="tn-admin-action px-4 py-2 rounded-lg text-sm font-semibold transition">Digital Invoice Plans</button>
+        <button :aria-pressed="activeTab === 'pos'" @click="activeTab = 'pos'" class="tn-admin-action px-4 py-2 rounded-lg text-sm font-semibold transition">PRA POS Plans</button>
+        <button :aria-pressed="activeTab === 'fbrpos'" @click="activeTab = 'fbrpos'" class="tn-admin-action px-4 py-2 rounded-lg text-sm font-semibold transition">FBR POS Plans</button>
+        <button :aria-pressed="activeTab === 'erps'" @click="activeTab = 'erps'" class="tn-admin-action px-4 py-2 rounded-lg text-sm font-semibold transition">{{ \App\Support\NestErps::LABEL }} Plans</button>
     </div>
 
     @if($canManageBilling)

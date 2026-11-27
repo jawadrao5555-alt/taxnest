@@ -1,5 +1,5 @@
 <x-dynamic-component :component="$layout">
-    <main class="max-w-5xl mx-auto p-4 space-y-6" id="package-checkout">
+    <main class="max-w-5xl mx-auto p-4 space-y-6" id="package-checkout" data-company-billing>
         <h1 class="text-2xl font-bold">Package selection and payment review</h1>
         <p>Select an available package and billing period, then upload evidence of a payment already made. This page does not charge a payment method or activate a subscription. Selection alone does not change access. Receipt uploads remain subject to the existing review and temporary-access policy.</p>
         @include('billing._policy-status')
@@ -20,13 +20,13 @@
                 <h2 class="font-bold">{{ $plan->name }}</h2>
                 <input type="hidden" name="plan_id" value="{{ $plan->id }}">
                 <label for="checkout-cycle-{{ $plan->id }}">Billing period and payable total</label>
-                <select id="checkout-cycle-{{ $plan->id }}" name="billing_cycle" class="block w-full rounded-lg dark:bg-gray-800">
+                <select id="checkout-cycle-{{ $plan->id }}" name="billing_cycle" class="block w-full rounded-lg tn-billing-field">
                     @foreach($cycles as $cycle)
                         @php($price = ($savedQuote['cycle'] ?? null) === $cycle ? $savedQuote : \App\Services\DistributorDiscountService::quote($company, $plan, $cycle))
                         <option value="{{ $cycle }}" @selected(($savedQuote['cycle'] ?? request('billing_cycle', 'annual')) === $cycle)>{{ \App\Models\Subscription::getCycleLabel($cycle) }} · PKR {{ number_format($price['net_quote'], 2) }}</option>
                     @endforeach
                 </select>
-                <button type="submit" class="rounded-lg bg-blue-700 text-white p-2">Select period and review quote</button>
+                <button type="submit" class="rounded-lg tn-billing-action p-2">Select period and review quote</button>
             </form>
         @endforeach
         </section>
@@ -42,11 +42,11 @@
                 @csrf
                 <input type="hidden" name="pricing_plan_id" value="{{ $selectedPlan->id }}">
                 <input type="hidden" name="billing_cycle" value="{{ $quote['cycle'] }}">
-                <label class="block">Amount you paid (PKR)<input name="amount" type="number" min="0.01" step="0.01" value="{{ $quote['net_quote'] }}" required class="block rounded-lg dark:bg-gray-800"></label>
-                <label class="block">Payment method<select name="payment_method" class="block rounded-lg dark:bg-gray-800"><option value="bank">Bank transfer</option><option value="jazzcash">JazzCash</option><option value="easypaisa">Easypaisa</option><option value="other">Other</option></select></label>
-                <label class="block">Transaction reference<input name="reference" maxlength="120" class="block rounded-lg dark:bg-gray-800"></label>
+                <label class="block">Amount you paid (PKR)<input name="amount" type="number" min="0.01" step="0.01" value="{{ $quote['net_quote'] }}" required class="block rounded-lg tn-billing-field"></label>
+                <label class="block">Payment method<select name="payment_method" class="block rounded-lg tn-billing-field"><option value="bank">Bank transfer</option><option value="jazzcash">JazzCash</option><option value="easypaisa">Easypaisa</option><option value="other">Other</option></select></label>
+                <label class="block">Transaction reference<input name="reference" maxlength="120" class="block rounded-lg tn-billing-field"></label>
                 <label class="block">Payment receipt (JPG, PNG or PDF; up to 5 MB)<input name="proof" type="file" accept=".jpg,.jpeg,.png,.pdf" required class="block max-w-full"></label>
-                <button type="submit" class="rounded-lg bg-blue-700 text-white p-2">Submit receipt for review</button>
+                <button type="submit" class="rounded-lg tn-billing-action p-2">Submit receipt for review</button>
             </form>
         </section>
         @endif

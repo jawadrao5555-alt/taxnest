@@ -21,7 +21,7 @@
                             @if($isHealthcare)
                                 <p class="text-xs">{{ __(\App\Support\HealthPanel::orgTypeLabelKey($company->health_org_type)) }}</p>
                             @endif
-                            <p class="text-xs">Company ID: {{ $company->id }} · <a class="underline" href="{{ route('saas.admin.usage', ['product_scope' => $erpType, 'company_id' => $company->id] + $erpFilters) }}">Reports</a></p>
+                            <p class="text-xs">Company ID: {{ \App\Services\CompanyProductId::display($company) }} · <a class="underline" href="{{ route('saas.admin.usage', ['product_scope' => $erpType, 'company_id' => $company->id] + $erpFilters) }}">Reports</a></p>
                         </td>
                         <td class="px-4 py-3 align-top" data-label="Status">{{ ucfirst($company->status) }}</td>
                         <td class="px-4 py-3 align-top" data-label="TaxNest subscriptions">

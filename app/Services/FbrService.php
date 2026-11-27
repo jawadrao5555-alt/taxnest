@@ -320,6 +320,7 @@ class FbrService
         $items = [];
         foreach ($invoice->items as $item) {
             $scheduleType = $item->schedule_type ?? 'standard';
+            $special = DiSpecialTax::rule($scheduleType);
             $rawSaleType = $item->sale_type ?: ScheduleEngine::mapSaleType($scheduleType);
             $is3rdSchedule = stripos($rawSaleType, '3rd Schedule') !== false;
             $isExempt = stripos($rawSaleType, 'exempt') !== false;
@@ -337,7 +338,9 @@ class FbrService
             $discount = $money['discount'];
             $totalValues = $money['totalValues'];
 
-            if ($isExempt) {
+            if ($special) {
+                $rateValue = $special['rate_label'];
+            } elseif ($isExempt) {
                 $rateValue = "Exempt";
             } else {
                 $rateNum = ($taxRate == intval($taxRate)) ? intval($taxRate) : round($taxRate, 2);
@@ -348,7 +351,7 @@ class FbrService
             $hsCode = $item->hs_code ?? "";
             $uomCode = match (true) {
                 $localOnly => $this->normalizeUom($item->default_uom),
-                (bool) $item->fbr_reference_checked => app(DiFbrReferences::class)->payloadUnit($company, $hsCode, $item->default_uom ?? 'U'),
+                $special !== null || (bool) $item->fbr_reference_checked => app(DiFbrReferences::class)->payloadUnit($company, $hsCode, $item->default_uom ?? 'U'),
                 default => $this->getUomByHsCode($hsCode, $item->default_uom ?? 'U', $company),
             };
 
@@ -371,7 +374,10 @@ class FbrService
             ];
 
             $needsSro = ($is3rdSchedule && $taxRate < 18) || $isExempt || $isReduced;
-            if ($item->fbr_reference_checked) {
+            if ($special) {
+                $itemPayload['sroScheduleNo'] = $special['schedule'];
+                $itemPayload['sroItemSerialNo'] = $special['serial'];
+            } elseif ($item->fbr_reference_checked) {
                 // Validate the exact selected pair before sending. Static or
                 // learned mappings would silently change its meaning.
                 if ($needsSro || filled($item->sro_schedule_no) || filled($item->serial_no)) {
@@ -519,6 +525,9 @@ class FbrService
 
         $saleType = strtolower($firstItem->sale_type ?? '');
         $scheduleType = strtolower($firstItem->schedule_type ?? 'standard');
+        if ($special = DiSpecialTax::rule($scheduleType)) {
+            return $special['scenario'];
+        }
         $hsCode = trim($firstItem->hs_code ?? '');
         $taxRate = floatval($firstItem->tax_rate ?? 18);
         $buyerRegType = strtolower($payload['buyerRegistrationType'] ?? 'unregistered');
@@ -1462,7 +1471,10 @@ class FbrService
         $schemaErrors = [];
         foreach ($payload['items'] as $idx => $pItem) {
             $itemNum = $idx + 1;
-            if (!is_string($pItem['rate'] ?? null) || (!str_ends_with($pItem['rate'], '%') && $pItem['rate'] !== '-' && $pItem['rate'] !== 'Exempt')) {
+            $special = DiSpecialTax::rule($invoice->items->values()[$idx]->schedule_type);
+            $rate = $pItem['rate'] ?? null;
+            if (!is_string($rate) || ($special ? $rate !== $special['rate_label']
+                : (!str_ends_with($rate, '%') && !in_array($rate, ['-', 'Exempt'], true)))) {
                 $schemaErrors[] = "Item {$itemNum}: rate must be string ending with '%', '-', or 'Exempt', got: " . json_encode($pItem['rate'] ?? null);
             }
             if (!is_numeric($pItem['quantity'] ?? null)) {
@@ -1544,6 +1556,19 @@ class FbrService
                 'failure_type' => 'token_error',
                 'response_time_ms' => 0,
             ];
+        }
+
+        if ($frozenEnvironment === 'production' && $this->hasSpecialTaxItems($invoice)) {
+            $validation = $this->verifyFbrPayload($payload, $company, $token);
+            if ($validation['status'] !== 'valid') {
+                $clearHashOnFailure();
+                return [
+                    'status' => 'failed',
+                    'failure_type' => 'pre_validation',
+                    'errors' => $validation['errors'] ?? [$validation['message']],
+                    'response_time_ms' => 0,
+                ];
+            }
         }
 
         $log = FbrLog::create([
@@ -1917,17 +1942,31 @@ class FbrService
     {
         $errors = [];
         foreach ($invoice->items->values() as $index => $item) {
-            if (!$item->fbr_reference_checked) {
+            $special = DiSpecialTax::rule($item->schedule_type);
+            if (!$special && !$item->fbr_reference_checked) {
                 continue;
             }
             $date = \Illuminate\Support\Carbon::parse($payload['invoiceDate'])->toDateString();
             $row = $payload['items'][$index];
+            if ($special && ($date < '2026-07-01'
+                || ($payload['invoiceType'] ?? '') !== 'Sale Invoice'
+                || !DiSpecialTax::matchesHs($special, $row['hsCode'] ?? null)
+                || !DiSpecialTax::isKilogram($row['uoM'] ?? null)
+                || (!empty($special['retail']) && ($row['fixedNotifiedValueOrRetailPrice'] ?? 0) <= 0))) {
+                $errors[] = 'Item '.($index + 1).': Check the document type, effective date, HS code, kilogram reporting unit and any required retail price.';
+                continue;
+            }
             $lineErrors = app(DiFbrReferences::class)->errors($invoice->company, $date, $payload['sellerProvince'], $row);
             foreach ($lineErrors as $error) {
                 $errors[] = 'Item '.($index + 1).': '.$error;
             }
         }
         return $errors;
+    }
+
+    private function hasSpecialTaxItems($invoice): bool
+    {
+        return $invoice->items->contains(fn ($item) => DiSpecialTax::rule($item->schedule_type) !== null);
     }
 
     public function validateOnly($invoice): array
@@ -1952,6 +1991,13 @@ class FbrService
         }
 
         $demoMode = \App\Models\SystemSetting::get('demo_mode', 'false') === 'true';
+        if ($this->hasSpecialTaxItems($invoice) && ($demoMode || !$this->getApiToken($company))) {
+            return [
+                'status' => 'error',
+                'message' => 'Configure an FBR connection to verify a fixed or mixed tax rate.',
+                'payload' => $payload,
+            ];
+        }
         if ($demoMode) {
             return [
                 'status' => 'valid',
@@ -1969,8 +2015,12 @@ class FbrService
             ];
         }
 
-        $validateUrl = $this->getValidateUrl($company);
+        return $this->verifyFbrPayload($payload, $company, $token);
+    }
 
+    private function verifyFbrPayload(array $payload, $company, string $token): array
+    {
+        $env = $company->fbr_environment ?? 'sandbox';
         $unavailable = [
             'status' => 'error',
             'message' => "Local checks passed. FBR {$env} validation could not be confirmed. Try Validate FBR Payload again.",
@@ -1979,7 +2029,7 @@ class FbrService
 
         try {
             $jsonBody = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRESERVE_ZERO_FRACTION | JSON_THROW_ON_ERROR);
-            $result = $this->sendToFbr($validateUrl, $token, $jsonBody, 0);
+            $result = $this->sendToFbr($this->getValidateUrl($company), $token, $jsonBody, 0, 'validate');
         } catch (\Exception $e) {
             return $unavailable;
         }

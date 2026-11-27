@@ -5,6 +5,7 @@ namespace App\Http\Controllers\SaasAdmin;
 use App\Http\Controllers\Controller;
 use App\Models\Company;
 use App\Models\CompanyUsageStat;
+use App\Services\CompanyProductId;
 use App\Services\Reporting\ErpAdminFinancialSummary;
 use App\Support\NestErps;
 use App\Support\ProductCatalog;
@@ -27,7 +28,7 @@ class AdminUsageController extends Controller
         $customDates = ($request->input('period') ?? 'custom') === 'custom';
         $filters = $request->validate([
             'export' => 'nullable|in:local_csv,pra_csv,fbr_csv,di_csv',
-            'company_id' => 'required_if:export,local_csv,pra_csv,fbr_csv,di_csv|nullable|integer|min:1',
+            'company_id' => ['required_if:export,local_csv,pra_csv,fbr_csv,di_csv', 'nullable', 'max:32', 'regex:/\A(?:[0-9]*[1-9][0-9]*|[A-Z][A-Z0-9-]+)\z/i'],
             'branch_id' => 'nullable|integer|min:0',
             'product_scope' => ['nullable', Rule::in(array_keys($productScopes))],
             'period' => 'nullable|in:custom,daily,monthly,yearly,two_year',
@@ -67,7 +68,7 @@ class AdminUsageController extends Controller
             ];
         }
         $companyQuery = Company::query()
-            ->when(isset($filters['company_id']), fn ($query) => $query->whereKey($filters['company_id']));
+            ->when(isset($filters['company_id']), fn ($query) => CompanyProductId::matching($query, (string) $filters['company_id']));
         $scope = $filters['product_scope'] ?? null;
         if (isset($scope)) {
             $categories = match ($scope) {

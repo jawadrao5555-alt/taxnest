@@ -38,7 +38,10 @@ class AdminDashboardDetail {
   });
   foreach(['from'=>'>=','to'=>'<='] as $key=>$op) if(!empty($filters[$key])) $q->whereDate($table.'.created_at',$op,$filters[$key]);
   if(isset($filters['status']) && $filters['status']!=='') $q->where($table.'.'.$d['status'],$filters['status']);
-  if(!empty($filters['company_id'])) $q->where($table.'.'.($d['companies']?'id':'company_id'),$filters['company_id']);
+  if (isset($filters['company_id']) && $filters['company_id'] !== '') {
+   $companyId = self::companyKey($filters['company_id']);
+   $q->where($table.'.'.($d['companies'] ? 'id' : 'company_id'), $companyId ?? 0);
+  }
   if(!empty($filters['product'])) {
    $types=NestErps::storedTypesFor($filters['product']);
    if($d['companies']) $q->whereIn('product_type',$types);
@@ -61,6 +64,11 @@ class AdminDashboardDetail {
   }
   if($d['metric']==='di_invoices' && !empty($filters['environment'])) $q->where('fbr_status',$filters['environment']);
   return $q;
+ }
+ public static function companyKey(string $identifier): ?int {
+  $numericId = filter_var($identifier, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+
+  return $numericId !== false ? $numericId : CompanyProductId::matching(Company::withTrashed(), $identifier)->value('id');
  }
  /** Existing values remain selectable: never silently discard unknown legacy states. */
  public function filterOptions(array $d): array {

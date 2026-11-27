@@ -1,3 +1,5 @@
+import { assertControlContrast } from './ui-control-contrast.mjs';
+
 export async function billingSelectionWorkflow(page, t, v, {baseUrl, saveEvidenceScreenshot, pass}) {
   const f=t.billingSelection[v.width];
   await page.goto(baseUrl+'/billing/plans',{waitUntil:'domcontentloaded'});
@@ -75,11 +77,19 @@ async function packageCheckoutWorkflow(page,t,v,{baseUrl,saveEvidenceScreenshot,
   await page.goto(baseUrl+'/billing/checkout?plan_id='+f.planId,{waitUntil:'domcontentloaded'});
   const form=page.locator('[data-checkout-plan="'+f.planId+'"]');
   const choice=form.locator('select[name="billing_cycle"]');
+  const review=form.getByRole('button', {name:'Select period and review quote'});
+  await assertControlContrast(choice, 'Checkout billing period');
+  await assertControlContrast(review, 'Checkout review quote');
+  await choice.focus();
+  await page.keyboard.press('Tab');
+  await assertControlContrast(review, 'Checkout review quote keyboard focus', {minimum:3, focus:true});
   await choice.selectOption('annual');
   const displayed=(await choice.locator('option:checked').innerText()).split('PKR ')[1];
   if(!displayed)throw Error('Checkout did not display an exact payable total');
   await Promise.all([page.waitForNavigation({waitUntil:'domcontentloaded'}),form.getByRole('button').click()]);
   const quote=page.locator('#selected-package-quote');
+  await assertControlContrast(quote.getByLabel('Amount you paid (PKR)'), 'Checkout paid amount');
+  await assertControlContrast(quote.getByRole('button', {name:'Submit receipt for review'}), 'Checkout receipt review');
   if(!(await quote.innerText()).includes('PKR '+displayed))throw Error('Saved quote differs from selected payable total');
   await quote.getByLabel('Transaction reference',{exact:true}).fill('SYNTHETIC-CHECKOUT-'+v.width);
   await quote.getByLabel('Payment receipt (JPG, PNG or PDF; up to 5 MB)',{exact:true}).setInputFiles({name:'synthetic-checkout.pdf',mimeType:'application/pdf',buffer:Buffer.from('%PDF-1.4\n% Synthetic checkout only\n%%EOF\n')});

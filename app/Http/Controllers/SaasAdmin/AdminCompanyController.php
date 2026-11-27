@@ -13,11 +13,13 @@ use App\Models\User;
 use App\Models\Subscription;
 use App\Models\PricingPlan;
 use App\Models\Franchise;
+use App\Models\WebsiteClient;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\Http\Request;
 use App\Services\CredentialLedgerService;
+use App\Services\CompanyProductId;
 use App\Services\LocalViewerService;
 use App\Services\ViewablePasswordService;
 use App\Models\Notification;
@@ -328,13 +330,15 @@ class AdminCompanyController extends Controller
         if ($request->filled('status')) {
             $query->where('status', $request->status);
         }
-        if ($request->filled('search')) {
-            $search = $request->search;
+        $search = $request->query('search');
+        if (is_string($search) && trim($search) !== '') {
+            $search = trim($search);
             $like = \App\Helpers\DbCompat::like();
             $query->where(function ($q) use ($search, $like) {
                 $q->where('name', $like, "%{$search}%")
                   ->orWhere('ntn', $like, "%{$search}%")
-                  ->orWhere('owner_name', $like, "%{$search}%");
+                  ->orWhere('owner_name', $like, "%{$search}%")
+                  ->orWhere(fn ($companies) => CompanyProductId::matching($companies, $search));
             });
         }
 
@@ -483,7 +487,10 @@ class AdminCompanyController extends Controller
             ->filter(fn ($p) => !\App\Services\PlanSellabilityService::isRetired($p))
             ->values();
 
-        return view('saas-admin.companies.show', compact('company', 'usageStats', 'extraStats', 'archiveViewers', 'localViewers', 'companyAdmin', 'teamUsers', 'exemptInternalBills', 'grantPlans', 'groupMember', 'groupSiblings', 'accountOverview', 'companyDeletionRequest', 'canManageCompanyLifecycle', 'canManageBilling', 'isSuperAdmin'));
+        $canReviewWebsiteClient = $currentAdmin?->canManageRelease()
+            && WebsiteClient::companySources()->whereKey($company->id)->exists();
+
+        return view('saas-admin.companies.show', compact('company', 'usageStats', 'extraStats', 'archiveViewers', 'localViewers', 'companyAdmin', 'teamUsers', 'exemptInternalBills', 'grantPlans', 'groupMember', 'groupSiblings', 'accountOverview', 'companyDeletionRequest', 'canManageCompanyLifecycle', 'canManageBilling', 'isSuperAdmin', 'canReviewWebsiteClient'));
     }
 
     /**

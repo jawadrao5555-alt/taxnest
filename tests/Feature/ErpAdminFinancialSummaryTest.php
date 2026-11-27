@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\AdminUser;
+use App\Models\Branch;
 use App\Models\Company;
 use App\Services\Reporting\ErpAdminFinancialSummary;
 use App\Support\NestErps;
@@ -105,6 +106,34 @@ final class ErpAdminFinancialSummaryTest extends TestCase
         $report = app(ErpAdminFinancialSummary::class)->forCompanies(collect([$erp]));
         $this->assertNull($report[$erp->id]['operations']);
         $this->assertSame(0, $report[$erp->id]['subscription']['receipt_count']);
+    }
+
+    public function test_live_ops_links_to_read_only_erp_billing_and_refuses_foreign_branches(): void
+    {
+        $erp = $this->company('Synthetic reporting Lab', 'health');
+        $other = $this->company('Separate healthcare company', NestErps::PRODUCT_TYPE);
+        $pos = $this->company('Existing FBR POS company', 'fbrpos');
+        $branch = Branch::create(['company_id' => $erp->id, 'name' => 'Fictional reporting branch', 'code' => 'LAB-A']);
+        $foreign = Branch::create(['company_id' => $other->id, 'name' => 'Fictional other branch', 'code' => 'LAB-B']);
+        $this->healthBill($erp, 'SYN-REPORTING-BILL', 123.45, 23.45, branch: $branch->id);
+        $this->healthBill($other, 'SYN-FOREIGN-BILL', 999.99, 999.99, branch: $foreign->id);
+        $viewer = AdminUser::create(['name' => 'Restricted reviewer', 'email' => 'erp-live-viewer@example.invalid',
+            'password' => 'ExamplePassword123!', 'role' => 'admin']);
+        $admin = AdminUser::create(['name' => 'Synthetic reviewer', 'email' => 'erp-live-admin@example.invalid',
+            'password' => 'ExamplePassword123!', 'role' => 'super_admin']);
+        $url = route('saas.admin.live-ops.erp-company', $erp->id);
+        $from = ['date_from' => '2026-11-27', 'date_to' => '2026-11-27'];
+
+        $this->actingAs($viewer, 'admin')->get($url)->assertForbidden();
+        $this->actingAs($admin, 'admin')
+            ->get(route('saas.admin.live-ops', ['product' => NestErps::PRODUCT_TYPE]))
+            ->assertOk()->assertSee($url)->assertSee('ERP activity and billing')->assertDontSee($pos->name);
+        $this->get($url.'?'.http_build_query($from + ['branch_id' => $branch->id]))
+            ->assertOk()->assertSee('PKR 123.45')->assertSee('Fictional reporting branch')
+            ->assertDontSee('PKR 999.99')->assertDontSee($foreign->name)->assertDontSee('Private sample payer');
+        $this->getJson($url.'?'.http_build_query($from + ['branch_id' => $foreign->id]))
+            ->assertUnprocessable()->assertJsonValidationErrors('branch_id');
+        $this->getJson(route('saas.admin.live-ops.erp-company', $pos->id))->assertNotFound();
     }
 
     private function company(string $name, string $product, string $vertical = 'health'): Company

@@ -216,6 +216,7 @@
         <a href="{{ route('contact', ['topic' => 'erp-upgrade']) }}" class="erp-hub-button">Plan your ERP move</a>
     </section>
 
+    <x-website-clients product="erp" />
     @include('partials.product-guide-link', ['productGuideKey' => 'erps'])
 </main>
 <x-site-footer :loginUrl="$healthLogin" loginLabel="Healthcare login" />

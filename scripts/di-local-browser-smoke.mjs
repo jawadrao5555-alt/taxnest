@@ -52,12 +52,16 @@ try {
   assert.equal(await page.locator('[name="items[0][serial_no]"]').inputValue(), '70');
 
   const isReferenceLookup = url => url.pathname === '/invoice/fbr-reference-options';
+  const specialRateLabels = ['18% along with rupees 60 per kilogram', 'Rs.3'];
   await page.route(isReferenceLookup, route => {
    const params = new URL(route.request().url()).searchParams;
    assert.equal(params.get('hs'), '0101.2100');
    const changed = params.get('invoice_date') === '2026-08-02';
    return route.fulfill({json: {province: 'Punjab', options: {
-    rates: [{id: 1, label: changed ? '7%' : '5%'}], schedules: [], serials: [], units: [],
+    rates: [
+     {id: 1, label: changed ? '7%' : '5%'},
+     ...specialRateLabels.map((label, index) => ({id: index + 2, label})),
+    ], schedules: [], serials: [], units: [],
    }}});
   });
   await type.selectOption('rate');
@@ -73,6 +77,13 @@ try {
   await results.getByRole('button', {name: 'Use', exact: true}).click();
   assert.equal(await page.locator('[name="items[0][tax_rate]"]').inputValue(), '7');
   assert.equal(await page.locator('[name="items[0][fbr_reference_checked]"]').inputValue(), '1');
+  for (const label of specialRateLabels) {
+   await search.fill(label);
+   const row = results.getByRole('listitem').filter({hasText: label});
+   await row.getByText('Reference only', {exact: true}).waitFor();
+   assert.equal(await row.getByRole('button', {name: 'Use', exact: true}).count(), 0);
+   assert.equal(await page.locator('[name="items[0][tax_rate]"]').inputValue(), '7');
+  }
   await picker.getByLabel('Use FBR options for this invoice').uncheck();
   await page.unroute(isReferenceLookup);
   await date.fill(originalDate);
@@ -146,6 +157,33 @@ try {
   await checkProductDefaults();
   await page.goto(base+'/invoice/create');
   await checkProductDefaults();
+
+  await page.goto(base+'/invoice/create');
+  await page.waitForFunction(() => window.Alpine && document.querySelector('form[x-data]')?._x_dataStack);
+  await page.locator('input[name="invoice_date"]').fill('2026-08-01');
+  await page.locator('input[name=buyer_name]').fill('Synthetic cement buyer');
+  await page.locator('[name=buyer_address]').fill('Synthetic local address');
+  await page.locator('[name=buyer_ntn]').fill('1234567');
+  await item('hs_code').fill('2523.2900');
+  await item('description').fill('Synthetic cement line');
+  await item('schedule_type').selectOption('di_cement_retail_kg');
+  assert.equal(await item('default_uom').inputValue(), 'Kilograms');
+  await item('quantity').fill('2.5');
+  await item('price').fill('400');
+  await item('mrp').fill('500');
+  await page.waitForFunction(() => Alpine.$data(document.querySelector('form[x-data]')).grandTotal() === '1235.00');
+  assert.equal(Number(await item('tax').inputValue()), 225);
+  await page.getByRole('button', {name: /Create Invoice/i}).first().click();
+  await page.waitForURL(url => url.pathname === '/invoices');
+  const cementRow = page.getByRole('row').filter({hasText: 'Synthetic cement buyer'});
+  await cementRow.getByText('PKR 1,235.00', {exact: true}).waitFor();
+  const cementEdit = cementRow.locator('a[href^="/invoice/"][href$="/edit"]');
+  await page.goto(base + await cementEdit.getAttribute('href'));
+  await page.waitForFunction(() => window.Alpine && document.querySelector('form[x-data]')?._x_dataStack);
+  assert.equal(await item('schedule_type').inputValue(), 'di_cement_retail_kg');
+  await item('mrp').fill('600');
+  await page.waitForFunction(() => Alpine.$data(document.querySelector('form[x-data]')).grandTotal() === '1280.00');
+  assert.equal(Number(await item('tax').inputValue()), 270);
  }
  assert.deepEqual(errors,[]);
  console.log('DI '+mode+' real form interaction and draft save passed.');

@@ -136,7 +136,10 @@ final class DiSellingPacking
             if ($inclusive) {
                 $rate = BigDecimal::of((string) ($item['tax_rate'] ?? 0))->dividedBy('100', 8, RoundingMode::HALF_UP);
                 $schedule = $item['schedule_type'] ?? 'standard';
-                if ($schedule === '3rd_schedule') {
+                if ($special = DiSpecialTax::rule($schedule)) {
+                    $mrp = !empty($item['mrp']) ? self::decimal($item['mrp'], "items.$index.mrp", 6) : BigDecimal::zero();
+                    $price = DiSpecialTax::taxExclusivePrice($special, $price, $factor, $mrp);
+                } elseif ($schedule === '3rd_schedule') {
                     $mrp = self::decimal($item['mrp'] ?? null, "items.$index.mrp", 6);
                     $price = $price->minus($mrp->multipliedBy($rate))->toScale(6, RoundingMode::HALF_UP);
                 } elseif (! in_array($schedule, ['exempt', 'zero_rated'], true)) {
@@ -199,7 +202,7 @@ final class DiSellingPacking
                 self::reject("items.$index.price", 'Converted invoice amount exceeds supported fiscal precision.');
             }
             if ($inclusive && ! $enteredPrice->multipliedBy($quantity)->toScale(2, RoundingMode::HALF_UP)
-                ->isEqualTo(number_format($money['valueSalesExcludingST'] + $money['salesTaxApplicable'], 2, '.', ''))) {
+                ->isEqualTo(number_format($money['valueSalesExcludingST'] + $money['salesTaxApplicable'] + $money['fedPayable'], 2, '.', ''))) {
                 self::reject("items.$index.price", 'Tax-inclusive rate cannot reconcile at fiscal precision. Use the base unit or adjust the rate.');
             }
         }

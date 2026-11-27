@@ -7,6 +7,7 @@ use App\Models\AdminUser;
 use App\Models\Company;
 use App\Models\SupportCase;
 use App\Models\SupportCaseEvent;
+use App\Services\CompanyProductId;
 use App\Services\SupportMailService;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
@@ -71,14 +72,19 @@ class SupportInboxController extends Controller
         $status = in_array($request->query('status'), [SupportCase::STATUS_OPEN, SupportCase::STATUS_RESOLVED, SupportCase::STATUS_REOPENED], true)
             ? $request->query('status')
             : null;
+        $identifier = $request->validate(['company_id' => ['nullable', 'string', 'max:32']])['company_id'] ?? null;
         $query = SupportCase::query()->with(['company', 'assignedAdmin'])->latest('updated_at');
         if ($status) {
             $query->where('status', $status);
+        }
+        if ($identifier !== null) {
+            $query->whereHas('company', fn ($companies) => CompanyProductId::matching($companies, $identifier));
         }
 
         return view('saas-admin.support-inbox.cases-index', [
             'cases' => $query->paginate(50)->withQueryString(),
             'status' => $status,
+            'companyIdentifier' => $identifier,
         ]);
     }
 
@@ -155,7 +161,10 @@ class SupportInboxController extends Controller
             'message' => $message,
             'supportCase' => $supportCase,
             'supportCompanies' => $box === 'inbox' && ! $supportCase
-                ? Company::query()->select(['id', 'name', 'account_code', 'product_type'])->orderBy('name')->limit(500)->get()
+                ? Company::query()->orderBy('name')->limit(500)->get(array_values(array_filter([
+                    'id', 'name', 'account_code', 'product_type',
+                    CompanyProductId::available((new Company)->getConnection()) ? 'product_company_id' : null,
+                ])))
                 : collect(),
             'supportOwners' => AdminUser::query()
                 ->whereIn('role', ['admin', 'super_admin'])

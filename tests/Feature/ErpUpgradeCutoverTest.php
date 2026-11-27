@@ -19,6 +19,7 @@ use App\Services\ProspectiveSubscriptionPolicy;
 use App\Services\SubscriptionAssignmentService;
 use App\Services\TrialSubscriptionService;
 use App\Services\VerifiedSubscriptionDocuments;
+use App\Services\WebsiteClientPaidSubscription;
 use App\Support\NestErps;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -62,6 +63,7 @@ final class ErpUpgradeCutoverTest extends TestCase
         $this->assertEquals($this->destination->id, $subscription->company_id);
         $this->assertEquals($this->erpPlan->id, $subscription->entitlementPlan()->id);
         $this->assertSame('71900.00', $subscription->final_price);
+        $this->assertSame([$this->destination->id], WebsiteClientPaidSubscription::eligibleCompanyIds([$this->destination->id]));
         $this->assertSame('erp_upgrade_settlement', $subscription->purchase_snapshot['source']);
         $funding = ['settlement_id' => $settled->id, 'gross_package_paisa' => 9000000,
             'applied_credit_paisa' => 1810000, 'verified_cash_paisa' => 7190000];
@@ -120,6 +122,7 @@ final class ErpUpgradeCutoverTest extends TestCase
         $this->travelTo(CarbonImmutable::parse('2027-02-01 09:00:00', 'Asia/Karachi'));
         $settled = $this->settle();
         $this->assertSame(0, $settled->verified_received_paisa);
+        $this->assertSame([], WebsiteClientPaidSubscription::eligibleCompanyIds([$this->destination->id]));
         $activated = $this->activate($settled);
         $subscription = Subscription::findOrFail($activated->destination_subscription_id);
         $policy = ProspectiveSubscriptionPolicy::display($subscription);
@@ -131,6 +134,9 @@ final class ErpUpgradeCutoverTest extends TestCase
         $this->assertDatabaseCount('subscription_invoices', 1);
         $this->assertDatabaseCount('subscription_payments', 1);
         $this->assertDatabaseMissing('subscription_invoices', ['company_id' => $this->destination->id]);
+        $this->assertSame([$this->destination->id], WebsiteClientPaidSubscription::eligibleCompanyIds([$this->destination->id]));
+        $this->travelTo(CarbonImmutable::parse($policy['paid_ends_at']));
+        $this->assertSame([], WebsiteClientPaidSubscription::eligibleCompanyIds([$this->destination->id]));
     }
 
     public function test_branchless_pos_can_switch_to_branchless_erp_without_waiting_for_legacy_trial_expiry(): void
@@ -171,6 +177,7 @@ final class ErpUpgradeCutoverTest extends TestCase
         $activated = $this->activate($this->settle());
         $term = Subscription::findOrFail($activated->destination_subscription_id);
         $this->assertSame('0.00', $term->final_price);
+        $this->assertSame([$this->destination->id], WebsiteClientPaidSubscription::eligibleCompanyIds([$this->destination->id]));
         $this->travelTo(CarbonImmutable::parse('2027-03-01 09:00:00', 'Asia/Karachi'));
         $renewal = SubscriptionAssignmentService::assign(
             $this->destination->id, $this->erpPlan->id, paidRenewal: true, verifiedReceived: 10000,

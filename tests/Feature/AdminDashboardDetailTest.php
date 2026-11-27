@@ -45,6 +45,28 @@ class AdminDashboardDetailTest extends TestCase {
   }
   $this->assertSame($before,DB::table('pos_transactions')->get()->toJson());
  }
+ public function test_company_codes_filter_reports_and_preserve_numeric_links_and_csv_identity(): void {
+  $this->admin();
+  Schema::table('companies', function (Blueprint $table) {
+   $table->string('account_code')->nullable();
+   $table->string('product_company_id')->nullable();
+  });
+  Schema::create('company_product_ids', function (Blueprint $table) {
+   $table->unsignedBigInteger('company_id');
+   $table->string('code');
+  });
+  DB::table('companies')->where('id', 2)->update(['account_code' => 'PRA-00002', 'product_company_id' => 'P01']);
+  DB::table('company_product_ids')->insert(['company_id' => 2, 'code' => 'P01']);
+  $route = '/admin/dashboard/details/pos_transactions?company_id=';
+  foreach (['P01', 'PRA-00002', '2'] as $identifier) {
+   $this->get($route.$identifier)->assertOk()->assertViewHas('count', 1)->assertSee('Company ID: P01')
+    ->assertSee(route('saas.admin.local-support-copies', 2), false);
+  }
+  foreach (['P99', '0'] as $unknown) {
+   $this->get($route.$unknown)->assertOk()->assertViewHas('count', 0);
+  }
+  $this->assertSame($this->get($route.'2&export=csv')->streamedContent(), $this->get($route.'P01&export=csv')->streamedContent());
+ }
  public function test_unknown_saved_modes_remain_selectable_and_company_scope_matches_csv(): void {
   $this->admin();
   DB::table('pos_transactions')->where('status','completed')->update(['invoice_mode'=>'legacy_custom','pra_status'=>'legacy_waiting']);

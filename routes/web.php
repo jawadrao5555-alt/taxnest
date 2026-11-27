@@ -205,30 +205,8 @@ Route::get('/__diag/infrastructure', function () {
     return response()->json($info);
 })->middleware('auth:admin');
 
-Route::get('/', function () {
-    // Perf (Jul 2026): these 4 COUNTs over big tables cost ~250ms on EVERY
-    // landing hit — cache 10 min (marketing stats don't need to be live).
-    try {
-        $stats = \Illuminate\Support\Facades\Cache::remember('landing_stats', 600, function () {
-            return [
-                'total_invoices' => \App\Models\Invoice::where('status', 'locked')->count()
-                    // PRA writes 'submitted' (never 'success'); FBR POS writes 'success'.
-                    + \App\Models\PosTransaction::whereIn('pra_status', ['submitted', 'success'])->count()
-                    + \App\Models\FbrPosTransaction::whereIn('fbr_status', ['submitted', 'success'])->count(),
-                'total_companies' => \App\Models\Company::where('status', 'approved')->count(),
-            ];
-        });
-    } catch (\Throwable $e) {
-        // DB down: show zeros for THIS request only — never cache zeros for 10 min.
-        \Log::warning('Landing stats unavailable: ' . $e->getMessage());
-        $stats = ['total_invoices' => 0, 'total_companies' => 0];
-    }
-
-    return view('landing', [
-        'showLogin' => false,
-        'stats' => $stats,
-    ]);
-});
+Route::view('/', 'landing');
+Route::view('/compare', 'landing', ['comparisonPage' => true])->name('public.compare');
 
 Route::get('/contact', fn () => view('contact'))->name('contact');
 Route::view('/product-guide', 'product-guide')->name('product-guide');
@@ -243,6 +221,7 @@ Route::get('/data-deletion', fn () => view('data-deletion'))->name('data-deletio
 Route::get('/sitemap.xml', function () {
     $urls = [
         ['loc' => url('/'),                'priority' => '1.0', 'changefreq' => 'weekly'],
+        ['loc' => route('public.compare'), 'priority' => '0.8', 'changefreq' => 'monthly'],
         ['loc' => url('/pos'),             'priority' => '0.9', 'changefreq' => 'monthly'],
         ['loc' => url('/fbr-pos-landing'), 'priority' => '0.9', 'changefreq' => 'monthly'],
         ['loc' => url('/digital-invoice'), 'priority' => '0.9', 'changefreq' => 'monthly'],
@@ -1675,6 +1654,8 @@ Route::prefix('admin')->middleware(['admin.auth'])->group(function () {
     Route::get('/live-ops/company/{id}', [\App\Http\Controllers\SaasAdmin\AdminLiveOpsController::class, 'showCompany'])->name('saas.admin.live-ops.company');
     Route::get('/live-ops/fbr-reconciliation/{id}', [\App\Http\Controllers\SaasAdmin\AdminLiveOpsController::class, 'fbrReconciliation'])
         ->whereNumber('id')->name('saas.admin.live-ops.fbr-reconciliation');
+    Route::get('/live-ops/erp-company/{id}', [\App\Http\Controllers\SaasAdmin\AdminLiveOpsController::class, 'erpCompany'])
+        ->whereNumber('id')->name('saas.admin.live-ops.erp-company');
     Route::post('/live-ops/propose', [\App\Http\Controllers\SaasAdmin\AdminLiveOpsController::class, 'propose'])->name('saas.admin.live-ops.propose');
     Route::get('/live-ops/remediation/{actionId}', [\App\Http\Controllers\SaasAdmin\AdminLiveOpsController::class, 'showRemediation'])->name('saas.admin.live-ops.remediation');
     Route::post('/live-ops/remediation/{actionId}/approve', [\App\Http\Controllers\SaasAdmin\AdminLiveOpsController::class, 'approve'])->name('saas.admin.live-ops.approve');

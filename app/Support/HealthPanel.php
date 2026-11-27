@@ -2,6 +2,8 @@
 
 namespace App\Support;
 
+use Illuminate\Database\Eloquent\Model;
+
 /**
  * The HEALTHCARE VERTICAL's identity — one place, so nothing has to guess.
  *
@@ -83,6 +85,13 @@ final class HealthPanel
         $path = ltrim($path, '/');
 
         return $path === self::PATH_PREFIX || str_starts_with($path, self::PATH_PREFIX . '/');
+    }
+
+    /** A missing legacy vertical belongs to Healthcare. Explicit other verticals never do. */
+    public static function ownsErpRecord(Model $record): bool
+    {
+        return self::isProductType($record->getAttribute('product_type'))
+            && in_array($record->getAttribute(NestErps::VERTICAL_COLUMN), [null, '', self::VERTICAL], true);
     }
 
     /**

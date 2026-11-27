@@ -6,6 +6,8 @@ use App\Models\Company;
 use App\Models\PricingPlan;
 use App\Models\Subscription;
 use App\Services\ProspectiveSubscriptionPolicy;
+use App\Support\HealthPanel;
+use App\Support\NestErps;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Notification;
@@ -14,6 +16,43 @@ use Tests\TestCase;
 class ProspectiveRegistrationPolicyTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_healthcare_registration_only_offers_and_accepts_healthcare_packages(): void
+    {
+        Mail::fake();
+        Notification::fake();
+        config(['health.registration_open' => true]);
+        $school = PricingPlan::create([
+            'name' => 'Synthetic School Only', 'product_type' => NestErps::PRODUCT_TYPE,
+            NestErps::VERTICAL_COLUMN => 'school', 'price' => 1000, 'invoice_limit' => 2, 'is_trial' => false,
+        ]);
+        $health = PricingPlan::create([
+            'name' => 'Synthetic Healthcare Only', 'product_type' => HealthPanel::PRODUCT_TYPE,
+            NestErps::VERTICAL_COLUMN => NestErps::HEALTH, 'price' => 1000, 'invoice_limit' => 2, 'is_trial' => false,
+        ]);
+
+        $this->get('/health/register?plan='.urlencode($school->name))
+            ->assertOk()->assertViewHas('pickedPlanName', null)
+            ->assertSee($health->name)->assertDontSee($school->name);
+
+        $input = [
+            'name' => 'Synthetic Owner', 'email' => 'health-vertical@example.invalid',
+            'password' => 'Synthetic123!', 'password_confirmation' => 'Synthetic123!',
+            'company_name' => 'Synthetic Hospital', 'company_ntn' => '8791901',
+            'company_cnic' => '3520212345611', 'org_type' => 'hospital',
+        ];
+        $this->postJson('/health/register', $input + ['requested_plan' => $school->name])
+            ->assertUnprocessable()->assertJsonValidationErrors('requested_plan');
+        $this->postJson('/health/register', $input + ['pricing_plan_id' => $school->id])
+            ->assertUnprocessable()->assertJsonValidationErrors('pricing_plan_id');
+        $this->assertDatabaseMissing('companies', ['email' => $input['email']]);
+
+        $this->post('/health/register', $input + ['pricing_plan_id' => $health->id])
+            ->assertSessionHasNoErrors()->assertRedirect();
+        $company = Company::where('email', $input['email'])->sole();
+        $this->assertSame(NestErps::HEALTH, $company->getAttribute(NestErps::VERTICAL_COLUMN));
+        $this->assertDatabaseHas('subscriptions', ['company_id' => $company->id, 'pricing_plan_id' => $health->id]);
+    }
 
     public function test_new_public_registration_requires_own_explicit_package_and_freezes_policy(): void
     {

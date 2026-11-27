@@ -12,6 +12,7 @@ return [
  'confirm'=>'I confirm this payment has already been received. Do not charge or collect it again.',
  'positive_amount'=>'Enter a positive payment and invoice total.', 'confirm_required'=>'Confirm the payment was already received.',
  'overpayment'=>'Payment exceeds the remaining invoice balance.', 'retry_conflict'=>'This payment ID is already saved with different details. Open the original receipt; do not collect again.',
+ 'erp_cutover_new_collection'=>'Create new bills in Hospital ERP. This account can still collect outstanding balances on existing bills.',
  'campus_changed'=>'The active branch changed. Return to the original branch and reload before retrying. No payment was recorded by this request.',
  'closed'=>'This branch/date is closed. New payments are disabled; an identical saved payment can still be recovered.',
  'recovery'=>'A previous payment may already be saved. Do not collect again. Re-enter the original details to recover the same receipt. Keep this tab open; recovery is scoped to this tab, account and branch.',

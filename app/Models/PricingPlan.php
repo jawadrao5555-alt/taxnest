@@ -36,6 +36,7 @@ class PricingPlan extends Model
         // Nest ERPS (Task 1568): which vertical of the umbrella product line
         // this package belongs to. Fillable or the admin plan form writes nothing.
         'erps_vertical',
+        'erp_website_price_visible',
     ];
 
     protected $casts = [
@@ -56,6 +57,7 @@ class PricingPlan extends Model
         'ai_page_limit' => 'integer',
         'fair_use_limit' => 'integer',
         'is_public' => 'boolean',
+        'erp_website_price_visible' => 'boolean',
         // Healthcare ERP (Task 1547)
         'health_modules' => 'array',
         'health_department_limit' => 'integer',

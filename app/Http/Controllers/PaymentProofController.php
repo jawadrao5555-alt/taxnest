@@ -3,6 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\PaymentProof;
+use App\Models\PricingPlan;
+use App\Services\ErpPublicPricing;
+use App\Services\PendingSubscriptionSelection;
 use App\Services\PlanCompanyCompatibility;
 use App\Support\NestErps;
 use Illuminate\Http\Request;
@@ -74,7 +77,7 @@ class PaymentProofController extends Controller
 
         // The selected package must be a real, non-trial plan for THIS account's
         // product line — a company can never request a plan from another panel.
-        $plan = \App\Models\PricingPlan::find($validated['pricing_plan_id']);
+        $plan = PricingPlan::find($validated['pricing_plan_id']);
         if (!$plan || $plan->is_trial
             || PlanCompanyCompatibility::productKey($plan->product_type) !== PlanCompanyCompatibility::productKey($productType)
             || (NestErps::isProductType($productType) && !PlanCompanyCompatibility::matches($company, $plan))) {
@@ -92,7 +95,11 @@ class PaymentProofController extends Controller
                 ->with('payment_proof', 'error');
         }
 
-        if (!\App\Services\PendingSubscriptionSelection::quote($company, $plan, $validated['billing_cycle'])) {
+        if (!PendingSubscriptionSelection::quote($company, $plan, $validated['billing_cycle'])) {
+            if (NestErps::isProductType($productType) && !ErpPublicPricing::availableForPurchase($plan)) {
+                return back()->withErrors(['pricing_plan_id' => 'This ERP package is not open for online purchase.'])
+                    ->withInput()->with('payment_proof', 'error');
+            }
             \App\Services\SubscriptionAssignmentService::cycleForPlan($plan, $validated['billing_cycle']);
         }
 
@@ -103,9 +110,20 @@ class PaymentProofController extends Controller
             if (PaymentProof::subscriptionKind()->where('company_id',$companyId)->where('status','pending')->exists()) {
                 return null;
             }
+            $erp = NestErps::isProductType($plan->product_type);
+            if ($erp) {
+                $plan = PricingPlan::whereKey($plan->id)->lockForUpdate()->first();
+                if (!$plan || $plan->is_trial || !PlanCompanyCompatibility::matches($lockedCompany, $plan)) {
+                    return false;
+                }
+            }
+
+            $savedQuote = PendingSubscriptionSelection::quote($lockedCompany, $plan, $validated['billing_cycle']);
+            if ($erp && !$savedQuote && !ErpPublicPricing::availableForPurchase($plan)) {
+                return false;
+            }
             $hasSnapshotColumn = Schema::hasColumn('payment_proofs', 'distributor_quote_snapshot');
-            $snapshot = \App\Services\PendingSubscriptionSelection::quote($lockedCompany, $plan, $validated['billing_cycle'])
-                ?? \App\Services\DistributorDiscountService::quote(
+            $snapshot = $savedQuote ?? \App\Services\DistributorDiscountService::quote(
                 $lockedCompany,
                 $plan,
                 $validated['billing_cycle'],
@@ -140,6 +158,10 @@ class PaymentProofController extends Controller
         });
         if (!$result) {
             Storage::disk('local')->delete($path);
+            if ($result === false) {
+                return back()->withErrors(['pricing_plan_id' => 'This ERP package is not open for online purchase.'])
+                    ->withInput()->with('payment_proof', 'error');
+            }
             return back()->with('success', 'Your payment proof is already under review. We will notify you once it is verified.')
                 ->with('payment_proof', 'pending');
         }

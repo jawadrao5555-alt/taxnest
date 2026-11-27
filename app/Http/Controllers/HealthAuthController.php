@@ -4,13 +4,16 @@ namespace App\Http\Controllers;
 
 use App\Models\AdminUser;
 use App\Models\Company;
+use App\Models\PricingPlan;
 use App\Models\User;
 use App\Services\CredentialLedgerService;
+use App\Services\ErpPublicPricing;
 use App\Services\HealthAccessService;
 use App\Services\HealthAudit\HealthAuditRecorder;
 use App\Services\HealthModuleService;
 use App\Services\HealthPlatformService;
 use App\Services\LoginIdentifierResolver;
+use App\Services\ProspectiveSubscriptionPolicy;
 use App\Services\RequestedPackageService;
 use App\Support\HealthPanel;
 use App\Support\NestErps;
@@ -79,6 +82,10 @@ class HealthAuthController extends Controller
 
         // ═══ STEP 2 — Healthcare user lookup (strict product isolation) ═══
         $user = $this->findUser($login, $throttleKey, $ambiguous);
+        if ($user && !HealthPlatformService::isHealthcareCompany($user->company)) {
+            $user = null;
+        }
+
         if ($ambiguous) {
             return back()->withErrors([
                 'login' => __('pos.auth_username_ambiguous'),
@@ -86,11 +93,7 @@ class HealthAuthController extends Controller
         }
 
         if ($user && Hash::check($password, $user->password)) {
-            $company = $user->company_id ? Company::find($user->company_id) : null;
-
-            if (HealthPlatformService::isHealthcareCompany($company)
-                && HealthAccessService::roleFor($user) !== null
-                && $user->is_active) {
+            if (HealthAccessService::roleFor($user) !== null && $user->is_active) {
                 RateLimiter::clear($throttleKey);
                 Auth::guard(HealthPanel::GUARD)->login($user, $remember);
                 $request->session()->regenerate();
@@ -167,7 +170,7 @@ class HealthAuthController extends Controller
                 // The same NTN/CNIC may legitimately sit on this person's POS
                 // or DI company too (identity is per product, 5 Sep 2026), and
                 // this panel only accepts its own product line.
-                $company = $matches->first(fn ($c) => HealthPanel::isProductType($c->product_type ?? null));
+                $company = $matches->first(fn ($c) => HealthPlatformService::isHealthcareCompany($c));
                 if ($company) {
                     $user = User::where('company_id', $company->id)
                         ->where('role', 'company_admin')
@@ -197,11 +200,21 @@ class HealthAuthController extends Controller
             return $this->redirectToPortal();
         }
 
-        $picked = RequestedPackageService::resolvePlan(request('plan'), HealthPanel::PRODUCT_TYPE);
+        $packages = ErpPublicPricing::registrationPackages();
+        $picked = $packages->firstWhere('id', request()->integer('plan_id'))
+            ?? $packages->firstWhere('name', request()->query('plan'));
+        $signupPeriods = $packages->mapWithKeys(fn ($plan) => [
+            $plan->id => collect(ErpPublicPricing::prices($plan))->map(fn ($total, $cycle) => [
+                'cycle' => $cycle,
+                'label' => \App\Models\Subscription::getCycleLabel($cycle).' · PKR '.number_format($total, 2),
+            ])->values(),
+        ]);
 
         return view('health.auth.register', [
             'pickedPlanName' => $picked?->name,
-            'registrationPlans' => \App\Services\ProspectiveSubscriptionPolicy::registrationPlans(HealthPanel::PRODUCT_TYPE),
+            'pickedPlanId' => $picked?->id,
+            'registrationPlans' => $packages,
+            'signupPeriods' => $signupPeriods,
             'orgTypes' => HealthPanel::ORG_TYPES,
         ]);
     }
@@ -233,6 +246,9 @@ class HealthAuthController extends Controller
             'email' => ['required', 'string', 'email', 'max:255', \App\Support\IdentityScope::uniqueEmail(\App\Support\ProductCatalog::ERPS)],
             'phone' => 'nullable|string|max:20',
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
+            'requested_plan' => 'nullable|string|max:100',
+            'pricing_plan_id' => 'nullable|integer|min:1',
+            'billing_cycle' => 'nullable|in:monthly,quarterly,semi_annual,annual',
         ], LoginIdentifierResolver::cnicMessages('company_cnic'));
 
         // Anti free-trial-abuse: the same platform ledger every product uses.
@@ -247,9 +263,11 @@ class HealthAuthController extends Controller
 
         $orgType = HealthPanel::normalizeOrgType($request->input('org_type'));
 
-        $selectedPlan=\App\Services\ProspectiveSubscriptionPolicy::resolveRegistrationSelection($request,HealthPanel::PRODUCT_TYPE);
-        \App\Services\ProspectiveSubscriptionPolicy::requireSelection($selectedPlan);
-        $requestedPackage = RequestedPackageService::companyAttributes($selectedPlan);
+        $selectedPlan = ErpPublicPricing::registrationPlan(
+            $request->filled('pricing_plan_id') ? $request->integer('pricing_plan_id') : null,
+            $request->input('requested_plan'),
+        );
+        ProspectiveSubscriptionPolicy::requireSelection($selectedPlan);
 
         // hasColumn guards: a deploy-before-migrate window must never 500 a signup.
         $healthDefaults = [];
@@ -267,7 +285,14 @@ class HealthAuthController extends Controller
             $healthDefaults[NestErps::VERTICAL_COLUMN] = NestErps::HEALTH;
         }
 
-        $user = \Illuminate\Support\Facades\DB::transaction(function () use ($request,$healthDefaults,$requestedPackage,$selectedPlan) {
+        $user = \Illuminate\Support\Facades\DB::transaction(function () use ($request,$healthDefaults,$selectedPlan) {
+        if ($selectedPlan) {
+            $selectedPlan = PricingPlan::whereKey($selectedPlan->id)->lockForUpdate()->first();
+            if (!$selectedPlan || !ErpPublicPricing::availableForRegistration($selectedPlan)) {
+                throw ValidationException::withMessages(['pricing_plan_id' => 'Select an available Healthcare package.']);
+            }
+        }
+        $requestedPackage = RequestedPackageService::companyAttributes($selectedPlan, $request->input('billing_cycle'));
         $company = Company::create([
             'name' => $request->company_name,
             'ntn' => $request->company_ntn,

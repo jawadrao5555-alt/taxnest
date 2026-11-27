@@ -79,7 +79,7 @@
     </div>
 
     @if($canManageBilling)
-    <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-6" x-data="{ showForm: false }">
+    <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-6" x-data="{ showForm: false, planProduct: 'di' }">
         <div class="flex items-center justify-between mb-4">
             <h3 class="text-sm font-semibold text-white">Create New Plan</h3>
             <button @click="showForm = !showForm" class="text-xs text-indigo-400 hover:underline" x-text="showForm ? 'Hide' : 'Show Form'"></button>
@@ -89,7 +89,7 @@
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                 <input type="text" name="name" placeholder="Plan Name" required class="bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500">
                 <div>
-                    <select name="product_type" required class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500">
+                    <select name="product_type" x-model="planProduct" required class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500">
                         <option value="di">TaxNest Digital Invoice</option>
                         <option value="pos">PRA POS</option>
                         <option value="fbrpos">TaxNest FBR POS</option>
@@ -106,7 +106,7 @@
                         @endforeach
                     </select>
                 </div>
-                <input type="number" name="price" placeholder="Price (PKR — DI = stored monthly base, POS/FBR POS = annual)" step="1" required class="bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500">
+                <input type="number" name="price" aria-label="Base price in PKR" :placeholder="planProduct === 'di' ? 'Stored monthly base (PKR)' : 'Annual package price (PKR)'" step="0.01" min="0" required class="bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500">
                 <label class="block text-xs text-gray-400"><input type="checkbox" name="configure_shared_cycle_rates" value="1"> Set configured period rates, including the DI monthly checkout rate</label>
                 @foreach(['price_monthly' => 'Monthly total', 'price_quarterly' => 'Quarterly total', 'price_semi_annual' => 'Six-month total'] as $field => $label)
                     <input type="number" name="{{ $field }}" aria-label="{{ $label }}" placeholder="{{ $label }} (blank = unavailable)" step="0.01" min="0" class="bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2">
@@ -121,6 +121,12 @@
                     <label class="flex items-center gap-1.5 text-sm text-gray-400"><input type="checkbox" name="reports_enabled" value="1" checked class="rounded bg-gray-800 border-gray-600 text-indigo-500"> Reports</label>
                 </div>
             </div>
+            <fieldset x-show="planProduct === 'erps'" :disabled="planProduct !== 'erps'" x-cloak class="space-y-3 rounded-lg border border-gray-700 p-3">
+                <legend class="px-1 text-sm font-semibold text-white">ERP package and website pricing</legend>
+                <p class="text-xs text-gray-400">Enter the annual price above. Publish it for online selection, or keep it for custom quotes.</p>
+                <label class="text-sm text-gray-300"><input type="checkbox" name="is_public" value="1"> On sale in ERP signup and checkout</label>
+                @include('saas-admin.partials.erp-pricing-fields')
+            </fieldset>
             <div>
                 <label class="text-[10px] text-gray-500 dark:text-gray-400 uppercase mb-1 block">Features (one per line — shown on landing page)</label>
                 <textarea name="features_text" rows="4" placeholder="e.g. POS Billing&#10;Thermal Receipt&#10;PRA Integration" class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500"></textarea>
@@ -181,7 +187,7 @@
         <div class="flex items-center gap-2 mb-4">
             <div class="w-2 h-2 rounded-full bg-teal-500"></div>
             <h2 class="text-lg font-bold text-white">{{ \App\Support\NestErps::LABEL }} Plans</h2>
-            <span class="text-xs text-gray-500 dark:text-gray-400">({{ $erpsPlans->count() }} plans — prices are annual)</span>
+            <span class="text-xs text-gray-500 dark:text-gray-400">({{ $erpsPlans->count() }} plans · website prices are optional)</span>
         </div>
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             @foreach($erpsPlans as $plan)

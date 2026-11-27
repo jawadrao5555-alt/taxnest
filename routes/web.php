@@ -1844,6 +1844,9 @@ Route::prefix('admin')->middleware(['admin.auth'])->group(function () {
     Route::post('/companies/{id}/delete', [AdminCompanyController::class, 'softDelete'])->name('saas.admin.companies.delete');
     Route::get('/companies/{id}/product-review', [\App\Http\Controllers\SaasAdmin\AdminProductTransitionController::class, 'productReview'])->name('saas.admin.companies.productReview');
     Route::get('/companies/{company}/erp-upgrade-quote', \App\Http\Controllers\SaasAdmin\ErpUpgradeQuoteController::class)->name('saas.admin.companies.erpUpgradeQuote');
+    Route::post('/companies/{company}/erp-upgrade-quote', [\App\Http\Controllers\SaasAdmin\ErpUpgradeQuoteController::class, 'freeze'])->name('saas.admin.companies.erpUpgradeFreeze');
+    Route::post('/companies/{company}/erp-upgrade-quote/{upgrade}/settle', [\App\Http\Controllers\SaasAdmin\ErpUpgradeQuoteController::class, 'settle'])->whereNumber('upgrade')->name('saas.admin.companies.erpUpgradeSettle');
+    Route::post('/companies/{company}/erp-upgrade-quote/{upgrade}/activate', [\App\Http\Controllers\SaasAdmin\ErpUpgradeQuoteController::class, 'activate'])->whereNumber('upgrade')->name('saas.admin.companies.erpUpgradeActivate');
     Route::post('/companies/{id}/change-type', [\App\Http\Controllers\SaasAdmin\AdminProductTransitionController::class, 'changeProductType'])->name('saas.admin.companies.changeType');
     Route::post('/companies/{id}/clone-product', [\App\Http\Controllers\SaasAdmin\AdminProductTransitionController::class, 'cloneToProduct'])->name('saas.admin.companies.cloneProduct');
     Route::post('/companies/{id}/reveal-access-code', [AdminCompanyController::class, 'revealFbrAccessCode'])->name('saas.admin.companies.revealAccessCode');
@@ -2036,6 +2039,11 @@ Route::prefix('health')->middleware(['health.auth', 'company.approval'])->group(
     Route::post('/survey/{id}/dismiss', [\App\Http\Controllers\PosSurveyController::class, 'dismiss'])->defaults('survey_guard', 'health')->name('health.survey.dismiss');
     Route::get('/', fn () => redirect()->route('health.dashboard'));
     Route::get('/dashboard', [HealthController::class, 'dashboard'])->name('health.dashboard');
+
+    Route::middleware(['health.module:lab', 'health.can:lab.view'])->group(function () {
+        Route::get('/lab', [\App\Http\Controllers\Health\LabWorkspaceController::class, 'index'])->name('health.lab');
+        Route::post('/lab/layout', [\App\Http\Controllers\Health\LabWorkspaceController::class, 'saveLayout'])->name('health.lab.layout');
+    });
 
     // Per-user display preferences — every signed-in member owns their own.
     Route::post('/set-dark-mode', [HealthController::class, 'toggleDarkMode'])->name('health.set-dark-mode');

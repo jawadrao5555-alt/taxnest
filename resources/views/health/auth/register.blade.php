@@ -47,12 +47,26 @@
                 </p>
             @endif
 
-            <form method="POST" action="{{ url('/health/register') }}" class="space-y-5">
+            @if($registrationPlans->isEmpty())
+                <p>No Healthcare packages are currently available for online signup. <a href="{{ url('/contact') }}" class="font-semibold text-teal-700 underline">Request a quote</a>.</p>
+            @else
+            <form method="POST" action="{{ url('/health/register') }}" class="space-y-5"
+                x-data="{ packageId: @js((string) old('pricing_plan_id', $pickedPlanId ?? '')), periods: @js($signupPeriods ?? []), cycle: @js(old('billing_cycle', request('billing_cycle', 'annual'))) }"
+                x-effect="if (!(periods[packageId] || []).some(period => period.cycle === cycle)) cycle = 'annual'">
                 @csrf
-<label for="required-signup-package" class="block text-sm font-semibold">{{ __('billing_policy.plan') }}</label>
-                <select id="required-signup-package" name="requested_plan" required class="w-full rounded-xl border-gray-300">
+                <label for="required-signup-package" class="block text-sm font-semibold">{{ __('billing_policy.plan') }}</label>
+                <select id="required-signup-package" name="pricing_plan_id" x-model="packageId" required class="w-full rounded-xl border-gray-300">
                     <option value="">{{ __('billing_policy.choose_plan') }}</option>
-                    @foreach(($registrationPlans ?? collect()) as $signupPlan)<option value="{{ $signupPlan->name }}" @selected(old('requested_plan', $pickedPlanName ?? '') === $signupPlan->name)>{{ $signupPlan->name }}</option>@endforeach
+                    @foreach($registrationPlans as $signupPlan)
+                        <option value="{{ $signupPlan->id }}" @selected((int) old('pricing_plan_id', $pickedPlanId ?? 0) === $signupPlan->id)>{{ $signupPlan->name }}</option>
+                    @endforeach
+                </select>
+                <label for="erp-signup-billing-cycle" class="block text-sm font-semibold">Billing period and full price</label>
+                <select id="erp-signup-billing-cycle" name="billing_cycle" x-model="cycle" class="w-full rounded-xl border-gray-300">
+                    <option value="annual" x-show="!(periods[packageId] || []).length">Annual</option>
+                    <template x-for="period in periods[packageId] || []" :key="period.cycle">
+                        <option :value="period.cycle" x-text="period.label" :selected="cycle === period.cycle"></option>
+                    </template>
                 </select>
                 @include('billing._signup-policy')
 
@@ -124,6 +138,7 @@
                     {{ __('health.register') }}
                 </button>
             </form>
+            @endif
 
             <p class="mt-5 text-center text-sm text-gray-500">
                 {{ __('health.already_registered') }}

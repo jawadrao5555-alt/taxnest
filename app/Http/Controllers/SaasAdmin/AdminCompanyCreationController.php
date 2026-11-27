@@ -7,8 +7,15 @@ use App\Models\AdminAuditLog;
 use App\Models\Franchise;
 use App\Models\User;
 use App\Services\CredentialLedgerService;
+use App\Services\HealthModuleService;
+use App\Services\TrialSubscriptionService;
+use App\Support\HealthPanel;
+use App\Support\NestErps;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\Rule;
 
 /** Dedicated company signup boundary. No credential-reveal or lifecycle actions. */
 class AdminCompanyCreationController extends AdminCompanyController
@@ -35,9 +42,7 @@ class AdminCompanyCreationController extends AdminCompanyController
     public function store(Request $request)
     {
         $currentAdmin = \App\Models\AdminUser::requireBillingAdministrator();
-        // Which POS panel (if any) this company is being created on. The
-        // business type is a POS-only question: Digital Invoice and healthcare
-        // companies are created exactly as they always were.
+        // Which POS panel (if any) owns the selected business type.
         $posPanel = match ($request->input('product_type')) {
             'fbrpos' => 'fbr',
             'pos'    => 'pra',
@@ -48,6 +53,8 @@ class AdminCompanyCreationController extends AdminCompanyController
             'name' => 'required|string|max:255',
             'owner_name' => 'required|string|max:255',
             'product_type' => 'required|' . \App\Support\ProductCatalog::validationRule(),
+            'erps_vertical' => ['nullable', 'string', Rule::in(NestErps::verticalKeys())],
+            'health_org_type' => ['nullable', 'string', Rule::in(HealthPanel::ORG_TYPES)],
             'email' => 'required|email|max:255',
             'ntn' => 'nullable|string|max:50',
             // Shared CNIC truth (Task 580): 13 digits, dash-tolerant, GLOBAL
@@ -114,9 +121,13 @@ class AdminCompanyCreationController extends AdminCompanyController
             'company_status' => $request->status === 'pending' ? 'pending' : 'active',
             'standard_tax_rate' => $request->product_type === 'di' ? 18.00 : 16.00,
             'fbr_pos_enabled' => $request->product_type === 'fbrpos',
-            'fbr_pos_environment' => $request->product_type === 'fbrpos' ? 'sandbox' : null,
             'fbr_reporting_enabled' => $request->product_type === 'fbrpos',
         ];
+
+        // The database supplies the default on products that do not use FBR POS.
+        if ($request->product_type === 'fbrpos') {
+            $companyData['fbr_pos_environment'] = 'sandbox';
+        }
 
         if ($request->product_type === 'pos') {
             $companyData['pra_reporting_enabled'] = false;
@@ -144,22 +155,18 @@ class AdminCompanyCreationController extends AdminCompanyController
             }
         }
 
-        // Nest ERPS (Task 1568): the company is stamped with the vertical it
-        // runs, and that vertical's own preset is applied — a healthcare
-        // organisation starts as a clinic with that org type's default modules,
-        // so the owner signs in to a working panel rather than an empty one.
-        // Schema guards keep an un-migrated column from breaking creation.
-        if (\App\Support\NestErps::isProductType($request->product_type)) {
-            $vertical = \App\Support\NestErps::normalizeVertical($request->input('erps_vertical'));
-            if (\Illuminate\Support\Facades\Schema::hasColumn('companies', \App\Support\NestErps::VERTICAL_COLUMN)) {
-                $companyData[\App\Support\NestErps::VERTICAL_COLUMN] = $vertical;
+        if (NestErps::isProductType($request->product_type)) {
+            $vertical = NestErps::normalizeVertical($request->input('erps_vertical'));
+            if (Schema::hasColumn('companies', NestErps::VERTICAL_COLUMN)) {
+                $companyData[NestErps::VERTICAL_COLUMN] = $vertical;
             }
-            if ($vertical === \App\Support\NestErps::HEALTH) {
-                if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'health_org_type')) {
-                    $companyData['health_org_type'] = 'clinic';
+            if ($vertical === NestErps::HEALTH) {
+                $orgType = HealthPanel::normalizeOrgType($request->input('health_org_type'));
+                if (Schema::hasColumn('companies', 'health_org_type')) {
+                    $companyData['health_org_type'] = $orgType;
                 }
-                if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'health_modules')) {
-                    $companyData['health_modules'] = \App\Services\HealthModuleService::ORG_TYPE_DEFAULTS['clinic'];
+                if (Schema::hasColumn('companies', 'health_modules')) {
+                    $companyData['health_modules'] = HealthModuleService::defaultsForOrgType($orgType);
                 }
             }
         }
@@ -173,37 +180,40 @@ class AdminCompanyCreationController extends AdminCompanyController
             $companyData['agent_id'] = $request->agent_id;
         }
 
-        $company = Company::create($companyData + $requestedAttributes);
+        $adminPassword = Hash::make($request->admin_password);
+        $company = DB::transaction(function () use ($request, $currentAdmin, $companyData, $requestedAttributes, $normalizedCnic, $adminPassword): Company {
+            $company = Company::create($companyData + $requestedAttributes);
 
-        User::create([
-            'name' => $request->admin_name,
-            'email' => $request->admin_email,
-            'password' => Hash::make($request->admin_password),
-            'company_id' => $company->id,
-            'role' => 'company_admin',
-            'is_active' => true,
-            'pos_role' => in_array($request->product_type, ['pos', 'fbrpos']) ? 'pos_admin' : null,
-        ]);
+            User::create([
+                'name' => $request->admin_name,
+                'email' => $request->admin_email,
+                'password' => $adminPassword,
+                'company_id' => $company->id,
+                'role' => 'company_admin',
+                'is_active' => true,
+                'pos_role' => in_array($request->product_type, ['pos', 'fbrpos']) ? 'pos_admin' : null,
+            ]);
 
-        // Every company must start with a subscription row — admin-created ones
-        // get the standard 14-day trial (admin can assign a real plan after).
-        \App\Services\TrialSubscriptionService::ensureTrial($company->id, $request->product_type, 14);
+            // The requested paid package remains separate from the standard 14-day trial.
+            TrialSubscriptionService::ensureTrial($company->id, $request->product_type, 14);
 
-        // Record credentials in the anti-reuse ledger (admin creation is never blocked).
-        CredentialLedgerService::record([
-            'email' => $request->admin_email,
-            'phone' => $request->phone ?: $request->mobile,
-            'ntn' => $request->ntn,
-            'cnic' => $normalizedCnic,
-        ], $company->id, $request->product_type);
+            CredentialLedgerService::record([
+                'email' => $request->admin_email,
+                'phone' => $request->phone ?: $request->mobile,
+                'ntn' => $request->ntn,
+                'cnic' => $normalizedCnic,
+            ], $company->id, $request->product_type);
 
-        AdminAuditLog::log(auth('admin')->id(), 'Company created', 'Company', $company->id, [
-            'name' => $company->name,
-            'type' => $request->product_type,
-            'admin_email' => $request->admin_email,
-            'agent_id' => $company->agent_id,
-            'attribution_source' => $company->agent_id ? 'super_admin_company_creation' : 'direct_customer',
-        ]);
+            AdminAuditLog::log($currentAdmin->id, 'Company created', 'Company', $company->id, [
+                'name' => $company->name,
+                'type' => $request->product_type,
+                'admin_email' => $request->admin_email,
+                'agent_id' => $company->agent_id,
+                'attribution_source' => $company->agent_id ? 'super_admin_company_creation' : 'direct_customer',
+            ]);
+
+            return $company;
+        });
 
         return redirect()->route('saas.admin.companies.show', $company->id)->with('success', "Company '{$company->name}' created successfully with admin account.");
     }

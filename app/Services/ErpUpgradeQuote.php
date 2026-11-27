@@ -10,6 +10,7 @@ use App\Models\SubscriptionFinancialAdjustment;
 use App\Models\SubscriptionInvoice;
 use App\Support\NestErps;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
 
@@ -18,16 +19,31 @@ final class ErpUpgradeQuote
 {
     public function hospitalPlans(): Collection
     {
+        return $this->hospitalPlanQuery()->orderBy('name')->orderBy('id')->get()
+            ->filter($this->canSellHospitalPlan(...));
+    }
+
+    private function hospitalPlanQuery(): Builder
+    {
         return PricingPlan::query()
             ->whereIn('product_type', NestErps::PRODUCT_TYPES)
             ->where('is_trial', false)->where('price', '>', 0)
-            ->where(fn ($q) => $q->where('erps_vertical', NestErps::HEALTH)->orWhereNull('erps_vertical')->orWhere('erps_vertical', ''))
-            ->orderBy('name')->orderBy('id')->get()
-            ->filter(fn (PricingPlan $plan) => PlanSellabilityService::isSellable($plan)
-                && in_array('ipd', HealthModuleService::normalize($plan->health_modules), true));
+            ->where(fn ($q) => $q->where('erps_vertical', NestErps::HEALTH)->orWhereNull('erps_vertical')->orWhere('erps_vertical', ''));
     }
 
-    public function preview(Company $source, int $planId, string $cycle, ?CarbonImmutable $asOf = null): array
+    private function canSellHospitalPlan(PricingPlan $plan): bool
+    {
+        return PlanSellabilityService::isSellable($plan)
+            && in_array('ipd', HealthModuleService::normalize($plan->health_modules), true);
+    }
+
+    public function preview(
+        Company $source,
+        int $planId,
+        string $cycle,
+        ?CarbonImmutable $asOf = null,
+        bool $lockEvidence = false
+    ): array
     {
         $asOf = ($asOf ?? CarbonImmutable::now())->setTimezone(config('app.timezone'));
         if (!$source->isHospitalCollectionPilot() || $source->company_status !== 'active'
@@ -35,8 +51,8 @@ final class ErpUpgradeQuote
             $this->unavailable('Choose an active Hospital Collections POS account.');
         }
 
-        $plan = $this->hospitalPlans()->firstWhere('id', $planId);
-        if (!$plan) {
+        $plan = $this->hospitalPlanQuery()->when($lockEvidence, fn ($query) => $query->lockForUpdate())->find($planId);
+        if (!$plan || !$this->canSellHospitalPlan($plan)) {
             throw ValidationException::withMessages(['pricing_plan_id' => 'Choose an available Healthcare package with inpatient care.']);
         }
         $targetPrice = $this->paisa(SubscriptionAssignmentService::computePrice($plan, $cycle)['final_price']);
@@ -44,12 +60,13 @@ final class ErpUpgradeQuote
             throw ValidationException::withMessages(['pricing_plan_id' => 'This period requires a positive configured package price.']);
         }
 
-        $active = Subscription::query()->where('company_id', $source->id)->where('active', true)->limit(2)->get();
+        $active = Subscription::query()->where('company_id', $source->id)->where('active', true)
+            ->when($lockEvidence, fn ($query) => $query->lockForUpdate())->limit(2)->get();
         if ($active->count() !== 1 || $active->first()->hasActiveOverride()) {
             $this->unavailable('An unambiguous active paid term is required before estimating credit.');
         }
         $subscription = $active->first();
-        [$start, $end, $basePaid] = $this->verifiedSource($source, $subscription, $asOf);
+        [$start, $end, $basePaid, $evidence] = $this->verifiedSource($source, $subscription, $asOf, $lockEvidence);
 
         $totalDays = (int) $start->startOfDay()->diffInDays($end->startOfDay());
         $remainingDays = (int) $asOf->startOfDay()->diffInDays($end->startOfDay());
@@ -70,10 +87,13 @@ final class ErpUpgradeQuote
             'unused_source_value_paisa' => $unusedValue,
             'credit_paisa' => $credit,
             'difference_paisa' => $targetPrice - $credit,
+            'source_invoice_id' => $evidence['invoice_id'],
+            'source_evidence' => hash('sha256', json_encode($evidence, JSON_THROW_ON_ERROR)),
+            'destination_plan_terms' => SubscriptionPurchaseSnapshot::planTerms($plan),
         ];
     }
 
-    private function verifiedSource(Company $source, Subscription $subscription, CarbonImmutable $asOf): array
+    private function verifiedSource(Company $source, Subscription $subscription, CarbonImmutable $asOf, bool $lockEvidence): array
     {
         $purchase = $subscription->purchase_snapshot;
         $price = $purchase['price'] ?? [];
@@ -107,7 +127,8 @@ final class ErpUpgradeQuote
         }
 
         $invoices = SubscriptionInvoice::query()->where('company_id', $source->id)
-            ->where('subscription_id', $subscription->id)->packageCharge()->limit(2)->get();
+            ->where('subscription_id', $subscription->id)->packageCharge()
+            ->when($lockEvidence, fn ($query) => $query->lockForUpdate())->limit(2)->get();
         $invoice = $invoices->first();
         $document = $invoice?->document_snapshot;
         $amount = $this->paisa($price['final_price'] ?? null);
@@ -127,8 +148,12 @@ final class ErpUpgradeQuote
         }
 
         $proof = PaymentProof::query()->where('company_id', $source->id)->where('subscription_id', $subscription->id)
-            ->where('status', 'verified')->find($invoice->payment_proof_id);
-        $receipts = $invoice->payments()->limit(2)->get();
+            ->where('status', 'verified')->when($lockEvidence, fn ($query) => $query->lockForUpdate())->find($invoice->payment_proof_id);
+        $receiptQuery = $invoice->payments()->limit(2);
+        if ($lockEvidence) {
+            $receiptQuery->lockForUpdate();
+        }
+        $receipts = $receiptQuery->get();
         $receipt = $receipts->first();
         if (!$proof?->verified_by || !$proof->verified_at || $proof->verified_at->greaterThan($asOf)
             || $proof->kind() !== 'subscription' || (int) $proof->pricing_plan_id !== (int) $subscription->pricing_plan_id
@@ -139,7 +164,17 @@ final class ErpUpgradeQuote
             $this->unavailable('A reviewed payment receipt for this package is required to estimate credit.');
         }
 
-        return [$start, $end, $base];
+        return [$start, $end, $base, [
+            'invoice_id' => $invoice->id,
+            'subscription_id' => $subscription->id,
+            'proof_id' => $proof->id,
+            'receipt_id' => $receipt->id,
+            'paid_base_paisa' => $base,
+            'term_starts_at' => $start->toIso8601String(),
+            'term_ends_at' => $end->toIso8601String(),
+            'verified_by' => $proof->verified_by,
+            'verified_at' => $proof->verified_at->toIso8601String(),
+        ]];
     }
 
     private function paisa(mixed $value): int

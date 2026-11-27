@@ -9,8 +9,10 @@ use App\Models\User;
 use App\Services\HealthAccessService;
 use App\Services\HealthHrService;
 use App\Services\HealthModuleService;
+use App\Services\HealthPlatformService;
 use App\Services\HealthScopeService;
 use App\Support\HealthPanel;
+use App\Support\NestErps;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -64,6 +66,7 @@ class HealthcareFoundationTest extends TestCase
             $table->string('email')->nullable();
             $table->string('phone')->nullable();
             $table->string('product_type')->nullable();
+            $table->string(NestErps::VERTICAL_COLUMN)->nullable();
             $table->string('status')->nullable();
             $table->string('company_status')->nullable();
             $table->boolean('is_internal_account')->default(false);
@@ -110,6 +113,7 @@ class HealthcareFoundationTest extends TestCase
             $table->id();
             $table->string('name');
             $table->string('product_type')->default('health');
+            $table->string(NestErps::VERTICAL_COLUMN)->nullable();
             $table->boolean('is_trial')->default(false);
             $table->integer('invoice_limit')->default(-1);
             $table->decimal('price', 12, 2)->default(0);
@@ -556,6 +560,38 @@ class HealthcareFoundationTest extends TestCase
 
         $this->get('/health/dashboard')->assertRedirect(HealthPanel::LOGIN_PATH);
         $this->assertFalse(auth(HealthPanel::GUARD)->check());
+    }
+
+    public function test_another_erp_vertical_is_refused_at_healthcare_login_and_direct_routes(): void
+    {
+        $owner = User::where('email', 'owner@shifa.test')->firstOrFail();
+        Company::whereKey($this->healthCompanyId)->update([
+            'product_type' => NestErps::PRODUCT_TYPE,
+            NestErps::VERTICAL_COLUMN => 'school',
+        ]);
+        $this->forgetHealthCaches();
+
+        $this->post('/health/login', ['login' => $owner->email, 'password' => 'Health@12345'])
+            ->assertSessionHasErrors('login');
+        $this->assertGuest(HealthPanel::GUARD);
+
+        $this->actingAs($owner, HealthPanel::GUARD)->get('/health/dashboard')
+            ->assertRedirect(HealthPanel::LOGIN_PATH);
+        $this->assertGuest(HealthPanel::GUARD);
+    }
+
+    public function test_the_healthcare_catalogue_offers_current_and_legacy_healthcare_plans_only(): void
+    {
+        DB::table('pricing_plans')->insert([
+            ['name' => 'Synthetic legacy Healthcare', 'product_type' => 'health', NestErps::VERTICAL_COLUMN => null],
+            ['name' => 'Synthetic modern Healthcare', 'product_type' => NestErps::PRODUCT_TYPE, NestErps::VERTICAL_COLUMN => NestErps::HEALTH],
+            ['name' => 'Synthetic School', 'product_type' => NestErps::PRODUCT_TYPE, NestErps::VERTICAL_COLUMN => 'school'],
+        ]);
+        $names = HealthPlatformService::sellablePlans()->pluck('name')->all();
+
+        $this->assertContains('Synthetic legacy Healthcare', $names);
+        $this->assertContains('Synthetic modern Healthcare', $names);
+        $this->assertNotContains('Synthetic School', $names);
     }
 
     public function test_an_inactive_member_is_logged_out_of_the_panel(): void

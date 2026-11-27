@@ -5,7 +5,9 @@
         <h1 class="text-2xl font-bold text-white">Create New Company</h1>
     </div>
 
-    <form method="POST" action="{{ route('saas.admin.companies.store') }}" class="space-y-6" x-data="{ productType: '{{ old('product_type', 'di') }}' }" x-init="$watch('productType', () => { if ($refs.requestedPlan) $refs.requestedPlan.value = ''; })">
+    <form method="POST" action="{{ route('saas.admin.companies.store') }}" class="space-y-6"
+        x-data="{ productType: @js(\App\Support\ProductCatalog::normalize(old('product_type', 'di')) ?? 'di'), erpVertical: @js(old('erps_vertical', \App\Support\NestErps::DEFAULT_VERTICAL)) }"
+        x-init="$watch('productType', () => { if ($refs.requestedPlan) $refs.requestedPlan.value = ''; })">
         @csrf
 
         <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
@@ -62,11 +64,21 @@
         <div x-show="productType === '{{ \App\Support\NestErps::PRODUCT_TYPE }}'" x-cloak class="bg-gray-900 border border-gray-800 rounded-xl p-5">
             <h3 class="text-sm font-semibold text-white mb-1">{{ \App\Support\NestErps::LABEL }} vertical</h3>
             <p class="text-xs text-gray-500 mb-4">Which ERP inside the line this organisation runs. The panel opens with that vertical's default modules already switched on.</p>
-            <select name="erps_vertical" class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500">
+            <select name="erps_vertical" x-model="erpVertical" :disabled="productType !== '{{ \App\Support\NestErps::PRODUCT_TYPE }}'" class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500">
                 @foreach(\App\Support\NestErps::verticals() as $vKey => $vMeta)
-                <option value="{{ $vKey }}" {{ old('erps_vertical', \App\Support\NestErps::DEFAULT_VERTICAL) === $vKey ? 'selected' : '' }}>{{ $vMeta['label'] }}</option>
+                    <option value="{{ $vKey }}" @selected(old('erps_vertical', \App\Support\NestErps::DEFAULT_VERTICAL) === $vKey)>{{ $vMeta['label'] }}</option>
                 @endforeach
             </select>
+            <div x-show="erpVertical === '{{ \App\Support\NestErps::HEALTH }}'" class="mt-4">
+                <label for="health-org-type" class="text-xs text-gray-400 mb-1 block">Healthcare organisation type</label>
+                <select id="health-org-type" name="health_org_type"
+                    :disabled="productType !== '{{ \App\Support\NestErps::PRODUCT_TYPE }}' || erpVertical !== '{{ \App\Support\NestErps::HEALTH }}'"
+                    class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500">
+                    @foreach(\App\Support\HealthPanel::ORG_TYPES as $type)
+                        <option value="{{ $type }}" @selected(old('health_org_type', \App\Support\HealthPanel::DEFAULT_ORG_TYPE) === $type)>{{ __(\App\Support\HealthPanel::orgTypeLabelKey($type)) }}</option>
+                    @endforeach
+                </select>
+            </div>
         </div>
 
         {{-- Business type (Task 1562) — POS products only. The type stores the

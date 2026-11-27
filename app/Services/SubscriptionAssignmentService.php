@@ -120,7 +120,7 @@ class SubscriptionAssignmentService
             // in `price` (6% already baked in) — use it as-is, never × 12.
             return [
                 'cycle' => 'annual',
-                'final_price' => round((float) $plan->sale_price),
+                'final_price' => round((float) $plan->sale_price, NestErps::isProductType($type) ? 2 : 0),
                 'discount_percent' => 6.0,
             ];
         }
@@ -211,7 +211,8 @@ class SubscriptionAssignmentService
                 && (int) $previous->pricing_plan_id === $pricingPlanId
                 && !$previous->trial_ends_at
                 && !$previous->hasActiveOverride()
-                && (float) $previous->final_price > 0
+                && ((float) $previous->final_price > 0
+                    || ($previous->purchase_snapshot['source'] ?? null) === SubscriptionPurchaseSnapshot::SOURCE_ERP_UPGRADE)
                 && $previous->end_date?->greaterThan(now()->startOfDay())) {
                 $endDate = $previous->end_date->copy()->addMonthsNoOverflow($months);
             }

@@ -59,6 +59,10 @@
     @if(data_get($snapshot, 'review.at'))<br>Verified on: {{ data_get($snapshot, 'review.at') }}@endif
 </div>
 <table>
+    @if(isset($snapshot['erp_upgrade']['gross_package_paisa'], $snapshot['erp_upgrade']['applied_credit_paisa']))
+        <tr><td>ERP package price</td><td class="amount">PKR {{ number_format($snapshot['erp_upgrade']['gross_package_paisa'] / 100, 2) }}</td></tr>
+        <tr><td>Credit from existing paid term</td><td class="amount">PKR {{ number_format($snapshot['erp_upgrade']['applied_credit_paisa'] / 100, 2) }}</td></tr>
+    @endif
     @unless($historical)
         <tr><td>Invoice amount</td><td class="amount">PKR {{ number_format((float) ($snapshot['amount_due'] ?? $invoice->amount), 2) }}</td></tr>
     @endunless

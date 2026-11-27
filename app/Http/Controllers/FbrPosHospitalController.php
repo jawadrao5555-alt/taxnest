@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 use App\Models\Company;
 use App\Models\Branch;
 use App\Services\BranchContextService;
+use App\Services\ErpUpgradeCutoverService;
 use App\Services\PosAccessService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -51,7 +52,12 @@ class FbrPosHospitalController extends Controller
     private function closed(Company $c,string $date): bool { return DB::table('hospital_day_closes')->where('company_id',$c->id)->where('branch_key',$this->branch()??0)->where('report_date',$date)->when(DB::transactionLevel()>0,fn($q)=>$q->lockForUpdate())->first()!==null; }
     private function response(Request $r,int $id) { $url='/fbr-pos/hospital/receipts/'.$id.($this->unassigned?'?unassigned=1':''); return $r->expectsJson()?response()->json(['success'=>true,'receipt_id'=>$id,'receipt_url'=>$url]):redirect()->away($url); }
     public function index() {
-        $company=$this->company(); $requestKey=(string)Str::uuid(); $closed=$this->closed($company,today()->toDateString());
+        $company=$this->company();
+        if (ErpUpgradeCutoverService::sourceIsCutOver((int) $company->id)) {
+            return response()->view('fbr-pos.hospital.index', ['company' => $company, 'cutover' => true])
+                ->header('Cache-Control', 'private, no-store');
+        }
+        $requestKey=(string)Str::uuid(); $closed=$this->closed($company,today()->toDateString());
         $services=DB::table('hospital_services')->where('company_id',$company->id)->where('active',true)->orderBy('label')->get();
         $patients=$this->rows('hospital_invoices',$company)->where('patient_reference', 'not like', 'Walk-in-%')->select('patient_reference','patient_name')->distinct()->limit(100)->get();
         return response()->view('fbr-pos.hospital.index',compact('company','requestKey','closed','services','patients'))->header('Cache-Control','private, no-store');
@@ -112,6 +118,9 @@ class FbrPosHospitalController extends Controller
                     || ($invoice->service_lines && array_map(fn($l)=>['service_head'=>$l['service_head'],'amount_paisa'=>$l['amount_paisa']],json_decode($invoice->service_lines,true))!==$lineInputs)
                     || $invoice->service_head!==$d['service_head'] || (int)$invoice->total_paisa!==$total)) $this->error('request_key','retry_conflict');
                 return (int)$saved->id;
+            }
+            if ($invoiceId === null && ErpUpgradeCutoverService::sourceIsCutOver((int) $company->id, lock: true)) {
+                $this->error('subscription', 'erp_cutover_new_collection');
             }
             if (!$r->boolean('payment_confirmed')) $this->error('payment_confirmed','confirm_required');
             $at=now(); if ($this->closed($company,$at->toDateString())) $this->error('amount','closed');

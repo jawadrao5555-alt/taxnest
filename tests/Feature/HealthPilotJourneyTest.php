@@ -624,7 +624,16 @@ class HealthPilotJourneyTest extends TestCase
         $this->get(route('health.lab'))->assertOk()->assertSee('data-lab-layout="modern"', false)
             ->assertDontSee(route('health.ipd'));
         $this->post(route('health.lab.layout'), ['layout' => 'fast_reception'])->assertRedirect(route('health.lab'));
-        $this->get(route('health.lab'))->assertOk()->assertSee('data-lab-layout="fast_reception"', false);
+        $this->get(route('health.lab'))->assertOk()->assertSee('data-lab-layout="fast_reception"', false)
+            ->assertSee('href="'.route('health.patients.create').'"', false);
+
+        $technician = $this->makeUser($lab, 'synthetic.lab.tech@example.test', 'health_lab_tech');
+        $this->actingAs($technician, 'health');
+        $this->post(route('health.lab.layout'), ['layout' => 'fast_reception'])->assertRedirect(route('health.lab'));
+        $this->get(route('health.lab'))->assertOk()->assertDontSee('href="'.route('health.patients.create').'"', false);
+
+        $this->actingAs($labOwner, 'health')->withSession(['health.lab_layout.'.$lab->id.'.'.$labOwner->id => 'retired_layout']);
+        $this->get(route('health.lab'))->assertOk()->assertSee('data-lab-layout="modern"', false);
 
         $accountant = $this->makeUser($this->company, 'synthetic.accountant@example.test', 'health_accountant');
         $this->actingAs($accountant, 'health');

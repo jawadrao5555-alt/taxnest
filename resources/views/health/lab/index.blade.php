@@ -25,6 +25,9 @@
             'sm:grid-cols-3' => $layout === 'classic',
             'max-w-xl' => $layout === 'fast_reception',
         ])>
+            @if($layout === 'fast_reception' && in_array('patients.view', $healthCapabilities ?? [], true) && in_array('patients.manage', $healthCapabilities ?? [], true))
+                <a href="{{ route('health.patients.create') }}" class="rounded-xl border border-teal-700 bg-teal-700 p-4 font-semibold text-white">{{ __('health.patient_register') }}</a>
+            @endif
             @if(in_array('patients.view', $healthCapabilities ?? [], true))
                 <a href="{{ route('health.patients') }}" @class(['rounded-xl border border-gray-300 p-4 font-semibold dark:border-gray-700', 'bg-teal-50 dark:bg-teal-900/30' => $layout === 'fast_reception'])>{{ __('health.nav_patients') }}</a>
             @endif

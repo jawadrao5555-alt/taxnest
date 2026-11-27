@@ -2,9 +2,12 @@
 
 namespace Tests\Feature\Auth;
 
+use App\Http\Middleware\HrAuthenticate;
+use App\Http\Middleware\SchoolErpAccess;
 use App\Models\AdminUser;
 use App\Models\Company;
 use App\Models\Franchise;
+use App\Models\HrOrganization;
 use App\Models\User;
 use App\Services\TwoStepLogin;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -26,7 +29,11 @@ class TwoStepLoginTest extends TestCase
     {
         parent::setUp();
         Mail::fake();
-        foreach (['di' => 'auth', 'pos' => 'pos.auth', 'fbrpos' => 'fbrpos.auth', 'health' => 'health.auth', 'schoolerp' => \App\Http\Middleware\SchoolErpAccess::class, 'admin' => 'admin.auth', 'franchise' => 'franchise.auth'] as $panel => $middleware) {
+        $middlewareByPanel = [
+            'di' => 'auth', 'pos' => 'pos.auth', 'fbrpos' => 'fbrpos.auth', 'health' => 'health.auth',
+            'schoolerp' => SchoolErpAccess::class, 'admin' => 'admin.auth', 'franchise' => 'franchise.auth', 'hr' => HrAuthenticate::class,
+        ];
+        foreach ($middlewareByPanel as $panel => $middleware) {
             Route::middleware(['web', $middleware])->match(['GET', 'POST'], '/two-step-test/'.$panel, fn () => response('Protected handler reached'));
         }
     }
@@ -40,6 +47,13 @@ class TwoStepLoginTest extends TestCase
         if ($panel === 'franchise') {
             return Franchise::create(['name' => 'Fictional franchise', 'email' => 'factor-franchise@example.invalid',
                 'password' => 'Synthetic123!', 'status' => 'active']);
+        }
+        if ($panel === 'hr') {
+            $actor = User::factory()->create(['is_active' => true, 'password' => 'Synthetic123!']);
+            $workspace = HrOrganization::create(['name' => 'Fictional HR workspace', 'timezone' => 'Asia/Karachi', 'status' => 'active']);
+            $workspace->memberships()->create(['user_id' => $actor->id, 'role' => 'owner', 'active' => true]);
+
+            return $actor;
         }
         $erpPanel = in_array($panel, ['health', 'schoolerp'], true);
         $company = Company::create(['name' => 'Fictional factor '.$panel, 'ntn' => uniqid('factor'),

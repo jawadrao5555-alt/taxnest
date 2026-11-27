@@ -1,7 +1,7 @@
 <?php
 namespace App\Http\Controllers;
 use App\Models\{Company, PosImsProfile, PosImsSubmission, PosDiSandboxProfile, PosTransaction};
-use App\Services\{PosImsReportingService, PosTaxIntegrationEndpoints};
+use App\Services\{PosFederalAddonAccess, PosImsReportingService, PosTaxIntegrationEndpoints};
 use App\Support\PraDiSandboxGate;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\{DB, Validator};
@@ -28,6 +28,7 @@ class PosTaxIntegrationController extends Controller
     public function ims(Request $request)
     {
         $company=$this->company($request);abort_unless(PraDiSandboxGate::setupAvailable(),404);
+        abort_unless(PosFederalAddonAccess::allows($company, 'federal_ims'), 403);
         $profile=PosImsProfile::where('company_id',$company->id)->first();
         $records=PosImsSubmission::where('company_id',$company->id)->latest('id')->limit(30)->get();
         $devices=\Illuminate\Support\Facades\Schema::hasTable('pos_agent_devices') ? \App\Models\PosAgentDevice::where('company_id',$company->id)->orderBy('id')->get() : collect();

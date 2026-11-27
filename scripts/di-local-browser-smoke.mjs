@@ -113,6 +113,39 @@ try {
   await page.goto(base + await edit.getAttribute('href'));
   await page.waitForFunction(() => window.Alpine && document.querySelector('form[x-data]')?._x_dataStack);
   assert.equal(await item('fbr_reference_checked').inputValue(), '1');
+
+  const profile = 'a'.repeat(64);
+  const product = {
+   id: 9001, name: 'Synthetic verified defaults', hs_code: '0101.2100', pct_code: '0101.2100',
+   uom: 'Kilograms', schedule_type: 'reduced', default_tax_rate: '5.50',
+   sro_reference: 'Synthetic Schedule', serial_number: '70', default_price: '80', di_tax_profile_revision: profile,
+  };
+  await page.route(url => url.pathname === '/api/products/search', route => route.fulfill({json: [product]}));
+  await page.route(url => url.pathname === '/invoice/fbr-reference-options', route => {
+   const params = new URL(route.request().url()).searchParams;
+   if (!params.has('product_id')) return route.continue();
+   assert.equal(params.get('product_id'), String(product.id));
+   assert.equal(params.get('profile_revision'), profile);
+   return route.fulfill({json: {province: 'Punjab', errors: params.get('invoice_date') === '2026-08-02'
+    ? ['This rate is no longer available.'] : []}});
+  });
+
+  const checkProductDefaults = async () => {
+   await page.locator('input[name="invoice_date"]').fill('2026-08-01');
+   await page.getByPlaceholder('Search products...').first().fill(product.name);
+   await page.getByRole('button', {name: /Synthetic verified defaults/}).first().click();
+   await page.getByText(/Saved product tax defaults confirmed for Punjab/).waitFor();
+   assert.equal(Number(await item('tax_rate').inputValue()), 5.5);
+   assert.equal(await item('sro_schedule_no').inputValue(), 'Synthetic Schedule');
+   assert.equal(await item('serial_no').inputValue(), '70');
+   assert.equal(await item('fbr_reference_checked').inputValue(), '1');
+   await page.locator('input[name="invoice_date"]').fill('2026-08-02');
+   await page.getByText(/This rate is no longer available/).waitFor();
+   assert.equal(Number(await item('tax_rate').inputValue()), 5.5);
+  };
+  await checkProductDefaults();
+  await page.goto(base+'/invoice/create');
+  await checkProductDefaults();
  }
  assert.deepEqual(errors,[]);
  console.log('DI '+mode+' real form interaction and draft save passed.');

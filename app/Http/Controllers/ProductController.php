@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Company;
 use App\Models\Product;
+use App\Services\DiProductTaxProfile;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
 
@@ -50,7 +52,7 @@ class ProductController extends Controller
             'aliases_text' => 'nullable|string|max:4000',
             'hs_code' => 'required|string|max:50',
             'pct_code' => 'nullable|string|max:50',
-            'default_tax_rate' => 'required|integer|min:0|max:100',
+            'default_tax_rate' => 'required|numeric|decimal:0,2|min:0|max:100',
             'tax_type' => 'nullable|in:taxable,exempt,custom',
             'uom' => 'required|string|max:20',
             'schedule_type' => 'nullable|string|max:100',
@@ -70,7 +72,7 @@ class ProductController extends Controller
             $validationRules['mrp'] = 'required|numeric|min:0.01';
         }
 
-        $request->validate($validationRules + ['selling_packings' => 'sometimes|array|max:30']);
+        $request->validate($validationRules + ['selling_packings' => 'sometimes|array|max:30', 'verify_di_tax' => 'sometimes|boolean']);
         if (($request->has('selling_packings_present') || $request->has('selling_packings')) && !Schema::hasColumn('products', 'selling_packings')) {
             throw \Illuminate\Validation\ValidationException::withMessages(['selling_packings' => 'Packing support is not installed yet.']);
         }
@@ -86,7 +88,8 @@ class ProductController extends Controller
             $taxType = 'custom';
         }
 
-        $product = Product::create([
+        $verification = $this->taxVerification($request, $companyId);
+        $product = new Product([
             'company_id' => $companyId,
             'name' => $request->name,
             'barcode' => $request->barcode,
@@ -102,7 +105,9 @@ class ProductController extends Controller
             'mrp' => $request->mrp,
             'default_price' => $request->default_price,
         ]);
-        if ($packings !== null) $product->update(['selling_packings' => $packings]);
+        if ($verification !== null) $product->di_tax_verification = $verification;
+        if ($packings !== null) $product->selling_packings = $packings;
+        $product->save();
         $this->syncAliases($product, (string) $request->input('aliases_text', ''));
 
         return redirect('/products')->with('success', 'Product created successfully.');
@@ -135,7 +140,7 @@ class ProductController extends Controller
             'aliases_text' => 'nullable|string|max:4000',
             'hs_code' => 'required|string|max:50',
             'pct_code' => 'nullable|string|max:50',
-            'default_tax_rate' => 'required|integer|min:0|max:100',
+            'default_tax_rate' => 'required|numeric|decimal:0,2|min:0|max:100',
             'uom' => 'required|string|max:20',
             'schedule_type' => 'nullable|string|max:100',
             'sro_reference' => 'nullable|string|max:100',
@@ -154,7 +159,7 @@ class ProductController extends Controller
             $validationRules['mrp'] = 'required|numeric|min:0.01';
         }
 
-        $request->validate($validationRules + ['selling_packings' => 'sometimes|array|max:30']);
+        $request->validate($validationRules + ['selling_packings' => 'sometimes|array|max:30', 'verify_di_tax' => 'sometimes|boolean']);
         if (($request->has('selling_packings_present') || $request->has('selling_packings')) && !Schema::hasColumn('products', 'selling_packings')) {
             throw \Illuminate\Validation\ValidationException::withMessages(['selling_packings' => 'Packing support is not installed yet.']);
         }
@@ -171,14 +176,33 @@ class ProductController extends Controller
         if ($product->selling_packings && $request->uom !== $product->uom) {
             throw \Illuminate\Validation\ValidationException::withMessages(['uom' => 'Clear and save existing packings before changing the base UOM.']);
         }
-        $product->update(array_merge($request->only([
+        $verification = $this->taxVerification($request, $companyId, $product);
+        $product->fill(array_merge($request->only([
             'name', 'barcode', 'sku', 'hs_code', 'pct_code', 'default_tax_rate',
             'uom', 'schedule_type', 'sro_reference', 'serial_number', 'mrp', 'default_price'
         ]), ['tax_type' => $taxType]));
-        if ($packings !== null) $product->update(['selling_packings' => $packings]);
+        if ($verification !== null || ($product->di_tax_verification && !DiProductTaxProfile::hasVerifiedDefaults($product))) {
+            $product->di_tax_verification = $verification;
+        }
+        if ($packings !== null) $product->selling_packings = $packings;
+        $product->save();
         $this->syncAliases($product, (string) $request->input('aliases_text', ''));
 
         return redirect('/products')->with('success', 'Product updated successfully.');
+    }
+
+    private function taxVerification(Request $request, int $companyId, ?Product $product = null): ?array
+    {
+        if (!$request->boolean('verify_di_tax')) return null;
+
+        abort_unless(Schema::hasColumn('products', 'di_tax_verification'), 503);
+        $request->validate([
+            'schedule_type' => 'required|in:standard,reduced,3rd_schedule,exempt,zero_rated,fed_services,services',
+        ]);
+
+        return app(DiProductTaxProfile::class)->verification(
+            Company::findOrFail($companyId), now()->toDateString(), $request->only(DiProductTaxProfile::FIELDS) + ($product?->only(DiProductTaxProfile::FIELDS) ?? [])
+        );
     }
 
     public function deactivate(Product $product)
@@ -217,7 +241,8 @@ class ProductController extends Controller
                 }
             })
             ->take(20)
-            ->get(['id', 'name', 'hs_code', 'pct_code', 'default_tax_rate', 'tax_type', 'uom', 'default_price', 'schedule_type', 'sro_reference', 'serial_number', 'mrp']);
+            ->get(array_merge(['id', 'name', 'hs_code', 'pct_code', 'default_tax_rate', 'tax_type', 'uom', 'default_price', 'schedule_type', 'sro_reference', 'serial_number', 'mrp'],
+                Schema::hasColumn('products', 'di_tax_verification') ? ['di_tax_verification'] : []));
 
         if (Schema::hasColumn('products', 'selling_packings')) {
             $packingRows = Product::where('company_id', $companyId)->whereIn('id', $products->pluck('id'))->pluck('selling_packings', 'id');
@@ -229,6 +254,7 @@ class ProductController extends Controller
             $product->matched_packing_id = $matches->count() === 1 ? $matches->first()['id'] : null;
             $product->requires_sro = $rules['requires_sro'];
             $product->requires_serial = $rules['requires_serial'];
+            $product->di_tax_profile_revision = DiProductTaxProfile::hasVerifiedDefaults($product) ? $product->di_tax_verification['fingerprint'] : null;
             $product->requires_mrp = $rules['requires_mrp'];
             return $product;
         });

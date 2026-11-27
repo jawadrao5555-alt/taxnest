@@ -2,10 +2,12 @@
 
 namespace Tests\Feature;
 
+use App\Services\SchoolAdmissionsService;
 use Illuminate\Database\QueryException;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\ValidationException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
@@ -54,6 +56,39 @@ class SchoolErpAdmissionsSchemaTest extends TestCase
     public static function crossTenantEnrollments(): array
     {
         return ['another school student' => [2, 1], 'another school term' => [1, 2]];
+    }
+
+    public function test_admission_retries_preserve_the_same_enrollment_and_date(): void
+    {
+        $admissions = app(SchoolAdmissionsService::class);
+        $id = $admissions->enroll(1, 1, 1, '2027-01-01');
+        $this->assertSame($id, $admissions->enroll(1, 1, 1, '2027-01-01'));
+        $this->assertDatabaseCount('school_erp_enrollments', 1);
+
+        $this->expectException(ValidationException::class);
+        $admissions->enroll(1, 1, 1, '2027-01-02');
+    }
+
+    #[DataProvider('invalidAdmissions')]
+    public function test_admission_requires_same_school_and_a_valid_term_date(int $student, int $term, string $date, string $field): void
+    {
+        try {
+            app(SchoolAdmissionsService::class)->enroll(1, $student, $term, $date);
+            $this->fail('The admission should have been rejected.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey($field, $exception->errors());
+            $this->assertDatabaseCount('school_erp_enrollments', 0);
+        }
+    }
+
+    public static function invalidAdmissions(): array
+    {
+        return [
+            'another school student' => [2, 1, '2027-01-01', 'student_id'],
+            'another school term' => [1, 2, '2027-01-01', 'term_id'],
+            'invalid calendar date' => [1, 1, '2027-02-30', 'admitted_on'],
+            'outside term' => [1, 1, '2028-01-01', 'admitted_on'],
+        ];
     }
 
     private function enroll(int $company, int $student, int $term): void

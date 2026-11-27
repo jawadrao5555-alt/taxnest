@@ -87,28 +87,31 @@ class PosAddonService
     /** The catalogue entries not already granted by this exact paid package. */
     public static function purchasableCodesForPlan(?PricingPlan $plan): array
     {
-        if (!self::planEligibleForPurchase($plan)) {
+        if (!PosPlanComparisonService::isSellablePlan($plan)) {
             return [];
         }
 
-        return array_keys(array_filter(PosAddonPricingService::definitions(), function (array $addon) use ($plan) {
-            $gate = $addon['gate'];
-            return empty($plan->{$gate});
-        }));
+        return array_keys(array_filter(PosAddonPricingService::definitions(), function (array $addon, string $code) use ($plan) {
+            return PosFederalAddonAccess::isFederalCode($code)
+                || (self::planEligibleForPurchase($plan) && empty($plan->{$addon['gate']}));
+        }, ARRAY_FILTER_USE_BOTH));
+    }
+
+    /** Federal integrations are available only through paid-account billing. */
+    public static function publicCodesForPlan(?PricingPlan $plan): array
+    {
+        return array_values(array_intersect(self::purchasableCodesForPlan($plan), array_keys(PosAddonPricingService::ADDONS)));
     }
 
     /** Public/signup quote: never price a feature already inside the chosen package. */
     public static function quoteForPlan(array $codes, string $cycle, ?PricingPlan $plan): array
     {
-        $publicCodes = array_intersect(self::purchasableCodesForPlan($plan), array_keys(PosAddonPricingService::ADDONS));
+        $publicCodes = self::publicCodesForPlan($plan);
         return self::quote(array_values(array_intersect($codes, $publicCodes)), $cycle);
     }
 
-    /**
-     * Add-ons can be purchased by paid Business+ PRA packages only.
-     * Starter and trial accounts must upgrade first.
-     */
-    public static function purchaseEligibility(?Company $company): array
+    /** Federal integrations are sold on every paid PRA POS package. */
+    public static function purchaseEligibility(?Company $company, array $codes = []): array
     {
         if (!self::isPraCompany($company)) {
             return ['allowed' => false, 'reason_key' => 'pos.addons_not_available'];
@@ -116,7 +119,11 @@ class PosAddonService
 
         $sub = self::activeSubscription($company);
         $plan = $sub?->entitlementPlan();
-        if (!$sub || !self::planEligibleForPurchase($plan)) {
+        $federalOnly = $codes !== [] && array_diff($codes, PosFederalAddonAccess::CODES) === [];
+        $eligiblePlan = $federalOnly
+            ? PosPlanComparisonService::isSellablePlan($plan) && PosFederalAddonAccess::hasPaidPackage($company)
+            : self::planEligibleForPurchase($plan);
+        if (!$sub || !$eligiblePlan) {
             return ['allowed' => false, 'reason_key' => 'pos.addons_upgrade_required'];
         }
 
@@ -175,13 +182,10 @@ class PosAddonService
             return self::$activeCache[$company->id] = [];
         }
 
-        // A paid add-on belongs to its paid Business+ subscription. A later
-        // Starter downgrade or replacement subscription cannot inherit it.
-        // NULL subscription_id rows predate this binding and keep their old
-        // access while this eligible package remains active, until expiry.
+        // Replacement subscriptions cannot inherit add-ons. Old unbound
+        // feature grants keep access only while their package stays eligible.
         $subscription = self::activeSubscription($company);
-        if (!self::planEligibleForPurchase($subscription?->entitlementPlan())
-            || (self::remainingMonths($subscription) ?? 0) === 0) {
+        if ((self::remainingMonths($subscription) ?? 0) === 0) {
             return self::$activeCache[$company->id] = [];
         }
 
@@ -194,7 +198,10 @@ class PosAddonService
                 $q->whereNull('ends_at')->orWhereDate('ends_at', '>=', now()->toDateString());
             })
             ->pluck('addon_code')
-            ->filter(fn ($code) => isset(PosAddonPricingService::definitions()[$code]) || isset(self::LEGACY_GATES[$code]))
+            ->filter(fn ($code) => PosFederalAddonAccess::isFederalCode($code)
+                ? PosFederalAddonAccess::state($company, $code) === 'paid'
+                : self::planEligibleForPurchase($subscription->entitlementPlan())
+                    && (isset(PosAddonPricingService::ADDONS[$code]) || isset(self::LEGACY_GATES[$code])))
             ->values()
             ->all();
     }
@@ -227,13 +234,18 @@ class PosAddonService
 
         $taken = array_merge(self::activeCodes($company), self::pendingCodes($company));
         $out = [];
+        $federalEligible = self::purchaseEligibility($company, PosFederalAddonAccess::CODES)['allowed'];
         foreach (PosFederalAddonAccess::CODES as $code) {
             if (!in_array($code, $taken, true) && PosAddonPricingService::price($code) > 0 && self::tableExists()
-                && self::purchaseEligibility($company)['allowed'] && PosFederalAddonAccess::hasPaidPackage($company)
+                && $federalEligible
                 && PosFederalAddonAccess::selectionAllowed($company, [$code])) {
                 $out[] = $code;
             }
         }
+        if (!self::purchaseEligibility($company)['allowed']) {
+            return $out;
+        }
+
         foreach (PosAddonPricingService::ADDONS as $code => $addon) {
             if (in_array($code, $taken, true)) {
                 continue;

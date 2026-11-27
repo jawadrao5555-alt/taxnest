@@ -26,8 +26,6 @@
             Dashboard
         </a>
 
-        <x-di-madadgar-read-link />
-
         @if(auth()->user()->role !== 'super_admin' || auth()->user()->company_id)
         <div class="pt-4 pb-1 px-4 cursor-pointer select-none" @click="toggle('business')">
             <p class="text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-300 flex items-center justify-between">
@@ -107,6 +105,7 @@
         </div>
 
         <div x-show="isOpen('reports')" x-collapse>
+        <x-di-madadgar-read-link />
         <a href="/mis" class="sidebar-link flex items-center gap-3 py-3 px-4 rounded-lg text-sm {{ request()->is('mis*') ? 'active text-gray-900 dark:text-white' : 'text-gray-600 dark:text-gray-200' }}">
             <svg class="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
             MIS Reports

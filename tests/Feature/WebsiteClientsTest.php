@@ -135,6 +135,37 @@ class WebsiteClientsTest extends TestCase
         $this->get('/digital-invoice')->assertOk()->assertDontSee('Synthetic Market Public');
     }
 
+    public function test_company_id_lookup_links_from_admin_screens_and_handles_unavailable_ids(): void
+    {
+        $company = Company::create(['name' => 'Synthetic ID Account', 'ntn' => 'WC-SYNTHETIC-ID', 'product_type' => 'di']);
+        $pending = Company::create(['name' => 'Synthetic Pending Account', 'ntn' => 'WC-SYNTHETIC-PENDING', 'status' => 'pending']);
+        $index = route('saas.admin.website-clients.index');
+        $create = route('saas.admin.website-clients.create');
+        $lookup = route('saas.admin.website-clients.create', ['company' => $company->id]);
+
+        $this->actingAs($this->admin('support'), 'admin')->get($lookup)->assertForbidden();
+        $this->actingAs($this->admin('admin'), 'admin');
+        $this->get($index)->assertOk()->assertSee('Find by ID')->assertSee('Company ID '.$company->id);
+        $this->get($create)->assertOk()->assertSee('Find by ID')->assertSee('Add manually');
+        $this->get(route('saas.admin.companies.show', $company->id))->assertOk()
+            ->assertSee('Review for Our Clients')->assertSee($lookup, false);
+        $this->get(route('saas.admin.companies.show', $pending->id))->assertOk()->assertDontSee('Review for Our Clients');
+        $this->get($lookup)->assertOk()->assertSee('Company ID '.$company->id)->assertSee('value="Synthetic ID Account"', false);
+
+        foreach (['', 'not-an-id', '0', ['id' => 1]] as $invalid) {
+            $this->get(route('saas.admin.website-clients.create', ['company' => $invalid]))
+                ->assertRedirect($index)->assertSessionHasErrors(['company' => 'Enter a valid numeric Company ID.']);
+        }
+
+        foreach ([$pending->id, $pending->id + 1000] as $unavailable) {
+            $this->get(route('saas.admin.website-clients.create', ['company' => $unavailable]))
+                ->assertRedirect($index)->assertSessionHasErrors(['company' => 'No eligible company was found for this ID. Check the ID in Companies.'])
+                ->assertSessionHasInput('company', (string) $unavailable);
+        }
+
+        $this->assertDatabaseCount('website_clients', 0);
+    }
+
     public function test_linked_card_and_logo_hide_when_company_product_changes_or_company_becomes_inactive(): void
     {
         $company = Company::create(['name' => 'Synthetic Posted Account', 'ntn' => 'WC-SYNTHETIC-POSTED', 'product_type' => 'di']);

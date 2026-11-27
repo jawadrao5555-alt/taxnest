@@ -4,7 +4,7 @@
     <p class="text-xs text-gray-500 dark:text-gray-400 mb-6">Configure the global WhatsApp support number and the bank / payment account details shown to companies whose free trial has ended.</p>
 
     @if(auth('admin')->user()?->canManageRelease())
-    <a href="{{ route('saas.admin.website-clients.index') }}" class="mb-5 inline-block text-sm text-emerald-300 underline">Website Clients</a>
+    <a href="{{ route('saas.admin.website-clients.index') }}" class="tn-website-client-action mb-5">Website Clients</a>
     @endif
 
     @if(!$canManageSensitiveConfiguration)

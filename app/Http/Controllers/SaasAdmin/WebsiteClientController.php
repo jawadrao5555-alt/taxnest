@@ -10,6 +10,7 @@ use App\Models\WebsiteClient;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -42,9 +43,22 @@ class WebsiteClientController extends Controller
         $entry = $client === null ? new WebsiteClient : WebsiteClient::findOrFail($client);
         $source = $entry->company_id ? WebsiteClient::companySources()->find($entry->company_id) : null;
 
-        if (!$entry->exists && $request->filled('company')) {
-            $companyId = $request->validate(['company' => ['required', 'integer', 'min:1']])['company'];
-            $source = WebsiteClient::companySources()->findOrFail($companyId);
+        if (!$entry->exists && $request->has('company')) {
+            $lookup = Validator::make($request->query(), ['company' => ['required', 'integer', 'min:1']], [
+                'company.*' => 'Enter a valid numeric Company ID.',
+            ]);
+            $index = redirect()->route('saas.admin.website-clients.index');
+            if ($lookup->fails()) {
+                return $index->withErrors($lookup);
+            }
+
+            $companyId = $lookup->validated()['company'];
+            $source = WebsiteClient::companySources()->find($companyId);
+            if (!$source) {
+                return $index->withErrors(['company' => 'No eligible company was found for this ID. Check the ID in Companies.'])
+                    ->withInput(['company' => $companyId]);
+            }
+
             $existing = WebsiteClient::query()->where('company_id', $source->id)->first();
             if ($existing) {
                 return redirect()->route('saas.admin.website-clients.edit', $existing->id);

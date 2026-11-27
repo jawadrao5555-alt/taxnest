@@ -11,10 +11,19 @@ if (!app()->environment('testing') || config('database.default') !== 'sqlite'
 $mode = $argv[1] ?? '';
 $out = $argv[2] ?? '';
 if ($mode === 'verify') {
-    $invoice = App\Models\Invoice::withoutGlobalScopes()->with(['items', 'company'])->sole();
+    $invoices = App\Models\Invoice::withoutGlobalScopes()->with(['items', 'company'])->orderBy('id')->get();
+    $invoice = $invoices->first();
+    if (!$invoice || $invoices->count() !== (($argv[3] ?? '') === 'financial' ? 2 : 1)) exit(1);
     $expected = ($argv[3] ?? '') === 'financial' ? 98.0 : 11800.0;
     if ($invoice->status !== 'draft' || abs((float) $invoice->total_amount - $expected) > 0.005 || $invoice->fbr_invoice_number) exit(1);
     if (($argv[3] ?? '') === 'financial' && !$invoice->items->first()->fbr_reference_checked) exit(1);
+    if (($argv[3] ?? '') === 'financial') {
+        $special = $invoices->last();
+        $line = $special->items->sole();
+        if ($special->status !== 'draft' || $special->fbr_invoice_number
+            || (float) $special->total_amount !== 1235.0 || $line->tax !== 225.0
+            || $line->di_federal_excise !== 10.0) exit(1);
+    }
     if (($argv[3] ?? '') === 'withholding' && abs((float) $invoice->items->first()->st_withheld_amount - 500.25) > 0.005) exit(1);
     echo "DI browser draft persisted with expected amount and no fiscal submission.\n"; exit(0);
 }

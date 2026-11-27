@@ -44,6 +44,13 @@ class InvoiceItem extends Model
         'tax' => 'float',
     ];
 
+    public function getDiFederalExciseAttribute(): float
+    {
+        $rule = \App\Services\DiSpecialTax::rule($this->schedule_type);
+
+        return $rule ? \App\Services\DiSpecialTax::excise($rule, (float) $this->quantity) : 0.0;
+    }
+
     public function invoice()
     {
         return $this->belongsTo(Invoice::class);

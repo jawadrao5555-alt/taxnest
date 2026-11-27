@@ -132,11 +132,18 @@
                 <td class="text-right">{{ $item->quantity }}</td>
                 <td class="text-right">PKR {{ number_format($item->price, $item->selling_snapshot ? 6 : 2) }}</td>
                 <td class="text-right">PKR {{ number_format($item->tax, 2) }}</td>
-                <td class="text-right" style="font-weight: 600;">PKR {{ number_format(($item->price * $item->quantity) + $item->tax, 2) }}</td>
+                <td class="text-right" style="font-weight: 600;">PKR {{ number_format(($item->price * $item->quantity) + $item->tax + $item->di_federal_excise, 2) }}</td>
             </tr>
             @endforeach
         </tbody>
         <tfoot>
+            @php $totalFederalExcise = $invoice->items->sum('di_federal_excise'); @endphp
+            @if($totalFederalExcise > 0)
+            <tr>
+                <td colspan="6" class="text-right">Federal Excise Duty</td>
+                <td class="text-right">PKR {{ number_format($totalFederalExcise, 2) }}</td>
+            </tr>
+            @endif
             @php $totalFurtherTax = $invoice->items->sum('further_tax'); @endphp
             @if($totalFurtherTax > 0)
             <tr>

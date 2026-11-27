@@ -15,6 +15,7 @@ use App\Services\InvoiceActivityService;
 use App\Services\InvoiceNumberingService;
 use App\Services\PlanLimitService;
 use App\Services\ScheduleEngine;
+use App\Services\DiSpecialTax;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -61,7 +62,7 @@ class DiInvoiceApiController extends Controller
             'items.*.quantity' => 'required|numeric|min:0.0001',
             'items.*.price' => 'required|numeric|min:0.01',
             'items.*.tax' => 'required|numeric|min:0',
-            'items.*.schedule_type' => 'nullable|string|in:standard,reduced,3rd_schedule,exempt,zero_rated,fed_services,services',
+            'items.*.schedule_type' => 'nullable|string|in:standard,reduced,3rd_schedule,exempt,zero_rated,fed_services,services,'.implode(',', array_keys(DiSpecialTax::RULES)),
             'items.*.pct_code' => 'nullable|string|max:50',
             'items.*.tax_rate' => 'nullable|numeric|min:0|max:100',
             'items.*.sro_schedule_no' => 'nullable|string|max:100',
@@ -105,7 +106,11 @@ class DiInvoiceApiController extends Controller
             return $this->duplicateResponse($existing, $request);
         }
 
-        $request->merge(['items' => \App\Services\DiSellingPacking::normalizeRequest($request, (int) $companyId)]);
+        $request->merge(['items' => DiSpecialTax::normalizeItems(
+            \App\Services\DiSellingPacking::normalizeRequest($request, (int) $companyId),
+            $documentType,
+            \Illuminate\Support\Carbon::parse($request->input('invoice_date') ?: now()->toDateString())->toDateString(),
+        )]);
 
         // ── FBR schedule rules — same engine as the panel ───────────────────
         $standardTaxRate = $company->getStandardTaxRateValue();

@@ -315,7 +315,7 @@
                 <td class="ar">{{ number_format($item->quantity, $item->quantity == intval($item->quantity) ? 0 : (round($item->quantity, 2) == $item->quantity ? 2 : 4)) }}</td>
                 <td class="ar">{{ number_format($item->price, $item->selling_snapshot ? 6 : 2) }}</td>
                 <td class="ar" style="font-weight: 800;">{{ number_format($item->price * $item->quantity, 2) }}</td>
-                <td class="ar" style="font-size: 9px;">{{ number_format($item->tax_rate ?? 0, 0) }}%</td>
+                <td class="ar" style="font-size: 9px;">{{ \App\Services\DiSpecialTax::rule($item->schedule_type)['rate_label'] ?? (number_format($item->tax_rate ?? 0, 0).'%') }}</td>
             </tr>
             @endforeach
         </tbody>
@@ -333,7 +333,7 @@
                 @if($scheduleTypes->count() > 0 || $sroNumbers->count() > 0)
                 <div class="schedule-info">
                     @if($scheduleTypes->count() > 0)
-                    <strong>Schedule:</strong> {{ $scheduleTypes->map(fn($t) => ucfirst(str_replace('_', ' ', $t)))->join(', ') }}<br>
+                    <strong>Schedule:</strong> {{ $scheduleTypes->map(fn($t) => \App\Services\DiSpecialTax::rule($t)['label'] ?? ucfirst(str_replace('_', ' ', $t)))->join(', ') }}<br>
                     @endif
                     @if($sroNumbers->count() > 0)
                     <strong>SRO:</strong> {{ $sroNumbers->join(', ') }}<br>
@@ -355,6 +355,13 @@
                             <td class="t-label">Sales Tax (GST)</td>
                             <td class="t-value">PKR {{ number_format($totalTax, 2) }}</td>
                         </tr>
+                        @php $totalFederalExcise = $invoice->items->sum('di_federal_excise'); @endphp
+                        @if($totalFederalExcise > 0)
+                        <tr>
+                            <td class="t-label">Federal Excise Duty</td>
+                            <td class="t-value">PKR {{ number_format($totalFederalExcise, 2) }}</td>
+                        </tr>
+                        @endif
                         @php $totalFurtherTax = $invoice->items->sum('further_tax'); @endphp
                         @if($totalFurtherTax > 0)
                         <tr>

@@ -1,3 +1,4 @@
+import { verifyAdminControlContrast } from './lib/admin-controls-contrast.mjs';
 import {pilotFiscalControlWorkflow} from './lib/pilot-fiscal-control-browser.mjs';
 import { prospectivePolicyWorkflow } from './lib/prospective-policy-browser.mjs';
 import { platformExpenseWorkflow } from './lib/platform-expense-browser.mjs';
@@ -1534,7 +1535,11 @@ async function workflow(page,t,v,diagnostics) {
   if(t.whatsappAutoSend)return whatsappAutoSendWorkflow(page,t,v);
   if(t.riderRealtime)return riderRealtimeWorkflow(page,t,v);
   if(t.liveOpsReadability)return liveOpsReadability(page,t,v);
-  if(t.companyDirectoryContrast)return companyDirectoryContrast(page,t,v);
+  if (t.companyDirectoryContrast) {
+    await companyDirectoryContrast(page, t, v);
+    await verifyAdminControlContrast(page, baseUrl, t.contrastProofCompanyId);
+    return pass(t.name+'/'+v.width+': Plans, Settings and pending payment actions contrast verified in six palettes, light/dark, keyboard and hover');
+  }
   if(t.fbrReconciliation) {
     for(const [decision,id] of Object.entries(t.fbrReconciliation[v.width])) {
       await page.goto(baseUrl+'/fbr-pos/fail-queue',{waitUntil:'domcontentloaded'});

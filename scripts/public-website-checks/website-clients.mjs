@@ -10,6 +10,7 @@ export default async function check(page, baseUrl) {
   assert.match(await grid.innerText(), /Synthetic Retail Studio\s+PRA POS/);
   assert.match(await grid.innerText(), /Synthetic Invoice Studio\s+Digital Invoice/);
   assert.equal(await grid.getByText('Synthetic Unpublished Studio').count(), 0);
+  assert.equal(await grid.getByText('Synthetic Expired Studio').count(), 0);
   const logo = grid.locator('img');
   await logo.evaluate(image => image.decode());
   const size = await cards.first().boundingBox();

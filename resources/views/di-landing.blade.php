@@ -240,6 +240,7 @@
     </script>
     {{-- Urdu-script font (Task 1287) — inert unless the app locale is ever 'ur'. --}}
     @include('partials.urdu-font')
+    <link rel="stylesheet" href="{{ asset('css/public-controls.css') }}?v={{ @filemtime(public_path('css/public-controls.css')) }}">
 </head>
 <body class="relative min-h-[100dvh] flex flex-col" x-data="{ showLoginModal: {{ isset($showLogin) && $showLogin ? 'true' : 'false' }}, scrolled: false, mobileOpen: false }" @scroll.window="scrolled = (window.pageYOffset > 20)">
     <div id="tn-boot" aria-hidden="true"><span>Tax<b>Nest</b></span></div>
@@ -264,19 +265,19 @@
                         <p class="text-xs text-white/60 tracking-wider uppercase">FBR Portal Access</p>
                     </div>
                 </div>
-                <button @click="showLoginModal = false" class="text-white/40 hover:text-white transition p-1">
+                <button type="button" aria-label="Close login" @click="showLoginModal = false" class="tn-public-control tn-public-control--dark tn-public-close transition p-2">
                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                 </button>
             </div>
-            <form method="POST" action="/login" class="px-6 py-6 space-y-5">
+            <form method="POST" action="/login" class="tn-public-login tn-public-control--dark px-6 py-6 space-y-5">
                 @csrf
                 <div>
                     <label class="block text-xs font-bold tracking-wide text-white/70 uppercase mb-2">Identifier</label>
-                    <input type="text" name="login" required autofocus class="w-full px-4 py-2.5 rounded-lg bg-white/5 border border-white/15 text-sm text-white focus:ring-2 focus:ring-[#2EA0B3]/30 focus:border-[#2EA0B3] transition-colors placeholder:text-white/30" placeholder="Email, Phone, Username, CNIC or NTN">
+                    <input type="text" name="login" required autofocus class="w-full px-4 py-2.5 rounded-lg bg-white/5 border border-white/15 text-sm text-white focus:ring-2 focus:ring-[#2EA0B3]/30 focus:border-[#2EA0B3] transition-colors" placeholder="Email, Phone, Username, CNIC or NTN">
                 </div>
                 <div>
                     <label class="block text-xs font-bold tracking-wide text-white/70 uppercase mb-2">Password</label>
-                    <input type="password" name="password" required autocomplete="current-password" class="w-full px-4 py-2.5 rounded-lg bg-white/5 border border-white/15 text-sm text-white focus:ring-2 focus:ring-[#2EA0B3]/30 focus:border-[#2EA0B3] transition-colors placeholder:text-white/30" placeholder="••••••••">
+                    <input type="password" name="password" required autocomplete="current-password" class="w-full px-4 py-2.5 rounded-lg bg-white/5 border border-white/15 text-sm text-white focus:ring-2 focus:ring-[#2EA0B3]/30 focus:border-[#2EA0B3] transition-colors" placeholder="••••••••">
                 </div>
                 <div class="flex items-center justify-between">
                     <label class="flex items-center cursor-pointer">
@@ -685,39 +686,39 @@
             </div>
             <div class="space-y-0 divide-y divide-gray-200 border-y border-gray-200" x-data="{ open: null }">
                 <div class="bg-white">
-                    <button @click="open = (open === 1 ? null : 1)" class="w-full flex items-center justify-between py-6 text-left hover:bg-gray-50 px-2 transition-colors">
+                    <button type="button" @click="open = (open === 1 ? null : 1)" :aria-expanded="open === 1" aria-controls="di-faq-answer-1" class="tn-public-control w-full flex items-center justify-between py-6 text-left hover:bg-gray-50 px-2 transition-colors">
                         <span class="font-bold text-gray-900 text-sm uppercase tracking-wide">Can I test invoices before sending them to FBR?</span>
-                        <svg class="w-5 h-5 text-gray-400 transition-transform flex-shrink-0 ml-4" :class="open === 1 ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                        <svg aria-hidden="true" class="tn-disclosure-indicator w-5 h-5 transition-transform flex-shrink-0 ml-4" :class="open === 1 ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                     </button>
-                    <div x-show="open === 1" x-collapse class="px-2 pb-6 text-sm text-gray-600 leading-relaxed">Yes. Every invoice is validated against FBR's rules before submission, and a sandbox environment lets you verify the full payload safely before anything touches production.</div>
+                    <div id="di-faq-answer-1" x-show="open === 1" x-collapse class="px-2 pb-6 text-sm text-gray-600 leading-relaxed">Yes. Every invoice is validated against FBR's rules before submission, and a sandbox environment lets you verify the full payload safely before anything touches production.</div>
                 </div>
                 <div class="bg-white">
-                    <button @click="open = (open === 2 ? null : 2)" class="w-full flex items-center justify-between py-6 text-left hover:bg-gray-50 px-2 transition-colors">
+                    <button type="button" @click="open = (open === 2 ? null : 2)" :aria-expanded="open === 2" aria-controls="di-faq-answer-2" class="tn-public-control w-full flex items-center justify-between py-6 text-left hover:bg-gray-50 px-2 transition-colors">
                         <span class="font-bold text-gray-900 text-sm uppercase tracking-wide">How is Digital Invoice billed?</span>
-                        <svg class="w-5 h-5 text-gray-400 transition-transform flex-shrink-0 ml-4" :class="open === 2 ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                        <svg aria-hidden="true" class="tn-disclosure-indicator w-5 h-5 transition-transform flex-shrink-0 ml-4" :class="open === 2 ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                     </button>
-                    <div x-show="open === 2" x-collapse class="px-2 pb-6 text-sm text-gray-600 leading-relaxed">Annual totals are shown in the comparison. Other configured billing periods are listed with their exact totals below it; your selected period is carried into signup and checkout.</div>
+                    <div id="di-faq-answer-2" x-show="open === 2" x-collapse class="px-2 pb-6 text-sm text-gray-600 leading-relaxed">Annual totals are shown in the comparison. Other configured billing periods are listed with their exact totals below it; your selected period is carried into signup and checkout.</div>
                 </div>
                 <div class="bg-white">
-                    <button @click="open = (open === 3 ? null : 3)" class="w-full flex items-center justify-between py-6 text-left hover:bg-gray-50 px-2 transition-colors">
+                    <button type="button" @click="open = (open === 3 ? null : 3)" :aria-expanded="open === 3" aria-controls="di-faq-answer-3" class="tn-public-control w-full flex items-center justify-between py-6 text-left hover:bg-gray-50 px-2 transition-colors">
                         <span class="font-bold text-gray-900 text-sm uppercase tracking-wide">I don't know my HS codes. Does the system help?</span>
-                        <svg class="w-5 h-5 text-gray-400 transition-transform flex-shrink-0 ml-4" :class="open === 3 ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                        <svg aria-hidden="true" class="tn-disclosure-indicator w-5 h-5 transition-transform flex-shrink-0 ml-4" :class="open === 3 ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                     </button>
-                    <div x-show="open === 3" x-collapse class="px-2 pb-6 text-sm text-gray-600 leading-relaxed">Yes. As you type an item, the HS intelligence engine suggests matching codes and checks them against the correct tax schedule — for your review before submission. Your company remains responsible for the selected classification and rate.</div>
+                    <div id="di-faq-answer-3" x-show="open === 3" x-collapse class="px-2 pb-6 text-sm text-gray-600 leading-relaxed">Yes. As you type an item, the HS intelligence engine suggests matching codes and checks them against the correct tax schedule — for your review before submission. Your company remains responsible for the selected classification and rate.</div>
                 </div>
                 <div class="bg-white">
-                    <button @click="open = (open === 5 ? null : 5)" class="w-full flex items-center justify-between py-6 text-left hover:bg-gray-50 px-2 transition-colors">
+                    <button type="button" @click="open = (open === 5 ? null : 5)" :aria-expanded="open === 5" aria-controls="di-faq-answer-5" class="tn-public-control w-full flex items-center justify-between py-6 text-left hover:bg-gray-50 px-2 transition-colors">
                         <span class="font-bold text-gray-900 text-sm uppercase tracking-wide">Can I import invoices in bulk instead of typing them one by one?</span>
-                        <svg class="w-5 h-5 text-gray-400 transition-transform flex-shrink-0 ml-4" :class="open === 5 ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                        <svg aria-hidden="true" class="tn-disclosure-indicator w-5 h-5 transition-transform flex-shrink-0 ml-4" :class="open === 5 ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                     </button>
-                    <div x-show="open === 5" x-collapse class="px-2 pb-6 text-sm text-gray-600 leading-relaxed">Yes. Upload an Excel sheet and TaxNest converts the rows into draft invoices in one batch, each validated against FBR rules before submission. You can also paste rough invoice text and let the AI parser extract buyer, items, and amounts into a structured draft.</div>
+                    <div id="di-faq-answer-5" x-show="open === 5" x-collapse class="px-2 pb-6 text-sm text-gray-600 leading-relaxed">Yes. Upload an Excel sheet and TaxNest converts the rows into draft invoices in one batch, each validated against FBR rules before submission. You can also paste rough invoice text and let the AI parser extract buyer, items, and amounts into a structured draft.</div>
                 </div>
                 <div class="bg-white">
-                    <button @click="open = (open === 4 ? null : 4)" class="w-full flex items-center justify-between py-6 text-left hover:bg-gray-50 px-2 transition-colors">
+                    <button type="button" @click="open = (open === 4 ? null : 4)" :aria-expanded="open === 4" aria-controls="di-faq-answer-4" class="tn-public-control w-full flex items-center justify-between py-6 text-left hover:bg-gray-50 px-2 transition-colors">
                         <span class="font-bold text-gray-900 text-sm uppercase tracking-wide">What happens if a submission fails?</span>
-                        <svg class="w-5 h-5 text-gray-400 transition-transform flex-shrink-0 ml-4" :class="open === 4 ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                        <svg aria-hidden="true" class="tn-disclosure-indicator w-5 h-5 transition-transform flex-shrink-0 ml-4" :class="open === 4 ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                     </button>
-                    <div x-show="open === 4" x-collapse class="px-2 pb-6 text-sm text-gray-600 leading-relaxed">Review the saved response and correct rejected fields before retrying. If the outcome is uncertain, verify the earlier submission first.</div>
+                    <div id="di-faq-answer-4" x-show="open === 4" x-collapse class="px-2 pb-6 text-sm text-gray-600 leading-relaxed">Review the saved response and correct rejected fields before retrying. If the outcome is uncertain, verify the earlier submission first.</div>
                 </div>
             </div>
         </div>

@@ -193,6 +193,7 @@
 
 {{-- The footer login link is panel-aware: a visitor on this page belongs to the
      TaxNest ERP panel, never the Digital Invoice one. --}}
+<x-website-clients product="erp" />
 @include('partials.product-guide-link', ['productGuideKey' => 'erps'])
     <x-site-footer :loginUrl="NestErps::loginPath(NestErps::HEALTH)" :loginLabel="NestErps::LABEL . ' Log In'" />
 </body>

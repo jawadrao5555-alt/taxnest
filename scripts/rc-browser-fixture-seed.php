@@ -5,10 +5,13 @@ use App\Models\AdminUser;
 use App\Models\AppUpdate;
 use App\Models\Company;
 use App\Models\HotelRoom;
+use App\Models\PricingPlan;
 use App\Models\RestaurantFloor;
 use App\Models\RestaurantOrder;
 use App\Models\RestaurantOrderItem;
 use App\Models\RestaurantTable;
+use App\Models\Subscription;
+use App\Models\SubscriptionInvoice;
 use App\Models\User;
 use App\Services\HealthModuleService;
 use App\Services\PosFeatureService;
@@ -18,6 +21,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 
 require dirname(__DIR__).'/vendor/autoload.php';
 $app = require dirname(__DIR__).'/bootstrap/app.php';
@@ -44,7 +48,7 @@ if (DB::connection()->getDriverName() !== 'mysql'
     || config('database.connections.mysql.unix_socket') !== $socket) {
     $fail('connection is outside the browser-lab allowlist.');
 }
-foreach (['companies', 'users', 'admin_users', 'branches', 'hotel_rooms', 'pos_service_work_orders', 'health_patients', 'invoices', 'invoice_items', 'school_fee_receipts', 'school_fee_heads', 'hospital_invoices', 'hospital_payments', 'hospital_day_closes'] as $table) {
+foreach (['companies', 'users', 'admin_users', 'branches', 'hotel_rooms', 'pos_service_work_orders', 'health_patients', 'invoices', 'invoice_items', 'school_fee_receipts', 'school_fee_heads', 'hospital_invoices', 'hospital_payments', 'hospital_day_closes', 'website_clients', 'subscriptions', 'subscription_invoices'] as $table) {
     if (!Schema::hasTable($table)) {
         $fail("required migrated table is absent: {$table}");
     }
@@ -70,20 +74,6 @@ if (!is_file($announcementDestination) || hash_file('sha256', $announcementSourc
 if (Company::withoutGlobalScopes()->where('email', 'like', '%@rc-browser.invalid')->exists()
     || User::withoutGlobalScopes()->where('email', 'like', '%@rc-browser.invalid')->exists()) {
     $fail('fresh browser database already contains a synthetic fixture.');
-}
-
-// Public client cards in this guarded fixture use fictional branding only.
-$clientLogo = 'iVBORw0KGgoAAAANSUhEUgAAAFAAAAAwCAIAAAAJh2qgAAAA60lEQVR4nO2auw0CMRBEfQiR0AMxKXVQBCllUAYpRVAHKTE9kJCYwCL0rC3dh52dl651mqe980fnIeecIrFaOsDcSJiddcugzf4wdY6x+DwfeIDdYUe2qSGtIezLtoAzI2GPtgWQvCrs17ZQyx9ulpYwO03rsMnxdgHV+wlVZyZchyXMjoTZCSc8zrLUBT7BTb2lDddhCbMjYXYWmKW7eF23oLo7v3sfGK7DEmZHwuxImB0JszPUrjx4/9WSKgfvcB2WMDsS/mFelvhzavlRh/06g+TGK+3RGWe2v2Ffzmba6saDFc3S7IQT/gJL8jBdHe4YfAAAAABJRU5ErkJggg==';
-foreach ([
-    ['Synthetic Retail Studio', 'pos', $clientLogo, now()],
-    ['Synthetic Invoice Studio', 'di', null, now()],
-    ['Synthetic Unpublished Studio', 'pos', $clientLogo, null],
-] as [$displayName, $product, $logo, $publishedAt]) {
-    DB::table('website_clients')->insert([
-        'display_name' => $displayName, 'product' => $product,
-        'logo_data' => $logo, 'logo_mime' => $logo ? 'image/png' : null,
-        'published_at' => $publishedAt, 'created_at' => now(), 'updated_at' => now(),
-    ]);
 }
 
 $password = 'RcBrowser!'.bin2hex(random_bytes(18));
@@ -1288,6 +1278,41 @@ foreach ([1366, 390] as $width) {
         'start_date' => now()->subDay(), 'end_date' => now()->addYearNoOverflow()]);
     $diBulkCases[$width] = ['login' => $bulkOwner->email, 'companyId' => $bulkCompany->id, 'planId' => $bulkPlan->id];
 }
+// Public client cards in this guarded fixture use fictional branding only.
+$clientLogo = 'iVBORw0KGgoAAAANSUhEUgAAAFAAAAAwCAIAAAAJh2qgAAAA60lEQVR4nO2auw0CMRBEfQiR0AMxKXVQBCllUAYpRVAHKTE9kJCYwCL0rC3dh52dl651mqe980fnIeecIrFaOsDcSJiddcugzf4wdY6x+DwfeIDdYUe2qSGtIezLtoAzI2GPtgWQvCrs17ZQyx9ulpYwO03rsMnxdgHV+wlVZyZchyXMjoTZCSc8zrLUBT7BTb2lDddhCbMjYXYWmKW7eF23oLo7v3sfGK7DEmZHwuxImB0JszPUrjx4/9WSKgfvcB2WMDsS/mFelvhzavlRh/06g+TGK+3RGWe2v2Ffzmba6saDFc3S7IQT/gJL8jBdHe4YfAAAAABJRU5ErkJggg==';
+$clientLogoPath = 'company-logos/rc-browser-showcase.png';
+if (!Storage::disk('public')->put($clientLogoPath, base64_decode($clientLogo, true))) {
+    $fail('could not materialize the synthetic profile logo.');
+}
+$clientPlans = [];
+foreach ([
+    ['Synthetic Retail Studio', 'pos', $clientLogoPath, $now, false],
+    ['Synthetic Invoice Studio', 'di', null, $now, false],
+    ['Synthetic Unpublished Studio', 'pos', null, null, false],
+    ['Synthetic Expired Studio', 'pos', $clientLogoPath, $now, true],
+] as $index => [$displayName, $product, $logoPath, $publishedAt, $expired]) {
+    $client = $company($displayName, "showcase-{$index}@rc-browser.invalid", "RCBROWSERCLIENT{$index}", $product, [
+        'is_internal_account' => false, 'logo_path' => $logoPath,
+    ]);
+    $plan = $clientPlans[$product] ??= PricingPlan::create([
+        'name' => 'Synthetic showcase package', 'product_type' => $product,
+        'price' => 1000, 'is_trial' => false, 'is_public' => false, 'invoice_limit' => 10,
+    ]);
+    $term = Subscription::create([
+        'company_id' => $client->id, 'pricing_plan_id' => $plan->id, 'billing_cycle' => 'annual',
+        'active' => true, 'final_price' => 1000, 'start_date' => $now->copy()->subWeek(),
+        'end_date' => $expired ? $now->copy()->subDay() : $now->copy()->addMonth(),
+    ]);
+    SubscriptionInvoice::create([
+        'company_id' => $client->id, 'subscription_id' => $term->id, 'status' => 'paid',
+        'amount' => 1000, 'paid_at' => $now->copy()->subWeek(), 'due_date' => $now->copy()->subWeek(),
+    ]);
+    DB::table('website_clients')->insert([
+        'company_id' => $client->id, 'display_name' => $displayName, 'product' => $product,
+        'sync_company_logo' => true, 'published_at' => $publishedAt, 'created_at' => $now, 'updated_at' => $now,
+    ]);
+}
+
 $fixture = [
     'generated_at' => $now->toIso8601String(), 'synthetic' => true,
     'readOnlyJourneys' => array_merge([
@@ -1305,7 +1330,7 @@ $fixture = [
             'paths'=>['/pos/riders/tracking'],'markers'=>['Synthetic Live Rider'],
             'riderRealtime'=>['id'=>$riderLive->id,'token'=>$riderLiveToken]],
         ['name'=>'admin-live-ops-readability','login'=>$admin->email,'password'=>$password,'loginPath'=>'/admin/login','paths'=>['/admin/live-ops'],'markers'=>['Live Ops'],'liveOpsReadability'=>true],
-        ['name'=>'admin-company-directory-contrast','login'=>$admin->email,'password'=>$password,'loginPath'=>'/admin/login','paths'=>['/admin/companies?search=Synthetic%20Contrast'],'expectedPaths'=>['/admin/companies'],'markers'=>['Synthetic Contrast Owner'],'companyDirectoryContrast'=>true],
+        ['name'=>'admin-company-directory-contrast','login'=>$admin->email,'password'=>$password,'loginPath'=>'/admin/login','paths'=>['/admin/companies?search=Synthetic%20Contrast'],'expectedPaths'=>['/admin/companies'],'markers'=>['Synthetic Contrast Owner'],'companyDirectoryContrast'=>true,'contrastProofCompanyId'=>$b01Cases[1366]['companyId']],
         ['name'=>'admin-dashboard-details','login'=>$admin->email,'password'=>$password,'loginPath'=>'/admin/login','paths'=>['/admin/dashboard'],'markers'=>['Admin Dashboard'],'dashboardDetails'=>true,'previewDocuments'=>$adminPreviewDocuments,'invoicePreviewCsp'=>$adminPreviewCsp],
         ['name' => 'customer-amount-audit', 'login' => $amountOwner->email, 'password' => $password, 'loginPath' => '/pos/login',
             'paths' => ['/pos/customers/'.$amountCustomer->id.'/history'], 'markers' => ['Synthetic Amount Customer'],

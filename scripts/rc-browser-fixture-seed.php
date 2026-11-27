@@ -1265,6 +1265,13 @@ foreach ([1366,390] as $width) {
         $signupPlan=match($signupProduct){
             'pos'=>\App\Services\PosPlanComparisonService::plans()->first(),
             'fbrpos'=>\App\Services\FbrPosPlanComparisonService::plans()->first(),
+            'erps'=>\App\Models\PricingPlan::create([
+                'name' => 'Synthetic Signup ERP '.$width,
+                'product_type' => \App\Support\NestErps::PRODUCT_TYPE,
+                'erps_vertical' => \App\Support\NestErps::HEALTH,
+                'erp_website_price_visible' => true,
+                'price' => 1000, 'price_yearly' => 12000, 'invoice_limit' => 25, 'is_trial' => false, 'is_public' => true,
+            ]),
             default=>\App\Models\PricingPlan::create(['name'=>'Synthetic Signup '.$signupProduct.' '.$width,'product_type'=>$signupProduct,'price'=>1000,'price_yearly'=>12000,'invoice_limit'=>25,'is_trial'=>false,'is_public'=>true]),
         };
         if(!$signupPlan)$fail('canonical synthetic signup catalogue is empty for '.$signupProduct);

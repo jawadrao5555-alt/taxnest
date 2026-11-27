@@ -46,7 +46,12 @@ class BillingPolicyPresentationTest extends TestCase
         }
     }
     public function test_signup_selection_is_required_and_every_surface_uses_same_api():void {
-        foreach(['auth/register','health/auth/register','fbr-pos/auth/register']as$view){$html=file_get_contents(resource_path('views/'.$view.'.blade.php'));$this->assertMatchesRegularExpression('/name="requested_plan"[^>]*required/',$html);$this->assertStringContainsString("billing._signup-policy",$html);}
+        $signupFields = ['auth/register' => 'requested_plan', 'health/auth/register' => 'pricing_plan_id', 'fbr-pos/auth/register' => 'requested_plan'];
+        foreach ($signupFields as $view => $field) {
+            $html = file_get_contents(resource_path('views/'.$view.'.blade.php'));
+            $this->assertMatchesRegularExpression('/<select\b[^>]*\bname="'.$field.'"[^>]*\brequired\b/', $html);
+            $this->assertStringContainsString('billing._signup-policy', $html);
+        }
         $pos=file_get_contents(resource_path('views/pos/auth/register.blade.php'));$this->assertMatchesRegularExpression('/name="pricing_plan_id"[^>]*required/',$pos);$this->assertStringContainsString(':disabled="!planId ||',$pos);
         $partial=file_get_contents(resource_path('views/billing/_policy-status.blade.php'));$this->assertStringContainsString('ProspectiveSubscriptionPolicy::display($policySubscription)',$partial);
         foreach(['billing/plans','billing/package-checkout','pos/billing','fbr-pos/billing','health/settings','saas-admin/companies/partials/account-overview']as$view)$this->assertStringContainsString('billing._policy-status',file_get_contents(resource_path('views/'.$view.'.blade.php')));

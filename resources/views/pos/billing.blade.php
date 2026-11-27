@@ -1,5 +1,5 @@
 <x-pos-layout>
-    <div class="py-8">
+    <div class="py-8" data-company-billing>
         <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
             <a href="{{ route('pos.customize') }}" class="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-500 dark:text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 transition mb-3">
                 <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
@@ -65,6 +65,17 @@
                 </section>
             @endif
 
+            @php
+                $pendingBundle = $billingUser?->isCompanyAdmin() ? \App\Services\PosSignupBundle::pending($company) : null;
+            @endphp
+            @if($pendingBundle)
+                <section class="rounded-xl border p-4 mb-5" aria-label="{{ __('pos_federal_addons.signup_heading') }}">
+                    <p class="font-semibold">{{ $pendingBundle->plan_name }} · PKR {{ number_format($pendingBundle->quoted_amount, 2) }}</p>
+                    @include('billing._pra-signup-bundle', ['bundle' => $pendingBundle->quote_snapshot[\App\Services\PosSignupBundle::KEY]])
+                    <a class="underline" href="{{ route('pos.package-checkout', ['plan_id' => $pendingBundle->pricing_plan_id]) }}">{{ __('pos_federal_addons.review_signup') }}</a>
+                </section>
+            @endif
+
             @php $annualDiscount = 6; @endphp
 
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
@@ -79,7 +90,7 @@
                         <span class="text-white text-xs font-bold tracking-wide">MOST POPULAR</span>
                     </div>
                     @endif
-                    <div class="bg-white dark:bg-gray-900 shadow-md border {{ $isPopular ? 'border-purple-500 border-t-0' : 'border-gray-200 dark:border-gray-800' }} {{ $isPopular ? '' : 'rounded-2xl' }} {{ $isPopular ? 'rounded-b-2xl' : '' }} p-5">
+                    <div class="tn-billing-plan shadow-md border {{ $isPopular ? 'border-purple-500 border-t-0' : 'border-gray-200 dark:border-gray-800' }} {{ $isPopular ? '' : 'rounded-2xl' }} {{ $isPopular ? 'rounded-b-2xl' : '' }} p-5">
                         @if($isCurrent)
                         <span class="inline-block px-2 py-0.5 bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300 rounded text-[10px] font-bold mb-2">YOUR PLAN</span>
                         @endif
@@ -136,12 +147,7 @@
                 @endforeach
             </div>
 
-            {{-- ── Optional paid features (Aug 2026) ──
-                 Six add-ons a Business+ shop can buy instead of upgrading. Every
-                 price and the purchasable list come from PosAddonService /
-                 PosAddonPricingService, so this box can never quote something the
-                 approval will not activate. Features the package already grants are
-                 filtered out server-side. --}}
+            {{-- The services determine which add-ons customers can buy and at what price. --}}
             @php
                 $adCatalog = $addons['catalog'] ?? [];
                 $adFederalCodes = \App\Services\PosFederalAddonAccess::CODES;
@@ -151,6 +157,14 @@
                 $adActive = $addons['active'] ?? [];
                 $adPending = $addons['pending'] ?? [];
                 $adCanBuy = $addons['can_buy'] ?? true;
+                $adPlan = $currentSubscription && !$currentSubscription->isExpired()
+                    ? $currentSubscription->entitlementPlan() : null;
+                $adIncluded = [];
+                foreach (['delivery_riders' => 'riders_enabled', 'rider_tracking' => 'rider_tracking_enabled'] as $code => $gate) {
+                    if ($adPlan?->{$gate} && \App\Services\PosFeatureService::planAllows($company, $gate)) {
+                        $adIncluded[] = $code;
+                    }
+                }
                 $adPreselected = array_values(array_intersect((array) ($addons['preselected'] ?? []), $adPurchasable));
                 $adPreselectedCycle = \App\Services\PosAddonPricingService::normalizeCycle($addons['preselected_cycle'] ?? null);
                 $adForceOpen = session('payment_proof') || $errors->has('proof') || $errors->has('addon_codes') || !empty($adPreselected);
@@ -173,7 +187,22 @@
 
                 @if(\App\Services\PosAddonService::isPraCompany($company ?? null))
                     <x-pos-federal-addon-options :billing="true"
+                        :active="$adActive" :pending="$adPending" :purchasable="$adPurchasable"
                         :codes="array_values(array_intersect($adFederalCodes, $adActive)) ?: $adFederalCodes" />
+                @endif
+
+                @if($adIncluded)
+                <section class="mb-4 mt-4 rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900" aria-labelledby="included-delivery-features">
+                    <h4 id="included-delivery-features" class="text-sm font-semibold text-gray-900 dark:text-gray-100">{{ __('pos_addon_billing.included') }}</h4>
+                    <dl class="mt-2 grid gap-3 text-sm sm:grid-cols-2">
+                        @foreach($adIncluded as $code)
+                            <div>
+                                <dt class="font-semibold text-gray-900 dark:text-gray-100">{{ __('pos.addon_label_' . $code) }}</dt>
+                                <dd class="mt-0.5 text-gray-600 dark:text-gray-300">{{ __('pos.addon_desc_' . $code) }}</dd>
+                            </div>
+                        @endforeach
+                    </dl>
+                </section>
                 @endif
 
                 @if(!empty($adActive))
@@ -201,7 +230,7 @@
                 </div>
                 @elseif(empty($adPurchasable))
                 <div class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-sm p-5 text-center">
-                    <p class="text-sm text-gray-600 dark:text-gray-300">{{ __('pos.addons_none_left') }}</p>
+                    <p class="text-sm text-gray-600 dark:text-gray-300">{{ __('pos_addon_billing.no_purchases') }}</p>
                 </div>
                 @elseif(!$adCanBuy)
                 <div class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-sm p-5 text-center">

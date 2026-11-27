@@ -8,6 +8,8 @@ use App\Models\PricingPlan;
 /** Evidence of the catalogue at assignment, not an alternative access gate. */
 final class SubscriptionPurchaseSnapshot
 {
+    public const SOURCE_ERP_UPGRADE = 'erp_upgrade_settlement';
+
     public static function capture(Company $company, PricingPlan $plan, array $priced, string $start, string $end, bool $paidRenewal, ?array $quotedPlan = null): array
     {
         $terms = $quotedPlan ?? self::planTerms($plan);

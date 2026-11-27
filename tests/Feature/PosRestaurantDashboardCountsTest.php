@@ -592,8 +592,8 @@ class PosRestaurantDashboardCountsTest extends TestCase
         // cashier), business_date, and never re-introduce the widget's 5/10
         // item truncation.
         $controller = file_get_contents(app_path('Http/Controllers/PosController.php'));
-        $start = strpos($controller, '$topItemsDetailed = null;');
-        $end = strpos($controller, '$monthlyTrend =', $start);
+        $start = strpos($controller, 'private function reportItemSales(');
+        $end = strpos($controller, 'public function exportReportCsv(', $start);
         $detailedBlock = substr($controller, $start, $end - $start);
 
         $this->assertStringContainsString("whereBetween('business_date'", $detailedBlock);

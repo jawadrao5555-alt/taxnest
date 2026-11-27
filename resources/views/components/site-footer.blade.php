@@ -43,7 +43,7 @@
                     <li><a href="/pos" class="hover:text-white transition-colors">TaxNest PRA POS</a></li>
                     <li><a href="/fbr-pos-landing" class="hover:text-white transition-colors">TaxNest FBR POS</a></li>
                     <li><a href="{{ \App\Support\NestErps::LANDING_PATH }}" class="hover:text-white transition-colors">{{ \App\Support\NestErps::LABEL }}</a></li>
-                    <li><a href="/#compare" class="hover:text-white transition-colors">Compare</a></li>
+                    <li><a href="{{ route('public.compare') }}" class="hover:text-white transition-colors">Compare</a></li>
                     <li><a href="/download" class="hover:text-white transition-colors">Downloads</a></li>
                 </ul>
             </div>

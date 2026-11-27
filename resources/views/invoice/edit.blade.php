@@ -224,6 +224,9 @@
                                         <option value="zero_rated">Zero Rated</option>
                                         <option value="fed_services" title="FBR only accepts a 16% tax rate for Services (FED in ST Mode)">Services (FED in ST Mode)</option>
                                         <option value="services" title="Plain services (no FED) — tax rate follows your province's services rate">Services</option>
+                                        @foreach(\App\Services\DiSpecialTax::RULES as $code => $rule)
+                                            <option value="{{ $code }}">{{ $rule['label'] }}</option>
+                                        @endforeach
                                     </select>
                                 </div>
                                 <div>
@@ -238,7 +241,7 @@
                                 </div>
                                 <div>
                                     <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Tax Rate (%)</label>
-                                    <input type="number" step="0.01" min="0" max="100" x-model="item.tax_rate" @input="calcTax(index)" :name="'items[' + index + '][tax_rate]'"
+                                    <input type="number" step="0.01" min="0" max="100" x-model="item.tax_rate" @input="calcTax(index)" :readonly="!!diSpecialTax.getRule(item)" :name="'items[' + index + '][tax_rate]'"
                                         class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm text-sm focus:ring-emerald-500 focus:border-emerald-500">
                                 </div>
                             </div>
@@ -335,7 +338,8 @@
                                 </div>
                                 <div>
                                     <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">MRP / Retail Price (PKR)</label>
-                                    <input type="number" step="0.01" min="0" :name="'items[' + index + '][mrp]'" x-model="item.mrp" @input="item.mrpManual = true; calcTax(index)" placeholder="0.00"
+                                    <p x-show="diSpecialTax.getRule(item)?.retail" x-cloak class="mb-1 text-xs text-gray-600 dark:text-gray-300">Enter the printed retail price for the selected selling unit.</p>
+                                    <input type="number" step="0.01" min="0" :name="'items[' + index + '][mrp]'" x-model="item.mrp" @input="item.mrpManual = true; calcTax(index)" :required="!!diSpecialTax.getRule(item)?.retail" :readonly="!!diSpecialTax.getRule(item) && !diSpecialTax.getRule(item).retail" placeholder="0.00"
                                         class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm text-sm focus:ring-emerald-500 focus:border-emerald-500">
                                 </div>
                             </div>
@@ -379,6 +383,10 @@
                         <div class="flex justify-between items-center text-sm text-gray-600 dark:text-gray-400">
                             <span>Total Sales Tax</span>
                             <span class="font-medium" x-text="'PKR ' + totalSalesTax()"></span>
+                        </div>
+                        <div x-show="Number(totalFederalExcise()) > 0" x-cloak class="flex justify-between items-center text-sm text-gray-600 dark:text-gray-400">
+                            <span>Federal Excise Duty</span>
+                            <span class="font-medium" x-text="'PKR ' + totalFederalExcise()"></span>
                         </div>
                         <div x-show="applyFurtherTax" x-cloak class="flex justify-between items-center text-sm text-orange-600 dark:text-orange-400">
                             <span>Further Tax (4%)</span>
@@ -615,6 +623,10 @@
                 },
 
                 applyScheduleRules(item) {
+                    const special = window.diSpecialTax.getRule(item);
+                    if (special) {
+                        item.tax_rate = special.percentage;
+                    }
                     let rules = getScheduleRules(item.schedule_type, item.tax_rate);
                     item.requires_sro = rules.requires_sro;
                     item.requires_serial = rules.requires_serial;
@@ -653,6 +665,16 @@
                         item.thirdScheduleOverrideAcknowledged = item.schedule_type === 'standard';
                     }
                     item.tax_rate = defaultTaxRates[item.schedule_type] ?? companyStandardRate;
+                    const special = window.diSpecialTax.getRule(item);
+                    if (special) {
+                        item.default_uom = 'Kilograms';
+                        item.sro_schedule_no = special.schedule;
+                        item.serial_no = special.serial;
+                        item.mrp = '';
+                        item.mrpManual = true;
+                        item.petroleum_levy = '';
+                        item.show_petroleum_levy = false;
+                    }
                     this.applyScheduleRules(item);
                     this.calcTax(index);
                     this.validateMixedSchedules();
@@ -714,11 +736,12 @@
                             item.thirdScheduleRecommended = !!data.third_schedule_recommended;
                             item.thirdScheduleTaxRate = (parseFloat(data.tax_rate) || 18);
                             const keepChosenStandard = item.thirdScheduleRecommended && item.thirdScheduleOverrideAcknowledged && item.schedule_type === 'standard';
-                            if (!keepChosenStandard) {
+                            const special = window.diSpecialTax.getRule(item);
+                            if (!keepChosenStandard && !special) {
                                 item.schedule_type = data.schedule_type;
                                 item.tax_rate = (parseFloat(data.tax_rate) || 0);
                             }
-                            if (data.default_uom) item.default_uom = data.default_uom;
+                            if (data.default_uom && !special) item.default_uom = data.default_uom;
                             item.show_st_withheld = !!data.st_withheld_applicable;
                             item.show_petroleum_levy = !!data.petroleum_levy_applicable;
                             if (!item.show_st_withheld) item.st_withheld_at_source = false;
@@ -741,17 +764,19 @@
                     let item = this.items[index];
                     let unitPrice = this.effectivePrice(item);
                     let qty = Number(parseFloat(item.quantity || 0).toFixed(4));
-                    let subtotal = Number((unitPrice * qty).toFixed(2));
-                    if (!item.mrpManual && unitPrice > 0) item.mrp = unitPrice.toFixed(2);
+                    const special = window.diSpecialTax.getRule(item);
+                    let subtotal = special ? window.diSpecialTax.round(unitPrice * qty, 2) : Number((unitPrice * qty).toFixed(2));
+                    if (!special && !item.mrpManual && unitPrice > 0) item.mrp = unitPrice.toFixed(2);
                     let taxBase = item.schedule_type === '3rd_schedule' && parseFloat(item.mrp || 0) > 0
                         ? Number((parseFloat(item.mrp) * qty).toFixed(2)) : subtotal;
-                    item.tax = parseFloat(((parseFloat(item.tax_rate || 0) / 100) * taxBase).toFixed(2));
+                    item.tax = special ? window.diSpecialTax.salesTax(item, subtotal)
+                        : parseFloat(((parseFloat(item.tax_rate || 0) / 100) * taxBase).toFixed(2));
                     if (this.applyFurtherTax) {
                         item.further_tax = parseFloat((subtotal * 0.04).toFixed(2));
                     } else {
                         item.further_tax = 0;
                     }
-                    if (!item.mrpManual && unitPrice > 0) {
+                    if (!special && !item.mrpManual && unitPrice > 0) {
                         item.mrp = unitPrice.toFixed(2);
                     }
                     this.applyScheduleRules(item);
@@ -762,19 +787,23 @@
                 },
                 itemTotal(index) {
                     let item = this.items[index];
-                    return ((this.effectivePrice(item) * parseFloat(item.quantity || 0)) + parseFloat(item.tax || 0) + parseFloat(item.further_tax || 0)).toFixed(2);
+                    return ((this.effectivePrice(item) * parseFloat(item.quantity || 0)) + parseFloat(item.tax || 0) + window.diSpecialTax.excise(item) + parseFloat(item.further_tax || 0)).toFixed(2);
                 },
                 onDocTypeChange() {},
 
                 totalExclST() {
                     return this.items.reduce((total, item) => {
-                        return total + Number((this.effectivePrice(item) * Number(parseFloat(item.quantity || 0).toFixed(4))).toFixed(2));
+                        const net = this.effectivePrice(item) * Number(parseFloat(item.quantity || 0).toFixed(4));
+                        return total + (window.diSpecialTax.getRule(item) ? window.diSpecialTax.round(net, 2) : Number(net.toFixed(2)));
                     }, 0).toFixed(2);
                 },
                 totalSalesTax() {
                     return this.items.reduce((total, item) => {
                         return total + parseFloat(item.tax || 0);
                     }, 0).toFixed(2);
+                },
+                totalFederalExcise() {
+                    return this.items.reduce((total, item) => total + window.diSpecialTax.excise(item), 0).toFixed(2);
                 },
                 totalFurtherTax() {
                     return this.items.reduce((total, item) => total + parseFloat(item.further_tax || 0), 0).toFixed(2);
@@ -790,7 +819,7 @@
                     });
                 },
                 grandTotal() {
-                    return (parseFloat(this.totalExclST()) + parseFloat(this.totalSalesTax()) + parseFloat(this.totalFurtherTax())).toFixed(2);
+                    return (parseFloat(this.totalExclST()) + parseFloat(this.totalSalesTax()) + parseFloat(this.totalFurtherTax()) + parseFloat(this.totalFederalExcise())).toFixed(2);
                 },
                 whtAmount() {
                     return '0.00';
@@ -844,6 +873,7 @@
                 effectivePrice(item) {
                     let rate = Number(item.price || 0);
                     if (!item.selling_packing_id || !item.price_includes_tax) return rate;
+                    if (window.diSpecialTax.getRule(item)) return window.diSpecialTax.exclusivePrice(item, rate);
                     const taxRate = Number(item.tax_rate || 0) / 100;
                     if (item.schedule_type === '3rd_schedule') return Number((rate - Number(item.mrp || 0) * taxRate).toFixed(6));
                     if (['exempt', 'zero_rated'].includes(item.schedule_type)) return rate;

@@ -2,7 +2,7 @@
 <div class="tn-live-ops p-4 sm:p-6 max-w-7xl mx-auto">
     <div class="mb-6">
         <h1 class="text-2xl font-bold text-white">Live Ops</h1>
-        <p class="text-sm text-gray-400 mt-1">TaxNest PRA POS PRA diagnostics and owner-approved remediation. Diagnosis never auto-fixes.</p>
+        <p class="text-sm text-gray-400 mt-1">Company diagnostics and operational reports. Supported remediation requires owner approval.</p>
     </div>
 
     @if(session('success'))
@@ -17,7 +17,7 @@
             <h2 class="text-sm font-semibold text-white mb-3">Company search</h2>
             <p class="text-[11px] text-gray-500 mb-3">Find a company across products and open its available operational report.</p>
             <form method="get" action="{{ route('saas.admin.live-ops') }}" class="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-3">
-                <input type="text" name="search" aria-label="Company search" value="{{ $search ?? $q }}" placeholder="Search name, NTN, owner, id, account code…" class="w-full rounded-lg bg-gray-950 border border-gray-700 text-sm text-white px-3 py-2">
+                <input type="text" name="search" aria-label="Company search" value="{{ $search ?? $q }}" placeholder="Search name, NTN, owner, Company ID, account code…" class="w-full rounded-lg bg-gray-950 border border-gray-700 text-sm text-white px-3 py-2">
                 <select name="status" aria-label="Company status" class="rounded-lg bg-gray-950 border border-gray-700 text-sm text-white px-3 py-2">
                     <option value="">All statuses</option>
                     <option value="approved" @selected(($status ?? '') === 'approved')>Approved</option>
@@ -37,6 +37,7 @@
                     <li class="flex items-center justify-between gap-2 border-b border-gray-800 pb-2">
                         <div>
                             <span class="text-white">{{ $c->name }}</span>
+                            @if($c->product_company_id ?? null)<span class="font-mono text-gray-200">{{ $c->product_company_id }}</span>@endif
                             <span class="text-gray-500">#{{ $c->id }}</span>
                             @if($c->account_code)<span class="text-gray-600">{{ $c->account_code }}</span>@endif
                             @if($c->status)<span class="text-[10px] uppercase text-gray-500">{{ $c->status }}</span>@endif
@@ -47,6 +48,7 @@
                                 'pos' => [route('saas.admin.live-ops.company', $c->id), 'PRA diagnostic'],
                                 'fbrpos' => [route('saas.admin.live-ops.fbr-reconciliation', $c->id), 'FBR reconciliation'],
                                 'di' => [route('saas.admin.dashboard.detail', ['metric' => 'di_invoices', 'company_id' => $c->id]), 'DI invoice report'],
+                                \App\Support\ProductCatalog::ERPS => [route('saas.admin.live-ops.erp-company', $c->id), 'ERP activity and billing'],
                                 default => [route('saas.admin.companies.show', $c->id), 'Company details'],
                             };
                         @endphp
@@ -73,7 +75,7 @@
                 </div>
                 <div class="grid grid-cols-2 gap-2">
                     <div>
-                        <label class="block text-xs text-gray-500 mb-1">Company ID</label>
+                        <label class="block text-xs text-gray-500 mb-1">Internal company ID</label>
                         <input type="number" name="company_id" class="w-full rounded-lg bg-gray-950 border border-gray-700 text-sm text-white px-3 py-2">
                     </div>
                     <div>
@@ -113,7 +115,7 @@
                 </select>
             </div>
             <div>
-                <label class="block text-xs text-gray-500 mb-1">Company ID</label>
+                <label class="block text-xs text-gray-500 mb-1">Internal company ID</label>
                 <input type="number" name="company_id" required class="w-full rounded-lg bg-gray-950 border border-gray-700 text-sm text-white px-3 py-2">
             </div>
             <div class="md:col-span-2">

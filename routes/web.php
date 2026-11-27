@@ -6,7 +6,7 @@ use Illuminate\Support\Facades\Route;
 
 // Exact-guard authorization lives in the controller so the challenge cannot
 // redirect back into its own protected middleware. All writes retain web CSRF.
-Route::prefix('security/two-step/{panel}')->where(['panel' => 'di|pos|fbrpos|health|admin|franchise'])
+Route::prefix('security/two-step/{panel}')->where(['panel' => 'di|pos|fbrpos|health|schoolerp|admin|franchise|hr'])
     ->controller(\App\Http\Controllers\Auth\TwoStepController::class)->group(function () {
         Route::get('/', 'settings')->name('two-step.settings');
         Route::get('/challenge', 'challenge')->name('two-step.challenge');
@@ -205,30 +205,8 @@ Route::get('/__diag/infrastructure', function () {
     return response()->json($info);
 })->middleware('auth:admin');
 
-Route::get('/', function () {
-    // Perf (Jul 2026): these 4 COUNTs over big tables cost ~250ms on EVERY
-    // landing hit — cache 10 min (marketing stats don't need to be live).
-    try {
-        $stats = \Illuminate\Support\Facades\Cache::remember('landing_stats', 600, function () {
-            return [
-                'total_invoices' => \App\Models\Invoice::where('status', 'locked')->count()
-                    // PRA writes 'submitted' (never 'success'); FBR POS writes 'success'.
-                    + \App\Models\PosTransaction::whereIn('pra_status', ['submitted', 'success'])->count()
-                    + \App\Models\FbrPosTransaction::whereIn('fbr_status', ['submitted', 'success'])->count(),
-                'total_companies' => \App\Models\Company::where('status', 'approved')->count(),
-            ];
-        });
-    } catch (\Throwable $e) {
-        // DB down: show zeros for THIS request only — never cache zeros for 10 min.
-        \Log::warning('Landing stats unavailable: ' . $e->getMessage());
-        $stats = ['total_invoices' => 0, 'total_companies' => 0];
-    }
-
-    return view('landing', [
-        'showLogin' => false,
-        'stats' => $stats,
-    ]);
-});
+Route::view('/', 'landing');
+Route::view('/compare', 'landing', ['comparisonPage' => true])->name('public.compare');
 
 Route::get('/contact', fn () => view('contact'))->name('contact');
 Route::view('/product-guide', 'product-guide')->name('product-guide');
@@ -243,6 +221,7 @@ Route::get('/data-deletion', fn () => view('data-deletion'))->name('data-deletio
 Route::get('/sitemap.xml', function () {
     $urls = [
         ['loc' => url('/'),                'priority' => '1.0', 'changefreq' => 'weekly'],
+        ['loc' => route('public.compare'), 'priority' => '0.8', 'changefreq' => 'monthly'],
         ['loc' => url('/pos'),             'priority' => '0.9', 'changefreq' => 'monthly'],
         ['loc' => url('/fbr-pos-landing'), 'priority' => '0.9', 'changefreq' => 'monthly'],
         ['loc' => url('/digital-invoice'), 'priority' => '0.9', 'changefreq' => 'monthly'],
@@ -1100,6 +1079,7 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     Route::get('/tax-reports/csv', [PosController::class, 'exportTaxReportCsv'])->name('pos.tax-reports.csv');
     Route::get('/tax-reports/pdf', [PosController::class, 'exportTaxReportPdf'])->name('pos.tax-reports.pdf');
     Route::get('/reports/analytics-pdf', [PosController::class, 'reportsAnalyticsPdf'])->name('pos.reports.analytics-pdf');
+    Route::get('/reports/items-pdf', [PosController::class, 'reportsItemsPdf'])->name('pos.reports.items-pdf');
     // Task 705: khufia key (Ctrl+Alt+Shift+L) — no visible UI by design.
     // Manager/owner: session-only "local check mode" toggle (cashier = 403).
     // LOCAL-scoped cashier: station identity switch to the owner-linked PRA
@@ -1675,6 +1655,8 @@ Route::prefix('admin')->middleware(['admin.auth'])->group(function () {
     Route::get('/live-ops/company/{id}', [\App\Http\Controllers\SaasAdmin\AdminLiveOpsController::class, 'showCompany'])->name('saas.admin.live-ops.company');
     Route::get('/live-ops/fbr-reconciliation/{id}', [\App\Http\Controllers\SaasAdmin\AdminLiveOpsController::class, 'fbrReconciliation'])
         ->whereNumber('id')->name('saas.admin.live-ops.fbr-reconciliation');
+    Route::get('/live-ops/erp-company/{id}', [\App\Http\Controllers\SaasAdmin\AdminLiveOpsController::class, 'erpCompany'])
+        ->whereNumber('id')->name('saas.admin.live-ops.erp-company');
     Route::post('/live-ops/propose', [\App\Http\Controllers\SaasAdmin\AdminLiveOpsController::class, 'propose'])->name('saas.admin.live-ops.propose');
     Route::get('/live-ops/remediation/{actionId}', [\App\Http\Controllers\SaasAdmin\AdminLiveOpsController::class, 'showRemediation'])->name('saas.admin.live-ops.remediation');
     Route::post('/live-ops/remediation/{actionId}/approve', [\App\Http\Controllers\SaasAdmin\AdminLiveOpsController::class, 'approve'])->name('saas.admin.live-ops.approve');
@@ -1843,6 +1825,10 @@ Route::prefix('admin')->middleware(['admin.auth'])->group(function () {
     Route::post('/companies/{id}/ai-pages', [AdminCompanyController::class, 'grantAiPages'])->name('saas.admin.companies.aiPages');
     Route::post('/companies/{id}/delete', [AdminCompanyController::class, 'softDelete'])->name('saas.admin.companies.delete');
     Route::get('/companies/{id}/product-review', [\App\Http\Controllers\SaasAdmin\AdminProductTransitionController::class, 'productReview'])->name('saas.admin.companies.productReview');
+    Route::get('/companies/{company}/erp-upgrade-quote', \App\Http\Controllers\SaasAdmin\ErpUpgradeQuoteController::class)->name('saas.admin.companies.erpUpgradeQuote');
+    Route::post('/companies/{company}/erp-upgrade-quote', [\App\Http\Controllers\SaasAdmin\ErpUpgradeQuoteController::class, 'freeze'])->name('saas.admin.companies.erpUpgradeFreeze');
+    Route::post('/companies/{company}/erp-upgrade-quote/{upgrade}/settle', [\App\Http\Controllers\SaasAdmin\ErpUpgradeQuoteController::class, 'settle'])->whereNumber('upgrade')->name('saas.admin.companies.erpUpgradeSettle');
+    Route::post('/companies/{company}/erp-upgrade-quote/{upgrade}/activate', [\App\Http\Controllers\SaasAdmin\ErpUpgradeQuoteController::class, 'activate'])->whereNumber('upgrade')->name('saas.admin.companies.erpUpgradeActivate');
     Route::post('/companies/{id}/change-type', [\App\Http\Controllers\SaasAdmin\AdminProductTransitionController::class, 'changeProductType'])->name('saas.admin.companies.changeType');
     Route::post('/companies/{id}/clone-product', [\App\Http\Controllers\SaasAdmin\AdminProductTransitionController::class, 'cloneToProduct'])->name('saas.admin.companies.cloneProduct');
     Route::post('/companies/{id}/reveal-access-code', [AdminCompanyController::class, 'revealFbrAccessCode'])->name('saas.admin.companies.revealAccessCode');
@@ -1923,6 +1909,7 @@ Route::prefix('admin')->middleware(['admin.auth'])->group(function () {
     Route::post('/system-control/{key}/toggle', [AdminSystemController::class, 'toggle'])->name('saas.admin.system.toggle');
     Route::get('/settings', [AdminSettingsController::class, 'index'])->name('saas.admin.settings');
     Route::post('/settings', [AdminSettingsController::class, 'update'])->name('saas.admin.settings.update');
+    Route::post('/settings/erp-registration', [AdminSettingsController::class, 'updateErpRegistration'])->name('saas.admin.settings.erp-registration');
     Route::post('/settings/test-email', [AdminSettingsController::class, 'sendTestEmail'])->middleware('throttle:5,1')->name('saas.admin.settings.test-email');
     Route::post('/settings/smtp', [AdminSettingsController::class, 'updateSmtp'])->name('saas.admin.settings.smtp');
     Route::post('/settings/whatsapp', [AdminSettingsController::class, 'updateWhatsApp'])->name('saas.admin.settings.whatsapp');
@@ -2036,10 +2023,7 @@ Route::prefix('health')->middleware(['health.auth', 'company.approval'])->group(
     Route::get('/', fn () => redirect()->route('health.dashboard'));
     Route::get('/dashboard', [HealthController::class, 'dashboard'])->name('health.dashboard');
 
-    Route::middleware(['health.module:lab', 'health.can:lab.view'])->group(function () {
-        Route::get('/lab', [\App\Http\Controllers\Health\LabWorkspaceController::class, 'index'])->name('health.lab');
-        Route::post('/lab/layout', [\App\Http\Controllers\Health\LabWorkspaceController::class, 'saveLayout'])->name('health.lab.layout');
-    });
+    require __DIR__.'/health-lab.php';
 
     // Per-user display preferences — every signed-in member owns their own.
     Route::post('/set-dark-mode', [HealthController::class, 'toggleDarkMode'])->name('health.set-dark-mode');
@@ -3241,6 +3225,9 @@ Route::get('/api/fbr/item-sr-search', [\App\Http\Controllers\FbrReferenceControl
 Route::get('/api/fbr/hs-detail', [\App\Http\Controllers\FbrReferenceController::class, 'hsDetail'])->name('fbr.api.hs-detail');
 
 require __DIR__.'/auth.php';
+require __DIR__.'/school-erp.php';
+require __DIR__.'/school-erp-fees.php';
+require __DIR__.'/hr.php';
 
 // Owner Deployment Approval Relay. Browser routes are admin-session protected;
 // machine routes use a signed GitHub Actions OIDC JWT (never a shared secret).

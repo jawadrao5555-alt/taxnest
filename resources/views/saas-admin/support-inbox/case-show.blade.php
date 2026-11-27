@@ -5,7 +5,7 @@
         <div class="flex flex-wrap items-start justify-between gap-3">
             <div>
                 <h1 class="text-xl font-bold text-white">Case #{{ $supportCase->id }} · {{ $supportCase->subject }}</h1>
-                <p class="mt-1 text-sm text-gray-400">{{ $supportCase->company?->account_code ? $supportCase->company->account_code.' · ' : '' }}{{ $supportCase->company?->name ?? $supportCase->company_name_snapshot ?? 'Deleted company record' }}</p>
+                <p class="mt-1 text-sm text-gray-400">@if($supportCase->company){{ \App\Services\CompanyProductId::display($supportCase->company) }} · @endif{{ $supportCase->company?->name ?? $supportCase->company_name_snapshot ?? 'Deleted company record' }}</p>
             </div>
             <span class="rounded-full border border-gray-700 px-3 py-1 text-xs font-bold text-gray-300">{{ strtoupper($supportCase->status) }}</span>
         </div>

@@ -15,9 +15,33 @@ jobs:
     timeout-minutes: 35
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: '22.23.2'
+      - name: Check that the Agent version can be released from this tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          version=$(node -p 'require("./pra-agent/package.json").version')
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Invalid Agent version: $version" >&2; exit 1; }
+          tag="v$version"
+          if git show-ref --verify --quiet "refs/tags/$tag"; then
+            if git diff --quiet "$tag^{commit}" HEAD -- pra-agent .github/workflows/build-agent.yml; then
+              echo "Agent version $tag already covers these build inputs."
+            else
+              status=$?
+              if [ "$status" -eq 1 ]; then
+                echo "Agent build inputs differ from immutable $tag. Bump the package version before release." >&2
+              fi
+              exit "$status"
+            fi
+          else
+            status=$?
+            [ "$status" -eq 1 ] || exit "$status"
+            echo "Agent version $tag is available for a new release."
+          fi
       - name: Install locked Agent dependencies without running application
         working-directory: pra-agent
         run: npm ci --ignore-scripts --no-audit --no-fund

@@ -43,7 +43,7 @@ class FranchiseCommissionService
             if (!$proof->franchise_id_at_verification) {
                 return;
             }
-            $base = round((float) ($proof->distributor_net_amount ?? $proof->amount), 2);
+            $base = round((float) ($proof->distributor_net_amount ?? $proof->amount) - PosSignupBundle::federalAmount($proof->distributor_quote_snapshot), 2);
             $rate = round((float) $proof->franchise_rate_at_verification, 2);
             $conflict = (bool) $proof->franchise_attribution_conflict;
             FranchiseCommission::firstOrCreate(['payment_proof_id' => $proof->id], [

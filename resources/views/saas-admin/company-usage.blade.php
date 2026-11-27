@@ -5,7 +5,7 @@
 
     <h2 id="local-collections" class="mb-2 text-lg font-semibold">School / Hospital local collections</h2>
     <form method="get" class="mb-4 grid sm:grid-cols-3 gap-2">
-        <label>Company ID<input name="company_id" type="number" min="1" value="{{ request('company_id') }}"></label>
+        <label>Company ID<input name="company_id" type="text" maxlength="32" value="{{ request('company_id') }}"></label>
         <label>Product or collection category
             <select name="product_scope">
                 <option value="">All products</option>
@@ -26,7 +26,10 @@
         <label>Custom end date<input name="date_to" type="date" value="{{ request('date_to') }}"></label>
         <button>Apply filters</button>
     </form>
-    <p>Dates and branch selection apply to POS bills, DI documents, and School/Hospital collections. POS bills use their stored business date and DI documents use their invoice date. Records missing those dates appear only in all-time totals.</p>
+    <p>POS bills use their stored business date. DI documents use their invoice date. ERP package invoices use their issue-record date, and receipts use the payment date. Healthcare uses the bill date and receipt business date. Package billing applies to the whole company, so those totals are unavailable when a branch is selected.</p>
+    @unless($erpFinancials->isEmpty())
+        <p>TaxNest package collections are shown before any separately recorded adjustments. Healthcare totals cover the patient billing ledger. Standalone pharmacy checkout has its own ledger.</p>
+    @endunless
     @if(isset($filters['date_from']) || isset($filters['date_to']))
         <p>Reporting dates: {{ $filters['date_from'] ?? 'Earliest' }} to {{ $filters['date_to'] ?? 'Latest' }}.
             @if(isset($filters['comparison']))
@@ -59,6 +62,7 @@
                     <tr class="hover:bg-gray-800/50 {{ $loop->even ? 'bg-gray-800/20' : '' }}">
                         <td class="px-4 py-3 text-white font-medium">
                             <a href="{{ route('saas.admin.companies.show', $stat->company_id) }}" class="hover:text-indigo-400 transition">{{ $stat->company->name ?? 'Unknown' }}</a>
+                            <span class="block font-mono text-xs">{{ \App\Services\CompanyProductId::display($stat->company) }}</span>
                             @if(auth('admin')->user()?->canManageSensitiveConfiguration())<a class="block text-xs text-indigo-400" href="{{ route('admin.company-ai-usage',$stat->company_id) }}">AI usage / budget</a>@endif
                             <span class="block text-xs text-gray-500">{{ \App\Support\ProductCatalog::label($stat->company->product_type) }}</span>
                         </td>
@@ -100,6 +104,21 @@
                                 'as_of' => $filters['date_to'] ?? null,
                                 'page' => 1,
                             ]) }}">Download DI production document totals (CSV)</a>
+                        </td></tr>
+                    @endif
+                    @if($erpFinancials->has($stat->company_id))
+                        <tr><td colspan="7" class="px-4 py-3">
+                            @include('saas-admin.partials.erp-financial-summary', ['summary' => $erpFinancials->get($stat->company_id)])
+                            @if($erpComparison->has($stat->company_id))
+                                <h3 class="mt-3 font-semibold">Same period last year</h3>
+                                @include('saas-admin.partials.erp-financial-summary', ['summary' => $erpComparison->get($stat->company_id)])
+                            @endif
+                            <a class="mt-3 inline-block text-sm underline" href="{{ request()->fullUrlWithQuery([
+                                'export' => 'erp_csv',
+                                'company_id' => $stat->company_id,
+                                'as_of' => $filters['date_to'] ?? null,
+                                'page' => 1,
+                            ]) }}">Download ERP billing and collections (CSV)</a>
                         </td></tr>
                     @endif
                     @if($stat->local_collections)

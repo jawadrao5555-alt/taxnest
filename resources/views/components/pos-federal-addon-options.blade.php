@@ -1,4 +1,4 @@
-@props(['billing' => false, 'codes' => \App\Services\PosFederalAddonAccess::CODES])
+@props(['billing' => false, 'codes' => \App\Services\PosFederalAddonAccess::CODES, 'active' => [], 'pending' => [], 'purchasable' => []])
 
 @php
     $definitions = \App\Services\PosAddonPricingService::definitions();
@@ -13,8 +13,15 @@
             <div class="rounded-lg border border-gray-200 p-3 dark:border-gray-700">
                 <dt class="font-semibold">{{ $definitions[$code]['label'] }}</dt>
                 <dd class="mt-1 text-sm">
-                    @if($annualPrice > 0)
+                    @if(in_array($code, $active, true))
+                        {{ __('pos_federal_addons.active') }}
+                    @elseif(in_array($code, $pending, true))
+                        {{ __('pos.addons_pending_title') }}
+                    @elseif($annualPrice > 0)
                         {{ __('pos_federal_addons.annual', ['amount' => number_format($annualPrice)]) }}
+                        @if($billing && !in_array($code, $purchasable, true))
+                            <span class="mt-1 block text-gray-600 dark:text-gray-300">{{ __('pos_addon_billing.federal_unavailable') }}</span>
+                        @endif
                     @else
                         {{ __('pos_federal_addons.price_pending') }}
                     @endif

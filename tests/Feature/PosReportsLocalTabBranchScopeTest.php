@@ -260,6 +260,32 @@ class PosReportsLocalTabBranchScopeTest extends TestCase
         $this->assertSame(700.0, $tab['today']);
     }
 
+    public function test_item_sales_keep_branch_and_forced_cashier_scope(): void
+    {
+        $cashier = $this->makeUser('pos_cashier', $this->mainBranchId, 'user');
+        $cashier->forceFill(['pos_billing_scope' => 'local'])->save();
+        $otherCashier = $this->makeUser('pos_cashier', $this->mainBranchId, 'user');
+        DB::table('branch_user')->insert(['branch_id' => $this->mainBranchId, 'user_id' => $cashier->id]);
+        DB::table('pos_transactions')->whereIn('invoice_number', ['L-MAIN', 'L-CITY'])->update(['created_by' => $cashier->id]);
+        DB::table('pos_transactions')->where('invoice_number', 'L-OLD')->update(['created_by' => $otherCashier->id]);
+
+        foreach (DB::table('pos_transactions')->get() as $bill) {
+            DB::table('pos_transaction_items')->insert([
+                'transaction_id' => $bill->id, 'item_name' => $bill->invoice_number,
+                'quantity' => 1, 'subtotal' => $bill->total_amount,
+            ]);
+        }
+
+        $this->actAs($cashier, $this->cityBranchId);
+        $request = Request::create('/pos/reports', 'GET', ['top_items' => 1, 'tab' => 'pra', 'cashier' => $otherCashier->id]);
+        $report = (new PosController())->reports($request)->getData();
+
+        $this->assertSame('local', $report['tab']);
+        $this->assertSame((string) $cashier->id, $report['selectedCashier']);
+        $this->assertSame(['L-MAIN'], $report['itemSales']['rows']->pluck('item_name')->all());
+        $this->assertEquals(1000, $report['itemSales']['subtotal']);
+    }
+
     // ── 2. owner company-wide view ───────────────────────────────────────────
 
     public function test_owner_all_branches_view_lists_every_branch_and_legacy_rows(): void

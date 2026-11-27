@@ -83,6 +83,8 @@
         .qr-code p { font-size: 9px; margin-top: 1px; color: #000; font-weight: normal; }
         .fiscal-qr-payment { display: flex; align-items: center; justify-content: center; gap: 5px; margin: 3px 0; break-inside: avoid; }
         .fiscal-qr-payment .qr-code { flex: 0 0 auto; margin: 0; }
+        table.fiscal-qr-payment { display: table; width: 100%; table-layout: fixed; border-collapse: collapse; page-break-inside: avoid; }
+        table.fiscal-qr-payment td { width: 50%; vertical-align: middle; }
         .compact-payment { flex: 1 1 auto; text-align: center; font-weight: bold; font-size: 11px; letter-spacing: .3px; color: #000; }
 
         .footer { margin-top: 3px; font-size: 9px; line-height: 1.35; color: #000; font-weight: normal; }
@@ -155,6 +157,7 @@
     @php
         $printStyle = $company->posReceiptStyle();
         $receiptOptions = \App\Support\PosReceiptOptions::forBill($company, $transaction);
+        $rcptUsesCompactPayment = ($receiptOptions['show_payment'] ?? null) === 'show';
         $optionVisible = fn (string $key, bool $legacy = true): bool => \App\Support\PosReceiptOptions::visible($receiptOptions, $key, $legacy);
         if (in_array($receiptOptions['logo_position'] ?? '', ['center', 'side'], true)) $printStyle['logo'] = $receiptOptions['logo_position'];
         $receiptItemCols = 2 + (int) $optionVisible('show_quantity') + (int) $optionVisible('show_rate');
@@ -535,7 +538,7 @@
         <tr><td class="info-label">{{ __('pos.receipt_closed_by') }}:</td><td class="info-value">{{ $rcptClosedBy }}@if($rcptClosedAt) · {{ $rcptClosedAt }}@endif</td></tr>
         @endif
         {{-- ONE wording everywhere (owner, 26 Aug 2026) — mirrors receipt_80mm. --}}
-        @if($optionVisible('show_payment'))
+        @if(!$rcptUsesCompactPayment && $optionVisible('show_payment'))
         <tr><td class="info-label">{{ __('pos.receipt_payment_mode') }}:</td><td class="info-value"><strong style="font-weight:bold; text-transform:uppercase;">{{ \App\Support\PosPaymentLabels::label($transaction->payment_method) }}</strong></td></tr>
         @endif
         @if($transaction->creator && $rp['show_cashier'])
@@ -589,8 +592,6 @@
         @endif
     </table>
 
-    <div class="separator"></div>
-
     @php
         // Owner decision (Jul 2026): toggle OFF hides subtotal + tax on ALL receipts
         // (incl. PRA fiscal) — customer copy shows grand total only. Item Rate/Amt
@@ -615,6 +616,9 @@
                 ? round((float) $transaction->subtotal + (float) $transaction->tax_amount, 2)
                 : (float) $transaction->subtotal);
     @endphp
+    @if($optionVisible('show_separators'))
+    <div class="separator" data-item-table-separator="top"></div>
+    @endif
     <table class="items-table">
         <thead>
             <tr>
@@ -661,12 +665,13 @@
         </tbody>
     </table>
 
-    @if(!empty($transaction->notes) && $optionVisible('show_bill_notes'))
-    <div class="separator"></div>
-    <div style="font-size:9px; font-weight:normal; color:#000; padding:1px 0;">{{ __('pos.receipt_note') }}: {!! nl2br(e($transaction->notes)) !!}</div>
+    @if($optionVisible('show_separators'))
+    <div class="separator" data-item-table-separator="bottom"></div>
     @endif
-
+    @if(!empty($transaction->notes) && $optionVisible('show_bill_notes'))
+    <div style="font-size:9px; font-weight:normal; color:#000; padding:1px 0;">{{ __('pos.receipt_note') }}: {!! nl2br(e($transaction->notes)) !!}</div>
     <div class="separator"></div>
+    @endif
 
     <table class="totals-table">
         @if(($showTaxLines || $rcptCardSave) && $optionVisible('show_subtotal'))
@@ -768,26 +773,23 @@
     @endif
 
     @php
-        // ZFC feedback Jul 2026: riders must see AT A GLANCE cash vs card/online.
-        // Owner update (Pizza Master, Jul 2026): boxed method on DELIVERY bills ONLY
-        // (mirrors receipt_80mm; keep in sync).
+        // Keep inherited receipt behavior. An explicit Show uses one compact
+        // label by the QR (or on its own) even for counter and table sales.
         $rcptPayRaw = strtolower((string) $transaction->payment_method);
         $rcptPayLabel = \App\Support\PosPaymentLabels::upper($transaction->payment_method);
-        $rcptShowDeliveryPayment = (($transaction->order_type ?? '') === 'delivery'
-            || !empty($transaction->delivery_address) || $transaction->rider)
-            && $optionVisible('show_payment');
+        $rcptIsDelivery = ($transaction->order_type ?? '') === 'delivery'
+            || !empty($transaction->delivery_address) || $transaction->rider;
+        $rcptShowCompactPayment = $optionVisible('show_payment', $rcptIsDelivery);
     @endphp
-    @if($rcptShowDeliveryPayment)
-    @if($rcptPayRaw === 'qr_payment')
-    {{-- PREPAID marker (Task 291): prominent stamp for riders/customers so no cash is mistakenly collected. --}}
+    @if($rcptIsDelivery && $rcptShowCompactPayment && $rcptPayRaw === 'qr_payment')
+    {{-- Prominent paid marker helps the rider avoid collecting again. --}}
     <div style="border: 3px solid #000; text-align: center; font-weight: bold; font-size: 14px; letter-spacing: 1px; padding: 4px 2px; margin: 4px 0; margin-left: 0.5mm; margin-right: 0.5mm; color: #000;">&#10003; {{ __('pos.rcpt_prepaid_marker') }}</div>
-    @endif
     @endif
 
     @include('pos.hotel._credit-summary', ['summary' => $hotelCreditSummary, 'creditAmount' => $transaction->total_amount, 'creditReceipt' => true])
     @if($federalFiscal)
         @include('pos.receipts._dual-fiscal', ['fiscalQrSize' => 74])
-        @if($rcptShowDeliveryPayment)<div class="compact-payment">{{ __('pos.rcpt_payment_banner') }} {{ $rcptPayLabel }}</div>@endif
+        @if($rcptShowCompactPayment)<div class="compact-payment">{{ __('pos.rcpt_payment_banner') }} {{ $rcptPayLabel }}</div>@endif
     @elseif($transaction->pra_status === 'submitted' && $transaction->pra_invoice_number)
     @php
         // minVersion 4 (ZFC 13 Aug 2026): same module grid as the local invoice
@@ -797,16 +799,19 @@
             : ($transaction->pra_qr_code ?: '');
     @endphp
     @if($praQr)
-    <div @class(['fiscal-qr-payment' => $rcptShowDeliveryPayment])>
+    @if($rcptShowCompactPayment)
+    <table class="fiscal-qr-payment" role="presentation"><tr><td>
+    @endif
         <div class="qr-code">
             <img src="{{ $praQr }}" alt="PRA QR">
             @if($rp['show_verify_line'] ?? true)
             <p>{{ __('pos.receipt_scan_verify_short') }}</p>
             @endif
         </div>
-        @if($rcptShowDeliveryPayment)<div class="compact-payment">{{ __('pos.rcpt_payment_banner') }} {{ $rcptPayLabel }}</div>@endif
-    </div>
-    @elseif($rcptShowDeliveryPayment)
+    @if($rcptShowCompactPayment)
+    </td><td class="compact-payment">{{ __('pos.rcpt_payment_banner') }} {{ $rcptPayLabel }}</td></tr></table>
+    @endif
+    @elseif($rcptShowCompactPayment)
     <div class="compact-payment">{{ __('pos.rcpt_payment_banner') }} {{ $rcptPayLabel }}</div>
     @endif
     @elseif($transaction->pra_status === 'offline')
@@ -815,7 +820,7 @@
         {{ __('pos.receipt_offline_sync_auto') }}<br>
         {{ $transaction->invoice_number }}
     </div>
-    @if($rcptShowDeliveryPayment)<div class="compact-payment">{{ __('pos.rcpt_payment_banner') }} {{ $rcptPayLabel }}</div>@endif
+    @if($rcptShowCompactPayment)<div class="compact-payment">{{ __('pos.rcpt_payment_banner') }} {{ $rcptPayLabel }}</div>@endif
     @else
     @php
         // Reporting-OFF FINALS vs provisionals (client report Jul 2026 — ZFC):
@@ -870,14 +875,14 @@
     {{-- Bottom SALE RECEIPT / PROVISIONAL badge removed (owner, Jul 2026) — the
          serial badge now prints in the TOP box; only the QR remains down here. --}}
     @if($qrUrl)
-    <div @class(['fiscal-qr-payment' => $rcptShowDeliveryPayment])>
+    <div @class(['fiscal-qr-payment' => $rcptShowCompactPayment])>
         <div class="qr-code receipt-extra-qr">
             <img src="{{ $qrUrl }}" alt="Invoice QR" style="width: 64px; height: 64px; margin: 3px auto;">
             @if($optionVisible('show_qr_caption'))<p style="font-size: 8px; color: #000;">{{ $qrCaption }}</p>@endif
         </div>
-        @if($rcptShowDeliveryPayment)<div class="compact-payment">{{ __('pos.rcpt_payment_banner') }} {{ $rcptPayLabel }}</div>@endif
+        @if($rcptShowCompactPayment)<div class="compact-payment">{{ __('pos.rcpt_payment_banner') }} {{ $rcptPayLabel }}</div>@endif
     </div>
-    @elseif($rcptShowDeliveryPayment)
+    @elseif($rcptShowCompactPayment)
     <div class="compact-payment">{{ __('pos.rcpt_payment_banner') }} {{ $rcptPayLabel }}</div>
     @endif
     @endif

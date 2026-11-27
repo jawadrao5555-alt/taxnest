@@ -42,6 +42,26 @@ class AdminSubscriptionPaidAssignmentTest extends TestCase
         return [['cash'], ['card']];
     }
 
+    public function test_erp_subscription_filter_includes_legacy_healthcare_and_school(): void
+    {
+        $this->setupSale();
+        foreach (['health' => 'health', 'erps' => 'school', 'di' => null] as $type => $vertical) {
+            $company = Company::create([
+                'name' => 'Example '.$type, 'ntn' => 'FILTER-'.$type, 'product_type' => $type,
+                'erps_vertical' => $vertical, 'status' => 'approved', 'company_status' => 'active',
+            ]);
+            Subscription::create([
+                'company_id' => $company->id, 'billing_cycle' => 'annual', 'start_date' => now(),
+                'end_date' => now()->addYear(), 'active' => true, 'final_price' => 1500,
+            ]);
+        }
+
+        $this->get(route('saas.admin.subscriptions', ['product' => 'erps', 'status' => 'active']))
+            ->assertOk()->assertViewHas('companiesPage', fn ($page) => $page->count() === 2
+                && !$page->pluck('product_type')->contains('di'))
+            ->assertSee('School ERP')->assertSee('Healthcare');
+    }
+
     #[DataProvider('methods')]
     public function test_admin_can_confirm_payment_once_and_receive_document_links(string $method): void
     {

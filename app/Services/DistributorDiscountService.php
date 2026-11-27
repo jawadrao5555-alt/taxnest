@@ -77,15 +77,17 @@ class DistributorDiscountService
             if ((int) $quotedPlan->id !== (int) $plan->id || $quotedPlan->product_type !== $plan->product_type) return 'Frozen plan identity is inconsistent.';
         }
         if (($s['product_type'] ?? null) !== ($plan->product_type ?? 'di') || ($s['cycle'] ?? null) !== $cycle || !in_array($cycle, SubscriptionAssignmentService::cyclesForPlan($quotedPlan, true), true)) return 'Distributor quote product or billing cycle is inconsistent.';
+        if ($error = PosSignupBundle::validateQuote($s, $company, $quotedPlan)) return $error;
         $quotedSlots = $s['pricing_snapshot']['extra_branch_slots'] ?? null;
-        if ($checkBranchCapacity && $quotedSlots !== null && (int) $quotedSlots !== BranchAddonService::billableSlots($company, $quotedPlan)) {
+        $additionalSlots = $s[PosSignupBundle::KEY]['branch_slots'] ?? 0;
+        if ($checkBranchCapacity && $quotedSlots !== null && (int) $quotedSlots - $additionalSlots !== BranchAddonService::billableSlots($company, $quotedPlan)) {
             return 'Paid branch slots changed after this quote. Review a fresh quote before approving payment.';
         }
         if ($cycle !== 'annual' && ((float) ($s['discount_percent'] ?? 0) !== 0.0 || (float) ($s['discount_amount'] ?? 0) !== 0.0)) return 'Distributor discounts apply only to annual purchases.';
         $snapshotAgent = ($s['agent_id'] ?? null) === null ? null : (int)$s['agent_id'];
         $companyAgent = $company->agent_id === null ? null : (int)$company->agent_id;
         if ($snapshotAgent !== $companyAgent) return 'Distributor attribution changed after this quote. Submit a fresh payment proof.';
-        $math = round((float)$s['gross_package_price'] - (float)$s['discount_amount'] + (float)($s['undiscounted_addon_amount'] ?? 0), 2);
+        $math = round((float)$s['gross_package_price'] - (float)$s['discount_amount'] + (float)($s['undiscounted_addon_amount'] ?? 0) + PosSignupBundle::federalAmount($s), 2);
         if ($math !== round((float)$s['net_quote'],2) || (float)$s['discount_percent'] > (float)$s['policy_cap'] || (float)$s['policy_cap'] > 10) return 'Distributor quote arithmetic is invalid.';
         return null;
     }

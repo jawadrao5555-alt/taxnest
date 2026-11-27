@@ -312,7 +312,9 @@ class RestaurantWaiterController extends Controller
             // 'agent_core' = the waiter's own offline order replayed by the shop
             // PC once the net returned (Sep 2026) — still theirs, still open.
             ->whereIn('source', ['waiter', 'agent_core'])
-            ->where('status', 'held')
+            ->whereIn('status', ['held', 'preparing', 'ready'])
+            ->whereNull('pos_transaction_id')
+            ->whereNull('payment_method')
             ->where('created_by', $user->id)
             // 'creator' MUST be eager-loaded: orderJson() reads $o->creator?->name
             // and production has lazy-loading disabled (62 live 500s, Jul-Aug 2026).
@@ -1647,6 +1649,7 @@ class RestaurantWaiterController extends Controller
             'id' => $o->id,
             'order_number' => $o->order_number,
             'order_type' => $o->order_type,
+            'status' => $o->status,
             'table_id' => $o->table_id !== null ? (int) $o->table_id : null,
             'table' => $o->table ? $o->table->table_number : null,
             'customer_name' => $o->customer_name,

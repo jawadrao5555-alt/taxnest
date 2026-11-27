@@ -1,6 +1,12 @@
 @extends('fbr-pos.hospital.layout')
 @section('content')
 <h1>{{ __('hospital.collect') }}</h1><p>{{ __('hospital.scope') }}</p>
+@if($cutover ?? false)
+<section class="card" role="status">
+    <p>{{ __('hospital.erp_cutover_new_collection') }}</p>
+    <a href="/fbr-pos/hospital/history">{{ __('hospital.history') }}</a>
+</section>
+@else
 <section class="card">
 <form id="hospital-collection" method="post" action="/fbr-pos/hospital" data-closed="{{ $closed ? 1 : 0 }}">
 @csrf<input type="hidden" name="request_key" value="{{ $requestKey }}"><input type="hidden" name="expected_branch_key" value="{{ $hospitalCampusId ?? 0 }}">
@@ -32,4 +38,5 @@
 })();
 </script>
 @include('fbr-pos.hospital.payment-script' ,['formId'=>'hospital-collection','invoiceKey'=>'new'])
+@endif
 @endsection

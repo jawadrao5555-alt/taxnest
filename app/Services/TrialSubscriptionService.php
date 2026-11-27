@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Company;
 use App\Models\PricingPlan;
 use App\Models\Subscription;
+use App\Support\NestErps;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
@@ -70,9 +71,18 @@ class TrialSubscriptionService
 
             // A missing product seed retains the existing bounded, plan-less trial;
             // another product's feature/limit catalogue is never an entitlement.
-            $trialPlan = PricingPlan::whereIn('product_type', \App\Support\NestErps::storedTypesFor($productType))
-                ->where('is_trial', true)
-                ->orderBy('id')->lockForUpdate()->first();
+            $trialPlans = PricingPlan::whereIn('product_type', NestErps::storedTypesFor($productType))
+                ->where('is_trial', true);
+            if (NestErps::isProductType($productType) && Schema::hasColumn('pricing_plans', NestErps::VERTICAL_COLUMN)) {
+                $vertical = NestErps::verticalOf($company);
+                $trialPlans->where(function ($query) use ($vertical) {
+                    $query->where(NestErps::VERTICAL_COLUMN, $vertical);
+                    if ($vertical === NestErps::DEFAULT_VERTICAL) {
+                        $query->orWhereNull(NestErps::VERTICAL_COLUMN)->orWhere(NestErps::VERTICAL_COLUMN, '');
+                    }
+                });
+            }
+            $trialPlan = $trialPlans->orderBy('id')->lockForUpdate()->first();
 
             $attributes = [
                 'company_id' => $companyId,

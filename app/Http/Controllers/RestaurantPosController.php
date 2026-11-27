@@ -13,6 +13,7 @@ use App\Models\RestaurantTable;
 use App\Models\RestaurantOrder;
 use App\Services\PosCustomerSpend;
 use App\Services\RestaurantOrderPaymentCalculator;
+use App\Support\PosFulfillment;
 use App\Models\RestaurantOrderItem;
 use App\Models\ProductRecipe;
 use App\Models\Ingredient;
@@ -1179,6 +1180,27 @@ class RestaurantPosController extends Controller
         abort_unless($order->allowsHeldBillingStream(auth('pos')->user()?->posBillingScopeExplicit() ?? 'both'), 403, __('This order belongs to a different billing stream.'));
         \App\Services\PosPromotions::assertHeldCurrent($order, $company);
         $quote = RestaurantOrderPaymentCalculator::calculate($order, $company, $validated['payment_method']);
+        $cash = [];
+        if ($quote['payment_method'] === 'cash') {
+            $mode = $order->delivery_collection_mode ?? ($order->order_type === 'delivery' ? 'rider' : 'counter');
+            $riderDue = 0;
+            if (Schema::hasColumn('pos_transactions', 'has_delivery_items')
+                && PosFulfillment::hasDelivery($order->items, $order->order_type)
+                && PosFulfillment::isExplicit($order->items)) {
+                $riderDue = PosFulfillment::collectionAmount(
+                    $quote['total_amount'],
+                    $order->items,
+                    $mode,
+                    max(0, $quote['discount_ratio']),
+                    $quote['tax_rate'],
+                    $quote['tax_inclusive']
+                );
+            }
+            $cash = [
+                'delivery_collection_mode' => $mode,
+                'counter_cash_due' => round($quote['total_amount'] - $riderDue, 2),
+            ];
+        }
 
         return response()->json([
             'success' => true,
@@ -1189,6 +1211,7 @@ class RestaurantPosController extends Controller
             'discount_amount' => $quote['discount_amount'],
             'tax_amount' => $quote['tax_amount'],
             'total_amount' => $quote['total_amount'],
+            ...$cash,
         ])->header('Cache-Control', 'no-store, no-cache, must-revalidate, private');
     }
 

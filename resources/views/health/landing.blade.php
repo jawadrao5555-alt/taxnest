@@ -1,199 +1,242 @@
 @php
+    use App\Models\Subscription;
+    use App\Services\ErpPublicPricing;
     use App\Services\HealthModuleService;
     use App\Support\HealthPanel;
     use App\Support\NestErps;
+    use App\Support\SchoolErpPanel;
+
+    $healthUser = auth('health')->user();
+    $healthOwner = in_array($healthUser?->role, ['company_admin', 'super_admin'], true);
+    $healthLogin = url(NestErps::loginPath(NestErps::HEALTH));
+    $healthSignup = NestErps::registerPath(NestErps::HEALTH);
+    $canStartHealthcare = !$healthUser && HealthPanel::registrationOpen() && $publicPlans->get(NestErps::HEALTH, collect())->isNotEmpty();
+    $schoolUser = auth(SchoolErpPanel::GUARD)->user();
+    $schoolOwner = $schoolUser?->isCompanyAdmin();
+    $canStartSchool = !$schoolUser && SchoolErpPanel::registrationOpen()
+        && $publicPlans->get(NestErps::SCHOOL, collect())->isNotEmpty();
 @endphp
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{{ NestErps::LABEL }} — ERPs built for the way your organisation runs</title>
-    <meta name="description" content="{{ NestErps::LABEL }} is TaxNest's ERP line. Healthcare is live today — clinics, hospitals, laboratories and pharmacies. Other ERPs are built on demand.">
-    @include('partials.font-css', ['fontFamilies' => 'figtree:400,500,600,700,800'])
+    <meta name="theme-color" content="#092a33">
+    <title>{{ NestErps::LABEL }} — Hospital, Laboratory and School</title>
+    <meta name="description" content="Explore {{ NestErps::LABEL }} for hospitals, laboratories and schools, see published packages, and plan a move to ERP.">
+    @include('partials.font-css', ['fontFamilies' => 'inter:400,500,600,700|playfair-display:600,700'])
     @vite(['resources/css/app.css'])
+    <style>
+        .erp-hub {
+            --erp-petrol: #092a33;
+            --erp-paper: #f7f8f5;
+            --erp-teal: #09665e;
+            --erp-muted: #526769;
+            --erp-line: #d1ded9;
+            --erp-focus: #075952;
+            font-family: Inter, system-ui, sans-serif;
+            color: var(--erp-petrol);
+            background: var(--erp-paper);
+        }
+        .erp-hub :is(h1, h2) { font-family: "Playfair Display", Georgia, serif; }
+        .erp-hub :is(a, button):focus-visible { outline: 2px solid var(--erp-focus); outline-offset: 3px; }
+        .erp-hub :is(.erp-hub-hero, .erp-hub-upgrade, footer) { --erp-focus: #4fd6bd; }
+        .erp-hub footer :is(h4, p) { color: #b8cfcb; }
+        .erp-hub :is(section, article)[id] { scroll-margin-top: 5.5rem; }
+        .erp-hub-width { width: min(100% - 2rem, 74rem); margin-inline: auto; }
+        .erp-hub-header { position: sticky; top: 0; z-index: 10; background: #fff; border-bottom: 1px solid var(--erp-line); }
+        .erp-hub-bar, .erp-hub-actions, .erp-hub-nav, .erp-hub-brand {
+            display: flex; align-items: center; gap: .75rem;
+        }
+        .erp-hub-bar { min-height: 4rem; justify-content: space-between; }
+        .erp-hub-brand { color: var(--erp-petrol); font-weight: 700; min-width: 0; gap: .55rem; }
+        .erp-hub-brand img { display: block; width: 2rem; height: 2rem; flex: none; }
+        .erp-hub-hero { background: radial-gradient(ellipse at right top, #175359 0, var(--erp-petrol) 67%); color: #fff; }
+        .erp-hub-hero .erp-hub-width { padding-block: clamp(2.25rem, 7vw, 5rem); }
+        .erp-hub h1 { max-width: 16ch; font-size: clamp(2.1rem, 6vw, 4.3rem); font-weight: 700; line-height: 1.08; }
+        .erp-hub h2 { font-size: clamp(1.6rem, 3vw, 2.4rem); font-weight: 700; line-height: 1.2; }
+        .erp-hub h3 { font-size: 1.125rem; font-weight: 700; }
+        .erp-hub-hero p { max-width: 60ch; margin-block: .9rem 1.25rem; color: #dcece8; }
+        .erp-hub-nav { flex-wrap: wrap; margin-top: 1.1rem; gap: .25rem 1rem; }
+        .erp-hub-nav a { color: #b8e6db; display: inline-flex; align-items: center; min-height: 2.75rem; }
+        .erp-hub-nav a, .erp-hub-text-link { text-decoration: underline; text-underline-offset: .22em; }
+        .erp-hub-button {
+            display: inline-flex; align-items: center; justify-content: center; min-height: 2.75rem; max-width: 100%;
+            color: #fff; background: var(--erp-teal); border: 1px solid var(--erp-teal); border-radius: .6rem;
+            padding: .6rem .95rem; font-size: .875rem; font-weight: 700; text-align: center;
+        }
+        .erp-hub-button:hover { background: #075952; }
+        .erp-hub-button-outline { background: #fff; border-color: #52716e; color: var(--erp-petrol); }
+        .erp-hub-button-outline:hover { background: #ecf7f3; }
+        .erp-hub-hero .erp-hub-button, .erp-hub-upgrade .erp-hub-button { border-color: #8bbdb1; }
+        .erp-hub-section { padding-block: clamp(1.55rem, 5vw, 3.25rem); }
+        .erp-hub-grid, .erp-hub-plans { display: grid; gap: 1rem; margin-top: 1rem; }
+        .erp-hub-card {
+            min-width: 0; background: #fff; border: 1px solid var(--erp-line); border-radius: .8rem;
+            padding: clamp(1rem, 3vw, 1.35rem); overflow-wrap: anywhere;
+        }
+        .erp-hub-grid .erp-hub-card { display: flex; flex-direction: column; }
+        .erp-hub-status { margin: .25rem 0 .65rem; color: var(--erp-teal); font-size: .875rem; font-weight: 700; }
+        .erp-hub-muted { color: var(--erp-muted); }
+        .erp-hub-card .erp-hub-actions { margin-top: auto; padding-top: .85rem; }
+        .erp-hub-actions { flex-wrap: wrap; }
+        .erp-hub-text-link { display: inline-flex; align-items: center; min-height: 2.75rem; color: var(--erp-teal); font-weight: 700; }
+        .erp-hub-rates { margin-top: .75rem; }
+        .erp-hub-rates > div {
+            display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+            gap: .25rem .8rem; padding-block: .35rem; border-top: 1px solid var(--erp-line);
+        }
+        .erp-hub-rates dd { display: flex; flex-wrap: wrap; align-items: center; gap: .25rem .65rem; font-weight: 700; }
+        .erp-hub-rates .erp-hub-text-link { min-height: 2.75rem; }
+        .erp-hub-pricing > section + section { margin-top: 1.1rem; }
+        .erp-hub-pricing section h3 { margin-top: .65rem; }
+        .erp-hub-plan-facts { display: flex; flex-wrap: wrap; gap: .25rem 1rem; margin-block: .4rem; }
+        .erp-hub-upgrade { background: var(--erp-petrol); color: #fff; border-radius: .85rem; padding: clamp(1.1rem, 4vw, 2rem); margin-bottom: 2rem; }
+        .erp-hub-upgrade p { max-width: 62ch; margin-block: .65rem 1rem; color: #dcece8; }
+        @media (min-width: 42rem) {
+            .erp-hub-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+            .erp-hub-plans { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        }
+    </style>
 </head>
-<body class="bg-white text-[#0B1B20] antialiased font-sans">
-
-{{-- ══════════════ Header ══════════════ --}}
-<header class="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-gray-200">
-    <div class="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-        <a href="/" class="flex items-center gap-2.5">
-            <img src="{{ asset('images/brand/taxnest-logo.svg') }}" alt="TaxNest" class="h-7 w-auto"
-                 onerror="this.style.display='none'">
-            <span class="text-sm font-extrabold tracking-tight text-[#0A4D5C]">{{ NestErps::LABEL }}</span>
+<body class="erp-hub">
+<header class="erp-hub-header">
+    <div class="erp-hub-width erp-hub-bar">
+        <a href="{{ url('/') }}" class="erp-hub-brand" aria-label="{{ NestErps::LABEL }} home">
+            <img src="{{ asset('images/brand/taxnest-mark.svg') }}" alt="" width="32" height="32">
+            {{ NestErps::LABEL }}
         </a>
-        <div class="flex items-center gap-2">
-            <a href="{{ url('/contact') }}" class="px-4 py-2 text-sm font-semibold text-[#0A4D5C] hover:bg-[#0A4D5C]/5 rounded-lg transition">Talk to us</a>
-            <a href="{{ url(NestErps::loginPath(NestErps::HEALTH)) }}" class="px-4 py-2 text-sm font-bold text-white bg-[#0A4D5C] hover:bg-[#083c48] rounded-lg transition">Log In</a>
-        </div>
+        <a href="{{ $healthLogin }}" class="erp-hub-button erp-hub-button-outline">{{ $healthUser ? 'Open Healthcare' : 'Healthcare login' }}</a>
     </div>
 </header>
 
-{{-- ══════════════ Hero ══════════════ --}}
-<section class="bg-[#052730] text-white">
-    <div class="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8 py-20 lg:py-28">
-        <p class="text-[11px] font-bold uppercase tracking-[0.2em] text-[#E7BF3B]">{{ NestErps::LABEL }}</p>
-        <h1 class="mt-4 text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight leading-[1.15] max-w-3xl">
-            {{ NestErps::TAGLINE }}
-        </h1>
-        <p class="mt-5 text-base sm:text-lg text-white/70 leading-relaxed max-w-2xl">
-            One ERP line with a separate system for each kind of organisation. Healthcare runs on it
-            today. The rest are built on request — on the same platform, with the same branch
-            boundaries, the same roles and the same three languages as everything else we make.
-        </p>
-        <div class="mt-8 flex flex-wrap gap-3">
-            <a href="#verticals" class="px-6 py-3 rounded-xl bg-[#0A4D5C] hover:bg-[#0d5d70] text-white text-sm font-bold transition">See what is live</a>
-            <a href="{{ url('/contact') }}" class="px-6 py-3 rounded-xl border border-white/25 hover:bg-white/10 text-white text-sm font-bold transition">Ask for your ERP</a>
+<main>
+    <section class="erp-hub-hero" aria-labelledby="erp-hub-heading">
+        <div class="erp-hub-width">
+            <h1 id="erp-hub-heading">ERP for hospitals, labs and schools</h1>
+            <p>Run your hospital or lab in the Healthcare panel, or manage admissions, attendance and fees in the School workspace.</p>
+            <div class="erp-hub-actions">
+                <a href="#pricing" class="erp-hub-button">See ERP packages</a>
+                <a href="#erp-upgrade" class="erp-hub-button erp-hub-button-outline">Plan an ERP move</a>
+            </div>
+            <nav class="erp-hub-nav" aria-label="ERP products">
+                <a href="#hospital-erp">Hospital ERP</a>
+                <a href="#lab-erp">Lab ERP</a>
+                <a href="#school-erp">School ERP</a>
+            </nav>
         </div>
-    </div>
-</section>
+    </section>
 
-{{-- ══════════════ The line ══════════════ --}}
-<section id="verticals" class="py-16 lg:py-20">
-    <div class="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8">
-        <h2 class="text-2xl font-extrabold tracking-tight">Inside the line</h2>
-        <p class="mt-2 text-sm text-gray-600 max-w-2xl">
-            Each vertical is its own panel with its own screens — never a general-purpose ERP with a
-            different logo on it.
-        </p>
-
-        <div class="mt-8 grid md:grid-cols-2 gap-5">
-            @foreach(NestErps::verticals() as $key => $vertical)
-                <div class="rounded-2xl border-2 border-gray-200 p-6 flex flex-col">
-                    <div class="flex items-center gap-2">
-                        <p class="text-sm font-extrabold text-[#0A4D5C]">{{ NestErps::LABEL }} — {{ $vertical['label'] }}</p>
-                        @if($vertical['live'] ?? false)
-                            <span class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-[#E7BF3B]/20 text-[#8a6d0b]">Live</span>
-                        @else
-                            <span class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-gray-100 text-gray-500">On request</span>
-                        @endif
-                    </div>
-                    <p class="mt-2 text-xs text-gray-600 leading-relaxed flex-1">{{ $vertical['blurb'] ?? '' }}</p>
-                    @if($vertical['live'] ?? false)
-                        <div class="mt-5 flex flex-wrap gap-2">
-                            {{-- "Live" here means the vertical is built and deployed, which is
-                                 not the same as being open to strangers. While it is pre-pilot
-                                 the front door stays shut, so the sign-up call-to-action asks
-                                 the same predicate the route guard does — the page can never
-                                 offer a door the server will answer with a 404. --}}
-                            @if(HealthPanel::registrationOpen())
-                                <a href="{{ url(NestErps::registerPath($key)) }}"
-                                   class="px-5 py-2.5 rounded-xl bg-[#0A4D5C] hover:bg-[#083c48] text-white text-sm font-bold transition">Start your organisation</a>
-                            @endif
-                            <a href="{{ url(NestErps::loginPath($key)) }}"
-                               class="px-5 py-2.5 rounded-xl border border-gray-300 hover:bg-gray-50 text-[#0A4D5C] text-sm font-bold transition">Log in</a>
-                        </div>
+    <section id="verticals" class="erp-hub-width erp-hub-section" aria-labelledby="erp-options-heading">
+        <h2 id="erp-options-heading">ERP options</h2>
+        <div class="erp-hub-grid">
+            <article id="hospital-erp" data-erp-signup="{{ $canStartHealthcare ? 'open' : 'closed' }}" class="erp-hub-card" aria-labelledby="hospital-erp-title">
+                <h3 id="hospital-erp-title">Hospital ERP</h3>
+                <p class="erp-hub-status">Healthcare panel</p>
+                <p class="erp-hub-muted">Patient records, outpatient and inpatient work, pharmacy and billing, with modules set by your package.</p>
+                <div class="erp-hub-actions">
+                    <a href="#pricing" class="erp-hub-text-link">Healthcare packages</a>
+                    <a href="{{ $healthLogin }}" class="erp-hub-text-link">{{ $healthUser ? 'Open Healthcare' : 'Hospital login' }}</a>
+                    @if($canStartHealthcare)
+                        <a href="{{ route('health.register', ['org_type' => 'hospital']) }}" class="erp-hub-text-link">Hospital signup</a>
                     @endif
                 </div>
-            @endforeach
-
-            {{-- The point of the line, stated plainly. --}}
-            <div class="rounded-2xl border-2 border-dashed border-gray-300 p-6 flex flex-col bg-gray-50">
-                <p class="text-sm font-extrabold text-[#0A4D5C]">Your ERP</p>
-                <p class="mt-2 text-xs text-gray-600 leading-relaxed flex-1">
-                    School, factory, workshop, distribution — if your organisation runs on paper
-                    registers today, tell us how it works and we build that ERP into this line. It
-                    arrives as its own panel, not as a settings page bolted onto someone else's.
-                </p>
-                <a href="{{ url('/contact') }}"
-                   class="mt-5 inline-block text-center px-5 py-2.5 rounded-xl bg-[#0A4D5C] hover:bg-[#083c48] text-white text-sm font-bold transition">Tell us what you need</a>
-            </div>
-        </div>
-    </div>
-</section>
-
-{{-- ══════════════ Live vertical: Healthcare ══════════════ --}}
-<section class="py-16 lg:py-20 bg-gray-50 border-y border-gray-200">
-    <div class="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8">
-        <p class="text-[11px] font-bold uppercase tracking-[0.2em] text-[#E7BF3B]">{{ NestErps::LABEL }}</p>
-        <h2 class="mt-2 text-2xl font-extrabold tracking-tight">{{ NestErps::verticalLabel(NestErps::HEALTH) }}</h2>
-        <p class="mt-2 text-sm text-gray-600 max-w-2xl">
-            One system for the clinic, the hospital, the lab and the pharmacy. Pick your type at
-            sign-up and the right modules are switched on for you — you can change them any time.
-        </p>
-
-        <div class="mt-8 grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            @foreach(HealthPanel::ORG_TYPES as $type)
-                <div class="rounded-2xl bg-white border border-gray-200 p-5">
-                    <p class="text-sm font-extrabold text-[#0A4D5C]">{{ ucfirst($type) }}</p>
-                    <p class="mt-1.5 text-xs text-gray-600 leading-relaxed">
-                        Starts with {{ implode(', ', array_map(
-                            fn ($m) => ucfirst($m),
-                            HealthModuleService::ORG_TYPE_DEFAULTS[$type] ?? []
-                        )) }}.
-                    </p>
+            </article>
+            <article id="lab-erp" data-erp-signup="{{ $canStartHealthcare ? 'open' : 'closed' }}" class="erp-hub-card" aria-labelledby="lab-erp-title">
+                <h3 id="lab-erp-title">Lab ERP</h3>
+                <p class="erp-hub-status">Shared Healthcare workspace</p>
+                <p class="erp-hub-muted">A lab workspace for standalone laboratories and hospital labs with the relevant package and roles.</p>
+                <div class="erp-hub-actions">
+                    <a href="#pricing" class="erp-hub-text-link">Healthcare packages</a>
+                    <a href="{{ $healthLogin }}" class="erp-hub-text-link">{{ $healthUser ? 'Open Healthcare' : 'Lab login' }}</a>
+                    @if($canStartHealthcare)
+                        <a href="{{ route('health.register', ['org_type' => 'lab']) }}" class="erp-hub-text-link">Lab signup</a>
+                    @endif
                 </div>
-            @endforeach
-        </div>
-
-        <h3 class="mt-12 text-lg font-extrabold tracking-tight">Only the modules you run</h3>
-        <p class="mt-2 text-sm text-gray-600 max-w-2xl">A module that is switched off does not appear anywhere in the panel — not in the menu, not as an upsell.</p>
-        <div class="mt-6 grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            @foreach($modules as $module)
-                <div class="rounded-2xl bg-white border border-gray-200 p-5">
-                    <div class="flex items-center gap-2">
-                        <span class="text-lg leading-none">{{ $moduleMeta[$module]['icon'] ?? '•' }}</span>
-                        <p class="text-sm font-extrabold">{{ __(HealthModuleService::moduleLabelKey($module), [], 'en') }}</p>
-                    </div>
-                    <p class="mt-1.5 text-xs text-gray-600 leading-relaxed">{{ __(HealthModuleService::moduleDescriptionKey($module), [], 'en') }}</p>
+            </article>
+            <article id="school-erp" data-erp-signup="{{ $canStartSchool ? 'open' : 'closed' }}" class="erp-hub-card" aria-labelledby="school-erp-title">
+                <h3 id="school-erp-title">School ERP</h3>
+                <p class="erp-hub-status">{{ $canStartSchool ? 'Registration available' : 'Enquiry only for new schools' }}</p>
+                <p class="erp-hub-muted">Student records, admissions, attendance and fees across school campuses.</p>
+                <div class="erp-hub-actions">
+                    <a href="{{ route('school-erp.login') }}" class="erp-hub-text-link">School login</a>
+                    @if($canStartSchool)
+                        <a href="{{ route('school-erp.register') }}" class="erp-hub-text-link">School signup</a>
+                        <a href="#erp-package-{{ NestErps::SCHOOL }}" class="erp-hub-text-link">School packages</a>
+                    @endif
+                    <a href="{{ route('contact') }}" class="erp-hub-text-link">Enquire about School ERP</a>
                 </div>
-            @endforeach
+            </article>
         </div>
-    </div>
-</section>
+    </section>
 
-@if($publicPlans->isNotEmpty())
-<section id="pricing" class="py-16 lg:py-20" aria-labelledby="healthcare-pricing-title">
-    <div class="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8">
-        <h2 id="healthcare-pricing-title" class="text-2xl font-extrabold tracking-tight">Healthcare package prices</h2>
-        <p class="mt-2 text-sm text-gray-600">Prices in PKR for the full billing period.</p>
-        <div class="mt-6 grid gap-4 sm:grid-cols-2">
-            @foreach($publicPlans as $plan)
-                <article class="rounded-2xl border border-gray-200 p-5">
-                    <h3 class="font-extrabold text-[#0A4D5C]">{{ $plan['name'] }}</h3>
-                    <dl class="mt-3 divide-y divide-gray-100">
-                        @foreach($plan['periods'] as $label => $total)
-                            <div class="flex justify-between gap-4 py-2 text-sm">
-                                <dt>{{ $label }}</dt>
-                                <dd class="text-right font-semibold tabular-nums">PKR {{ number_format($total, 2) }}</dd>
-                            </div>
-                        @endforeach
-                    </dl>
-                    <a href="{{ url('/contact') }}" class="mt-4 inline-block font-semibold text-[#0A4D5C] underline">Enquire about {{ $plan['name'] }}</a>
-                </article>
-            @endforeach
+    <section id="pricing" class="erp-hub-width erp-hub-section erp-hub-pricing" aria-label="ERP package pricing">
+        <h2>Packages and pricing</h2>
+        @forelse($publicPlans as $vertical => $packages)
+            <section aria-labelledby="erp-package-{{ $vertical }}">
+                <h3 id="erp-package-{{ $vertical }}">{{ NestErps::verticalLabel($vertical) }} package prices</h3>
+                <p class="erp-hub-muted">Prices in PKR for the full billing period.</p>
+                <div class="erp-hub-plans">
+                    @foreach($packages as $plan)
+                        <article class="erp-hub-card">
+                            <h4 class="font-bold">{{ $plan->name }}</h4>
+                            @if($plan->branch_limit !== null || $plan->user_limit !== null || $plan->health_department_limit !== null)
+                                <p class="erp-hub-plan-facts erp-hub-muted">
+                                    @if($plan->branch_limit !== null)<span>Branches: {{ $plan->getBranchLimitDisplay() }}</span>@endif
+                                    @if($plan->user_limit !== null)<span>Users: {{ $plan->getUserLimitDisplay() }}</span>@endif
+                                    @if($vertical === NestErps::HEALTH && $plan->health_department_limit !== null)<span>Departments: {{ $plan->health_department_limit === -1 ? 'Unlimited' : $plan->health_department_limit }}</span>@endif
+                                </p>
+                            @endif
+                            @if($vertical === NestErps::HEALTH && $plan->health_modules)
+                                <p class="erp-hub-muted">{{ collect(HealthModuleService::normalize($plan->health_modules))->map(fn ($module) => __(HealthModuleService::moduleLabelKey($module), [], 'en'))->join(' · ') }}</p>
+                            @endif
+                            <dl class="erp-hub-rates">
+                                @foreach(ErpPublicPricing::prices($plan) as $cycle => $total)
+                                    @php
+                                        $period = Subscription::getCycleLabel($cycle);
+                                        $selection = ['plan_id' => $plan->id, 'billing_cycle' => $cycle];
+                                        $periodLink = match (true) {
+                                            $vertical === NestErps::HEALTH && $healthOwner => route('health.package-checkout', $selection),
+                                            $vertical === NestErps::HEALTH && $canStartHealthcare => url($healthSignup).'?'.http_build_query($selection),
+                                            $vertical === NestErps::SCHOOL && $schoolOwner => route('school-erp.package-checkout', $selection),
+                                            $vertical === NestErps::SCHOOL && $canStartSchool => route('school-erp.register', $selection),
+                                            default => null,
+                                        };
+                                    @endphp
+                                    <div>
+                                        <dt>{{ $period }}</dt>
+                                        <dd>
+                                            <span>PKR {{ number_format($total, 2) }}</span>
+                                            @if($periodLink)<a href="{{ $periodLink }}" class="erp-hub-text-link" aria-label="Choose {{ $plan->name }}, {{ $period }}">Choose</a>@endif
+                                        </dd>
+                                    </div>
+                                @endforeach
+                            </dl>
+                            <a href="{{ route('contact') }}" class="erp-hub-text-link">Enquire about {{ $plan->name }}</a>
+                        </article>
+                    @endforeach
+                </div>
+            </section>
+        @empty
+            <p class="erp-hub-muted">Contact us for a package and price suited to your organisation.</p>
+        @endforelse
+        <div class="erp-hub-actions">
+            <a href="{{ route('contact') }}" class="erp-hub-text-link">Request a quote</a>
+            @if($canStartHealthcare)
+                <a href="{{ $healthSignup }}" class="erp-hub-text-link">Start Healthcare signup</a>
+            @endif
         </div>
-    </div>
-</section>
-@endif
+    </section>
 
-{{-- ══════════════ Enquiry ══════════════ --}}
-<section class="py-16 lg:py-20">
-    <div class="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="rounded-2xl bg-[#052730] text-white p-8 sm:p-10">
-            <h2 class="text-2xl font-extrabold tracking-tight">Custom ERP quotes</h2>
-            <p class="mt-3 text-sm text-white/70 leading-relaxed max-w-2xl">
-                An ERP is scoped to the organisation that runs it — how many branches, which
-                departments, how many people on it. Tell us how yours works and we quote the line
-                and the rate together.
-            </p>
-            <div class="mt-7 flex flex-wrap gap-3">
-                <a href="{{ url('/contact') }}" class="px-6 py-3 rounded-xl bg-[#E7BF3B] hover:bg-[#d8b230] text-[#052730] text-sm font-bold transition">Request a quote</a>
-                {{-- The vertical is deployed but still pre-pilot: the code is live and
-                     provable, the front door is shut. One predicate decides it, so this
-                     call-to-action can never disagree with the route guard. --}}
-                @if(HealthPanel::registrationOpen())
-                    <a href="{{ url(NestErps::registerPath(NestErps::HEALTH)) }}" class="px-6 py-3 rounded-xl border border-white/25 hover:bg-white/10 text-white text-sm font-bold transition">Try {{ NestErps::verticalLabel(NestErps::HEALTH) }} free</a>
-                @endif
-            </div>
-        </div>
-    </div>
-</section>
+    <section id="erp-upgrade" class="erp-hub-width erp-hub-upgrade" aria-labelledby="erp-upgrade-heading">
+        <h2 id="erp-upgrade-heading">Move from standalone to ERP</h2>
+        <p>We can help plan your move from TaxNest POS, standalone billing or another system. Tell us what records need to carry over and which branches, roles and modules you need.</p>
+        <a href="{{ route('contact', ['topic' => 'erp-upgrade']) }}" class="erp-hub-button">Plan your ERP move</a>
+    </section>
 
-{{-- The footer login link is panel-aware: a visitor on this page belongs to the
-     TaxNest ERP panel, never the Digital Invoice one. --}}
-@include('partials.product-guide-link', ['productGuideKey' => 'erps'])
-    <x-site-footer :loginUrl="NestErps::loginPath(NestErps::HEALTH)" :loginLabel="NestErps::LABEL . ' Log In'" />
+    <x-website-clients product="erp" />
+    @include('partials.product-guide-link', ['productGuideKey' => 'erps'])
+</main>
+<x-site-footer :loginUrl="$healthLogin" loginLabel="Healthcare login" />
 </body>
 </html>

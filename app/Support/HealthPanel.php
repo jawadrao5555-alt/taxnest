@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Models\SystemSetting;
 use Illuminate\Database\Eloquent\Model;
 
 /**
@@ -76,7 +77,7 @@ final class HealthPanel
      */
     public static function registrationOpen(): bool
     {
-        return (bool) config('health.registration_open', false);
+        return SystemSetting::get(SystemSetting::ERP_HEALTH_SIGNUP, config('health.registration_open') ? '1' : '0') === '1';
     }
 
     /** True when the request path belongs to this panel. */

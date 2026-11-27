@@ -13,6 +13,43 @@
 </datalist>
 
 <script>
+    window.diSpecialTax = (() => {
+        const rules = @js(\App\Services\DiSpecialTax::RULES);
+        const round = (value, decimals) => {
+            const factor = 10 ** decimals;
+            const scaled = value * factor;
+            return Math.round(scaled + Number.EPSILON * Math.abs(scaled)) / factor;
+        };
+        const getRule = item => Object.hasOwn(rules, item.schedule_type) ? rules[item.schedule_type] : null;
+        const packingFactor = item => Number((item.packings || []).find(pack => pack.id === item.selling_packing_id)?.factor ?? 1);
+        const reportingQuantity = item => round(round(Number(item.quantity || 0), 4) * packingFactor(item), 4);
+        const excise = item => round((getRule(item)?.fed ?? 0) * reportingQuantity(item), 2);
+
+        return {
+            getRule,
+            round,
+            excise,
+            salesTax(item, subtotal) {
+                const rule = getRule(item);
+                const mrp = Number(item.mrp || 0);
+                const base = rule.retail
+                    ? round(mrp * round(Number(item.quantity || 0), 4), 2) : subtotal + excise(item);
+                return round(base * rule.percentage / 100 + rule.fixed_tax * reportingQuantity(item), 2);
+            },
+            exclusivePrice(item, gross) {
+                const rule = getRule(item);
+                const factor = packingFactor(item);
+                const percentage = rule.percentage / 100;
+                const fixedDuty = rule.fed * factor;
+                const mrp = Number(item.mrp || 0);
+                const unfixed = gross - rule.fixed_tax * factor;
+                return round(rule.retail
+                    ? unfixed - mrp * percentage - fixedDuty
+                    : unfixed / (1 + percentage) - fixedDuty, 6);
+            },
+        };
+    })();
+
     window.diProductProfileCheck = () => {
         let key = '';
         let sequence = 0;
@@ -183,7 +220,7 @@
                 switch (entry.category) {
                     case 'hs': return !item.product_id;
                     case 'sale_type': return schedules.has(entry.value);
-                    case 'rate': return entry.percentage !== null && entry.percentage >= 0
+                    case 'rate': return !window.diSpecialTax.getRule(item) && entry.percentage !== null && entry.percentage >= 0
                         && entry.percentage <= 100 && Number(entry.percentage.toFixed(2)) === entry.percentage;
                     case 'sro': return item.requires_sro || item.optional_sro;
                     case 'serial': return entry.value !== '-' && (item.requires_serial || item.optional_serial);

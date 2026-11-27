@@ -1,5 +1,5 @@
 <x-app-layout>
-    <div class="py-8">
+    <div class="py-8" data-company-billing>
         <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="mb-6">
                 <h2 class="font-bold text-xl text-gray-800 dark:text-gray-100 leading-tight">Billing & Plans</h2>
@@ -294,7 +294,7 @@
                         if (is_string($planFeatures)) $planFeatures = json_decode($planFeatures, true);
                         if (!is_array($planFeatures)) $planFeatures = [];
                     @endphp
-                    <div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border-2 transition relative
+                    <div class="tn-billing-plan rounded-xl shadow-sm border-2 relative
                         {{ $isFeatured ? 'border-emerald-500 ring-2 ring-emerald-500' : 'border-gray-200 dark:border-gray-800' }}
                         {{ $isCurrent ? 'border-emerald-500' : '' }}">
 
@@ -315,10 +315,10 @@
                             <div class="mt-4" x-show="row({{ $plan->id }})">
                                 <span class="text-3xl font-bold text-gray-900 dark:text-gray-100">PKR <span x-text="fmt(perMonth({{ $plan->id }}))"></span></span>
                                 <span class="text-gray-500 dark:text-gray-400 text-sm">/mo</span>
-                                <p class="text-xs text-gray-400 mt-1">
+                                <p class="text-xs mt-1 tn-billing-muted">
                                     PKR <span x-text="fmt(total({{ $plan->id }}))"></span> billed every <span x-text="cycleLabels[cycle]"></span>
                                     <template x-if="saving({{ $plan->id }}) > 0">
-                                        <span class="text-emerald-600 font-semibold"> &middot; save PKR <span x-text="fmt(saving({{ $plan->id }}))"></span></span>
+                                        <span class="tn-billing-saving font-semibold"> &middot; save PKR <span x-text="fmt(saving({{ $plan->id }}))"></span></span>
                                     </template>
                                 </p>
                             </div>
@@ -336,7 +336,7 @@
                                 <input type="hidden" name="billing_cycle" :value="cycle">
                                 <p x-show="!row({{ $plan->id }})" class="text-amber-700 text-sm">This period is not configured for this package.</p>
                                 <button type="submit" :disabled="!row({{ $plan->id }})" class="w-full py-2.5 rounded-lg font-semibold text-sm transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed
-                                    {{ $isFeatured ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'bg-gray-900 text-white hover:bg-gray-800' }}">
+                                    {{ $isFeatured ? 'tn-billing-action' : 'bg-gray-900 text-white hover:bg-gray-800' }}">
                                     {{ $isCurrent ? 'Select period & upload renewal receipt' : 'Select package & upload receipt' }}
                                 </button>
                             </form>

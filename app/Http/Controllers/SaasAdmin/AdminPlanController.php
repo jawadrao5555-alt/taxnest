@@ -5,11 +5,16 @@ namespace App\Http\Controllers\SaasAdmin;
 use App\Http\Controllers\Controller;
 use App\Models\PricingPlan;
 use App\Models\AdminAuditLog;
+use App\Services\HealthModuleService;
 use App\Services\PlanLadderGuard;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\Database\Eloquent\Collection;
 use App\Services\PosAddonPricingService;
+use App\Services\PosFederalAddonAccess;
 use App\Services\PosPlanComparisonService;
 use App\Support\NestErps;
 use App\Support\ProductCatalog;
@@ -52,7 +57,7 @@ class AdminPlanController extends Controller
         // silently until the next deploy gate run (Task 1455).
         $ladderWarnings = PlanLadderGuard::allCurrentProblems();
 
-        $posAddons = array_intersect_key(PosAddonPricingService::catalog(), PosAddonPricingService::ADDONS);
+        $posAddons = PosAddonPricingService::catalog(includeUnpricedFederal: true);
 
         return view('saas-admin.plans', compact('diPlans', 'posPlans', 'fbrposPlans', 'erpsPlans', 'erpsVerticals', 'ladderWarnings', 'posAddons'));
     }
@@ -68,22 +73,27 @@ class AdminPlanController extends Controller
                 $rules["addons.{$code}.{$cycle}"] = ['required', 'numeric', 'min:0', 'max:999999999'];
             }
         }
+        foreach (PosFederalAddonAccess::CODES as $code) {
+            $rules["addons.{$code}.annual"] = ['sometimes', 'required', 'integer', 'min:0', 'max:999999999'];
+        }
 
         $data = $request->validate($rules);
-        $before = PosAddonPricingService::catalog();
-        PosAddonPricingService::save($data['addons']);
-        $after = PosAddonPricingService::catalog();
-
         $auditShape = fn (array $catalog) => collect($catalog)->mapWithKeys(fn ($row, $code) => [
             $code => collect(PosAddonPricingService::CYCLES)
                 ->mapWithKeys(fn ($cycle) => [$cycle => $row["{$cycle}_price"] ?? null])
                 ->all(),
         ])->all();
 
-        AdminAuditLog::log(auth('admin')->id(), 'PRA POS add-on pricing updated', 'SystemSetting', null, [
-            'old' => $auditShape($before),
-            'new' => $auditShape($after),
-        ]);
+        DB::transaction(function () use ($data, $auditShape) {
+            $before = PosAddonPricingService::catalog(includeUnpricedFederal: true);
+            PosAddonPricingService::save($data['addons']);
+            $after = PosAddonPricingService::catalog(includeUnpricedFederal: true);
+
+            AdminAuditLog::log(auth('admin')->id(), 'PRA POS add-on pricing updated', 'SystemSetting', null, [
+                'old' => $auditShape($before),
+                'new' => $auditShape($after),
+            ]);
+        });
 
         return back()->with('success', 'PRA POS add-on rates saved successfully.');
     }
@@ -142,12 +152,7 @@ class AdminPlanController extends Controller
      */
     private function onlyExistingColumns(array $attributes): array
     {
-        static $columns = null;
-        if ($columns === null) {
-            $columns = \Illuminate\Support\Facades\Schema::getColumnListing('pricing_plans');
-        }
-
-        return array_intersect_key($attributes, array_flip($columns));
+        return array_intersect_key($attributes, array_flip(Schema::getColumnListing('pricing_plans')));
     }
 
     private function configuredCycleRates(Request $request, array $data, string $productType): array
@@ -159,6 +164,40 @@ class AdminPlanController extends Controller
             ? ['price_monthly', 'price_quarterly', 'price_semi_annual']
             : ($productType === 'di' ? ['price_quarterly', 'price_semi_annual'] : []);
         return array_intersect_key($data, array_flip($fields));
+    }
+
+    private function erpPackageRules(): array
+    {
+        return [
+            'erp_website_price_visible' => 'sometimes|nullable|boolean',
+            'branch_limit' => 'sometimes|nullable|integer|min:-1',
+            'user_limit' => 'sometimes|nullable|integer|min:-1',
+            'health_department_limit' => 'sometimes|nullable|integer|min:-1',
+            'configure_health_modules' => 'sometimes|boolean',
+            'health_modules' => 'sometimes|array',
+            'health_modules.*' => ['string', 'distinct', Rule::in(HealthModuleService::MODULES)],
+        ];
+    }
+
+    private function erpPackageAttributes(Request $request, array $data): array
+    {
+        if ($request->boolean('erp_website_price_visible') && ((float) $data['price'] <= 0 || !$request->boolean('is_public'))) {
+            throw ValidationException::withMessages([
+                'erp_website_price_visible' => 'Put this ERP package on sale and enter a positive annual price before publishing it.',
+            ]);
+        }
+
+        $attributes = array_intersect_key($data, array_flip([
+            'erp_website_price_visible', 'branch_limit', 'user_limit', 'health_department_limit',
+        ]));
+        if ($request->boolean('configure_health_modules')) {
+            $attributes['health_modules'] = HealthModuleService::normalize($data['health_modules'] ?? []);
+            if ($attributes['health_modules'] === []) {
+                throw ValidationException::withMessages(['health_modules' => 'Select at least one included Healthcare module.']);
+            }
+        }
+
+        return $attributes;
     }
 
     public function store(Request $request)
@@ -183,6 +222,7 @@ class AdminPlanController extends Controller
             'inventory_enabled' => 'boolean',
             'reports_enabled' => 'boolean',
             'features_text' => 'nullable|string',
+            ...$this->erpPackageRules(),
         ]);
 
         $features = array_filter(array_map('trim', explode("\n", $request->input('features_text', ''))));
@@ -212,6 +252,7 @@ class AdminPlanController extends Controller
             'price' => $data['price'],
             'price_yearly' => $data['price_yearly'] ?? null,
             ...$this->configuredCycleRates($request, $data, $productType),
+            ...(NestErps::isProductType($productType) ? $this->erpPackageAttributes($request, $data) : []),
             'invoice_limit' => $data['invoice_limit'],
             'ai_page_limit' => $data['ai_page_limit'] ?? 0,
             'fair_use_limit' => $data['fair_use_limit'] ?? null,
@@ -255,6 +296,7 @@ class AdminPlanController extends Controller
             'max_users' => 'nullable|integer|min:-1',
             'max_products' => 'nullable|integer|min:-1',
             'features_text' => 'nullable|string',
+            ...$this->erpPackageRules(),
         ]);
 
         $features = array_filter(array_map('trim', explode("\n", $request->input('features_text', ''))));
@@ -284,6 +326,7 @@ class AdminPlanController extends Controller
             'price' => $data['price'],
             'price_yearly' => $data['price_yearly'] ?? ($plan->price_yearly ?? null),
             ...$this->configuredCycleRates($request, $data, $productType),
+            ...(NestErps::isProductType($productType) ? $this->erpPackageAttributes($request, $data) : []),
             'invoice_limit' => $data['invoice_limit'],
             'ai_page_limit' => $data['ai_page_limit'] ?? 0,
             'fair_use_limit' => $data['fair_use_limit'] ?? null,

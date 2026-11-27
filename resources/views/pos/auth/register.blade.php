@@ -74,6 +74,14 @@
                         $signupAddonPrices = collect(\App\Services\PosAddonPricingService::catalog())
                             ->mapWithKeys(fn ($item, $code) => [$code => (int) $item['annual_price']])->all();
 
+                        $bundleEnabled = \App\Services\PosSignupBundle::available();
+                        $bundlePrices = $bundleEnabled ? \App\Services\PosSignupBundle::federalPrices() : [];
+                        $bundleBranchPlans = ($plans ?? collect())->filter(\App\Services\PosSignupBundle::branchEligible(...))->pluck('id')->map(fn ($id) => (string) $id)->values();
+                        $bundleBranchMax = \App\Services\BranchAddonService::MAX_QTY;
+                        $bundleBranchPrices = $bundleEnabled ? collect($cycleOptions ?? [])->mapWithKeys(fn ($label, $period) => [
+                            $period => array_map(fn ($quantity) => \App\Services\BranchAddonService::priceForMonths($quantity, \App\Services\BranchAddonService::monthsForCycle($period)), range(0, $bundleBranchMax)),
+                        ]) : [];
+
                         // Business-type picker data. The offered list, its family
                         // grouping and the words each type can be found by all come
                         // from PosFeatureService, so signup, the admin preset chooser
@@ -91,7 +99,14 @@
                             );
                         }
                     @endphp
-                    <form method="POST" action="/pos/register" class="px-6 pb-6 pt-4 space-y-4" x-data="{ posType: '{{ old('pos_type', 'restaurant') }}', planId: '{{ old('pricing_plan_id', $preselectedPlanId ?? '') }}', cycle: @js(old('billing_cycle', request('billing_cycle', 'annual'))), prices: @js($planPrices ?? []), perLabels: @js($cyclePerLabels ?? []), addonCodes: @js($signupAddonQuote['codes']), addonAllowed: @js($signupAllowedByPlan), addonPrices: @js($signupAddonPrices), billableAddons() { return this.addonCodes.filter(code => (this.addonAllowed[this.planId] || []).includes(code)); }, addonTotal() { return this.billableAddons().reduce((sum, code) => sum + Number(this.addonPrices[code] || 0), 0); }, btFilter: '', btTerms: @js($praBusinessTypeTerms), btMatch(k) { const q = (this.btFilter || '').trim().toLowerCase(); if (! q) return true; const hay = this.btTerms[k] || ''; return q.split(/\s+/).every(w => hay.includes(w)); }, btGroupHas(keys) { return keys.some(k => this.btMatch(k)); }, get btAnyMatch() { return Object.keys(this.btTerms).some(k => this.btMatch(k)); }, priceOf(id) { const row = this.prices[id] || {}; const v = row[this.cycle]; return v === undefined ? 'Unavailable' : Number(v).toLocaleString('en-US'); }, get perLabel() { return this.perLabels[this.cycle] || ''; } }">
+                    <form method="POST" action="/pos/register" class="px-6 pb-6 pt-4 space-y-4" x-data="{ posType: '{{ old('pos_type', 'restaurant') }}', planId: '{{ old('pricing_plan_id', $preselectedPlanId ?? '') }}', cycle: @js(old('billing_cycle', request('billing_cycle', 'annual'))), prices: @js($planPrices ?? []), perLabels: @js($cyclePerLabels ?? []), addonCodes: @js($signupAddonQuote['codes']), addonAllowed: @js($signupAllowedByPlan), addonPrices: @js($signupAddonPrices), federal: @js(old('federal_signup_addon', '')), federalPrices: @js($bundlePrices), branchSlots: @js(old('signup_extra_branch_slots', 0)), branchPrices: @js($bundleBranchPrices), branchPlans: @js($bundleBranchPlans), branchMax: @js($bundleBranchMax),
+                        bundleTotal() {
+                            const federalDue = this.cycle === 'annual' ? Number(this.federalPrices[this.federal] || 0) : 0;
+                            const quantity = Math.min(this.branchMax, Math.max(0, Math.floor(Number(this.branchSlots) || 0)));
+                            const branchDue = this.branchPlans.includes(this.planId) ? Number(this.branchPrices[this.cycle]?.[quantity] || 0) : 0;
+                            return federalDue + branchDue;
+                        },
+                        billableAddons() { return this.addonCodes.filter(code => (this.addonAllowed[this.planId] || []).includes(code)); }, addonTotal() { return this.billableAddons().reduce((sum, code) => sum + Number(this.addonPrices[code] || 0), 0); }, btFilter: '', btTerms: @js($praBusinessTypeTerms), btMatch(k) { const q = (this.btFilter || '').trim().toLowerCase(); if (! q) return true; const hay = this.btTerms[k] || ''; return q.split(/\s+/).every(w => hay.includes(w)); }, btGroupHas(keys) { return keys.some(k => this.btMatch(k)); }, get btAnyMatch() { return Object.keys(this.btTerms).some(k => this.btMatch(k)); }, priceOf(id) { const row = this.prices[id] || {}; const v = row[this.cycle]; return v === undefined ? 'Unavailable' : Number(v).toLocaleString('en-US'); }, get perLabel() { return this.perLabels[this.cycle] || ''; } }">
                         @csrf
 
                         {{-- Package picker (owner rule Jul 2026): shop selects its plan at
@@ -165,7 +180,33 @@
                         </div>
                         @endif
 
-                        <p data-signup-quote-total x-show="planId" class="text-sm font-semibold text-white" aria-live="polite">
+                        @if($bundleEnabled)
+                        <fieldset x-show="planId" x-cloak class="rounded-xl px-3 py-3 space-y-2" style="background: rgba(10,77,92,0.28); border: 1px solid rgba(125,211,252,0.22);">
+                            <legend class="text-sm font-bold text-white">{{ __('pos_federal_addons.signup_heading') }}</legend>
+                            <p class="text-xs text-purple-100/80">{{ __('pos_federal_addons.signup_policy') }}</p>
+                            @if($bundlePrices)
+                            <label x-show="cycle === 'annual'" class="block text-xs font-semibold text-white">
+                                {{ __('pos_federal_addons.heading') }}
+                                <select name="federal_signup_addon" x-model="federal" :disabled="cycle !== 'annual'" class="block w-full rounded-xl border-gray-300 text-gray-900">
+                                    <option value="">{{ __('pos_federal_addons.none') }}</option>
+                                    @foreach($bundlePrices as $code => $amount)
+                                    <option value="{{ $code }}">{{ \App\Services\PosAddonPricingService::definitions()[$code]['label'] }} · {{ __('pos_federal_addons.annual', ['amount' => number_format($amount)]) }}</option>
+                                    @endforeach
+                                </select>
+                            </label>
+                            @endif
+                            <label x-show="branchPlans.includes(planId)" class="block text-xs font-semibold text-white">
+                                {{ __('pos_federal_addons.signup_branches') }}
+                                <input name="signup_extra_branch_slots" type="number" min="0" max="{{ $bundleBranchMax }}" step="1" x-model="branchSlots" :disabled="!branchPlans.includes(planId)" class="block w-full rounded-xl border-gray-300 text-gray-900">
+                            </label>
+                            <p x-show="bundleTotal() > 0" class="text-sm font-semibold text-white" aria-live="polite">
+                                {{ __('pos_federal_addons.signup_total') }}
+                                <span data-pra-bundle-total x-text="(Number((prices[planId] || {})[cycle] || 0) + bundleTotal()).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})"></span>
+                            </p>
+                        </fieldset>
+                        @endif
+
+                        <p data-signup-quote-total x-show="planId && !bundleTotal()" class="text-sm font-semibold text-white" aria-live="polite">
                             {{ __('pos.addons_grand_total') }}: PKR
                             <span x-text="(prices[planId] || {})[cycle] === undefined ? 'Unavailable' : (Number(prices[planId][cycle]) + addonTotal()).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})"></span>
                             <span x-show="cycle === 'annual' || billableAddons().length === 0" x-text="perLabel"></span>

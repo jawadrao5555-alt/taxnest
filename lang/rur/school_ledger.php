@@ -1,5 +1,6 @@
 <?php
 return [
+ 'erp_cutover_closed'=>'Nayi payments School ERP mein record hoti hain. Purani rasidein yahan milengi.',
     'student_name' => 'Talib-e-ilm ka naam (ikhtiyari)',
     'lookup' => 'Talib-e-ilm / baqi fee talash karein',
     'lines' => 'Fee ki tafseel',

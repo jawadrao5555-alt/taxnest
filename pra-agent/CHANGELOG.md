@@ -1,3 +1,9 @@
+## v1.13.40 (2026-11-27)
+**Windows Agent package for the dual-counter POS update**
+
+- Include the independent cashier sessions, supported offline billing, and reconnect recovery from the POS and Agent release.
+- Existing company pairing, printer selections and previously published versions are preserved.
+
 ## v1.13.29 (2026-11-02)
 **Customer bulk on the latest printer foundation**
 

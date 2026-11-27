@@ -1549,7 +1549,7 @@ window.addEventListener('popstate', function() {
                         <template x-if="hasDeliveryPortion()">
                             <div class="mt-1 space-y-1">
                                 <div class="flex items-center gap-1">
-                                    <select x-model="selectedDeliveryAddress" @change="_deliveryAddressChoiceVersion = (_deliveryAddressChoiceVersion || 0) + 1" class="flex-1 min-w-0 text-sm font-medium rounded-md border-blue-200 dark:border-blue-800 dark:bg-gray-800 dark:text-white py-1.5 px-2 focus:ring-blue-500 focus:border-blue-400">
+                                    <select x-model="selectedDeliveryAddress" aria-label="{{ __('pos.ph_full_delivery_address') }}" @change="_deliveryAddressChoiceVersion = (_deliveryAddressChoiceVersion || 0) + 1" class="flex-1 min-w-0 text-sm font-medium rounded-md border-blue-200 dark:border-blue-800 dark:bg-gray-800 dark:text-white py-1.5 px-2 focus:ring-blue-500 focus:border-blue-400">
                                         <option value="">{{ __('pos.delivery_address_divider') }}</option>
                                         <template x-for="(a, ai) in customerAddresses" :key="a.id ?? ('t' + ai)">
                                             <option :value="a.address" x-text="(a.label ? a.label + ': ' : '') + a.address"></option>
@@ -1560,13 +1560,14 @@ window.addEventListener('popstate', function() {
                                     <button x-show="selectedDeliveryAddress && customerAddresses.some(a => a.address === selectedDeliveryAddress)" @click="deleteSelectedAddress()" title="{{ __('pos.ti_delete_address') }}" class="text-xs font-bold text-red-500 dark:text-red-400 px-2 py-1.5 rounded-md border border-red-200 dark:border-red-800 hover:bg-red-50 dark:hover:bg-red-900/30 whitespace-nowrap">✕</button>
                                     <button @click="showAddrNew = !showAddrNew; if (showAddrNew) { addressSaveError = ''; $nextTick(() => document.getElementById('tnNewAddrInput')?.focus()) }" class="text-xs font-bold text-blue-600 dark:text-blue-300 px-2 py-1.5 rounded-md border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/30 whitespace-nowrap">{{ __('pos.new_short') }}</button>
                                 </div>
+                                <p x-show="selectedDeliveryAddress" x-text="selectedDeliveryAddress" class="whitespace-pre-wrap break-words text-sm text-blue-900 dark:text-blue-100"></p>
                                 <div x-show="showAddrNew" x-cloak class="space-y-2">
                                     <label for="tnNewAddrLabel" class="block text-xs font-semibold">{{ __('pos.ph_addr_label') }}</label>
                                     <input id="tnNewAddrLabel" type="text" maxlength="50" x-model="newAddrLabel" :disabled="addressSaving" @keydown.enter.prevent="saveNewAddress()" autocomplete="off" name="pos_new_addr_label_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore class="w-full text-sm rounded-md border-blue-200 dark:border-blue-800 dark:bg-gray-800 dark:text-white py-1.5 px-2">
                                     <label for="tnNewAddrInput" class="block text-xs font-semibold">{{ __('pos.ph_full_delivery_address') }}</label>
-                                    <textarea id="tnNewAddrInput" rows="2" maxlength="500" x-model="newAddrText" :disabled="addressSaving" @keydown.escape.prevent="if (!addressSaving) showAddrNew = false" autocomplete="off" name="pos_new_addr_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore class="w-full text-sm rounded-md border-blue-200 dark:border-blue-800 dark:bg-gray-800 dark:text-white py-1.5 px-2"></textarea>
-                                    <p x-show="addressSaveError" x-text="addressSaveError" role="alert" class="text-xs text-red-700 dark:text-red-300"></p>
-                                    <button type="button" @click="saveNewAddress()" :disabled="addressSaving || !newAddrText.trim()" class="text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 px-2 py-1.5 rounded-md disabled:opacity-50" :aria-busy="addressSaving">{{ __('pos.save_btn') }}</button>
+                                    <textarea id="tnNewAddrInput" rows="3" maxlength="500" x-model="newAddrText" aria-required="true" aria-describedby="tnNewAddrError" data-required-message="{{ __('validation.required', ['attribute' => __('pos.ph_full_delivery_address')]) }}" @input="addressSaveError = ''" :disabled="addressSaving" @keydown.escape.prevent="if (!addressSaving) showAddrNew = false" autocomplete="off" name="pos_new_addr_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore class="w-full text-sm rounded-md border-blue-200 dark:border-blue-800 dark:bg-gray-800 dark:text-white py-1.5 px-2"></textarea>
+                                    <p id="tnNewAddrError" x-show="addressSaveError" x-text="addressSaveError" role="alert" class="text-xs text-red-700 dark:text-red-300"></p>
+                                    <button type="button" @click="saveNewAddress()" :disabled="addressSaving" class="text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 px-2 py-1.5 rounded-md disabled:opacity-50" :aria-busy="addressSaving">{{ __('pos.save_btn') }}</button>
                                 </div>
                             </div>
                         </template>
@@ -2397,7 +2398,7 @@ window.addEventListener('popstate', function() {
                                      <p class="mt-1 text-[10px] font-black uppercase tracking-wide text-indigo-600 dark:text-indigo-300">{{ __('pos.online_payment_pending_status') }}</p>
                                  </div>
                              </template>
-                            <button @click="boardViewEdit()" :disabled="boardBusy" class="w-full py-2.5 rounded-xl text-sm font-bold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 hover:bg-purple-100 disabled:opacity-40 transition" x-text="boardBusy ? window.TXT.loading_generic : window.TXT.open_edit_bill"></button>
+                            <button @click="boardViewEdit()" :disabled="boardBusy" class="w-full py-2.5 rounded-xl text-sm font-bold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 hover:bg-purple-100 disabled:opacity-40 transition" x-text="boardBusy ? window.TXT.loading_generic : (boardMenuTable.order.source === 'waiter' ? window.TXT.add_items : window.TXT.open_edit_bill)"></button>
                             {{-- Proof Bill (Pizza Master feedback, Jul 2026): customer ko bill
                                  dikhana ho to FINAL kiye BAGHAIR parchi — koi invoice nahi banta. --}}
                             <button @click="boardProofBill('cash')" :disabled="boardBusy" class="w-full py-2.5 rounded-xl text-sm font-bold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 disabled:opacity-40 transition">{{ __('pos.sale_proof_cash') }}</button>
@@ -2453,7 +2454,7 @@ window.addEventListener('popstate', function() {
     {{-- ═══ TABLE BOARD FINAL CONFIRM (Jul 2026) ═══
          The anti-"anjaane mein final" step: table + amount shown big, then an
          explicit CASH/CARD choice. Menu closes before this opens (no overlap). --}}
-    <div x-show="boardConfirm" x-cloak x-transition.opacity class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" @click.self="boardConfirm = null">
+    <div x-show="boardConfirm" x-cloak x-transition.opacity class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" @click.self="if (!boardBusy) boardConfirm = null">
         <template x-if="boardConfirm">
             <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden" x-transition.scale.90>
                 <div class="p-5 text-center border-b border-gray-100 dark:border-gray-800">
@@ -2462,7 +2463,23 @@ window.addEventListener('popstate', function() {
                     <p class="text-lg font-extrabold text-green-600 mt-0.5" x-text="boardConfirmAmountText()"></p>
                     <p class="text-[11px] text-gray-500 dark:text-gray-400 mt-1">{{ __('pos.finalize_confirm_choose_payment') }}</p>
                 </div>
-            <div x-show="!payingOrderAwaitingOnline()" class="p-4 grid grid-cols-2 gap-3">
+                @if(!empty($company->pos_cash_received_enabled))
+                <div x-show="!boardPaymentAwaitingOnline()" class="px-4 pt-4">
+                    <label for="board-cash-received" class="block mb-1 text-xs font-bold text-gray-600 dark:text-gray-300">{{ __('pos.cash_received_now') }}</label>
+                    <input id="board-cash-received" type="number" min="0" step="0.01" inputmode="decimal"
+                        autocomplete="off" x-model="boardConfirm.cashReceived" :disabled="boardBusy"
+                        @keydown.stop @keydown.enter.prevent="if (!$event.repeat) boardFinalPay('cash')"
+                        placeholder="{{ __('pos.ph_cash_received') }}"
+                        class="w-full rounded-lg border border-green-200 bg-green-50/60 px-2.5 py-2 text-sm font-bold text-gray-800 dark:border-green-900/40 dark:bg-green-900/10 dark:text-gray-200">
+                    <p x-show="boardCashDue() !== null" class="mt-1 text-xs text-gray-600 dark:text-gray-300">
+                        {{ __('pos.fulfill_counter_amount') }} <strong x-text="boardCashDue() === null ? '' : 'Rs. ' + boardCashDue().toLocaleString()"></strong>
+                    </p>
+                    <p aria-live="polite" class="mt-1 text-xs font-bold" :class="boardCashDifference() < 0 ? 'text-amber-600' : 'text-green-600'" x-text="boardCashDifferenceText()"></p>
+                    <button type="button" x-show="boardConfirm.cashQuote?.error" @click="loadBoardCashQuote()" :disabled="boardBusy"
+                        class="mt-1 text-xs font-bold text-green-700 underline dark:text-green-300">{{ __('pos.sale_screen_try_again') }}</button>
+                </div>
+                @endif
+                <div x-show="!boardPaymentAwaitingOnline()" class="p-4 grid grid-cols-2 gap-3">
                     <button @click="boardFinalPay('cash')" :disabled="boardBusy" class="py-4 rounded-xl text-center border-2 transition disabled:opacity-50 bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 hover:bg-green-100 hover:border-green-400">
                         <p class="text-sm font-black text-green-700 dark:text-green-300">CASH</p>
                     </button>
@@ -2470,7 +2487,7 @@ window.addEventListener('popstate', function() {
                         <p class="text-sm font-black text-blue-700 dark:text-blue-300">CARD</p>
                     </button>
                 </div>
-             <div x-show="payingOrderAwaitingOnline()" class="p-4">
+             <div x-show="boardPaymentAwaitingOnline()" class="p-4">
                  <div class="mb-3 rounded-xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-900/20 px-3 py-2 text-xs">
                      <div class="flex justify-between font-black text-indigo-700 dark:text-indigo-300"><span>{{ __('pos.online_amount_label') }}</span><span x-text="'Rs ' + Math.round(Number(boardConfirm.onlineTotal || 0)).toLocaleString()"></span></div>
                      <div class="flex justify-between mt-1 font-bold text-amber-700 dark:text-amber-300"><span>{{ __('pos.remaining_amount_label') }}</span><span x-text="'Rs ' + Math.round(Number(boardConfirm.onlineTotal || 0)).toLocaleString()"></span></div>
@@ -3672,7 +3689,7 @@ window.addEventListener('popstate', function() {
                             {{-- Route through the atomic claim (Table-se-Bill, Jul 2026): a direct
                                  loadIncomingToCart here would bypass single-winner claiming and two
                                  terminals could finalize the same order twice. --}}
-                            <button @click="claimAndLoadIncoming(o)" class="px-4 py-2 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold transition">{{ __('pos.load_to_cart') }}</button>
+                            <button @click="claimAndLoadIncoming(o)" class="px-4 py-2 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold transition">{{ __('pos.add_items') }}</button>
                             {{-- Task 1379: the FULL ticket is a reprint only once EVERY
                                  line has already been printed — exactly the server's
                                  rule (KotPrintService::isReprintRender). An order the
@@ -5350,7 +5367,7 @@ function restaurantPos() {
         boardMenuItems: null,   // lazy-fetched items of the open table's order (null = loading)
         boardOnlineQuote: null, // authoritative qr_payment total for the open order
         boardOnlineQuoteSeq: 0, // stale-response guard when the popup changes/retries
-        boardConfirm: null,     // { table } → Final CASH/CARD confirm modal
+        boardConfirm: null,     // Final payment and its optional cash tender
         boardCancelAsk: null,   // { table, order, items|null } → cancel-warning modal (ZFC, 2 Aug 2026)
         boardCancelMade: {},    // item_id → true jab cashier ne "ban gaya" tick kiya (waste audit)
         boardShift: null,       // { table, order } → Table Shift modal (26 Jul 2026)
@@ -6136,6 +6153,14 @@ function restaurantPos() {
             // Lazy-load provisional bill list on mount (for header badge count).
             // Failures are silent — badge just won't show until next refresh.
             setTimeout(() => this.loadLocalBills(), 1200);
+            const refreshOpenDeliveries = () => {
+                if (this.showPendingDeliveries && !document.hidden && !this.localBillsLoading
+                    && !this.riderSettleBusyId && !this.riderAssignBusyId && !this.deliveryFinalBusyId) {
+                    this.loadLocalBills();
+                }
+            };
+            setInterval(refreshOpenDeliveries, 25000);
+            document.addEventListener('visibilitychange', refreshOpenDeliveries);
             setTimeout(() => this.loadFailedBills(), 1500);
             setTimeout(() => this.loadReprintBills(), 1800); // Akhri Bills strip (Jul 2026 redesign)
             // P7: incoming waiter orders — badge poll every 20s (restaurant mode only).
@@ -8834,19 +8859,16 @@ function restaurantPos() {
             if (!this._recallCartBaseline) return false;
             return this.cartEditFingerprint() !== this._recallCartBaseline;
         },
-        // Save-first option sirf wahan jahan Hold/F5 sach mein chalega: claimed
-        // waiter orders payment par settle hote hain (P7 re-hold guard) aur
-        // manual/deal lines ko YE SCREEN hold se rokti hai (endpoint khud unhein
-        // qubool kar leta hai — rule cart ka hai, server ka nahi) — un cases mein
-        // prompt sirf discard/cancel dikhata hai. Order TYPE ab rukawat nahi:
-        // har type park hota hai (25 Aug 2026).
+        // Save-first uses the same update as Hold/F5. Incoming waiter orders
+        // save in place. Regular cashier holds reject manual and deal lines.
         //
         // Delivery fee ko yahan se chhoot dene ki koshish mat karna: wo ek
         // synthetic MANUAL line hai, aur manual cart payment processPaymentManual
         // se jata hai jo recalled restaurant order ko settle NAHI karta — parked
         // order latak kar roz day-close block karega. Pehle wo settlement banao.
         canSaveRecalledEdits() {
-            return !!(this.recalledOrderId || this.incomingOrderId) && !this.editingBillId
+            if (this.incomingOrderId) return this.cart.length > 0 && !this.hasDealItems();
+            return !!this.recalledOrderId && !this.editingBillId
                 && !this.holdBlockedByManual() && !this.hasDealItems()
                 && !(this.tableBoardEnabled && this.orderType === 'dine_in' && !this.selectedTable);
         },
@@ -9053,7 +9075,13 @@ function restaurantPos() {
         },
         async saveNewAddress() {
             const text = (this.newAddrText || '').trim();
-            if (!text || this.addressSaving) return;
+            if (this.addressSaving) return;
+            if (!text) {
+                const field = document.getElementById('tnNewAddrInput');
+                this.addressSaveError = field?.dataset.requiredMessage || '';
+                field?.focus();
+                return;
+            }
             this.addressSaveError = '';
             const label = (this.newAddrLabel || '').trim();
             const customer = this.selectedCustomer;
@@ -9179,11 +9207,6 @@ function restaurantPos() {
             const h = Math.floor(mins / 60), m = mins % 60;
             return h > 0 ? (h + 'h ' + m + 'm') : (m + 'm');
         },
-        // Task 1109: If-None-Match ETag fast-path — 304 means floor hasn't
-        // changed; skip the body parse and leave tableFloors untouched.
-        // A weak/briefly interrupted shop connection must not leave the table
-        // board on "Loading..." forever. Preserve the last board and surface
-        // the existing retry state when the request exceeds the timeout.
         async _fetchWithTimeout(url, options = {}, timeoutMs = 12000) {
             const controller = new AbortController();
             const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -9198,13 +9221,17 @@ function restaurantPos() {
             if (this.tablesErrorKind === 'server') return window.TXT.tables_server_error;
             return window.TXT.tables_offline;
         },
+        // A 304 revalidates the board already on screen without parsing a body.
         async loadTableStatus() {
             const serial = ++this._tableRequestSerial;
+            // Keep the request deadline active while reading the response body.
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), 12000);
             this.tablesLoading = true;
             try {
                 const hdrs = { 'Accept': 'application/json' };
                 if (this._tableEtag) hdrs['If-None-Match'] = this._tableEtag;
-                const res = await this._fetchWithTimeout('/pos/restaurant/api/table-status', { headers: hdrs });
+                const res = await fetch('/pos/restaurant/api/table-status', { headers: hdrs, signal: controller.signal });
                 if (serial !== this._tableRequestSerial) return;
                 if (res.status === 304) {
                     if (!this._tableEtag) throw new Error('Uncached table response');
@@ -9235,6 +9262,7 @@ function restaurantPos() {
                     this.tablesErrorKind = e instanceof TypeError || e.name === 'AbortError' ? 'network' : 'server';
                 }
             } finally {
+                clearTimeout(timer);
                 if (serial === this._tableRequestSerial) this.tablesLoading = false;
             }
         },
@@ -9928,7 +9956,56 @@ function restaurantPos() {
             // Task 514: per-bill print checkbox ka default company setting se
             // (tile ki apni order_type ke hisaab se) — har bill par fresh reset.
             this.boardPrintReceipt = this.billPrintDefault(t.order.order_type || 'dine_in');
-            this.boardConfirm = { table: t, onlineTotal: null };
+            this.boardConfirm = { table: t, onlineTotal: null, cashReceived: '' };
+            if (this.cashReceivedEnabled && !this.boardPaymentAwaitingOnline()) this.loadBoardCashQuote();
+        },
+        boardPaymentAwaitingOnline() {
+            return this.boardConfirm?.fromPanel
+                ? this.payingOrderAwaitingOnline()
+                : !!this.boardConfirm?.table?.order?.online_payment_awaited_at;
+        },
+        async loadBoardCashQuote() {
+            const orderId = this.boardConfirm?.table?.order?.id;
+            if (!orderId) return;
+            const request = Symbol();
+            this.boardConfirm.cashQuote = { request };
+            try {
+                const res = await this.fetchWithTimeout('/pos/restaurant/orders/' + encodeURIComponent(orderId) + '/payment-quote?payment_method=cash', {
+                    headers: { 'Accept': 'application/json' },
+                    cache: 'no-store',
+                });
+                if (!res.ok) throw new Error('cash_quote_failed');
+                const data = await res.json();
+                if (this.boardConfirm?.cashQuote?.request !== request) return;
+                if (data?.success !== true || String(data.order_id) !== String(orderId)
+                    || data.payment_method !== 'cash' || !Number.isFinite(data.total_amount)
+                    || !Number.isFinite(data.counter_cash_due)) throw new Error('cash_quote_invalid');
+                this.boardConfirm.cashQuote = {
+                    total: data.total_amount,
+                    counterDue: data.counter_cash_due,
+                    deliveryCollectionMode: data.delivery_collection_mode,
+                };
+            } catch (_) {
+                if (this.boardConfirm?.cashQuote?.request === request) this.boardConfirm.cashQuote = { error: true };
+            }
+        },
+        boardCashDue() {
+            return this.boardConfirm?.fromPanel ? this.payModalCounterCash : (this.boardConfirm?.cashQuote?.counterDue ?? null);
+        },
+        boardCashTender() {
+            const received = Number(this.boardConfirm?.cashReceived);
+            return this.cashReceivedEnabled && Number.isFinite(received) && received > 0 ? this.r2(received) : 0;
+        },
+        boardCashDifference() {
+            const received = this.boardCashTender();
+            const due = this.boardCashDue();
+            return received > 0 && due !== null ? this.r2(received - due) : 0;
+        },
+        boardCashDifferenceText() {
+            const difference = this.boardCashDifference();
+            if (difference > 0) return window.TXT.change_rs_prefix + difference.toLocaleString();
+            if (difference < 0) return window.TXT.short_by_rs + (-difference).toLocaleString() + window.TXT.more_needed_sfx;
+            return '';
         },
         // Marked online payments use the normal table finalisation pipeline, not a
         // client-side settlement shortcut. Its first request intentionally reaches
@@ -9948,7 +10025,7 @@ function restaurantPos() {
             if (!this.boardConfirm || !this.boardConfirm.table || !this.boardConfirm.table.order) {
                 return 'Rs 0';
             }
-            const amount = this.payingOrderAwaitingOnline()
+            const amount = this.boardPaymentAwaitingOnline()
                 ? Number(this.boardConfirm.onlineTotal || 0)
                 : Number(this.boardConfirm.table.order.total_amount || 0);
             return 'Rs ' + Math.round(amount).toLocaleString();
@@ -9963,7 +10040,13 @@ function restaurantPos() {
             // hold-with-recalled_order_id → pay pipeline) instead of paying the
             // stale server-side order snapshot directly.
             if (this.boardConfirm.fromPanel) { return this.panelFinalPay(method); }
-            const t = this.boardConfirm.table;
+            const confirmation = this.boardConfirm;
+            const t = confirmation.table;
+            const cash = method === 'cash' ? {
+                tender: this.boardCashTender(),
+                deliveryCollectionMode: confirmation.cashQuote?.deliveryCollectionMode ?? t.order.delivery_collection_mode,
+            } : null;
+            const printReceipt = this.boardPrintReceipt;
             this.boardBusy = true;
             try {
                 let orderId = t.order.id;
@@ -9981,10 +10064,9 @@ function restaurantPos() {
                     }
                     orderId = (data.order && data.order.id) || orderId;
                 }
-                const quotedTotal = method === 'qr_payment'
-                    ? Number(this.boardConfirm.onlineTotal || 0)
-                    : null;
-                const paid = await this.payHeldOrderDirect(orderId, method, quotedTotal, false, t.order.order_type || 'dine_in', !this.boardPrintReceipt);
+                const quotedTotal = method === 'qr_payment' ? Number(confirmation.onlineTotal || 0)
+                    : (cash ? confirmation.cashQuote?.total ?? null : null);
+                const paid = await this.payHeldOrderDirect(orderId, method, quotedTotal, false, t.order.order_type || 'dine_in', !printReceipt, null, cash);
                 // Keep the confirmation and order visible after any cloud/Core
                 // rejection. Closing this modal used to make a rejected local
                 // settlement look paid even though no durable settlement existed.
@@ -10381,8 +10463,11 @@ function restaurantPos() {
             if (!oid || this.submitting) return;
             this.boardPrintReceipt = this.billPrintDefault(this.orderType || 'dine_in');
             const ti = this.panelTableInfo();
+            this.payingHeldOrderId = null;
+            this.payMethodIndex = 0;
             this.boardConfirm = {
                 fromPanel: true,
+                cashReceived: '',
                 table: { table_number: (ti && ti.table_number) || '', order: { id: oid, total_amount: this.roundedTotal, order_type: this.orderType || 'dine_in' } },
             };
         },
@@ -10393,13 +10478,21 @@ function restaurantPos() {
         // tables-first return flow rides the receipt-close exactly as on the
         // normal CASH/CARD buttons.
         async panelFinalPay(method) {
-            if (this.submitting) return;
+            if (this.submitting || this.boardBusy) return;
+            const tender = method === 'cash' ? this.boardCashTender() : 0;
+            this.boardBusy = true;
             this.boardConfirm = null;
             this.payingHeldOrderId = null;
             this.saveAsProvisional = false;
             this.payPrintReceipt = this.boardPrintReceipt;
-            await this.processPayment(method);
-            this.loadTableStatus();
+            this.cashReceived = tender > 0 ? String(tender) : '';
+            try {
+                await this.processPayment(method);
+                this.loadTableStatus();
+            } finally {
+                this.cashReceived = '';
+                this.boardBusy = false;
+            }
         },
         panelResendKot() {
             const oid = this.panelOrderId();
@@ -11249,6 +11342,12 @@ function restaurantPos() {
         },
 
         async holdOrder(opts) {
+            // Hold/F5, Send to Kitchen and save before switching all update the
+            // existing waiter order. Payment is a separate action.
+            if (this.incomingOrderId) {
+                if (!this.cart.length || this.submitting) return null;
+                return this.saveIncomingOrder();
+            }
             if (this.hasDeliveryPortion() && await this.waitForDeliveryAddress() === false) return;
             if (this.hasMixedService() && this.hasDeliveryPortion() && (!this.orderCustomerPhone || !this.selectedDeliveryAddress?.trim())) { this.showToast(window.TXT.fulfill_delivery_contact, 'error'); return; }
             // EDIT MODE: a provisional bill can't be turned into a held order —
@@ -11273,12 +11372,6 @@ function restaurantPos() {
             // cashier doesn't lose the cart on a server reject.
             if (this.holdBlockedByManual() || this.hasDealItems()) {
                 this.showToast(window.TXT.manual_deals_billing_only_hold, 'error');
-                return null;
-            }
-            // P7 guard — an incoming WAITER order already exists as a held restaurant
-            // order (KDS sees it). Re-holding would duplicate it; settle via payment.
-            if (this.incomingOrderId) {
-                this.showToast(window.TXT.waiter_order_loaded_settle, 'info');
                 return null;
             }
             const now = Date.now();
@@ -12701,6 +12794,7 @@ function restaurantPos() {
                     : @json(__('pos.waiter_edit_saved')),
                     data.kot_status === 'action_required' ? 'warning' : 'success');
                 this.loadIncoming();
+                if (this.tableBoardEnabled) this.loadTableStatus();
                 return true;
             } catch (e) {
                 this.showToast(@json(__('pos.waiter_edit_error')), 'error');
@@ -12849,7 +12943,7 @@ function restaurantPos() {
             this.showIncoming = false;
             this.activeCartIndex = this.cart.length ? 0 : -1;
             this.flowStep = 'cart';
-            this.showToast(window.TXT.waiter_order_prefix + o.order_number + ' loaded — take payment to settle it', 'success');
+            this.showToast(window.TXT.waiter_order_edit_opened.replace(':order', o.order_number), 'success');
         },
         // Full KOT reprint (all items) or delta print (only newly-added items).
         printIncomingKot(o, delta = false) {
@@ -13091,8 +13185,9 @@ function restaurantPos() {
             const requestId = ++this.localBillsRequestId;
             this.localBillsLoading = true;
             try {
-                const res = await fetch('{{ route('pos.api.provisional-bills') }}', {
+                const res = await this.fetchWithTimeout('{{ route('pos.api.provisional-bills') }}', {
                     headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                    cache: 'no-store',
                 });
                 if (!res.ok) return;
                 const data = await res.json();
@@ -13424,8 +13519,8 @@ function restaurantPos() {
                 const data = await res.json().catch(() => null);
                 if (res.ok && data && data.success) {
                     this.showToast(data.message || @json(__('pos.rider_settled_ok')), 'success');
-                    this.riderSettleBill = null; // close the settle modal
-                    this.loadLocalBills(); // warning disappears on refresh
+                    this.riderSettleBill = null;
+                    await this.loadLocalBills();
                 } else {
                     this.showToast((data && data.message) || @json(__('pos.rider_settle_failed')), 'error');
                 }
@@ -13876,6 +13971,9 @@ function restaurantPos() {
             // held-order/override se capture ho chuka) — tables-first wapsi ka gate.
             this.lastOrderType = payOrderType || null;
             this.lastTotal = Number(data.total_amount ?? savedTotal ?? 0); this.lastPaymentMethod = data.payment_method || method;
+            if (this.lastCashReceived > 0 || Number(data.change_due) > 0) {
+                this.lastCashReceived = Number(data.cash_received ?? this.lastCashReceived);
+            }
             this.lastChangeDue = Number(data.change_due ?? (this.lastPaymentMethod === 'cash' ? Math.max(0, this.lastCashReceived - this.lastTotal) : 0));
             this.lastPraNumber = data.pra_invoice_number || ''; this.lastPraStatus = data.pra_status || '';
             this.lastWaiterName = (this.incomingOrderInfo && this.incomingOrderInfo.waiter) ? this.incomingOrderInfo.waiter : ((heldOrd && heldOrd.waiter) ? heldOrd.waiter : '');
@@ -14009,7 +14107,7 @@ function restaurantPos() {
                 ? product.recipe_snapshot.map(part => ({ stock_id: String(part.stock_id), quantity: Number(part.quantity) })) : [];
             return { has_recipe: recipe.length > 0, recipe_snapshot: recipe };
         },
-        localHeldSaleSnapshot(orderId, heldOrd, method, savedTotal, payUuid, payOrderType) {
+        localHeldSaleSnapshot(orderId, heldOrd, method, savedTotal, payUuid, payOrderType, cashTender = Number(this.cashReceived)) {
             if (heldOrd?.items?.some(i => i.promotion_snapshot || i.promotion_quote)) return null;
             if (!['cash', 'card'].includes(method)) return null;
             if (!heldOrd || !Array.isArray(heldOrd.items) || !heldOrd.items.length) return null;
@@ -14110,7 +14208,7 @@ function restaurantPos() {
                 delivery_address: heldOrd.delivery_address || null,
                 discount_type: heldOrd.discount_type || 'amount',
                 discount_value: Number(heldOrd.discount_value || 0),
-                cash_received: method === 'cash' && Number(this.cashReceived) > 0 ? Number(this.cashReceived) : total,
+                cash_received: method === 'cash' && cashTender > 0 ? cashTender : total,
                 terminal_id: this.terminalId || null,
                 customer_name: heldOrd.customer_name || null,
                 customer_phone: heldOrd.customer_phone || null,
@@ -14160,7 +14258,7 @@ function restaurantPos() {
             this.waReprintBusyId = null;
         },
 
-        async payHeldOrderDirect(orderId, method, savedTotal, provisional = false, orderTypeOverride = null, skipReceipt = false, payUuid = null) {
+        async payHeldOrderDirect(orderId, method, savedTotal, provisional = false, orderTypeOverride = null, skipReceipt = false, payUuid = null, boardCash = null) {
             // Order type captured NOW (owner, Jul 2026): held-modal pays read it from
             // the heldOrders entry (removed from the list on success below); billing
             // pass-through orders are never in heldOrders → falls back to the current
@@ -14171,6 +14269,10 @@ function restaurantPos() {
             // wrongly re-trigger the auto-KOT chain.
             const heldOrd = this.heldOrders.find(o => o.id === orderId);
             const payOrderType = orderTypeOverride || (heldOrd && heldOrd.order_type) || this.orderType || null;
+            const cashTender = boardCash ? boardCash.tender : parseFloat(this.cashReceived);
+            const deliveryMode = boardCash
+                ? (boardCash.deliveryCollectionMode ?? null)
+                : this.deliveryCollectionMode || heldOrd?.delivery_collection_mode || (payOrderType === 'delivery' ? 'rider' : 'counter');
             // Task 994: idempotency key — billing pass-through passes the sale-level
             // uuid in; DIRECT held-order pays (held modal / table board) mint one
             // per order id and REUSE it on retry, so a lost-response retry replays
@@ -14183,7 +14285,7 @@ function restaurantPos() {
                 // PROVISIONAL BILL FLOW — when true, RestaurantPosController::payOrder
                 // forces pra_status='local' and skips PRA submission. Bill remains
                 // editable / deletable until promoted via "Submit to PRA — Make Final".
-                const res = await this.fetchWithTimeout(`/pos/restaurant/orders/${orderId}/pay`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': '{{ csrf_token() }}' }, body: JSON.stringify({ payment_method: method, save_as_provisional: !!provisional, pay_uuid: effPayUuid, cash_received: (method === 'cash' && parseFloat(this.cashReceived) > 0) ? parseFloat(this.cashReceived) : null, delivery_collection_mode: this.deliveryCollectionMode || heldOrd?.delivery_collection_mode || (payOrderType === 'delivery' ? 'rider' : 'counter'), delivery_address: (payOrderType === 'delivery' || heldOrd?.items?.some(i => i.fulfillment === 'delivery')) ? (((heldOrd && (heldOrd.delivery_address || '').trim()) || (this.selectedDeliveryAddress || '').trim()) || null) : null, terminal_id: this.terminalId || null, online_payment_confirmed: !!this._onlineOkByOrder[orderId] }) });
+                const res = await this.fetchWithTimeout(`/pos/restaurant/orders/${orderId}/pay`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': '{{ csrf_token() }}' }, body: JSON.stringify({ payment_method: method, save_as_provisional: !!provisional, pay_uuid: effPayUuid, cash_received: method === 'cash' && cashTender > 0 ? cashTender : null, delivery_collection_mode: deliveryMode, delivery_address: (payOrderType === 'delivery' || heldOrd?.items?.some(i => i.fulfillment === 'delivery')) ? (((heldOrd && (heldOrd.delivery_address || '').trim()) || (this.selectedDeliveryAddress || '').trim()) || null) : null, terminal_id: this.terminalId || null, online_payment_confirmed: !!this._onlineOkByOrder[orderId] }) });
                 if (!res.ok) {
                     const bodyText = await res.text().catch(() => '');
                     console.error('[payOrder] HTTP', res.status, res.statusText, bodyText.slice(0, 500));
@@ -14200,7 +14302,7 @@ function restaurantPos() {
                     // offer a one-click provisional settle instead of a dead-end error.
                     if (res.status === 403 && errData && errData.quota_full && errData.provisional_allowed && !provisional) {
                         if (confirm(window.TXT.quota_provisional_prompt || errData.message)) {
-                            return await this.payHeldOrderDirect(orderId, method, savedTotal, true, orderTypeOverride, skipReceipt, payUuid);
+                            return await this.payHeldOrderDirect(orderId, method, savedTotal, true, orderTypeOverride, skipReceipt, effPayUuid, boardCash);
                         }
                     }
                     // ONLINE ADAIGI GATE (owner, 26 Aug 2026): jis bill par "paise
@@ -14213,7 +14315,7 @@ function restaurantPos() {
                     if (res.status === 422 && errData && errData.code === 'online_payment_awaited') {
                         this.onlineConfirm = {
                             orderId: orderId,
-                            args: [orderId, method, savedTotal, provisional, orderTypeOverride, skipReceipt, effPayUuid],
+                            args: [orderId, method, savedTotal, provisional, orderTypeOverride, skipReceipt, effPayUuid, boardCash],
                             total: Number(errData.online_total_amount ?? savedTotal ?? ((heldOrd && heldOrd.total_amount) || 0)),
                         };
                         return false;
@@ -14228,11 +14330,13 @@ function restaurantPos() {
                     delete this._payUuidByOrder[orderId];
                     // Online-adaigi ki tasdeeq bhi isi bill tak mehdood thi.
                     delete this._onlineOkByOrder[orderId];
+                    if (boardCash) this.lastCashReceived = boardCash.tender;
+                    if ((data.payment_method || method) !== 'cash') this.lastCashReceived = 0;
                     return this.applyPaySuccess(data, orderId, method, savedTotal, payOrderType, skipReceipt, provisional, heldOrd);
                 } else { if (data.stock_error) { this.stockError = data.message; this.showPayModal = true; } this.showToast(data.message || window.TXT.payment_failed, 'error'); if (res.status === 409 && this.tableBoardEnabled) this.loadTableStatus(); return false; }
             } catch (e) {
                 console.error('[payHeldOrderDirect] FAIL', e);
-                const snapshot = this.localHeldSaleSnapshot(orderId, heldOrd, method, savedTotal, effPayUuid, payOrderType);
+                const snapshot = this.localHeldSaleSnapshot(orderId, heldOrd, method, savedTotal, effPayUuid, payOrderType, boardCash?.tender);
                 const totalCents = Math.round(Number(snapshot ? snapshot.totals.total_amount : (savedTotal || (heldOrd && heldOrd.total_amount) || 0)) * 100);
                 const local = window.NestPosLocal && snapshot && await window.NestPosLocal.heldOrder.settleWithSale(
                     String(orderId), snapshot, {
@@ -15257,6 +15361,10 @@ function tnRetryDeliveryBoard() {
 (function () {
     var frame = document.getElementById('tn-delivery-board-frame');
     if (!frame) return;
+    function refreshDeliveryList(event) {
+        if (event && (!frame.getAttribute('src') || event.currentTarget !== frame.contentDocument)) return;
+        tnDeliverySaleState()?.loadLocalBills();
+    }
     frame.addEventListener('error', function () { clearTimeout(window._tnDeliveryBoardTimer); tnDeliveryBoardError(true); });
     frame.addEventListener('load', function () {
         if (!frame.getAttribute('src')) return;
@@ -15265,6 +15373,8 @@ function tnRetryDeliveryBoard() {
             var doc = frame.contentDocument;
             if (!doc || !doc.querySelector('[data-tn-delivery-page]')) { tnDeliveryBoardError(true); return; }
             tnDeliveryBoardError(false);
+            if (doc.querySelector('[data-tn-delivery-updated]')) refreshDeliveryList();
+            doc.addEventListener('tn-delivery-updated', refreshDeliveryList);
             doc.addEventListener('click', function (event) {
                 if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
                 var link = event.target.closest ? event.target.closest('a[href]') : null;

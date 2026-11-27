@@ -10,6 +10,41 @@ GitHub inventory reviewed on 27 November 2026. The comparison baseline is [`c168
 | Closed source PRs without an individual merge | 62 | Includes explicitly consolidated work such as #463–465. |
 | GitHub issues | 39 | The other numbers in the same sequence are issues. |
 
+## 27 November update after #476 deployed
+
+The production approval record and [Deploy Production](https://github.com/jawadrao5555-alt/taxnest/actions/runs/46033484587) confirm the exact #476 squash [`6d322dad78eb0447c81bc0ab5980bc004b6c2c0d`](https://github.com/jawadrao5555-alt/taxnest/commit/6d322dad78eb0447c81bc0ab5980bc004b6c2c0d). The deploy job completed the exact checkout, database migrations and post-deploy verification. The production probe matched the live SHA, opened the Hospital, Lab and School cards and pricing section, checked the Healthcare and School sign-in forms, and verified a sign-in with the standing NestPOS QA account. All three public ERP signup gates were closed at deploy time. Authenticated ERP journeys, published plan rates, named client cards and the eight reported issues each require their own observations. See the [deploy job](https://github.com/jawadrao5555-alt/taxnest/actions/runs/46033484587/job/140623527644) and the [production follow-up register](taxnest-production-history-and-follow-up.md).
+
+The numbered range through #477 contains 438 pull requests and 39 issues. The production SHA includes 314 main integration commits credited to PRs, with #73 separately reconciled through #72. Another 62 source PRs were closed without individual merge. The open count remains 61 because #476 merged and #477 opened. The integration count measures GitHub changes carried by the deployed tree. Feature acceptance is recorded per workflow, and the approval history tracks exact deployment runs. See the [open PR search](https://github.com/jawadrao5555-alt/taxnest/pulls?q=is%3Apr+is%3Aopen) and [deployment history](https://taxnest.pk/admin/deployment-approval?history=1).
+
+| Open PRs by primary scope | Count | PRs |
+| --- | ---: | --- |
+| Current consolidation | 1 | #477 |
+| Website, pricing and product IDs | 7 | #475, #472, #471, #470, #469, #468, #467 |
+| Digital Invoice | 7 | #458, #457, #456, #442, #338, #313, #266 |
+| Laboratory ERP | 10 | #444–453 |
+| HR | 7 | #434–440 |
+| Android, tutorial and distribution | 3 | #441, #381, #375 |
+| Restaurant POS, payment and Agent | 6 | #430, #429, #428, #417, #328, #237 |
+| Admin, platform and planned reviews | 10 | #403, #402, #401, #395, #337, #321, #320, #319, #301, #228 |
+| Standalone collections and fiscal | 5 | #394, #378, #377, #373, #318 |
+| Billing and lifecycle | 4 | #423, #374, #316, #264 |
+| Future ERP | 1 | #314 |
+
+### Source reconciliation after #476
+
+| Source | Evidence in production SHA or predecessor | Remaining evidence for disposition |
+| --- | --- | --- |
+| #457 | The sole research file matches byte for byte in the source, [merged #460](https://github.com/jawadrao5555-alt/taxnest/pull/460) and #476. The replacement recognizes valid unnumbered responses and has passing [PR checks](https://github.com/jawadrao5555-alt/taxnest/actions/runs/45748035724). Its parser tests are also unchanged at #476. | The research is carried by #460. Keep the original regulator response as a separate outstanding evidence item for live Sandbox acceptance. |
+| #458 | The source explicitly names [#461](https://github.com/jawadrao5555-alt/taxnest/pull/461) as its replacement. The dashboard, Reports shortcut, admin access label and acknowledgement environment behavior carry forward. The replacement moves the FBR environment label into its own row for the 390px layout and passed [PR checks](https://github.com/jawadrao5555-alt/taxnest/actions/runs/45762566807). #476 retains these changes. | Review the deployed DI dashboard, sidebar and environment label with an authorized DI account. |
+| #470 | Homepage, footer and browser check files match the source at #476. The separate `/compare` route is retained. The source passed [PR checks](https://github.com/jawadrao5555-alt/taxnest/actions/runs/45960225313). | Check desktop and phone homepage layout, product links, menu and comparison page. Client cards and the wider color review remain tracked by #468, #471 and #475. |
+| #401 | [#412](https://github.com/jawadrao5555-alt/taxnest/pull/412) carries collection links and Agent Health. [#431](https://github.com/jawadrao5555-alt/taxnest/pull/431) adds Company Usage date ranges and scoped export coverage. Both are in the deployed tree. | Record live totals, company and branch scope, permissions and affected-company links. |
+| #444 | Verified [#473](https://github.com/jawadrao5555-alt/taxnest/pull/473) carries the shared Lab workspace and three layouts. #476 retains these and extends clinical workflow. | Confirm the three layouts and entitlement and role boundaries in retained Hospital and standalone Lab demos. Track later clinical, device and integrations work separately. |
+| #456 | Twenty-two of 23 changed paths match the exact source head at #476. The remaining path is the updated scope document for the same feature. | Record authorized FBR Sandbox SN021 and SN022 responses. |
+| #467, #468, #469, #471, #472, #475 | The deployed code contains federal add-on pricing, website clients, ERP pricing, contrast changes and product identities. [#476](https://github.com/jawadrao5555-alt/taxnest/pull/476) lists the combined scope. | Check effective add-on prices and access, public client eligibility, contrast, configured ERP packages and checkout, and installed Agent pairing and aliases. The production probe found all ERP signup gates closed at deployment. |
+| #402, #403, #417, #423, #428–430 | [#433](https://github.com/jawadrao5555-alt/taxnest/pull/433) carries substantial work from #430, and #476 extends it. #429's planning file matches its original source in both #473 and #476. | Apply the [source acceptance register](bulk-pending-prs-400-430.md). Native POS 2 and device acceptance, billing lifecycle, Admin Live Ops scope, and print and reconciliation checks remain tracked. |
+
+Sources #463, #464 and #465 were already closed after verified #473 integration. [Issue #474](https://github.com/jawadrao5555-alt/taxnest/issues/474) tracks the remaining ERP roadmap. The current audit and confirmed fixes belong in [#477](https://github.com/jawadrao5555-alt/taxnest/pull/477).
+
 ## Workflows to reconcile
 
 | Area | Repository evidence | Live evidence to record |

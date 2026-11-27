@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Services\DistributorDiscountService;
 use App\Services\PlanCompanyCompatibility;
+use App\Services\PosSignupBundle;
 use App\Services\PlanSellabilityService;
 use App\Services\ProspectiveSubscriptionPolicy;
 use App\Services\RequestedPackageService;
@@ -41,7 +42,7 @@ class SignupPackageRequest extends Model
     }
 
     /** Called under the company's transaction lock. Reopening a request preserves its original quote. */
-    public static function capture(Company $company, PricingPlan $plan, string $source): self
+    public static function capture(Company $company, PricingPlan $plan, string $source, ?string $federal = null, int $extraSlots = 0): self
     {
         $existing = self::where('company_id', $company->id)->first();
         if ($existing) return $existing;
@@ -53,6 +54,9 @@ class SignupPackageRequest extends Model
 
         $cycle = RequestedPackageService::cycleForPlan($plan, $company->requested_billing_cycle);
         $quote = DistributorDiscountService::quote($company, $plan, $cycle, false);
+        if ($federal !== null || $extraSlots > 0) {
+            $quote = PosSignupBundle::addToQuote($quote, $company, $plan, $federal, $extraSlots);
+        }
         return self::create([
             'company_id' => $company->id, 'pricing_plan_id' => $plan->id,
             'plan_name' => $plan->name, 'billing_cycle' => $cycle, 'quoted_amount' => $quote['net_quote'],

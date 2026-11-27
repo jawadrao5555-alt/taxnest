@@ -20,8 +20,9 @@ return new class extends Migration
         DB::table('website_clients')->whereNotNull('company_id')->update(['published_at' => null]);
 
         Schema::table('website_clients', function (Blueprint $table) {
+            $table->dropForeign(['company_id']);
             $table->dropUnique(['company_id']);
-            $table->dropConstrainedForeignId('company_id');
+            $table->dropColumn('company_id');
         });
     }
 };

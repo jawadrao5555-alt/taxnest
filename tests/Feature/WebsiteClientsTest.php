@@ -155,17 +155,22 @@ class WebsiteClientsTest extends TestCase
         $index = route('saas.admin.website-clients.index');
         $create = route('saas.admin.website-clients.create');
         $lookup = route('saas.admin.website-clients.create', ['company' => $company->id]);
+        $displayId = $company->product_company_id ?? $company->id;
 
         $this->actingAs($this->admin('support'), 'admin')->get($lookup)->assertForbidden();
         $this->actingAs($this->admin('admin'), 'admin');
-        $this->get($index)->assertOk()->assertSee('Find by ID')->assertSee('Company ID '.$company->id);
+        $this->get($index)->assertOk()->assertSee('Find by ID')->assertSee('Company ID '.$displayId);
         $this->get($create)->assertOk()->assertSee('Find by ID')->assertSee('Add manually');
         $this->get(route('saas.admin.companies.show', $company->id))->assertOk()
             ->assertSee('Review for Our Clients')->assertSee($lookup, false);
         $this->get(route('saas.admin.companies.show', $pending->id))->assertOk()->assertDontSee('Review for Our Clients');
-        $this->get($lookup)->assertOk()->assertSee('Company ID '.$company->id)->assertSee('value="Synthetic ID Account"', false);
+        $this->get($lookup)->assertOk()->assertSee('Company ID '.$displayId)->assertSee('value="Synthetic ID Account"', false);
         $this->get(route('saas.admin.website-clients.create', ['company' => $company->account_code]))
             ->assertOk()->assertSee('value="Synthetic ID Account"', false);
+        if ($company->product_company_id ?? null) {
+            $this->get(route('saas.admin.website-clients.create', ['company' => $displayId]))
+                ->assertOk()->assertSee('value="Synthetic ID Account"', false);
+        }
 
         foreach (['', 'not-an-id', '0', ['id' => 1]] as $invalid) {
             $this->get(route('saas.admin.website-clients.create', ['company' => $invalid]))

@@ -11,7 +11,7 @@
         <ul class="mt-7 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
             @foreach($clients as $client)
             <li class="flex min-w-0 flex-col items-center justify-center rounded-xl border border-gray-200 bg-white px-3 py-5 text-center">
-                @if($client->logo_mime)
+                @if(\App\Services\WebsiteClientLogo::hasPublicLogo($client))
                 <img class="mb-3 h-12 w-full max-w-28 object-contain" loading="lazy" width="112" height="48"
                     src="{{ route('website-clients.logo', [$client->id, $client->revision]) }}" alt="">
                 @endif

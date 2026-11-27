@@ -19,6 +19,43 @@
             </form>
         </div>
 
+        @if($orders !== null)
+            <div class="flex flex-wrap gap-3">
+                @if(in_array('lab.orders.manage', $healthCapabilities ?? [], true))
+                    <a href="{{ route('health.lab.orders.create') }}" class="rounded-lg bg-teal-700 px-4 py-2 font-semibold text-white">{{ __('lab_workflow.new_order') }}</a>
+                @endif
+                @if(in_array('lab.catalogue.manage', $healthCapabilities ?? [], true))
+                    <a href="{{ route('health.lab.catalogue') }}" class="rounded-lg border border-gray-300 px-4 py-2 font-semibold dark:border-gray-600">{{ __('lab_workflow.catalogue') }}</a>
+                @endif
+                @if(in_array('lab.operations.view', $healthCapabilities ?? [], true))
+                    <a href="{{ route('health.lab.operations') }}" class="rounded-lg border border-gray-300 px-4 py-2 font-semibold dark:border-gray-600">{{ __('lab_operations.title') }}</a>
+                @endif
+            </div>
+
+            <form method="GET" action="{{ route('health.lab') }}" class="flex flex-wrap items-end gap-2">
+                <label class="grow text-sm font-medium">
+                    {{ __('lab_workflow.worklist_search') }}
+                    <input name="q" value="{{ $search }}" maxlength="60" class="mt-1 block w-full rounded-lg border-gray-300 bg-white dark:border-gray-600 dark:bg-gray-800" dir="ltr">
+                </label>
+                <button class="rounded-lg border border-gray-300 px-4 py-2 font-semibold dark:border-gray-600">{{ __('lab_workflow.search') }}</button>
+            </form>
+
+            <ul class="divide-y divide-gray-200 overflow-hidden rounded-xl border border-gray-300 dark:divide-gray-700 dark:border-gray-700">
+                @forelse($orders as $order)
+                    <li class="flex flex-wrap items-center justify-between gap-2 p-4">
+                        <div>
+                            <a href="{{ route('health.lab.orders.show', $order) }}" class="font-semibold text-teal-700 underline dark:text-teal-300" dir="ltr">{{ $order->order_no }}</a>
+                            <p>{{ $order->patient?->name }} · <bdi>{{ $order->patient?->mrn }}</bdi></p>
+                        </div>
+                        <span class="text-sm">{{ __('lab_workflow.verified_count', ['verified' => $order->verified_items_count, 'total' => $order->items_count]) }}</span>
+                    </li>
+                @empty
+                    <li class="p-4 text-sm">{{ __('lab_workflow.no_orders') }}</li>
+                @endforelse
+            </ul>
+            {{ $orders->links() }}
+        @endif
+
         <div @class([
             'grid gap-3',
             'sm:grid-cols-2' => $layout === 'modern',

@@ -1,14 +1,17 @@
 <?php
 namespace App\Services;
 use App\Models\{Company, Invoice, PosTransaction, FbrPosTransaction, PaymentProof, Subscription, User};
+use App\Support\{NestErps, ProductCatalog};
 use Illuminate\Database\Eloquent\Builder;
 class AdminDashboardDetail {
- public const LABELS=['total_companies'=>'Total Companies','di_companies'=>'DI Companies','pos_companies'=>'PRA POS','fbrpos_companies'=>'FBR POS','pending_companies'=>'Pending','pending_payment_proofs'=>'Pending Payments','suspended_companies'=>'Suspended','binned_companies'=>'In Bin','di_invoices'=>'DI Invoices','pos_transactions'=>'PRA POS Transactions','fbrpos_transactions'=>'FBR POS Transactions','active_subscriptions'=>'Active Subscriptions','total_users'=>'Total Users'];
+ public const ERP_COMPANIES = 'erp_companies';
+ public const LABELS=['total_companies'=>'Total Companies','di_companies'=>'DI Companies','pos_companies'=>'PRA POS','fbrpos_companies'=>'FBR POS',self::ERP_COMPANIES=>NestErps::LABEL.' Companies','pending_companies'=>'Pending','pending_payment_proofs'=>'Pending Payments','suspended_companies'=>'Suspended','binned_companies'=>'In Bin','di_invoices'=>'DI Invoices','pos_transactions'=>'PRA POS Transactions','fbrpos_transactions'=>'FBR POS Transactions','active_subscriptions'=>'Active Subscriptions','total_users'=>'Total Users'];
  public function definition(string $metric): array {
   abort_unless(isset(self::LABELS[$metric]),404);
-  $companies=in_array($metric,['total_companies','di_companies','pos_companies','fbrpos_companies','pending_companies','suspended_companies','binned_companies']);
+  $companies=in_array($metric,['total_companies','di_companies','pos_companies','fbrpos_companies',self::ERP_COMPANIES,'pending_companies','suspended_companies','binned_companies']);
   $q=match($metric){
    'total_companies'=>Company::query(), 'di_companies'=>Company::where('product_type','di'), 'pos_companies'=>Company::where('product_type','pos'), 'fbrpos_companies'=>Company::where('product_type','fbrpos'),
+   self::ERP_COMPANIES=>Company::whereIn('product_type',NestErps::PRODUCT_TYPES),
    'pending_companies'=>Company::where('status','pending'),'suspended_companies'=>Company::where('status','suspended'),'binned_companies'=>Company::onlyTrashed(),
    'di_invoices'=>Invoice::whereHas('company',fn($q)=>$q->where('product_type','di')),'pos_transactions'=>PosTransaction::whereHas('company',fn($q)=>$q->where('product_type','pos'))->where('status','completed'),'fbrpos_transactions'=>FbrPosTransaction::whereHas('company',fn($q)=>$q->where('product_type','fbrpos')),
    'pending_payment_proofs'=>PaymentProof::where('status','pending'),'active_subscriptions'=>Subscription::where('active',true),'total_users'=>User::query()};
@@ -16,12 +19,13 @@ class AdminDashboardDetail {
   $status=match($metric){'total_users'=>'role','active_subscriptions'=>'active',default=>'status'};
   $amount=match($metric){'di_invoices','pos_transactions','fbrpos_transactions'=>'total_amount','pending_payment_proofs'=>'amount','active_subscriptions'=>'final_price',default=>null};
   $isInvoice=in_array($metric,['di_invoices','pos_transactions','fbrpos_transactions']);
-  $fixedProduct=match($metric){'di_invoices','di_companies'=>'di','pos_transactions','pos_companies'=>'pos','fbrpos_transactions','fbrpos_companies'=>'fbrpos',default=>null};
+  $fixedProduct=match($metric){'di_invoices','di_companies'=>'di','pos_transactions','pos_companies'=>'pos','fbrpos_transactions','fbrpos_companies'=>'fbrpos',self::ERP_COMPANIES=>ProductCatalog::ERPS,default=>null};
   $statusLabel=match($metric){'di_invoices'=>'Invoice status','pos_transactions','fbrpos_transactions'=>'Transaction status','total_users'=>'Role','active_subscriptions'=>'Subscription status',default=>'Status'};
   $explanation=match($metric){
    'di_invoices'=>'DI companies only. Revenue includes locked invoices. Production/Sandbox describes the saved environment; it does not by itself prove FBR reporting. A fiscal number is shown separately.',
    'pos_transactions'=>'PRA POS companies and completed transactions only. Saved invoice mode is routing, not proof of reporting. Check the fiscal number and saved PRA status separately.',
    'fbrpos_transactions'=>'FBR POS companies only, including all existing transaction statuses and modes. Saved mode is routing, not proof of reporting. Check the fiscal number and saved FBR status separately.',
+   self::ERP_COMPANIES=>'Company filters control the company list. ERP dates control the figures for subscription receipts and Healthcare bills.',
    default=>'All-time totals appear when no filters are selected. Dates use record creation time. Counts and CSV use the selected filters.'};
   return compact('q','companies','reference','status','amount')+['title'=>self::LABELS[$metric],'metric'=>$metric,'is_invoice'=>$isInvoice,'fixed_product'=>$fixedProduct,'status_label'=>$statusLabel,'explanation'=>$explanation,'column_count'=>($isInvoice || $metric==='active_subscriptions')?8:7];
  }
@@ -34,10 +38,14 @@ class AdminDashboardDetail {
   });
   foreach(['from'=>'>=','to'=>'<='] as $key=>$op) if(!empty($filters[$key])) $q->whereDate($table.'.created_at',$op,$filters[$key]);
   if(isset($filters['status']) && $filters['status']!=='') $q->where($table.'.'.$d['status'],$filters['status']);
-  if(!empty($filters['company_id'])) $q->where($table.'.'.($d['companies']?'id':'company_id'),$filters['company_id']);
+  if (isset($filters['company_id']) && $filters['company_id'] !== '') {
+   $companyId = self::companyKey($filters['company_id']);
+   $q->where($table.'.'.($d['companies'] ? 'id' : 'company_id'), $companyId ?? 0);
+  }
   if(!empty($filters['product'])) {
-   if($d['companies']) $q->where('product_type',$filters['product']);
-   else $q->whereHas('company',fn($q)=>$q->where('product_type',$filters['product']));
+   $types=NestErps::storedTypesFor($filters['product']);
+   if($d['companies']) $q->whereIn('product_type',$types);
+   else $q->whereHas('company',fn($q)=>$q->whereIn('product_type',$types));
   }
   if($d['amount']) foreach(['min'=>'>=','max'=>'<='] as $key=>$op) if(isset($filters[$key]) && $filters[$key]!=='') $q->where($table.'.'.$d['amount'],$op,$filters[$key]);
   if(in_array($d['metric'],['pos_transactions','fbrpos_transactions'])) {
@@ -56,6 +64,11 @@ class AdminDashboardDetail {
   }
   if($d['metric']==='di_invoices' && !empty($filters['environment'])) $q->where('fbr_status',$filters['environment']);
   return $q;
+ }
+ public static function companyKey(string $identifier): ?int {
+  $numericId = filter_var($identifier, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+
+  return $numericId !== false ? $numericId : CompanyProductId::matching(Company::withTrashed(), $identifier)->value('id');
  }
  /** Existing values remain selectable: never silently discard unknown legacy states. */
  public function filterOptions(array $d): array {

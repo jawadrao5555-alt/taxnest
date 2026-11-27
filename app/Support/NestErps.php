@@ -65,6 +65,8 @@ final class NestErps
     /** Vertical keys — referenced by name so nothing has to spell the string. */
     public const HEALTH = 'health';
 
+    public const SCHOOL = 'school';
+
     public const DEFAULT_VERTICAL = self::HEALTH;
 
     /** @var array<string, array<string, mixed>> */
@@ -85,6 +87,20 @@ final class NestErps
             'module_service'  => \App\Services\HealthModuleService::class,
             'billable'        => [\App\Services\HealthPlatformService::class, 'billableCount'],
             'live'            => true,
+        ],
+        self::SCHOOL => [
+            'key'            => self::SCHOOL,
+            'label'          => 'School ERP',
+            'label_key'      => 'school_erp.title',
+            'tagline_key'    => 'school_erp.tagline',
+            'path_prefix'    => 'school-erp',
+            'guard'          => 'schoolerp',
+            'layout'         => 'components.school-erp-layout',
+            'login_path'     => '/school-erp/login',
+            'register_path'  => '/school-erp/register',
+            'dashboard_path' => '/school-erp/dashboard',
+            'lang_file'      => 'school_erp',
+            'live'           => false,
         ],
     ];
 

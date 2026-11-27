@@ -90,6 +90,61 @@ class PosReportsActiveBusinessDayTest extends TestCase
         }
     }
 
+    public function test_top_customers_view_all_matches_the_reports_scope_and_includes_ranked_customers_beyond_ten(): void
+    {
+        $company = $this->company('06:00');
+        $otherCompany = $this->company('06:00');
+        DB::table('companies')->where('id', $company->id)->update([
+            'is_internal_account' => true,
+            'pos_setup_completed' => true,
+        ]);
+        $owner = \App\Models\User::factory()->create([
+            'company_id' => $company->id, 'pos_role' => 'pos_admin', 'role' => 'company_admin', 'is_active' => true,
+        ]);
+        $cashier = \App\Models\User::factory()->create(['company_id' => $company->id, 'pos_role' => 'pos_cashier']);
+        $otherCashier = \App\Models\User::factory()->create(['company_id' => $company->id, 'pos_role' => 'pos_cashier']);
+        $branch = DB::table('branches')->insertGetId(['company_id' => $company->id, 'name' => 'Main', 'is_active' => true]);
+        $otherBranch = DB::table('branches')->insertGetId(['company_id' => $company->id, 'name' => 'Second', 'is_active' => true]);
+        $date = PosBusinessDay::current($company->id);
+        $sale = function (string $name, float $amount, array $extra = []) use ($company, $cashier, $date, $branch) {
+            DB::table('pos_transactions')->insert($extra + [
+                'company_id' => $company->id, 'branch_id' => $branch, 'business_date' => $date,
+                'created_by' => $cashier->id, 'invoice_number' => uniqid('SYNTHETIC-B'),
+                'status' => 'completed', 'transaction_type' => 'sale', 'invoice_mode' => 'local',
+                'customer_name' => $name, 'subtotal' => $amount, 'total_amount' => $amount,
+                'payment_method' => 'cash', 'created_at' => now(), 'updated_at' => now(),
+            ]);
+        };
+        foreach (range(1, 27) as $rank) {
+            $sale(sprintf('Ranked customer %02d', $rank), 100 - $rank);
+        }
+        $sale('Synthetic outside date', 200, ['business_date' => Carbon::parse($date)->subDay()->toDateString()]);
+        $sale('Synthetic outside branch', 200, ['branch_id' => $otherBranch]);
+        $sale('Synthetic outside tenant', 200, ['company_id' => $otherCompany->id, 'branch_id' => null]);
+        $sale('Synthetic outside cashier', 200, ['created_by' => $otherCashier->id]);
+        $sale('Synthetic outside stream', 200, ['invoice_mode' => 'pra', 'pra_status' => 'submitted']);
+        $sale('Synthetic return', 200, ['transaction_type' => 'return']);
+
+        $filters = ['tab' => 'local', 'from' => $date, 'to' => $date, 'cashier' => $cashier->id];
+        $detail = route('pos.reports', $filters + ['top_customers' => 1]);
+        $response = $this->actingAs($owner, 'pos')->withSession([\App\Services\BranchContextService::SESSION_KEY => $branch])
+            ->get(route('pos.reports', $filters));
+        $this->assertSame(200, $response->status(), $response->headers->get('Location') ?? '');
+        $response->assertSee($detail);
+        $doc = new \DOMDocument();
+        @$doc->loadHTML($response->getContent());
+        $ranking = (new \DOMXPath($doc))->query('//table[@data-pos-customer-ranking-table]')->item(0);
+        $this->assertNotNull($ranking);
+        $this->assertStringContainsString('Ranked customer 10', $ranking->textContent);
+        $this->assertStringNotContainsString('Ranked customer 11', $ranking->textContent);
+
+        $this->get($detail)->assertOk()->assertSee('Ranked customer 11')->assertDontSee('Ranked customer 27')
+            ->assertDontSee('Synthetic outside')->assertDontSee('Synthetic return');
+        $this->get($detail.'&page=2')->assertOk()->assertSee('Ranked customer 27')->assertDontSee('Ranked customer 01');
+        $this->get($detail.'&customer=Ranked%20customer%2027')->assertOk()
+            ->assertSee('Ranked customer 27')->assertDontSee('Ranked customer 26');
+    }
+
     public function test_after_midnight_default_uses_each_company_cutoff_and_rolls_after_cutoff(): void {
         config(['app.timezone'=>'Asia/Karachi']);Carbon::setTestNow(Carbon::parse('2026-10-22 00:30:00','Asia/Karachi'));
         $night=$this->company('06:00');$calendar=$this->company('00:00');

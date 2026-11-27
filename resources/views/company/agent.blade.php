@@ -254,9 +254,9 @@
                 <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Agent Credentials</h3>
 
                 <div class="space-y-4">
-                    {{-- Company ID --}}
+                    {{-- Numeric ID used by existing Agent installations. --}}
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Company ID</label>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ __('pos.fbr_agent_company_id') }}</label>
                         <div class="flex gap-2">
                             <input type="text" readonly value="{{ $company->id }}" class="flex-1 rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white font-mono">
                             <button onclick="copyToClipboard('{{ $company->id }}', this)" class="px-4 py-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg text-sm font-medium">Copy</button>
@@ -382,7 +382,7 @@
                     <li>Upar se Windows <strong>.zip</strong> download karein (Pakistan wale PC par, internet zaroori)</li>
                     <li>Zip file par right-click karke <strong>"Extract All"</strong> karein — Downloads ya Desktop par (kisi purane agent folder ke upar nahi)</li>
                     <li>Extract hue folder mein <strong>install.bat</strong> par double-click karein — installer purana agent khud band karke nayi files laga dega, shortcuts bana dega</li>
-                    <li>Agent khud start ho kar system tray mein chala jayega. Pehli dafa <strong>Company ID</strong>, <strong>API Key</strong> aur <strong>Server URL</strong> (upar diye gaye) enter karein — ya TaxNest PRA POS Desktop window mein sirf login karein, settings khud lag jayengi</li>
+                    <li>Agent khud start ho kar system tray mein chala jayega. Upar se <strong>Server URL</strong> aur <strong>API Key</strong> enter karein, phir <strong>Test Connection</strong> dabayen. Company ID khud fill ho jayegi. TaxNest PRA POS Desktop mein login karne se bhi settings khud lag jayengi.</li>
                     <li>PC business hours mein online rakhein — bas! Aage se <strong>naye versions khud-ba-khud update</strong> ho jayenge, dobara download/install ki zaroorat <strong>nahi</strong></li>
                 </ol>
                 <div class="mt-3 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg text-xs text-amber-800 dark:text-amber-300">

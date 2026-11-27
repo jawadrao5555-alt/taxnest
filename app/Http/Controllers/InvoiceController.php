@@ -18,6 +18,7 @@ use App\Services\SroSuggestionService;
 use App\Services\ScheduleEngine;
 use App\Services\GlobalHsService;
 use App\Services\FbrService;
+use App\Services\DiSpecialTax;
 use App\Services\DiFiscalSubmissionState;
 use App\Services\ComplianceScoreService;
 use App\Services\HsUsagePatternService;
@@ -336,7 +337,7 @@ class InvoiceController extends Controller
             'items.*.quantity' => 'required|numeric|min:0.0001',
             'items.*.price' => 'required|numeric|min:0.01',
             'items.*.tax' => 'required|numeric|min:0',
-            'items.*.schedule_type' => 'nullable|string|in:standard,reduced,3rd_schedule,exempt,zero_rated,fed_services,services',
+            'items.*.schedule_type' => 'nullable|string|in:standard,reduced,3rd_schedule,exempt,zero_rated,fed_services,services,'.implode(',', array_keys(DiSpecialTax::RULES)),
             'items.*.pct_code' => 'nullable|string|max:50',
             'items.*.tax_rate' => 'nullable|numeric|min:0|max:100',
             'items.*.sro_schedule_no' => 'nullable|string|max:100',
@@ -355,7 +356,11 @@ class InvoiceController extends Controller
             'items.*.price.min' => 'Item prices must be greater than Rs 0. FBR rejects free/bonus lines (error 0300). Note the free item in the description of a paid line or omit it.',
         ]);
 
-        $request->merge(['items' => \App\Services\DiSellingPacking::normalizeRequest($request, (int) $companyId)]);
+        $request->merge(['items' => DiSpecialTax::normalizeItems(
+            \App\Services\DiSellingPacking::normalizeRequest($request, (int) $companyId),
+            $request->input('document_type'),
+            \Illuminate\Support\Carbon::parse($request->input('invoice_date') ?: now()->toDateString())->toDateString(),
+        )]);
         $itemsWithTaxRate = collect($request->items)->map(function ($item) {
             $item['tax_rate'] = isset($item['tax_rate']) && is_numeric($item['tax_rate']) ? floatval($item['tax_rate']) : null;
             return $item;
@@ -638,7 +643,7 @@ class InvoiceController extends Controller
             'items.*.quantity' => 'required|numeric|min:0.0001',
             'items.*.price' => 'required|numeric|min:0.01',
             'items.*.tax' => 'required|numeric|min:0',
-            'items.*.schedule_type' => 'nullable|string|in:standard,reduced,3rd_schedule,exempt,zero_rated,fed_services,services',
+            'items.*.schedule_type' => 'nullable|string|in:standard,reduced,3rd_schedule,exempt,zero_rated,fed_services,services,'.implode(',', array_keys(DiSpecialTax::RULES)),
             'items.*.pct_code' => 'nullable|string|max:50',
             'items.*.tax_rate' => 'nullable|numeric|min:0|max:100',
             'items.*.sro_schedule_no' => 'nullable|string|max:100',
@@ -657,7 +662,11 @@ class InvoiceController extends Controller
             'items.*.price.min' => 'Item prices must be greater than Rs 0. FBR rejects free/bonus lines (error 0300). Note the free item in the description of a paid line or omit it.',
         ]);
 
-        $request->merge(['items' => \App\Services\DiSellingPacking::normalizeRequest($request, (int) $companyId, $invoice)]);
+        $request->merge(['items' => DiSpecialTax::normalizeItems(
+            \App\Services\DiSellingPacking::normalizeRequest($request, (int) $companyId, $invoice),
+            $request->input('document_type'),
+            \Illuminate\Support\Carbon::parse($request->input('invoice_date') ?: ($invoice->invoice_date ?: now()->toDateString()))->toDateString(),
+        )]);
         $itemsWithTaxRate = collect($request->items)->map(function ($item) {
             $item['tax_rate'] = isset($item['tax_rate']) && is_numeric($item['tax_rate']) ? floatval($item['tax_rate']) : null;
             return $item;

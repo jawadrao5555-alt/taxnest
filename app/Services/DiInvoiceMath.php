@@ -12,6 +12,7 @@ class DiInvoiceMath
         $unitPrice = (float) $get('price', 0);
         $valueSalesExcludingST = round($unitPrice * $quantity, 2);
         $saleType = (string) ($get('sale_type') ?: ScheduleEngine::mapSaleType($get('schedule_type', 'standard')));
+        $special = DiSpecialTax::rule($get('schedule_type'));
         $third = stripos($saleType, '3rd Schedule') !== false;
         $exempt = stripos($saleType, 'exempt') !== false;
         $reduced = stripos($saleType, 'reduced') !== false;
@@ -27,6 +28,12 @@ class DiInvoiceMath
         $furtherTax = round((float) $get('further_tax', 0), 2);
         $fedPayable = round((float) $get('fed_payable', 0) * $quantity, 2);
         $discount = round((float) $get('discount', 0) * $quantity, 2);
+        if ($special) {
+            $taxRate = $special['percentage'];
+            $retailPrice = !empty($special['retail']) ? round($mrp * $quantity, 2) : 0.0;
+            $fedPayable = DiSpecialTax::excise($special, $quantity);
+            $salesTaxApplicable = DiSpecialTax::salesTax($special, $valueSalesExcludingST, $retailPrice, $quantity);
+        }
         $totalValues = round($valueSalesExcludingST + $salesTaxApplicable + $extraTaxVal + $furtherTax + $fedPayable - $discount, 2);
         return compact('quantity', 'unitPrice', 'valueSalesExcludingST', 'retailPrice', 'taxRate', 'salesTaxApplicable', 'extraTaxVal', 'furtherTax', 'fedPayable', 'discount', 'totalValues');
     }

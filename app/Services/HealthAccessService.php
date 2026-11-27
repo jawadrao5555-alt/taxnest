@@ -46,6 +46,7 @@ class HealthAccessService
         'health_nurse',
         'health_pharmacist',
         'health_lab_tech',
+        'health_lab_supervisor',
         'health_accountant',
         'health_auditor',
         'health_cashier',
@@ -72,7 +73,7 @@ class HealthAccessService
             'ipd.view', 'ipd.manage', 'ipd.charge', 'ipd.discharge',
             'wards.manage',
             'operations.view', 'operations.manage',
-            'lab.view',
+            'lab.view', 'lab.orders.manage', 'lab.catalogue.manage', 'lab.operations.view',
             'billing.view', 'billing.charge',
             // Reads the books and signs off what the accountant prepared —
             // period close and doctor payouts — without being able to post the
@@ -92,6 +93,7 @@ class HealthAccessService
             'dashboard.view',
             'patients.view', 'patients.manage',
             'appointments.view', 'appointments.manage',
+            'lab.view', 'lab.orders.manage',
             'billing.view',
         ],
         // Sees and writes the clinical record for the patients in front of them.
@@ -106,7 +108,7 @@ class HealthAccessService
             // past an unpaid bill are two different decisions.
             'ipd.view', 'ipd.manage',
             'operations.view', 'operations.manage',
-            'lab.view',
+            'lab.view', 'lab.orders.manage', 'lab.report',
             'pharmacy.view',
         ],
         // Records observations and runs the ward. No prescribing.
@@ -117,7 +119,7 @@ class HealthAccessService
             'clinical.view', 'nursing.record',
             'ipd.view', 'ipd.manage',
             'operations.view',
-            'lab.view',
+            'lab.view', 'lab.report',
         ],
         // Reads the prescription, dispenses against it, keeps the counter.
         'health_pharmacist' => [
@@ -126,11 +128,15 @@ class HealthAccessService
             'clinical.view',
             'pharmacy.view', 'pharmacy.dispense', 'pharmacy.manage',
         ],
-        // Collects samples and signs results out. No other clinical access.
+        // Collects specimens and enters drafts. A separate account verifies them.
         'health_lab_tech' => [
             'dashboard.view',
             'patients.view',
-            'lab.view', 'lab.collect', 'lab.result',
+            'lab.view', 'lab.collect', 'lab.result', 'lab.report',
+        ],
+        'health_lab_supervisor' => [
+            'dashboard.view',
+            'lab.view', 'lab.verify', 'lab.report', 'lab.operations.view',
         ],
         // Owns the money side. Reaches an inpatient stay to post its charges,
         // take advances and clear the bill — but holds neither clinical.view
@@ -144,7 +150,7 @@ class HealthAccessService
             'ipd.view', 'ipd.charge', 'ipd.discharge',
             'accounts.view', 'accounts.manage',
             'hr.view', 'hr.payroll.view',
-            'reports.view',
+            'reports.view', 'lab.costing.view',
         ],
         // Read-only by definition (see READ_ONLY_ROLES). Clinical notes are
         // deliberately NOT included: an audit of the books is not a reason to
@@ -155,7 +161,7 @@ class HealthAccessService
             'pharmacy.view',
             'ipd.view',
             'operations.view',
-            'lab.view',
+            'lab.view', 'lab.operations.view',
             'billing.view',
             'accounts.view',
             'hr.view', 'hr.attendance.view', 'hr.payroll.view',
@@ -204,6 +210,7 @@ class HealthAccessService
         'health_nurse',
         'health_pharmacist',
         'health_lab_tech',
+        'health_lab_supervisor',
         'health_accountant',
         'health_cashier',
         'health_hr',
@@ -219,7 +226,7 @@ class HealthAccessService
      * colleague's attendance correction or leave is a write in every sense that
      * matters, so an auditor must not hold it however it was granted.
      */
-    private const WRITE_SUFFIXES = ['manage', 'write', 'charge', 'dispense', 'collect', 'result', 'record', 'correct', 'approve'];
+    private const WRITE_SUFFIXES = ['manage', 'write', 'charge', 'dispense', 'collect', 'result', 'record', 'correct', 'approve', 'verify'];
 
     /**
      * Capabilities only the organisation owner may ever exercise.
@@ -241,6 +248,8 @@ class HealthAccessService
      * mint a login without going near the team screen.
      */
     public const OWNER_ONLY = ['settings.manage.modules', 'staff.delegate', 'audit.manage', 'setup.import', 'billing.manage'];
+
+    private const FINANCE_ONLY = ['lab.costing.view'];
 
     public static function roleLabelKey(?string $role): string
     {
@@ -377,6 +386,10 @@ class HealthAccessService
         // Layer 1 always wins: an OFF module removes the capability entirely.
         $granted = array_values(array_intersect($available, $granted));
 
+        if ($role !== 'health_accountant') {
+            $granted = array_values(array_diff($granted, self::FINANCE_ONLY));
+        }
+
         // A read-only role stays read-only no matter what was stored.
         if (in_array($role, self::READ_ONLY_ROLES, true)) {
             $granted = array_values(array_filter(
@@ -410,7 +423,8 @@ class HealthAccessService
     {
         return array_values(array_diff(
             HealthModuleService::availableCapabilities($company),
-            self::OWNER_ONLY
+            self::OWNER_ONLY,
+            self::FINANCE_ONLY
         ));
     }
 
@@ -483,6 +497,7 @@ class HealthAccessService
         // capabilities.
         '#^health/ipd#'               => 'ipd.view|ipd.charge|ipd.discharge',
         '#^health/operations#'        => 'operations.view',
+        '#^health/lab/costs(?:/|$)#'   => 'lab.costing.view',
         '#^health/lab#'               => 'lab.view',
         '#^health/billing#'           => 'billing.view',
         '#^health/accounts#'          => 'accounts.view',

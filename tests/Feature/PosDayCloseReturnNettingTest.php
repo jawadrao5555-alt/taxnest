@@ -588,6 +588,86 @@ class PosDayCloseReturnNettingTest extends TestCase
         $this->assertSame(500.0, (float) $items['Chai']->total_revenue);
     }
 
+    public function test_filtered_item_sales_and_pdf_share_scoped_rows_and_subtotal(): void
+    {
+        $companyId = $this->makeCompany();
+        $user = $this->makePosUser($companyId);
+        $this->seedNettingDay($companyId, $user->id);
+        $this->makeTxn($companyId, 'EARLIER', ['business_date' => now()->subDay()->toDateString()], [
+            ['item_id' => 501, 'item_name' => 'Earlier Burger', 'unit_price' => 900, 'subtotal' => 900],
+        ]);
+        $this->makeTxn($companyId, 'LOCAL', ['pra_status' => null, 'pra_invoice_number' => null], [
+            ['item_id' => 501, 'item_name' => 'Local Burger', 'unit_price' => 70, 'subtotal' => 70],
+        ]);
+        $otherCompanyId = $this->makeCompany();
+        DB::table('pos_products')->insert(['id' => 610, 'company_id' => $otherCompanyId, 'name' => 'Burger', 'category' => 'Other company category']);
+        $this->makeTxn($otherCompanyId, 'FOREIGN', [], [
+            ['item_id' => 610, 'item_name' => 'Foreign Burger', 'unit_price' => 120, 'subtotal' => 120],
+        ]);
+
+        $planId = DB::table('pricing_plans')->insertGetId(['name' => 'Business']);
+        DB::table('subscriptions')->insert(['company_id' => $companyId, 'pricing_plan_id' => $planId, 'active' => true]);
+        Auth::guard('pos')->setUser($user);
+        app()->instance('currentCompanyId', $companyId);
+
+        $filters = ['tab' => 'pra', 'top_items' => '1', 'category' => 'Food', 'item' => 'burg',
+            'from' => now()->toDateString(), 'to' => now()->toDateString()];
+        $controller = new PosController();
+        $data = $controller->reports(Request::create('/pos/reports', 'GET', $filters))->getData();
+        $itemSales = $data['itemSales'];
+        $this->assertSame(['Burger'], $itemSales['rows']->pluck('item_name')->all());
+        $this->assertEquals(4, $itemSales['quantity']);
+        $this->assertEquals(1000, $itemSales['subtotal']);
+        $this->assertSame(['Drinks', 'Food'], $itemSales['categories']->all());
+
+        $html = view('pos.reports-items', $data)->render();
+        $this->assertStringContainsString('name="category"', $html);
+        $this->assertStringContainsString('name="item"', $html);
+        $this->assertStringContainsString('PKR 1,000.00', $html);
+        $this->assertStringNotContainsString('Other company category', $html);
+        $pdfQuery = $filters;
+        unset($pdfQuery['top_items']);
+        $this->assertStringContainsString(e(route('pos.reports.items-pdf', ['tab' => 'pra', 'cashier' => 'all', 'from' => $filters['from'], 'to' => $filters['to'], 'category' => 'Food', 'item' => 'burg'])), $html);
+
+        $pdfRequest = Request::create('/pos/reports/items-pdf', 'GET', $pdfQuery);
+        $pdf = $controller->reportsItemsPdf($pdfRequest);
+        $this->assertSame('application/pdf', $pdf->headers->get('content-type'));
+        $this->assertStringStartsWith('%PDF-', $pdf->getContent());
+
+        // Inspect data actually used by the export, independently of PDF compression.
+        $capture = new class extends PosController {
+            protected function renderReportPdf(string $view, array $data, string $filename, string $orientation = 'portrait', bool $download = true): \Illuminate\Http\Response
+            {
+                return response(view($view, $data)->render());
+            }
+        };
+        $pdfHtml = $capture->reportsItemsPdf($pdfRequest)->getContent();
+        foreach ([$html, $pdfHtml] as $rendered) {
+            $this->assertStringContainsString('PKR 1,000.00', $rendered);
+            $this->assertStringNotContainsString('Earlier Burger', $rendered);
+            $this->assertStringNotContainsString('Local Burger', $rendered);
+            $this->assertStringNotContainsString('Foreign Burger', $rendered);
+            $this->assertStringNotContainsString('>Chai<', $rendered);
+        }
+    }
+
+    public function test_item_name_filter_can_find_historical_items_and_treats_wildcards_as_text(): void
+    {
+        $companyId = $this->makeCompany();
+        $user = $this->makePosUser($companyId);
+        $this->makeTxn($companyId, 'HISTORICAL', [], [
+            ['item_id' => null, 'item_name' => 'Juice 100%', 'unit_price' => 75, 'subtotal' => 75],
+            ['item_id' => null, 'item_name' => 'Juice Regular', 'unit_price' => 175, 'subtotal' => 175],
+        ]);
+        Auth::guard('pos')->setUser($user);
+        app()->instance('currentCompanyId', $companyId);
+
+        $filters = ['top_items' => '1', 'item' => '%', 'from' => now()->toDateString(), 'to' => now()->toDateString()];
+        $data = (new PosController())->reports(Request::create('/pos/reports', 'GET', $filters))->getData();
+        $this->assertSame(['Juice 100%'], $data['itemSales']['rows']->pluck('item_name')->all());
+        $this->assertEquals(75, $data['itemSales']['subtotal']);
+    }
+
     // ── 5. range analytics: returns EXCLUDED entirely ────────────────────────
 
     public function test_range_analytics_exclude_return_transactions_completely(): void

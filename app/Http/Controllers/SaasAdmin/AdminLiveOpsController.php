@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\SaasAdmin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Branch;
 use App\Models\Company;
 use App\Models\AdminUser;
 use App\Models\LiveOpsAgentCommand;
@@ -12,9 +13,14 @@ use App\Models\LiveOpsRemediationRequest;
 use App\Services\LiveOps\LiveOpsDiagnosticsService;
 use App\Services\LiveOps\LiveOpsRemediationService;
 use App\Services\FbrPosReconciliationService;
+use App\Services\CompanyProductId;
+use App\Services\Reporting\ErpAdminFinancialSummary;
+use App\Support\NestErps;
 use App\Support\ProductCatalog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Super-admin Live Ops console — NestPOS PRA diagnostics + owner-approved remediation.
@@ -61,16 +67,14 @@ class AdminLiveOpsController extends Controller
         if ($search !== '' || $status !== '' || $product !== null) {
             $companies = Company::query()
                 ->when($product !== null, fn ($q) => $q->whereIn('product_type',
-                    $product === ProductCatalog::ERPS ? [$product, 'health'] : [$product]))
+                    NestErps::storedTypesFor($product)))
                 ->when($status !== '', fn ($q) => $q->where('status', $status))
                 ->when($search !== '', function ($q) use ($search) {
                     $q->where(function ($w) use ($search) {
                         $w->where('name', 'like', '%'.$search.'%')
                             ->orWhere('owner_name', 'like', '%'.$search.'%')
-                            ->orWhere('ntn', 'like', '%'.$search.'%');
-                        if (ctype_digit($search)) {
-                            $w->orWhere('id', (int) $search);
-                        }
+                            ->orWhere('ntn', 'like', '%'.$search.'%')
+                            ->orWhere(fn ($companies) => CompanyProductId::matching($companies, $search));
                         if (Schema::hasColumn('companies', 'account_code')) {
                             $w->orWhere('account_code', 'like', '%'.$search.'%');
                         }
@@ -81,6 +85,7 @@ class AdminLiveOpsController extends Controller
                 ->get(array_values(array_filter([
                     'id', 'name', 'status', 'product_type',
                     Schema::hasColumn('companies', 'account_code') ? 'account_code' : null,
+                    CompanyProductId::available((new Company)->getConnection()) ? 'product_company_id' : null,
                     Schema::hasColumn('companies', 'ntn') ? 'ntn' : null,
                 ])));
         }
@@ -162,6 +167,36 @@ class AdminLiveOpsController extends Controller
         }
 
         return view('saas-admin.live-ops.fbr-reconciliation', compact('diagnostic'));
+    }
+
+    public function erpCompany(Request $request, int $id, ErpAdminFinancialSummary $financials)
+    {
+        $this->gate();
+        $company = Company::query()->whereIn('product_type', NestErps::PRODUCT_TYPES)->findOrFail($id);
+        $period = $request->validate([
+            'date_from' => ['nullable', 'date_format:Y-m-d'],
+            'date_to' => ['nullable', 'date_format:Y-m-d'],
+            'branch_id' => ['nullable', 'integer', 'min:1', Rule::exists('branches', 'id')->where('company_id', $company->id)],
+        ]);
+        $filters = [
+            'date_from' => $period['date_from'] ?? today()->startOfMonth()->toDateString(),
+            'date_to' => $period['date_to'] ?? today()->toDateString(),
+        ];
+        if ($filters['date_from'] > $filters['date_to']) {
+            throw ValidationException::withMessages(['date_from' => 'Choose a start date on or before the end date.']);
+        }
+        if (isset($period['branch_id'])) {
+            $filters['branch_id'] = (int) $period['branch_id'];
+        }
+
+        return response()->view('saas-admin.live-ops.erp-company', [
+            'company' => $company,
+            'branches' => Branch::withoutGlobalScope(\App\Models\Scopes\CompanyScope::class)
+                ->where('company_id', $company->id)->orderBy('name')->orderBy('id')->get(['id', 'name']),
+            'filters' => $filters,
+            'summary' => $financials->forCompanies(collect([$company]), $filters)->get($company->id),
+            'measuredAt' => now(),
+        ])->header('Cache-Control', 'private, no-store');
     }
 
     public function propose(Request $request, LiveOpsRemediationService $remediation)

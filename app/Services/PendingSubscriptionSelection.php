@@ -14,9 +14,14 @@ final class PendingSubscriptionSelection
 
     public static function quote(Company $company, PricingPlan $plan, ?string $cycle = null): ?array
     {
+        if ($signup = PosSignupBundle::pending($company)) {
+            $quote = $signup->quote_snapshot;
+            return DistributorDiscountService::validateSnapshot($quote, $company, $plan, $cycle ?? $signup->billing_cycle) === null
+                ? $quote : null;
+        }
         $selection = session(self::key((int) $company->id));
         $value = is_array($selection) ? ($selection['quote'] ?? null) : null;
-        if (!is_array($value) || DistributorDiscountService::validateSnapshot($value, $company, $plan, $cycle ?? (string) ($value['cycle'] ?? 'annual')) !== null) {
+        if (!is_array($value) || isset($value[PosSignupBundle::KEY]) || DistributorDiscountService::validateSnapshot($value, $company, $plan, $cycle ?? (string) ($value['cycle'] ?? 'annual')) !== null) {
             return null;
         }
         // A completed purchase ends the earlier first-purchase selection.

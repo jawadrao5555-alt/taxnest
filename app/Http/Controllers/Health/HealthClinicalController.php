@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Health;
 
+use App\Models\HealthLabOrder;
 use App\Models\HealthPrescription;
 use App\Models\HealthPrescriptionItem;
 use App\Models\HealthVisit;
@@ -14,6 +15,7 @@ use App\Services\HealthScopeService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 
@@ -98,10 +100,18 @@ class HealthClinicalController extends HealthPanelController
         HealthScopeService::applyBranchScope($historyQuery, $this->user());
         $history = $historyQuery->limit(15)->get();
 
+        $canSeeLab = $this->can('lab.view') && Schema::hasColumn('health_lab_orders', 'health_visit_id');
+        $labOrders = $canSeeLab ? HealthLabOrder::visibleTo($this->user())
+            ->where('health_visit_id', $visit->id)->where('health_patient_id', $visit->health_patient_id)
+            ->latest('id')->limit(20)->get(['id', 'order_no']) : collect();
+
         return view('health.clinical.visit', [
             'visit' => $visit,
             'patient' => $visit->patient,
             'history' => $history,
+            'labOrders' => $labOrders,
+            'canOrderLab' => $canSeeLab && $this->can('lab.orders.manage')
+                && $visit->status !== HealthVisit::STATUS_CANCELLED && $visit->patient?->is_active,
             'canWrite' => HealthRecordAccessService::canWriteClinical($this->user(), $visit->patient, $this->company()),
             'canRecordVitals' => $this->can('nursing.record') || $this->can('clinical.write'),
             'canManageFee' => $this->can('appointments.manage'),

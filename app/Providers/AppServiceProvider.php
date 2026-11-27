@@ -38,6 +38,24 @@ class AppServiceProvider extends ServiceProvider
             ];
         });
 
+        \Illuminate\Support\Facades\RateLimiter::for('hr-login', function (\Illuminate\Http\Request $request) {
+            $email = $request->input('email');
+            $identity = is_string($email) ? strtolower(substr($email, 0, 255)) : '';
+            $ip = $request->ip();
+
+            return [
+                \Illuminate\Cache\RateLimiting\Limit::perMinute(120)->by('ip:'.$ip),
+                \Illuminate\Cache\RateLimiting\Limit::perMinute(6)->by('login:'.$ip.'|'.hash('sha256', $identity)),
+            ];
+        });
+
+        \Illuminate\Support\Facades\RateLimiter::for('hr-attendance', function (\Illuminate\Http\Request $request) {
+            $account = $request->user('hr');
+            $identity = $account ? 'user:'.$account->id : 'ip:'.$request->ip();
+
+            return \Illuminate\Cache\RateLimiting\Limit::perMinute(12)->by($identity);
+        });
+
         // Desktop-agent API (/api/agent/*): volume limit keyed by the presented
         // key (sha1 — never the raw key in cache keys), falling back to IP when
         // no key is sent. Generous on purpose: one company key is shared by

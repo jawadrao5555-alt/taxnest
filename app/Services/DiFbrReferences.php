@@ -194,6 +194,7 @@ final class DiFbrReferences
             'goods at zero rate', 'zero rated' => 'goods at zero-rate',
             'exempt', 'goods exempt' => 'exempt goods',
             'services at standard rate' => 'services',
+            'cement /concrete block' => 'cement/concrete block',
             default => $label,
         };
     }

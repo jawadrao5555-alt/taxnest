@@ -41,7 +41,7 @@ final class RestoreSessionBoundary
         }
         $path = ltrim($request->path(), '/');
         $login = '/login';
-        foreach (['admin' => '/admin/login', 'franchise' => '/franchise/login', 'pos' => '/pos/login', 'fbr-pos' => '/fbr-pos/login'] as $prefix => $destination) {
+        foreach (['admin' => '/admin/login', 'franchise' => '/franchise/login', 'pos' => '/pos/login', 'fbr-pos' => '/fbr-pos/login', 'hr' => '/hr/login'] as $prefix => $destination) {
             if ($path === $prefix || str_starts_with($path, $prefix.'/')) {
                 $login = $destination;
             }

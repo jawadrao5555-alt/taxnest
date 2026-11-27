@@ -31,11 +31,17 @@ for (const panel of ['pos', 'fbrpos']) test(panel + ' confirms identity before a
   assert.equal(JSON.parse(calls[1].opts.body).company_id, 41);
   assert.equal(calls[1].opts.redirect, 'error'); assert.ok(!calls[1].url.includes('nonce'));
 });
-test('same-company/key reinstall does not rewrite settings or prompt', async () => {
-  const {calls,options}=setup(); const result=await companyPairing({...options,
+test('same-company/key reinstall ignores the new display ID and does not rewrite settings', async () => {
+  const {calls,options}=setup({preview:{product_company_id:'P01'}}); const result=await companyPairing({...options,
     existing:{companyId:41,apiKey:key,serverUrl:origin+'/api/agent',receiptPrinter:'Kitchen A'},
     confirm:()=>{throw Error('Must not prompt');}});
   assert.equal(result.unchanged,true);assert.equal(result.config,undefined);assert.equal(calls.length,1);
+});
+test('a product display ID cannot be used as the configured numeric company identity', async () => {
+  const { calls, options } = setup({ preview: { company_id: 'P01' } });
+  const result = await companyPairing({ ...options, confirm: () => { throw Error('Must not prompt'); } });
+  assert.deepEqual(result, { ok: false });
+  assert.equal(calls.length, 1);
 });
 test('cancelled company switch never fetches credentials or overwrites config', async () => {
   const {calls,options}=setup();const result=await companyPairing({...options,

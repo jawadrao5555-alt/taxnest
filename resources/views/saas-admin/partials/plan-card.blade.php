@@ -14,7 +14,7 @@
             @endif
         </div>
         @if($canManageBilling ?? false)
-        <button @click="editing = !editing" class="text-xs px-2 py-1 rounded transition" :class="editing ? 'bg-red-600/20 text-red-400 hover:bg-red-600/30' : 'bg-indigo-600/20 text-indigo-400 hover:bg-indigo-600/30'" x-text="editing ? 'Cancel' : 'Edit'"></button>
+        <button type="button" @click="editing = !editing" :aria-expanded="editing" class="tn-admin-action text-xs px-2 py-1 rounded transition" x-text="editing ? 'Cancel' : 'Edit'">Edit</button>
         @endif
     </div>
 
@@ -22,8 +22,9 @@
         <div class="mb-3">
             @php
                 $annualRate = \App\Services\SubscriptionAssignmentService::computePrice($plan, 'annual');
+                $annualDecimals = \App\Support\NestErps::isProductType($plan->product_type) ? 2 : 0;
             @endphp
-            <div class="text-2xl font-bold text-{{ $color }}-400">PKR {{ number_format($annualRate['final_price'], 0) }}<span class="text-sm text-gray-500 dark:text-gray-400 font-normal">/yr</span></div>
+            <div class="text-2xl font-bold text-{{ $color }}-400">PKR {{ number_format($annualRate['final_price'], $annualDecimals) }}<span class="text-sm text-gray-500 dark:text-gray-400 font-normal">/yr</span></div>
         </div>
 
         @if($plan->product_type === 'di')
@@ -51,7 +52,7 @@
                 <div class="flex justify-between text-[11px]"><span>{{ \App\Models\Subscription::getCycleLabel($cycleKey) }}</span><span>PKR {{ number_format(\App\Services\SubscriptionAssignmentService::computePrice($plan, $cycleKey)['final_price'], 2) }}</span></div>
                 @endif
             @endforeach
-            <div class="flex justify-between gap-2 text-[11px]"><span class="text-gray-400">Annual rate</span><span class="text-gray-200 font-medium">{{ number_format($annualRate['final_price']) }}</span></div>
+            <div class="flex justify-between gap-2 text-[11px]"><span class="text-gray-400">Annual rate</span><span class="text-gray-200 font-medium">{{ number_format($annualRate['final_price'], $annualDecimals) }}</span></div>
         </div>
         @endif
 
@@ -119,7 +120,7 @@
             @endif
             <div>
                 <label class="text-[10px] text-gray-500 dark:text-gray-400 uppercase">Price (PKR{{ (in_array($plan->product_type, ['pos', 'fbrpos', 'standalone']) || \App\Support\NestErps::isProductType($plan->product_type ?? null)) ? '/yr' : '/mo' }})</label>
-                <input type="number" name="price" value="{{ intval($plan->price) }}" step="1" required class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-1.5 focus:ring-2 focus:ring-indigo-500">
+                <input type="number" name="price" value="{{ $plan->price }}" step="0.01" min="0" required class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-1.5 focus:ring-2 focus:ring-indigo-500">
             </div>
             <label class="block text-xs text-gray-400"><input type="checkbox" name="configure_shared_cycle_rates" value="1"> Update configured period rates. For DI, tick this to change the monthly checkout rate.</label>
                 @foreach(['price_monthly' => 'Monthly total', 'price_quarterly' => 'Quarterly total', 'price_semi_annual' => 'Six-month total'] as $cycleField => $cycleLabel)
@@ -175,6 +176,12 @@
                 <label class="flex items-center gap-1.5 text-sm text-gray-400" title="Show this package on the landing page, billing page and signup"><input type="checkbox" name="is_public" value="1" {{ $plan->is_public ? 'checked' : '' }} class="rounded bg-gray-800 border-gray-600 text-indigo-500"> On sale</label>
             </div>
         </div>
+        @if(\App\Support\NestErps::isProductType($plan->product_type ?? null) && !$plan->is_trial)
+        <fieldset class="rounded-lg border border-gray-700 p-3">
+            <legend class="px-1 text-sm font-semibold text-white">ERP package and website pricing</legend>
+            @include('saas-admin.partials.erp-pricing-fields', ['erpPlan' => $plan])
+        </fieldset>
+        @endif
         <div>
             <label class="text-[10px] text-gray-500 dark:text-gray-400 uppercase mb-1 block">
                 Features (one per line — shown on landing page)

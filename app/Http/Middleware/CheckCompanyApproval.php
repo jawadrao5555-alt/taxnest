@@ -43,6 +43,12 @@ class CheckCompanyApproval
                 return $next($request);
             }
 
+            $frozenPraCheckout = $request->routeIs('pos.package-checkout.select')
+                || ($request->routeIs('pos.payment-proof.store') && !$request->filled('request_type'));
+            if ($request->isMethod('POST') && $frozenPraCheckout && \App\Services\PosSignupBundle::pending($company)) {
+                return $next($request);
+            }
+
             if (!$request->isMethod('GET') && !$request->isMethod('HEAD')) {
                 if ($request->ajax() || $request->wantsJson()) {
                     return response()->json([

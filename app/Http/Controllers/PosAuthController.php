@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\User;
 use App\Models\Company;
 use App\Models\AdminUser;
+use App\Models\PricingPlan;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -231,6 +232,8 @@ class PosAuthController extends Controller
             'requested_addons' => 'nullable|array|max:12',
             'requested_addons.*' => 'required|string|max:64',
             'requested_addon_cycle' => 'nullable|string|max:20',
+            'federal_signup_addon' => 'nullable|string|in:'.implode(',', \App\Services\PosFederalAddonAccess::CODES),
+            'signup_extra_branch_slots' => 'nullable|integer|min:0|max:'.\App\Services\BranchAddonService::MAX_QTY,
             'distributor_reference_code' => 'nullable|string|max:30',
         ], \App\Services\LoginIdentifierResolver::cnicMessages('company_cnic'));
 
@@ -301,9 +304,13 @@ class PosAuthController extends Controller
             $request->input('billing_cycle')
         );
 
+        $federal = $request->input('federal_signup_addon');
+        $extraSlots = $request->integer('signup_extra_branch_slots');
+        $hasSignupBundle = filled($federal) || $extraSlots > 0;
+
         // Company, owner, credential ledger and zero-price trial are one unit.
         // Never sign in or consume the referral session after a partial signup.
-        $user = \Illuminate\Support\Facades\DB::transaction(function () use ($request, $companyData, $selectedPlan) {
+        $user = \Illuminate\Support\Facades\DB::transaction(function () use ($request, $companyData, $selectedPlan, $hasSignupBundle, $federal, $extraSlots) {
             $company = Company::create($companyData);
 
             $userData = [
@@ -331,6 +338,14 @@ class PosAuthController extends Controller
                 'ntn' => $request->company_ntn,
             ], $company->id, 'pos');
 
+            if ($hasSignupBundle) {
+                if (!\App\Services\PosSignupBundle::available()) {
+                    throw ValidationException::withMessages(['pra_signup_bundle' => 'Signup add-ons are temporarily unavailable.']);
+                }
+                $plan = PricingPlan::whereKey($selectedPlan->id)->lockForUpdate()->firstOrFail();
+                \App\Models\SignupPackageRequest::capture($company, $plan, 'signup', $federal ?: null, $extraSlots);
+            }
+
             if (\App\Services\ProspectiveSubscriptionPolicy::available()) \App\Services\TrialSubscriptionService::ensureSelectedTrial($company->id,'pos',$selectedPlan->id, true);
             else $this->startTrial($company->id, 'pos');
 
@@ -357,7 +372,7 @@ class PosAuthController extends Controller
             $request->session()->forget(\App\Services\PosAddonService::SIGNUP_SESSION_KEY);
         }
 
-        return $this->redirectToPortal($user);
+        return $hasSignupBundle ? redirect()->route('pos.package-checkout') : $this->redirectToPortal($user);
     }
 
     /**

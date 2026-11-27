@@ -315,6 +315,10 @@ class ScheduleEngine
 
     public static function mapSaleType(string $scheduleType): string
     {
+        if ($special = DiSpecialTax::rule($scheduleType)) {
+            return $special['sale_type'];
+        }
+
         return match ($scheduleType) {
             'standard' => 'Goods at Standard Rate (default)',
             'reduced' => 'Goods at Reduced Rate',

@@ -61,6 +61,7 @@
               const cashBox = form.querySelector('[data-settle-bill=\'' + billId + '\']');
               if (cashBox) cashBox.checked = !wanted;
               this.recalcSettle(form);
+              document.dispatchEvent(new Event('tn-delivery-updated'));
           } catch (e) {
               event.target.checked = !wanted;
               window.alert(e.message || {{ Js::from(__('pos.settle_already_paid_failed')) }});
@@ -119,7 +120,7 @@
     <p class="text-sm text-gray-500 dark:text-gray-400 mb-6">{{ __('pos.deliveries_page_intro') }}</p>
 
     @if(session('success'))
-    <div class="mb-4 p-3 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 text-sm">{{ session('success') }}</div>
+    <div data-tn-delivery-updated class="mb-4 p-3 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 text-sm">{{ session('success') }}</div>
     @endif
     @if(session('error'))
     <div class="mb-4 p-3 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 text-sm">{{ session('error') }}</div>

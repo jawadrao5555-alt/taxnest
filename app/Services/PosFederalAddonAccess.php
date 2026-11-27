@@ -83,19 +83,26 @@ final class PosFederalAddonAccess
             && (float) $grant->amount > 0 && $grant->starts_at && $grant->starts_at->lte(now())
             && $grant->ends_at && $grant->ends_at->endOfDay()->isFuture()) {
             $sub = PosAddonService::activeSubscription($company);
-            if (self::hasPaidPackage($company)
-                && (int) $sub->id === (int) $grant->subscription_id
-                && in_array($code, PaymentProof::posAddonKind()->whereKey($grant->payment_proof_id)
+            if (self::hasPaidPackage($company) && (int) $sub->id === (int) $grant->subscription_id) {
+                $proof = PaymentProof::whereKey($grant->payment_proof_id)
                     ->where('company_id', $company->id)->where('subscription_id', $sub->id)
-                    ->where('status', 'verified')->first()?->addonCodeList() ?? [], true)) {
-                return 'paid';
+                    ->where('status', 'verified')->first();
+                if ($proof && (in_array($code, $proof->addonCodeList(), true)
+                    || PosSignupBundle::coversFederalGrant($proof, $grant))) {
+                    return 'paid';
+                }
             }
         }
         if ($grants->isEmpty() && self::hasLegacyProfile($company, $code)) return 'legacy';
+        $signup = PosSignupBundle::reservation($company);
+        $signupFederal = $signup?->quote_snapshot[PosSignupBundle::KEY]['federal'] ?? null;
+        if ($signupFederal !== null && $signup->status === 'pending') {
+            return $code === $signupFederal ? 'pending' : 'locked';
+        }
         $pending = Schema::hasTable('payment_proofs') ? array_intersect(PosAddonService::pendingCodes($company), self::CODES) : [];
         if (in_array($code, $pending, true)) return 'pending';
         if ($grant) return 'expired';
-        if ($pending || $grants->isNotEmpty() || self::policyActive()) return 'locked';
+        if ($pending || $signup || $grants->isNotEmpty() || self::policyActive()) return 'locked';
         return 'legacy';
     }
 

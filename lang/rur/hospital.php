@@ -26,6 +26,7 @@ return [
     'confirm_required' => 'Tasdeeq karein ke adaigi pehle wasool ho chuki hai.',
     'overpayment' => 'Adaigi baqi bill balance se zyada hai.',
     'retry_conflict' => 'Yeh payment ID mukhtalif tafseel ke saath mehfooz hai. Asal receipt kholein; dobara wasool na karein.',
+    'erp_cutover_new_collection' => 'Naye bills Hospital ERP mein banayein. Purane bills ka baqaya yahan wasool kar sakte hain.',
     'campus_changed' => 'Active branch badal gaya. Asal branch par wapas ja kar page reload karein. Is request se adaigi darj nahi hui.',
     'closed' => 'Is branch ki yeh tareekh band hai. Nayi adaigi band hai; pehle mehfooz adaigi recover ho sakti hai.',
     'recovery' => 'Pichli adaigi mehfooz ho sakti hai. Dobara wasool na karein. Wohi asal tafseel likh kar wahi receipt hasil karein. Yeh tab khula rakhein; recovery isi tab, account aur branch tak hai.',

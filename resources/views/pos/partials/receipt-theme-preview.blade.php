@@ -102,6 +102,9 @@
             <div x-show="optionShow('show_website')" style="font-size:10px;text-align:center;">shop.example</div>
             @endif
             {{-- ── Items ── --}}
+            @if($tnMode === 'pra')
+            <div x-show="optionShow('show_separators')" data-item-table-separator="top" style="border-top:1px dashed #000;margin:2px 0;"></div>
+            @endif
             <table class="tn-preview-items" style="width:100%;border-collapse:collapse;margin:4px 0;table-layout:fixed;">
                 <tr>
                     <td style="width:44%;font-size:10px;font-weight:bold;text-transform:uppercase;border-top:1.5px solid #000;border-bottom:1.5px solid #000;padding:3px 1px;">Item</td>
@@ -120,6 +123,7 @@
             </table>
 
             @if($tnMode === 'pra')
+            <div x-show="optionShow('show_separators')" data-item-table-separator="bottom" style="border-top:1px dashed #000;margin:2px 0;"></div>
             <div x-show="optionShow('show_item_notes')" style="font-size:9px;">* Sample item comment</div>
             <div x-show="optionShow('show_deal_components')" style="font-size:9px;">• Sample deal contents (when applicable)</div>
             <div x-show="optionShow('show_bill_notes')" style="font-size:9px;">Note: Sample bill note</div>

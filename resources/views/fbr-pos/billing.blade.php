@@ -1,5 +1,5 @@
 <x-fbr-pos-layout>
-    <div class="py-8">
+    <div class="py-8" data-company-billing>
         <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
             <a href="{{ route('fbrpos.customize') }}" class="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition mb-3">
                 <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
@@ -40,7 +40,7 @@
                         <span class="text-white text-xs font-bold tracking-wide">{{ __('pos.most_popular') }}</span>
                     </div>
                     @endif
-                    <div class="bg-white dark:bg-gray-900 border {{ $isPopular ? 'border-blue-500 border-t-0 rounded-b-2xl' : 'border-gray-200 dark:border-gray-800 rounded-2xl' }} p-5">
+                    <div class="tn-billing-plan border {{ $isPopular ? 'border-blue-500 border-t-0 rounded-b-2xl' : 'border-gray-200 dark:border-gray-800 rounded-2xl' }} p-5">
                         @if($isCurrent)
                         <span class="inline-block px-2 py-0.5 bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 rounded text-[10px] font-bold mb-2">{{ __('pos.your_plan') }}</span>
                         @endif

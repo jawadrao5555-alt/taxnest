@@ -6,7 +6,7 @@
 <div class="notice">{{ __('pos.fbr_missing_school_route') }} {{ __('pos.school_separate_ledger') }}</div>
 <section class="card">
     <h2>{{ __('school_ledger.record_payment') }}</h2>
-    @if($collectionClosed)<div role="alert" class="notice">{{ __('pos.school_closed_collection') }}</div>@endif
+    @if($collectionClosed)<div role="alert" class="notice">{{ __($erpCutover ? 'school_ledger.erp_cutover_closed' : 'pos.school_closed_collection') }}</div>@endif
     @if($errors->any())<div role="alert" class="error"><ul>@foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul></div>@endif
     <div id="school-recovery-notice" class="notice" role="alert" hidden></div>
     <button type="button" id="school-recover-payment" hidden>{{ __('school_ledger.recover') }}</button>

@@ -13,6 +13,8 @@ use App\Services\DistributorDiscountService;
 use App\Services\PlanSellabilityService;
 use App\Services\SubscriptionAssignmentService;
 use App\Services\PlanCompanyCompatibility;
+use App\Support\NestErps;
+use App\Support\ProductCatalog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -24,6 +26,10 @@ class AdminSubscriptionController extends Controller
         // trial conversion or plan change must not repeat the company in this
         // operational list; its underlying financial history remains intact.
         $query = Company::withTrashed()->whereHas('subscriptions');
+        $product = ProductCatalog::normalize($request->string('product')->toString());
+        if ($product !== null) {
+            $query->whereIn('product_type', NestErps::storedTypesFor($product));
+        }
 
         if ($request->filled('status')) {
             if ($request->status === 'active') {
@@ -56,7 +62,7 @@ class AdminSubscriptionController extends Controller
                 ->pluck('id')->map(fn ($id) => (int) $id)->values(),
         ])->values();
 
-        return view('saas-admin.subscriptions', compact('companiesPage', 'companySubscriptions', 'companies', 'plans', 'assignmentPlans'));
+        return view('saas-admin.subscriptions', compact('companiesPage', 'companySubscriptions', 'companies', 'plans', 'assignmentPlans', 'product'));
     }
 
     public function quote(Request $request)

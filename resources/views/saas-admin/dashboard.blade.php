@@ -50,6 +50,11 @@
             <p class="text-[10px] text-blue-500 uppercase tracking-wide mb-1">TaxNest FBR POS</p>
             <p class="text-xl font-bold text-blue-400">{{ $stats['fbrpos_companies'] }}</p>
         </div>
+        <div class="relative group bg-gray-900 border border-gray-800 rounded-xl p-4">
+            <a data-dashboard-metric="erp_companies" aria-label="Open ERP companies details" class="absolute z-10 inset-0 rounded-xl focus:ring-2 focus:ring-indigo-400 group-hover:ring-1 group-hover:ring-indigo-400" href="{{ route('saas.admin.dashboard.detail', ['metric' => 'erp_companies'] + $erpDates) }}"></a>
+            <p class="text-[10px] text-gray-400 uppercase tracking-wide mb-1">{{ \App\Support\ProductCatalog::label($erpType) }}</p>
+            <p class="text-xl font-bold text-white">{{ number_format($stats['erp_companies']) }}</p>
+        </div>
         <div class="relative group bg-gray-900 border border-amber-900/50 rounded-xl p-4">
 <a data-dashboard-metric="pending_companies" aria-label="Open pending companies details" class="absolute z-10 inset-0 rounded-xl focus:ring-2 focus:ring-indigo-400 group-hover:ring-1 group-hover:ring-indigo-400" href="{{ route('saas.admin.dashboard.detail', 'pending_companies') }}"></a>
             <p class="text-[10px] text-amber-500 uppercase tracking-wide mb-1">Pending</p>
@@ -111,6 +116,34 @@
         </div>
     </div>
 
+    <section id="erp-financials" class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-6" aria-labelledby="erp-financials-heading">
+        <h2 id="erp-financials-heading" class="text-lg font-bold">ERP invoicing and collections</h2>
+        <form action="{{ route('saas.admin.dashboard') }}#erp-financials" class="tn-dashboard-detail-filters flex flex-wrap gap-3 items-end my-3" method="GET">
+            @include('saas-admin.partials.erp-financial-dates', ['erpDates' => $erpDates])
+            <button class="tn-detail-primary">Apply ERP dates</button>
+            <a class="tn-detail-secondary" href="{{ route('saas.admin.dashboard') }}#erp-financials">All time</a>
+        </form>
+        @error('erp_from')<p role="alert">{{ $message }}</p>@enderror
+        @error('erp_to')<p role="alert">{{ $message }}</p>@enderror
+        <div class="grid gap-4 sm:grid-cols-2">
+            <div class="border rounded-lg p-4 min-w-0">
+                <h3 class="font-semibold">{{ \App\Support\ProductCatalog::label($erpType) }} subscriptions</h3>
+                @include('saas-admin.partials.erp-financial-amounts', ['lane' => $erpTotals['subscription'], 'isSubscription' => true])
+            </div>
+            <div class="border rounded-lg p-4 min-w-0">
+                <h3 class="font-semibold">Healthcare company billing</h3>
+                @include('saas-admin.partials.erp-financial-amounts', ['lane' => $erpTotals['operations'], 'isSubscription' => false])
+            </div>
+            @if($erpTotals['school_fees'] !== null)
+                <div class="border rounded-lg p-4 min-w-0">
+                    <h3 class="font-semibold">School ERP fees</h3>
+                    @include('saas-admin.partials.erp-financial-amounts', ['lane' => $erpTotals['school_fees'], 'isSubscription' => false, 'reversalLabel' => 'Receipt reversals'])
+                </div>
+            @endif
+        </div>
+        <p class="text-sm mt-3"><a class="underline" href="{{ route('saas.admin.usage', ['product_scope' => $erpType] + $erpFilters) }}">View ERP company reports</a></p>
+    </section>
+
     <div class="tn-company-workspace">
         <div class="tn-company-tabs flex border-b border-gray-800 mb-0 overflow-x-auto">
             <button type="button" data-company-tab="di" aria-pressed="true" class="flex items-center gap-2 px-5 py-3 text-sm font-semibold border-b-2 transition shrink-0 whitespace-nowrap">
@@ -124,6 +157,9 @@
             <button type="button" data-company-tab="fbrpos" aria-pressed="false" class="flex items-center gap-2 px-5 py-3 text-sm font-semibold border-b-2 transition shrink-0 whitespace-nowrap">
                 <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
                 FBR POS ({{ $stats['fbrpos_companies'] }})
+            </button>
+            <button type="button" data-company-tab="{{ $erpType }}" aria-pressed="false" class="flex items-center gap-2 px-5 py-3 text-sm font-semibold border-b-2 transition shrink-0 whitespace-nowrap">
+                {{ \App\Support\ProductCatalog::label($erpType) }} ({{ number_format($stats['erp_companies']) }})
             </button>
         </div>
 
@@ -149,7 +185,7 @@
                             <td class="px-4 py-3">
                                 <a href="{{ route('saas.admin.companies.show', $company->id) }}" class="text-white font-medium hover:text-emerald-400 transition">{{ $company->name }}</a>
                                 <p class="text-[10px] text-gray-600 dark:text-gray-400">{{ $company->email ?? '' }}</p>
-                                <p class="text-xs">Company ID: {{ $company->id }} · <a href="{{ route('saas.admin.dashboard.detail',['metric'=>'di_invoices','company_id'=>$company->id]) }}">Reports</a></p>
+                                <p class="text-xs">Company ID: {{ \App\Services\CompanyProductId::display($company) }} · <a href="{{ route('saas.admin.dashboard.detail',['metric'=>'di_invoices','company_id'=>$company->id]) }}">Reports</a></p>
                             </td>
                             <td class="px-4 py-3 text-gray-400 text-xs hidden sm:table-cell">{{ $company->ntn ?? '—' }}</td>
                             <td class="px-4 py-3 text-gray-400 text-xs hidden md:table-cell">{{ $company->owner_name ?? '—' }}</td>
@@ -198,7 +234,7 @@
                             <td class="px-4 py-3">
                                 <a href="{{ route('saas.admin.companies.show', $company->id) }}" class="text-white font-medium hover:text-purple-400 transition">{{ $company->name }}</a>
                                 <p class="text-[10px] text-gray-600 dark:text-gray-400">{{ $company->email ?? '' }}</p>
-                                <p class="text-xs">Company ID: {{ $company->id }} · <a href="{{ route('saas.admin.dashboard.detail',['metric'=>'pos_transactions','company_id'=>$company->id]) }}">Reports</a></p>
+                                <p class="text-xs">Company ID: {{ \App\Services\CompanyProductId::display($company) }} · <a href="{{ route('saas.admin.dashboard.detail',['metric'=>'pos_transactions','company_id'=>$company->id]) }}">Reports</a></p>
                             </td>
                             <td class="px-4 py-3 text-gray-400 text-xs hidden sm:table-cell">{{ $company->pra_pos_id ?? '—' }}</td>
                             <td class="px-4 py-3 text-gray-400 text-xs hidden md:table-cell">{{ $company->owner_name ?? '—' }}</td>
@@ -247,7 +283,7 @@
                             <td class="px-4 py-3">
                                 <a href="{{ route('saas.admin.companies.show', $company->id) }}" class="text-white font-medium hover:text-blue-400 transition">{{ $company->name }}</a>
                                 <p class="text-[10px] text-gray-600 dark:text-gray-400">{{ $company->email ?? '' }}</p>
-                                <p class="text-xs">Company ID: {{ $company->id }} · <a href="{{ route('saas.admin.dashboard.detail',['metric'=>'fbrpos_transactions','company_id'=>$company->id]) }}">Reports</a></p>
+                                <p class="text-xs">Company ID: {{ \App\Services\CompanyProductId::display($company) }} · <a href="{{ route('saas.admin.dashboard.detail',['metric'=>'fbrpos_transactions','company_id'=>$company->id]) }}">Reports</a></p>
                             </td>
                             <td class="px-4 py-3 text-gray-400 text-xs hidden sm:table-cell">{{ $company->ntn ?? '—' }}</td>
                             <td class="px-4 py-3 text-gray-400 text-xs hidden md:table-cell">{{ $company->owner_name ?? '—' }}</td>
@@ -277,6 +313,7 @@
             </div>
             @endif
         </div>
+        @include('saas-admin.partials.erp-dashboard-companies')
     </div>
 
     <div class="tn-information-grid">

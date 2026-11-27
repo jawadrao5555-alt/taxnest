@@ -1,0 +1,228 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\AdminUser;
+use App\Models\Branch;
+use App\Models\Company;
+use App\Services\CompanyProductId;
+use App\Services\Reporting\ErpAdminFinancialSummary;
+use App\Support\NestErps;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
+use Tests\TestCase;
+
+final class ErpAdminFinancialSummaryTest extends TestCase
+{
+    use RefreshDatabase;
+
+    public function test_erp_package_totals_include_real_receipts_and_keep_tenant_activity_separate(): void
+    {
+        $erp = $this->company('Synthetic ERP', NestErps::PRODUCT_TYPE);
+        $legacy = $this->company('Legacy healthcare', 'health');
+        $pos = $this->company('Separate POS', 'fbrpos');
+        $first = $this->packageInvoice($erp, 'ERP-0001', 71900, '2026-11-01');
+        $this->packageReceipt($first, 'ERP-R1', 71900, '2026-11-02');
+        $this->packageReceipt($first, 'ERP-R0', 0, '2026-11-02');
+        $this->packageReceipt($first, 'ERP-R2', 50.25, '2026-11-27 23:59:59');
+        $this->packageReceipt($first, null, 200, '2026-11-26');
+        $this->packageReceipt($first, 'ERP-UNATTESTED', 250, '2026-11-26', reviewerId: null);
+        $this->packageReceipt($first, 'ERP-FUTURE', 40, '2026-11-28');
+        $this->packageInvoice($erp, 'ERP-VOID', 5000, '2026-11-03', status: 'void');
+
+        // A credit-only activation has no real cash receipt or package invoice.
+        $addon = $this->packageInvoice($erp, 'ERP-ADD', 700, '2026-11-02', kind: 'ai_pages');
+        $this->packageReceipt($addon, 'ERP-ADD-R', 700, '2026-11-02');
+        $legacyInvoice = $this->packageInvoice($legacy, 'LEGACY-ERP', 100, '2026-11-03');
+        $this->packageReceipt($legacyInvoice, 'LEGACY-R', 100, '2026-11-03');
+        // Historical platform money remains included after an ERP company is binned.
+        $legacy->delete();
+        $posInvoice = $this->packageInvoice($pos, 'POS-0001', 200, '2026-11-03');
+        $this->packageReceipt($posInvoice, 'POS-R', 200, '2026-11-03');
+
+        $service = app(ErpAdminFinancialSummary::class);
+        $filters = ['date_from' => '2026-11-01', 'date_to' => '2026-11-27'];
+        $results = $service->forCompanies(collect([$erp, $legacy, $pos]), $filters);
+        $this->assertSame([$erp->id, $legacy->id], $results->keys()->all());
+        $this->assertSame(['invoice_count' => 1, 'invoiced' => 71900.0, 'receipt_count' => 2, 'received' => 71950.25],
+            $results[$erp->id]['subscription']);
+        $this->assertSame(100.0, $results[$legacy->id]['subscription']['received']);
+        $this->assertSame(0.0, $results[$erp->id]['operations']['received']);
+        $overall = $service->allCompanyTotals($filters);
+        $this->assertSame(['invoice_count' => 2, 'invoiced' => 72000.0, 'receipt_count' => 3, 'received' => 72050.25],
+            $overall['subscription']);
+        $this->assertNull($service->allCompanyTotals($filters + ['branch_id' => 0])['subscription']);
+    }
+
+    public function test_healthcare_activity_counts_only_final_bills_and_real_receipt_inflow_by_company_date_and_branch(): void
+    {
+        $erp = $this->company('Synthetic lab', NestErps::PRODUCT_TYPE);
+        $other = $this->company('Other company', NestErps::PRODUCT_TYPE);
+        $school = $this->company('Synthetic school', NestErps::PRODUCT_TYPE, 'school');
+        $this->healthBill($erp, 'SYN-01', 100, 50, branch: 27);
+        $this->healthBill($erp, 'SYN-CANCEL', 999, 999, branch: 27, status: 'cancelled');
+        $this->healthBill($erp, 'SYN-ESTIMATE', 888, 888, branch: 27, type: 'estimate');
+        $this->healthBill($erp, 'SYN-UNASSIGNED', 300, 90);
+        $this->healthBill($other, 'SYN-OTHER', 40, 10, branch: 29);
+        $this->healthBill($school, 'SYN-WRONG-VERTICAL', 999, 1);
+
+        $parent = $this->healthPayment($erp, 'SYN-DEPOSIT', 60, kind: 'deposit', branch: 27);
+        $this->healthPayment($erp, 'SYN-APPLIED-DEPOSIT', 40, kind: 'deposit', date: '2026-11-28', branch: 27, split: $parent);
+        $this->healthPayment($erp, 'SYN-REFUNDED', 10, kind: 'refund', branch: 27);
+        $this->healthPayment($erp, 'SYN-WRITEOFF', 800, kind: 'write_off', branch: 27);
+        $this->healthPayment($erp, 'SYN-CREDIT', 900, branch: 27, method: 'credit');
+        $this->healthPayment($erp, 'SYN-VOID', 500, branch: 27, reversed: true);
+        $this->healthPayment($other, 'SYN-OTHER-PAY', 40, branch: 29);
+        $this->healthPayment($other, 'SYN-FOREIGN-SPLIT', 999, kind: 'deposit', branch: 29, split: $parent);
+
+        $service = app(ErpAdminFinancialSummary::class);
+        $filters = ['date_to' => '2026-11-27', 'date_from' => '2026-11-27'];
+        $report = $service->forCompanies(collect([$erp, $other, $school]), $filters + ['branch_id' => 27]);
+        $this->assertSame([
+            'invoice_count' => 1, 'invoiced' => 100.0, 'receipt_count' => 1, 'received' => 100.0,
+            'refunds' => 10.0, 'net_received' => 90.0, 'outstanding' => 50.0,
+        ], $report[$erp->id]['operations']);
+        $this->assertNull($report[$erp->id]['subscription']);
+        $this->assertSame(0, $report[$other->id]['operations']['invoice_count']);
+        $this->assertNull($report[$school->id]['operations']);
+        $this->assertSame(300.0, $service->forCompanies(collect([$erp]), $filters + ['branch_id' => 0])[$erp->id]['operations']['invoiced']);
+        $this->assertSame(440.0, $service->allCompanyTotals($filters)['operations']['invoiced']);
+        $this->assertSame(0.0, $service->allCompanyTotals([
+            'company_id' => $erp->id, 'date_from' => '2026-11-28', 'date_to' => '2026-11-28',
+        ])['operations']['received']);
+
+        $admin = AdminUser::create(['name' => 'Synthetic reviewer', 'email' => 'erp-totals@example.invalid',
+            'password' => 'ExamplePassword123!', 'role' => 'super_admin']);
+        $this->actingAs($admin, 'admin')->get('/admin/company-usage?'.http_build_query($filters + [
+            'product_scope' => 'erps', 'company_id' => $erp->id, 'branch_id' => 27,
+        ]))->assertOk()->assertSee('Company Healthcare billing')->assertSee('PKR 90.00 net received')
+            ->assertDontSee('SYN-REFUNDED')->assertDontSee('Private sample payer');
+    }
+
+    public function test_unavailable_healthcare_sources_do_not_hide_package_totals_or_invent_zeroes(): void
+    {
+        $erp = $this->company('Synthetic ERP', NestErps::PRODUCT_TYPE);
+        DB::statement('DROP TABLE health_bills');
+
+        $report = app(ErpAdminFinancialSummary::class)->forCompanies(collect([$erp]));
+        $this->assertNull($report[$erp->id]['operations']);
+        $this->assertSame(0, $report[$erp->id]['subscription']['receipt_count']);
+    }
+
+    public function test_live_ops_links_to_read_only_erp_billing_and_refuses_foreign_branches(): void
+    {
+        $erp = $this->company('Synthetic reporting Lab', 'health');
+        $other = $this->company('Separate healthcare company', NestErps::PRODUCT_TYPE);
+        $pos = $this->company('Existing FBR POS company', 'fbrpos');
+        $branch = Branch::create(['company_id' => $erp->id, 'name' => 'Fictional reporting branch', 'code' => 'LAB-A']);
+        $foreign = Branch::create(['company_id' => $other->id, 'name' => 'Fictional other branch', 'code' => 'LAB-B']);
+        $this->healthBill($erp, 'SYN-REPORTING-BILL', 123.45, 23.45, branch: $branch->id);
+        $this->healthBill($other, 'SYN-FOREIGN-BILL', 999.99, 999.99, branch: $foreign->id);
+        $viewer = AdminUser::create(['name' => 'Restricted reviewer', 'email' => 'erp-live-viewer@example.invalid',
+            'password' => 'ExamplePassword123!', 'role' => 'admin']);
+        $admin = AdminUser::create(['name' => 'Synthetic reviewer', 'email' => 'erp-live-admin@example.invalid',
+            'password' => 'ExamplePassword123!', 'role' => 'super_admin']);
+        $url = route('saas.admin.live-ops.erp-company', $erp->id);
+        $from = ['date_from' => '2026-11-27', 'date_to' => '2026-11-27'];
+
+        $this->actingAs($viewer, 'admin')->get($url)->assertForbidden();
+        $this->actingAs($admin, 'admin')
+            ->get(route('saas.admin.live-ops', ['product' => NestErps::PRODUCT_TYPE]))
+            ->assertOk()->assertSee($url)->assertSee('ERP activity and billing')->assertDontSee($pos->name);
+        $this->get($url.'?'.http_build_query($from + ['branch_id' => $branch->id]))
+            ->assertOk()->assertSee('PKR 123.45')->assertSee('Fictional reporting branch')
+            ->assertDontSee('PKR 999.99')->assertDontSee($foreign->name)->assertDontSee('Private sample payer');
+        $this->getJson($url.'?'.http_build_query($from + ['branch_id' => $foreign->id]))
+            ->assertUnprocessable()->assertJsonValidationErrors('branch_id');
+        $this->getJson(route('saas.admin.live-ops.erp-company', $pos->id))->assertNotFound();
+    }
+
+    public function test_company_usage_exports_each_erp_ledger_with_its_own_totals_and_reporting_period(): void
+    {
+        $erp = $this->company('Fictional Lab', 'health');
+        $school = $this->company('Fictional School', NestErps::PRODUCT_TYPE, NestErps::SCHOOL);
+        $pos = $this->company('Fictional POS', 'fbrpos');
+        $branch = Branch::create(['company_id' => $erp->id, 'name' => 'Fictional Lab Branch', 'code' => 'LAB-A']);
+        $foreign = Branch::create(['company_id' => $school->id, 'name' => 'Fictional Campus', 'code' => 'SCH-A']);
+        $reference = CompanyProductId::display($erp);
+        $currentInvoice = $this->packageInvoice($erp, 'CSV-ERP-CURRENT', 900, '2026-11-27');
+        $priorInvoice = $this->packageInvoice($erp, 'CSV-ERP-PRIOR', 700, '2025-11-27');
+        $this->packageReceipt($currentInvoice, 'CSV-CURRENT-R', 300, '2026-11-27');
+        $this->packageReceipt($priorInvoice, 'CSV-PRIOR-R', 550, '2025-11-27');
+        $this->healthBill($erp, 'CSV-HEALTH-BILL', 123.45, 23.45, branch: $branch->id);
+        $this->healthPayment($erp, 'CSV-HEALTH-PAYMENT', 100, branch: $branch->id);
+        $this->healthPayment($erp, 'CSV-HEALTH-REFUND', 10, kind: 'refund', branch: $branch->id);
+        $this->healthBill($school, 'CSV-OTHER-BILL', 98.76, 98.76, branch: $foreign->id);
+        $admin = AdminUser::create(['name' => 'Fictional reviewer', 'email' => 'erp-csv@example.invalid',
+            'password' => 'ExamplePassword123!', 'role' => 'super_admin']);
+
+        $url = route('saas.admin.usage');
+        $filters = ['period' => 'two_year', 'as_of' => '2026-11-27', 'company_id' => $reference];
+        $this->actingAs($admin, 'admin')->get($url.'?'.http_build_query($filters))->assertOk()
+            ->assertSee('Download ERP billing and collections (CSV)');
+
+        $export = $filters + ['export' => 'erp_csv', 'product_scope' => NestErps::PRODUCT_TYPE];
+        $response = $this->get($url.'?'.http_build_query($export))->assertOk()->assertDownload('erp-financials-'.$erp->id.'.csv');
+        $csv = $response->streamedContent();
+        $this->assertStringNotContainsString('Private sample payer', $csv);
+        $this->assertStringNotContainsString('CSV-HEALTH-BILL', $csv);
+        $this->assertStringNotContainsString('98.76', $csv);
+        $this->assertSame([
+            'company_id,company_reference,branch_or_campus_id,period,date_from,date_to,ledger,coverage,invoice_count,invoiced_pkr,receipt_count,received_pkr,refunds_or_reversals_pkr,net_received_pkr,outstanding_pkr',
+            "$erp->id,$reference,all,current,2026-01-01,2026-11-27,taxnest_package,available,1,900.00,1,300.00,,,",
+            "$erp->id,$reference,all,current,2026-01-01,2026-11-27,healthcare_operations,available,1,123.45,1,100.00,10.00,90.00,23.45",
+            "$erp->id,$reference,all,prior_year,2025-01-01,2025-11-27,taxnest_package,available,1,700.00,1,550.00,,,",
+            "$erp->id,$reference,all,prior_year,2025-01-01,2025-11-27,healthcare_operations,available,0,0.00,0,0.00,0.00,0.00,0.00",
+        ], explode("\n", trim($csv)));
+
+        $scoped = $this->get($url.'?'.http_build_query($export + ['branch_id' => $branch->id]))->assertOk()->streamedContent();
+        $this->assertStringContainsString("$erp->id,$reference,$branch->id,current,2026-01-01,2026-11-27,taxnest_package,company_wide_only,,,,,,,", $scoped);
+        $this->assertStringContainsString("$erp->id,$reference,$branch->id,current,2026-01-01,2026-11-27,healthcare_operations,available,1,123.45,1,100.00,10.00,90.00,23.45", $scoped);
+        $this->getJson($url.'?'.http_build_query($export + ['branch_id' => $foreign->id]))
+            ->assertUnprocessable()->assertJsonValidationErrors('branch_id');
+        $this->getJson($url.'?'.http_build_query(['company_id' => $pos->id, 'export' => 'erp_csv']))->assertNotFound();
+
+        $schoolCsv = $this->get($url.'?'.http_build_query(['company_id' => $school->id, 'export' => 'erp_csv',
+            'date_from' => '2026-11-27', 'date_to' => '2026-11-27']))->assertOk()->streamedContent();
+        $this->assertStringContainsString('school_erp_fees,available,0,0.00,0,0.00,0.00,0.00,0.00', $schoolCsv);
+        $this->assertStringNotContainsString('healthcare_operations', $schoolCsv);
+    }
+
+    private function company(string $name, string $product, string $vertical = 'health'): Company
+    {
+        return Company::create(['name' => $name, 'ntn' => 'SYN-'.substr(sha1($name), 0, 12),
+            'product_type' => $product, 'erps_vertical' => $vertical, 'status' => 'approved', 'company_status' => 'active']);
+    }
+
+    private function packageInvoice(Company $company, string $number, float $amount, string $date, string $status = 'paid', string $kind = 'subscription'): int
+    {
+        return DB::table('subscription_invoices')->insertGetId(['company_id' => $company->id,
+            'amount' => $amount, 'document_number' => $number, 'document_snapshot' => json_encode(['kind' => $kind]),
+            'created_at' => $date, 'due_date' => $date, 'status' => $status]);
+    }
+
+    private function packageReceipt(int $invoice, ?string $number, float $amount, string $date, ?int $reviewerId = 1): void
+    {
+        DB::table('subscription_payments')->insert(['subscription_invoice_id' => $invoice, 'amount' => $amount,
+            'paid_at' => $date, 'receipt_number' => $number,
+            'receipt_snapshot' => $number ? json_encode(['version' => 1, 'kind' => 'subscription', 'review' => ['admin_id' => $reviewerId]]) : null]);
+    }
+
+    private function healthBill(Company $company, string $number, float $amount, float $due,
+        ?int $branch = null, string $status = 'finalized', string $type = 'invoice'): void
+    {
+        DB::table('health_bills')->insert(['company_id' => $company->id, 'branch_id' => $branch,
+            'health_patient_id' => 123, 'payer_name' => 'Private sample payer', 'bill_no' => $number,
+            'bill_date' => '2026-11-27', 'total_amount' => $amount, 'outstanding_amount' => $due,
+            'status' => $status, 'doc_type' => $type]);
+    }
+
+    private function healthPayment(Company $company, string $number, float $amount, string $kind = 'payment',
+        string $date = '2026-11-27', ?int $branch = null, ?int $split = null, string $method = 'cash', bool $reversed = false): int
+    {
+        return DB::table('health_payments')->insertGetId(['company_id' => $company->id, 'branch_id' => $branch,
+            'health_patient_id' => 123, 'receipt_no' => $number, 'kind' => $kind, 'method' => $method,
+            'amount' => $amount, 'business_date' => $date, 'split_from_payment_id' => $split,
+            'reversed_at' => $reversed ? '2026-11-27 12:00:00' : null]);
+    }
+}

@@ -2,12 +2,43 @@
 
 namespace App\Models;
 
+use App\Services\CompanyProductId;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Company extends Model
 {
     use SoftDeletes;
+
+    private bool $savingProductIdentity = false;
+
+    public function save(array $options = [])
+    {
+        $needsIdentifier = array_key_exists('product_company_id', $this->getAttributes()) && !$this->product_company_id;
+        if ($this->savingProductIdentity
+            || ($this->exists && !$needsIdentifier && !$this->isDirty(CompanyProductId::CLASSIFICATION_COLUMNS))
+            || !CompanyProductId::available($this->getConnection())) {
+            return parent::save($options);
+        }
+
+        // The created hook saves the legacy account code quietly on this same
+        // instance. Let that nested save finish before assigning the display ID.
+        $this->savingProductIdentity = true;
+        try {
+            return $this->getConnection()->transaction(function () use ($options) {
+                if (!parent::save($options)) {
+                    return false;
+                }
+
+                $this->setAttribute('product_company_id', CompanyProductId::synchronize($this->getConnection(), (int) $this->getKey()));
+                $this->syncOriginalAttribute('product_company_id');
+
+                return true;
+            });
+        } finally {
+            $this->savingProductIdentity = false;
+        }
+    }
 
     /** School collection is NOT an IMS retail invoice or a DI zero-rated sale. */
     public function isSchoolFeePilot(): bool

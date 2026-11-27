@@ -4,6 +4,24 @@
 @endphp
 <div class="p-4 sm:p-6 max-w-7xl mx-auto">
     <h1 class="text-2xl font-bold text-white mb-6">Subscriptions</h1>
+    <form method="GET" action="{{ route('saas.admin.subscriptions') }}" class="mb-5 flex flex-wrap items-end gap-3">
+        <label class="text-sm text-gray-300">Product
+            <select name="product" class="block mt-1 rounded-lg bg-gray-800 border-gray-700 text-sm">
+                <option value="">All products</option>
+                @foreach(\App\Support\ProductCatalog::TYPES as $type)
+                    <option value="{{ $type }}" @selected($product === $type)>{{ \App\Support\ProductCatalog::label($type) }}</option>
+                @endforeach
+            </select>
+        </label>
+        <label class="text-sm text-gray-300">Status
+            <select name="status" class="block mt-1 rounded-lg bg-gray-800 border-gray-700 text-sm">
+                <option value="">All statuses</option>
+                <option value="active" @selected(request('status') === 'active')>Active</option>
+                <option value="inactive" @selected(request('status') === 'inactive')>Inactive</option>
+            </select>
+        </label>
+        <button type="submit" class="rounded-lg border border-gray-700 px-4 py-2 text-sm text-white">Apply filters</button>
+    </form>
 
     @if($canManageBilling)
     @if($documents = session('package_sale_documents'))
@@ -115,7 +133,10 @@
                         $activeCount = $allSubs->where('active', true)->count();
                     @endphp
                     <tr class="hover:bg-gray-800/50">
-                        <td class="px-4 py-3 text-white font-medium">{{ $company->name }}@if($company->trashed()) <span class="text-xs text-gray-400">(archived)</span>@endif</td>
+                        <td class="px-4 py-3 text-white font-medium">
+                            {{ $company->name }}@if($company->trashed()) <span class="text-xs text-gray-400">(archived)</span>@endif
+                            <span class="block text-xs text-gray-400">{{ \App\Services\CompanyProductId::display($company) }} · {{ \App\Support\ProductCatalog::label($company->product_type, $company->erps_vertical) }}</span>
+                        </td>
                         <td class="px-4 py-3 text-gray-300">{{ $displayPlan?->name ?? '—' }}</td>
                         <td class="px-4 py-3 text-gray-400 hidden sm:table-cell">{{ ucfirst($sub->billing_cycle ?? 'monthly') }}</td>
                         <td class="px-4 py-3 text-gray-400 text-xs hidden md:table-cell">{{ optional($sub->start_date)->format('d M Y') ?? '—' }}</td>

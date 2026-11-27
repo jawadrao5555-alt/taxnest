@@ -118,6 +118,12 @@
                         <button type="submit" class="px-4 py-2.5 rounded-xl border border-gray-300 dark:border-gray-600 text-sm font-bold hover:bg-gray-50 dark:hover:bg-gray-700 transition">{{ __('health.visit_reopen') }}</button>
                     </form>
                 @endif
+                @if($canOrderLab)
+                    <a href="{{ route('health.lab.orders.create', ['visit_id' => $visit->id]) }}"
+                       class="px-4 py-2.5 rounded-xl border border-gray-300 dark:border-gray-600 text-sm font-bold hover:bg-gray-50 dark:hover:bg-gray-700">
+                        {{ __('lab_workflow.new_order') }}
+                    </a>
+                @endif
                 @if($prescription)
                     <a href="{{ route('health.clinical.prescription.print', $prescription->id) }}" target="_blank" rel="noopener"
                        class="px-4 py-2.5 rounded-xl border border-gray-300 dark:border-gray-600 text-sm font-bold hover:bg-gray-50 dark:hover:bg-gray-700 transition">
@@ -126,6 +132,18 @@
                 @endif
             </div>
         </div>
+
+        @if($labOrders->isNotEmpty())
+            <section class="rounded-2xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-5">
+                <h2 class="font-bold">{{ __('health.nav_lab') }}</h2>
+                <ul class="mt-2 flex flex-wrap gap-3">
+                    @foreach($labOrders as $labOrder)
+                        <li><a href="{{ route('health.lab.orders.show', $labOrder) }}"
+                               class="font-semibold text-teal-700 underline dark:text-teal-300"><bdi>{{ $labOrder->order_no }}</bdi></a></li>
+                    @endforeach
+                </ul>
+            </section>
+        @endif
 
         @if($readOnly)
             <div class="rounded-2xl bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-5 py-3">

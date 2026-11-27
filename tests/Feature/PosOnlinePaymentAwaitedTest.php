@@ -832,6 +832,56 @@ class PosOnlinePaymentAwaitedTest extends TestCase
         $this->assertSame(346.0, (float) $transaction->total_amount);
     }
 
+    public function test_cash_quote_and_retry_return_the_original_table_tender_and_change(): void
+    {
+        $companyId = $this->makeShop(['pos_tax_rate_cash' => 16, 'pos_tax_rate_card' => 8]);
+        $user = $this->makeCashier($companyId);
+        $orderId = $this->makeOrder($companyId);
+
+        $this->actingAs($user, 'pos')
+            ->getJson("/pos/restaurant/orders/{$orderId}/payment-quote?payment_method=cash")
+            ->assertOk()
+            ->assertJson([
+                'payment_method' => 'cash',
+                'total_amount' => 116,
+                'counter_cash_due' => 116,
+                'delivery_collection_mode' => 'counter',
+            ]);
+
+        $original = $this->pay($orderId, $user, ['pay_uuid' => 'table-cash-1', 'cash_received' => 200])
+            ->assertOk()
+            ->assertJson(['payment_method' => 'cash', 'total_amount' => 116, 'cash_received' => 200, 'change_due' => 84]);
+
+        $this->pay($orderId, $user, ['pay_uuid' => 'table-cash-1', 'cash_received' => 230])
+            ->assertOk()
+            ->assertJson([
+                'transaction_id' => $original->json('transaction_id'),
+                'cash_received' => 200,
+                'change_due' => 84,
+            ]);
+        $this->assertSame(1, DB::table('pos_transactions')->count());
+    }
+
+    public function test_optional_table_tender_preserves_the_cash_shortfall_policy(): void
+    {
+        $companyId = $this->makeShop(['pos_tax_rate_cash' => 16]);
+        $user = $this->makeCashier($companyId);
+        $shortOrder = $this->makeOrder($companyId);
+        $blankOrder = $this->makeOrder($companyId);
+        $cardOrder = $this->makeOrder($companyId);
+
+        $this->pay($shortOrder, $user, ['cash_received' => 100])
+            ->assertOk()
+            ->assertJson(['total_amount' => 116, 'cash_received' => 100, 'change_due' => 0]);
+        $this->pay($blankOrder, $user)
+            ->assertOk()
+            ->assertJson(['cash_received' => 116, 'change_due' => 0]);
+        $this->pay($cardOrder, $user, ['payment_method' => 'card', 'cash_received' => 200])
+            ->assertOk()
+            ->assertJson(['payment_method' => 'debit_card'])
+            ->assertJsonMissingPath('cash_received');
+    }
+
     public function test_quote_and_final_payment_stay_equal_across_tax_modes_with_discount_and_exempt_items(): void
     {
         foreach (['exclusive', 'inclusive', 'inclusive_card_save'] as $index => $pricingMode) {

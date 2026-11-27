@@ -45,6 +45,28 @@ class AdminDashboardDetailTest extends TestCase {
   }
   $this->assertSame($before,DB::table('pos_transactions')->get()->toJson());
  }
+ public function test_company_codes_filter_reports_and_preserve_numeric_links_and_csv_identity(): void {
+  $this->admin();
+  Schema::table('companies', function (Blueprint $table) {
+   $table->string('account_code')->nullable();
+   $table->string('product_company_id')->nullable();
+  });
+  Schema::create('company_product_ids', function (Blueprint $table) {
+   $table->unsignedBigInteger('company_id');
+   $table->string('code');
+  });
+  DB::table('companies')->where('id', 2)->update(['account_code' => 'PRA-00002', 'product_company_id' => 'P01']);
+  DB::table('company_product_ids')->insert(['company_id' => 2, 'code' => 'P01']);
+  $route = '/admin/dashboard/details/pos_transactions?company_id=';
+  foreach (['P01', 'PRA-00002', '2'] as $identifier) {
+   $this->get($route.$identifier)->assertOk()->assertViewHas('count', 1)->assertSee('Company ID: P01')
+    ->assertSee(route('saas.admin.local-support-copies', 2), false);
+  }
+  foreach (['P99', '0'] as $unknown) {
+   $this->get($route.$unknown)->assertOk()->assertViewHas('count', 0);
+  }
+  $this->assertSame($this->get($route.'2&export=csv')->streamedContent(), $this->get($route.'P01&export=csv')->streamedContent());
+ }
  public function test_unknown_saved_modes_remain_selectable_and_company_scope_matches_csv(): void {
   $this->admin();
   DB::table('pos_transactions')->where('status','completed')->update(['invoice_mode'=>'legacy_custom','pra_status'=>'legacy_waiting']);
@@ -105,13 +127,24 @@ class AdminDashboardDetailTest extends TestCase {
   }
  }
  private function admin(): void {$this->actingAs((new AdminUser)->forceFill(['id'=>50,'role'=>'super_admin','name'=>'Synthetic admin']),'admin');}
- public function test_all_thirteen_screens_render_and_csv_is_safe(): void {
+ public function test_all_dashboard_detail_screens_render_and_csv_is_safe(): void {
   $this->admin();foreach(AdminDashboardDetail::LABELS as $metric=>$label) {
    $this->get('/admin/dashboard/details/'.$metric)->assertOk()->assertSee($label.' details');
    $response=$this->get('/admin/dashboard/details/'.$metric.'?export=csv');$response->assertOk();$csv=$response->streamedContent();
    $this->assertStringNotContainsString('MUST-NOT-EXPORT',$csv);
   }
   $this->assertStringContainsString("'=Fictional Company",$this->get('/admin/dashboard/details/total_companies?export=csv')->streamedContent());
+ }
+ public function test_erp_companies_report_includes_the_legacy_product_alias_and_excludes_other_products(): void {
+  $this->admin();
+  foreach(['erps'=>'Current ERP company','health'=>'Legacy ERP company'] as $type=>$name) DB::table('companies')->insert([
+   'name'=>$name,'product_type'=>$type,'status'=>'approved','agent_api_key'=>'MUST-NOT-EXPORT','created_at'=>'2026-10-01']);
+  $response=$this->get('/admin/dashboard/details/erp_companies?erp_from=2026-11-01&erp_to=2026-11-30');
+  $response->assertOk()->assertViewHas('count',2)->assertSee('Current ERP company')->assertSee('Legacy ERP company')
+   ->assertDontSee('Company fbrpos')->assertDontSee('name="product"',false)
+   ->assertSee('product_scope=erps')->assertSee('date_from=2026-11-01')->assertSee('date_to=2026-11-30');
+  $this->get('/admin/dashboard/details/total_companies?product=health')->assertOk()->assertViewHas('count',2);
+  $this->getJson('/admin/dashboard/details/erp_companies?erp_from=2026-11-30&erp_to=2026-11-01')->assertUnprocessable();
  }
  public function test_detail_navigation_and_selected_status_are_explicit(): void {
   $this->admin();

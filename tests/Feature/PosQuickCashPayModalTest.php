@@ -115,25 +115,14 @@ class PosQuickCashPayModalTest extends TestCase
         $this->assertStringContainsString("this.processPayment('card')", $body);
     }
 
-    /**
-     * processPayment must NOT be globally gated on the cash-received flag — held
-     * / provisional / restaurant flows depend on the untouched pipeline. The
-     * ONLY reference to cashReceivedEnabled inside processPayment's body would be
-     * a regression, so assert the flag appears exactly once (in quickCashPay).
-     */
     public function test_process_payment_not_globally_regated(): void
     {
         $blade = $this->saleBlade();
-        $refs = substr_count($blade, 'cashReceivedEnabled');
-        // 1 = x-data declaration + comment mentions do not use the identifier
-        // with `this.`; the only executable use is inside quickCashPay.
-        $execRefs = substr_count($blade, 'this.cashReceivedEnabled');
-        $this->assertSame(
-            1,
-            $execRefs,
-            'this.cashReceivedEnabled must be referenced exactly once (in quickCashPay); '
-            . 'processPayment must stay flag-agnostic. Found ' . $execRefs
-        );
-        $this->assertGreaterThanOrEqual(2, $refs, 'flag should appear in x-data + quickCashPay');
+        $start = strpos($blade, '        async processPayment(method) {');
+        $this->assertNotFalse($start);
+        $end = strpos($blade, '        async processPaymentManual(', $start);
+        $this->assertNotFalse($end);
+
+        $this->assertStringNotContainsString('cashReceivedEnabled', substr($blade, $start, $end - $start));
     }
 }

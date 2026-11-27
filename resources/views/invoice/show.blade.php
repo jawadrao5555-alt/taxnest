@@ -829,7 +829,7 @@
                                 @if($hasStWht)<td class="px-2 py-2 text-xs text-center">@if($item->st_withheld_at_source)<span class="text-emerald-600 font-medium">{{ $item->st_withheld_amount !== null ? number_format($item->st_withheld_amount, 2) : 'Amount required' }}</span>@else<span class="text-gray-400">—</span>@endif</td>@endif
                                 @if($hasPetLevy)<td class="px-2 py-2 text-xs text-gray-700 dark:text-gray-300 text-right whitespace-nowrap">{{ $item->petroleum_levy ? number_format($item->petroleum_levy, 2) : '—' }}</td>@endif
                                 @if($hasFurtherTax)<td class="px-2 py-2 text-xs text-orange-600 text-right whitespace-nowrap">{{ ($item->further_tax ?? 0) > 0 ? number_format($item->further_tax, 2) : '—' }}</td>@endif
-                                <td class="px-2 py-2 text-xs font-bold text-gray-900 dark:text-white text-right whitespace-nowrap">{{ number_format(($item->price * $item->quantity) + $item->tax + ($item->further_tax ?? 0), 2) }}</td>
+                                <td class="px-2 py-2 text-xs font-bold text-gray-900 dark:text-white text-right whitespace-nowrap">{{ number_format(($item->price * $item->quantity) + $item->tax + $item->di_federal_excise + ($item->further_tax ?? 0), 2) }}</td>
                             </tr>
                             @endforeach
                         </tbody>
@@ -842,6 +842,13 @@
                                 <td colspan="{{ $footColspan }}" class="px-2 py-2 text-right text-xs text-gray-600 dark:text-gray-400">Total Sales Tax</td>
                                 <td class="px-2 py-2 text-right text-xs font-bold text-gray-800 dark:text-gray-100 whitespace-nowrap">PKR {{ number_format($invoice->total_sales_tax ?? $invoice->items->sum('tax'), 2) }}</td>
                             </tr>
+                            @php $totalFederalExcise = $invoice->items->sum('di_federal_excise'); @endphp
+                            @if($totalFederalExcise > 0)
+                            <tr>
+                                <td colspan="{{ $footColspan }}" class="px-2 py-2 text-right text-xs text-gray-600 dark:text-gray-400">Federal Excise Duty</td>
+                                <td class="px-2 py-2 text-right text-xs font-bold text-gray-800 dark:text-gray-100 whitespace-nowrap">PKR {{ number_format($totalFederalExcise, 2) }}</td>
+                            </tr>
+                            @endif
                             @php $totalFurtherTax = $invoice->items->sum('further_tax'); @endphp
                             @if($totalFurtherTax > 0)
                             <tr>

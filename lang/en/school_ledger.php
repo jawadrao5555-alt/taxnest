@@ -1,5 +1,6 @@
 <?php
 return [
+ 'erp_cutover_closed'=>'New payments are recorded in School ERP. Earlier receipts remain available here.',
  'pilot_scope'=>'Local administrative fee receipts with cash, recorded card/bank payments and outstanding balances. No fiscal submission or payment processing. Full School ERP remains separate.',
  'today_cash'=>"Today's cash collections",
 

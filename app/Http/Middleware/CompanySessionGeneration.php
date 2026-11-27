@@ -18,7 +18,7 @@ class CompanySessionGeneration
 
     public static function guards(): array
     {
-        return array_unique(array_merge(['web', 'pos', 'fbrpos'], array_column(NestErps::VERTICALS, 'guard')));
+        return array_unique(array_merge(['web', 'pos', 'fbrpos', 'hr'], array_column(NestErps::VERTICALS, 'guard')));
     }
 
     public function handle(Request $request, Closure $next): Response
@@ -50,7 +50,8 @@ class CompanySessionGeneration
         // controller to run after its earlier authentication already passed.
         $path = ltrim($request->path(), '/');
         $target = str_starts_with($path, 'pos/') ? 'pos' : (str_starts_with($path, 'fbr-pos/') ? 'fbrpos' : 'web');
-        $login = ['web' => '/login', 'pos' => '/pos/login', 'fbrpos' => '/fbr-pos/login'];
+        if ($path === 'hr' || str_starts_with($path, 'hr/')) $target = 'hr';
+        $login = ['web' => '/login', 'pos' => '/pos/login', 'fbrpos' => '/fbr-pos/login', 'hr' => '/hr/login'];
         foreach (NestErps::VERTICALS as $vertical) {
             $login[$vertical['guard']] = $vertical['login_path'];
             if (str_starts_with($path, $vertical['path_prefix'].'/')) $target = $vertical['guard'];

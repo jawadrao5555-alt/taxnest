@@ -6,9 +6,16 @@ use App\Http\Controllers\Controller;
 use App\Models\SystemSetting;
 use App\Models\AdminAuditLog;
 use App\Models\AdminUser;
+use App\Services\ErpPublicPricing;
+use App\Support\HealthPanel;
+use App\Support\NestErps;
+use App\Support\SchoolErpPanel;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class AdminSettingsController extends Controller
 {
@@ -75,7 +82,49 @@ class AdminSettingsController extends Controller
             'has_token' => $canManageSensitiveConfiguration && \App\Services\WhatsAppBusinessApi::centralHasToken(),
         ];
 
-        return view('saas-admin.settings', compact('settings', 'smtp', 'wa', 'canManageSensitiveConfiguration'));
+        $erpAvailability = [];
+        if ($canManageSensitiveConfiguration) {
+            $published = ErpPublicPricing::websitePackages();
+            $erpAvailability = [
+                NestErps::HEALTH => [
+                    'label' => 'Hospital and Lab ERP',
+                    'registrationOpen' => HealthPanel::registrationOpen(),
+                    'publishedCount' => $published->get(NestErps::HEALTH, collect())->count(),
+                ],
+                NestErps::SCHOOL => [
+                    'label' => 'School ERP',
+                    'registrationOpen' => SchoolErpPanel::registrationOpen(),
+                    'publishedCount' => $published->get(NestErps::SCHOOL, collect())->count(),
+                ],
+            ];
+        }
+
+        return view('saas-admin.settings', compact('settings', 'smtp', 'wa', 'canManageSensitiveConfiguration', 'erpAvailability'));
+    }
+
+    public function updateErpRegistration(Request $request)
+    {
+        $actor = AdminUser::requireSensitiveConfigurationAdministrator();
+        abort_unless($actor->isSuperAdmin(), 403);
+        $keys = [NestErps::HEALTH => SystemSetting::ERP_HEALTH_SIGNUP, NestErps::SCHOOL => SystemSetting::ERP_SCHOOL_SIGNUP];
+        $data = $request->validate([
+            'vertical' => ['required', Rule::in(array_keys($keys))],
+            'open' => ['required', 'boolean'],
+        ]);
+        $vertical = $data['vertical'];
+        $open = $request->boolean('open');
+
+        DB::transaction(function () use ($actor, $keys, $vertical, $open) {
+            if ($open && ErpPublicPricing::websitePackages()->get($vertical, collect())->isEmpty()) {
+                throw ValidationException::withMessages(['vertical' => 'Publish an online ERP package before opening public signup.']);
+            }
+            SystemSetting::set($keys[$vertical], $open ? '1' : '0');
+            AdminAuditLog::log($actor->id, 'ERP public signup updated', 'SystemSetting', null, [
+                'vertical' => $vertical, 'open' => $open,
+            ]);
+        }, 3);
+
+        return to_route('saas.admin.settings')->with('success', 'ERP website availability updated.');
     }
 
     public function update(Request $request)

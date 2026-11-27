@@ -1,0 +1,26 @@
+.tn-public-control,
+.tn-public-login {
+    --tn-public-control-ink: #334155;
+    --tn-public-control-focus: #0a4d5c;
+}
+
+.tn-public-control--dark {
+    --tn-public-control-ink: #e2e8f0;
+    --tn-public-control-focus: #5eead4;
+}
+
+.tn-public-control .tn-disclosure-indicator,
+.tn-public-close {
+    color: var(--tn-public-control-ink);
+}
+
+.tn-public-login input::placeholder {
+    color: var(--tn-public-control-ink);
+    opacity: 1;
+}
+
+.tn-public-control:focus-visible,
+.tn-public-login input:focus-visible {
+    outline: 2px solid var(--tn-public-control-focus);
+    outline-offset: 2px;
+}

@@ -17,7 +17,7 @@
         <div class="flex flex-wrap items-end justify-between gap-3">
             <div>
                 <h1 class="text-xl sm:text-2xl font-black tracking-tight">{{ __('health.bill_counter_title') }}</h1>
-                <p class="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{{ __('health.bill_counter_subtitle') }}</p>
+                <p class="text-sm text-gray-700 dark:text-gray-300 mt-0.5">{{ __('health.bill_counter_subtitle') }}</p>
             </div>
             <div class="flex flex-wrap gap-2">
                 <a href="{{ route('health.billing.shifts') }}" class="px-4 py-2.5 rounded-xl bg-gray-100 dark:bg-gray-700 text-sm font-bold">{{ __('health.shift_title') }}</a>

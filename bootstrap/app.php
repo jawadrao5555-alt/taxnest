@@ -192,8 +192,11 @@ return Application::configure(basePath: dirname(__DIR__))
             if (str_starts_with($path, 'fbr-pos/') || $path === 'fbr-pos') {
                 return redirect(auth('fbrpos')->check() ? '/fbr-pos/dashboard' : '/fbr-pos/login')->with('error', $message);
             }
-            if (str_starts_with($path, 'health/') || $path === 'health') {
-                return redirect(auth('health')->check() ? '/health/dashboard' : '/health/login')->with('error', $message);
+            if ($vertical = \App\Support\NestErps::verticalForPath($path)) {
+                $guard = \App\Support\NestErps::guardFor($vertical);
+                $destination = auth($guard)->check() ? 'dashboard_path' : 'login_path';
+
+                return redirect(\App\Support\NestErps::verticalValue($vertical, $destination))->with('error', $message);
             }
             if (str_starts_with($path, 'admin/') || $path === 'admin') {
                 return redirect(auth('admin')->check() ? '/admin/dashboard' : '/admin/login')->with('error', $message);
@@ -251,6 +254,14 @@ return Application::configure(basePath: dirname(__DIR__))
                     return redirect()->back()->with('error', 'Your session expired. Please try again.');
                 }
                 return redirect('/health/login')->with('error', 'Session expired. Please log in again.');
+            }
+
+            if (\App\Support\NestErps::verticalForPath($path) === \App\Support\NestErps::SCHOOL) {
+                if (auth(\App\Support\SchoolErpPanel::GUARD)->check()) {
+                    return redirect()->back()->with('error', 'Your session expired. Please try again.');
+                }
+
+                return redirect(\App\Support\SchoolErpPanel::LOGIN_PATH)->with('error', 'Session expired. Please log in again.');
             }
 
             if (auth()->check()) {

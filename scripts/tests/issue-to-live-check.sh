@@ -51,6 +51,11 @@ if [ -f "$VERIFY" ]; then
   grep -q 'EXPECTED_SHA' "$VERIFY" && ok "ci-live-verify checks EXPECTED_SHA" || bad "ci-live-verify missing EXPECTED_SHA"
   grep -q 'data-tn-sale-root\|data-tn-sale-document' "$VERIFY" && ok "ci-live-verify asserts sale markers" || bad "ci-live-verify missing sale markers"
   grep -q '/up' "$VERIFY" && ok "ci-live-verify checks /up" || bad "ci-live-verify missing /up"
+  if grep -q '^verify_public_erp$' "$VERIFY" && bash "$ROOT/scripts/tests/ci-live-verify-erp-check.sh"; then
+    ok "ci-live-verify checks public ERP entries and configured forms"
+  else
+    bad "ci-live-verify ERP probe failed its offline route fixtures"
+  fi
   grep -qi 'nayatel_vps_key' "$VERIFY" && ok "ci-live-verify refuses Replit key" || bad "ci-live-verify should refuse Replit key"
   # Must not hardcode passwords — only read from env
   if grep -E 'PASS="\$\{LIVE_QA_PASS' "$VERIFY" >/dev/null; then

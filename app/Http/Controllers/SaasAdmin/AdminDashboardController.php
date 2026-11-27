@@ -12,13 +12,26 @@ use App\Models\PosTransaction;
 use App\Models\FbrPosTransaction;
 use App\Models\AdminAuditLog;
 use App\Models\SystemControl;
+use App\Services\Reporting\ErpAdminFinancialSummary;
+use App\Support\NestErps;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 class AdminDashboardController extends Controller
 {
-    public function index()
+    public function index(Request $request, ErpAdminFinancialSummary $erpFinancials)
     {
+        $erpDates = $request->validate([
+            'erp_from' => 'nullable|date_format:Y-m-d',
+            'erp_to' => $request->filled('erp_from') ? 'nullable|date_format:Y-m-d|after_or_equal:erp_from' : 'nullable|date_format:Y-m-d',
+        ]);
+        $erpFilters = array_filter([
+            'date_from' => $erpDates['erp_from'] ?? null,
+            'date_to' => $erpDates['erp_to'] ?? null,
+        ]);
+        $erpType = NestErps::PRODUCT_TYPE;
+        $erpTypes = NestErps::storedTypesFor($erpType);
         // Single grouped query instead of loading every company row (scale-safe).
         $productCounts = Company::select('product_type', DB::raw('COUNT(*) as cnt'))
             ->groupBy('product_type')->pluck('cnt', 'product_type');
@@ -28,6 +41,7 @@ class AdminDashboardController extends Controller
             'di_companies' => (int) ($productCounts['di'] ?? 0),
             'pos_companies' => (int) ($productCounts['pos'] ?? 0),
             'fbrpos_companies' => (int) ($productCounts['fbrpos'] ?? 0),
+            'erp_companies' => (int) $productCounts->only($erpTypes)->sum(),
             'pending_companies' => Company::where('status', 'pending')->count(),
             'pending_payment_proofs' => Schema::hasTable('payment_proofs')
                 ? \App\Models\PaymentProof::where('status', 'pending')->count() : 0,
@@ -85,6 +99,14 @@ class AdminDashboardController extends Controller
             ->limit($tabLimit)
             ->get();
 
+        $erpCompaniesList = Company::whereIn('product_type', $erpTypes)
+            ->withCount('users')
+            ->latest()->orderByDesc('id')
+            ->limit($tabLimit)
+            ->get();
+        $erpSummaries = $erpFinancials->forCompanies($erpCompaniesList, $erpFilters);
+        $erpTotals = $erpFinancials->allCompanyTotals($erpFilters);
+
         // Per-company aggregates via three grouped queries (was 2 queries PER company).
         $posAgg = PosTransaction::whereIn('company_id', $posCompaniesList->pluck('id'))
             ->where('status', 'completed')
@@ -135,6 +157,7 @@ class AdminDashboardController extends Controller
 
         return view('saas-admin.dashboard', compact(
             'stats', 'diCompaniesList', 'posCompaniesList', 'fbrposCompaniesList',
+            'erpType', 'erpDates', 'erpFilters', 'erpCompaniesList', 'erpSummaries', 'erpTotals',
             'recentAuditLogs', 'systemControls', 'offlineAgentCount'
         ));
     }

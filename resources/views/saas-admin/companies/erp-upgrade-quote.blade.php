@@ -5,17 +5,6 @@
         <p class="text-sm">{{ $company->name }} · {{ $company->account_code ?: $company->id }}</p>
         <p class="text-sm">Estimate the difference between the destination package and the unused part of the source account’s verified package payment. This estimate does not collect payment or change either account.</p>
 
-        @if (session('success'))
-            <p class="rounded border border-emerald-500 p-3" role="status">{{ session('success') }}</p>
-        @endif
-        @if ($errors->any())
-            <div class="rounded border border-red-500 p-3" role="alert">
-                @foreach ($errors->all() as $message)
-                    <p>{{ $message }}</p>
-                @endforeach
-            </div>
-        @endif
-
         @if ($plans->isEmpty())
             <p>No paid Healthcare package with inpatient care is available for this estimate.</p>
         @else

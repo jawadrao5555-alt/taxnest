@@ -135,6 +135,12 @@ class ErpUpgradeQuoteTest extends TestCase
             ->assertRedirect($show);
         $this->get($show)->assertSee('Difference verified.')->assertSee('Activate Hospital ERP package');
         $this->assertDatabaseMissing('subscriptions', ['company_id' => $destination->id]);
+
+        $activate = route('saas.admin.companies.erpUpgradeActivate', [$source, $quote->id]);
+        $this->post($activate, ['activation_reference' => 'Fictional switch approval 18'])->assertRedirect($show);
+        $this->get($show)->assertSee('Activated on');
+        $this->assertDatabaseHas('subscriptions', ['company_id' => $destination->id, 'active' => 1]);
+        $this->assertDatabaseHas('subscription_invoices', ['company_id' => $destination->id, 'status' => 'paid', 'amount' => 71900]);
     }
 
     public function test_frozen_upgrade_accepts_only_the_difference_and_allocates_credit_once(): void

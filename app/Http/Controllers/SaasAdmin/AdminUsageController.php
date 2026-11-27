@@ -5,6 +5,7 @@ namespace App\Http\Controllers\SaasAdmin;
 use App\Http\Controllers\Controller;
 use App\Models\Company;
 use App\Models\CompanyUsageStat;
+use App\Services\Reporting\ErpAdminFinancialSummary;
 use App\Support\NestErps;
 use App\Support\ProductCatalog;
 use Carbon\CarbonImmutable;
@@ -158,6 +159,14 @@ class AdminUsageController extends Controller
             }, 'local-collections-'.$snapshot->company_id.'.csv', ['Content-Type' => 'text/csv', 'Cache-Control' => 'private, no-store']);
         }
 
-        return view('saas-admin.company-usage', compact('usageStats', 'companies', 'filters', 'productScopes'));
+        $financials = app(ErpAdminFinancialSummary::class);
+        $erpFinancials = $financials->forCompanies($companies->getCollection(), $filters);
+        $erpComparison = isset($filters['comparison'])
+            ? $financials->forCompanies($companies->getCollection(), $filters['comparison'] + $filters)
+            : collect();
+
+        return view('saas-admin.company-usage', compact(
+            'usageStats', 'companies', 'filters', 'productScopes', 'erpFinancials', 'erpComparison'
+        ));
     }
 }

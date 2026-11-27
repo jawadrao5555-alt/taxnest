@@ -420,6 +420,7 @@
                 <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">Vertical</span><span class="text-teal-400 font-medium text-right min-w-0">{{ $extraStats['erps_vertical_label'] }}</span></div>
                 <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">Billable Documents</span><span class="text-white font-medium text-right min-w-0">{{ number_format($extraStats['billable_documents'] ?? 0) }}</span></div>
                 <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">This Month</span><span class="text-white font-medium text-right min-w-0">{{ number_format($extraStats['billable_this_month'] ?? 0) }}</span></div>
+                <a class="text-sm underline" href="{{ route('saas.admin.usage', ['product_scope' => \App\Support\NestErps::PRODUCT_TYPE, 'company_id' => $company->id]) }}">View ERP billing totals</a>
                 @elseif($company->product_type === 'di')
                 <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">Total Invoices</span><span class="text-white font-medium text-right min-w-0">{{ number_format($extraStats['total_invoices']) }}</span></div>
                 <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">Locked (FBR)</span><span class="text-emerald-400 font-medium text-right min-w-0">{{ number_format($extraStats['locked_invoices']) }}</span></div>

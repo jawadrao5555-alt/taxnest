@@ -1563,8 +1563,8 @@ async function workflow(page,t,v,diagnostics) {
   if(t.reportingConnector)return reportingConnectorWorkflow(page,t,v);
   if(t.dashboardDetails) {
     await page.goto(baseUrl+'/admin/dashboard',{waitUntil:'domcontentloaded'});
-    for(const key of ['di','pos','fbrpos']) {
-      const tab=page.locator(`.tn-company-tabs button`).filter({hasText:key==='di'?'Digital Invoice':key==='pos'?'PRA POS':'FBR POS'});
+    for(const key of ['di','pos','fbrpos','erps']) {
+      const tab=page.locator(`.tn-company-tabs button[data-company-tab="${key}"]`);
       await tab.click();
       if(await tab.getAttribute('aria-pressed')!=='true' || await page.locator('.tn-company-tabs button[aria-pressed="true"]').count()!==1) throw new Error('Selected admin company tab is not explicit: '+key);
       if(!await page.locator(`[data-company-panel="${key}"]`).isVisible() || await page.locator('[data-company-panel]:not([hidden])').count()!==1) throw new Error('Selected company tab does not show its own panel: '+key);
@@ -1573,11 +1573,13 @@ async function workflow(page,t,v,diagnostics) {
       const reportLink=panel.getByRole('link',{name:'Reports',exact:true}).first();
       if(!await reportLink.isVisible())throw new Error('Company report shortcut missing: '+key);
       const reportUrl=new URL(await reportLink.getAttribute('href'),baseUrl);
-      if(!reportUrl.searchParams.get('company_id') || !reportUrl.pathname.endsWith({di:'di_invoices',pos:'pos_transactions',fbrpos:'fbrpos_transactions'}[key]))throw new Error('Company report scope is incorrect: '+key);
+      const reportDestination={di:'di_invoices',pos:'pos_transactions',fbrpos:'fbrpos_transactions',erps:'company-usage'}[key];
+      if(!reportUrl.searchParams.get('company_id') || !reportUrl.pathname.endsWith(reportDestination)
+        || (key==='erps' && reportUrl.searchParams.get('product_scope')!=='erps'))throw new Error('Company report scope is incorrect: '+key);
 
     }
     const keys=await page.locator('[data-dashboard-metric]').evaluateAll(els=>els.map(el=>el.dataset.dashboardMetric));
-    if(keys.length!==13 || new Set(keys).size!==13) throw new Error('All 13 distinct dashboard links are required');
+    if(keys.length!==14 || new Set(keys).size!==14) throw new Error('All 14 distinct dashboard links are required');
     for(const key of keys) {
       await page.goto(baseUrl+'/admin/dashboard',{waitUntil:'domcontentloaded'});
       const link=page.locator(`[data-dashboard-metric="${key}"]`);

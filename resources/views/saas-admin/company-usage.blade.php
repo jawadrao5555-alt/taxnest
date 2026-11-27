@@ -26,7 +26,10 @@
         <label>Custom end date<input name="date_to" type="date" value="{{ request('date_to') }}"></label>
         <button>Apply filters</button>
     </form>
-    <p>Dates and branch selection apply to POS bills, DI documents, and School/Hospital collections. POS bills use their stored business date and DI documents use their invoice date. Records missing those dates appear only in all-time totals.</p>
+    <p>POS bills use their stored business date. DI documents use their invoice date. ERP package invoices use their issue-record date, and receipts use the payment date. Healthcare uses the bill date and receipt business date. Package billing applies to the whole company, so those totals are unavailable when a branch is selected.</p>
+    @unless($erpFinancials->isEmpty())
+        <p>TaxNest package collections are shown before any separately recorded adjustments. Healthcare totals cover the patient billing ledger. Standalone pharmacy checkout has its own ledger.</p>
+    @endunless
     @if(isset($filters['date_from']) || isset($filters['date_to']))
         <p>Reporting dates: {{ $filters['date_from'] ?? 'Earliest' }} to {{ $filters['date_to'] ?? 'Latest' }}.
             @if(isset($filters['comparison']))
@@ -100,6 +103,15 @@
                                 'as_of' => $filters['date_to'] ?? null,
                                 'page' => 1,
                             ]) }}">Download DI production document totals (CSV)</a>
+                        </td></tr>
+                    @endif
+                    @if($erpFinancials->has($stat->company_id))
+                        <tr><td colspan="7" class="px-4 py-3">
+                            @include('saas-admin.partials.erp-financial-summary', ['summary' => $erpFinancials->get($stat->company_id)])
+                            @if($erpComparison->has($stat->company_id))
+                                <h3 class="mt-3 font-semibold">Same period last year</h3>
+                                @include('saas-admin.partials.erp-financial-summary', ['summary' => $erpComparison->get($stat->company_id)])
+                            @endif
                         </td></tr>
                     @endif
                     @if($stat->local_collections)

@@ -5,7 +5,7 @@
 
     <h2 id="local-collections" class="mb-2 text-lg font-semibold">School / Hospital local collections</h2>
     <form method="get" class="mb-4 grid sm:grid-cols-3 gap-2">
-        <label>Company ID<input name="company_id" type="number" min="1" value="{{ request('company_id') }}"></label>
+        <label>Company ID<input name="company_id" type="text" maxlength="32" value="{{ request('company_id') }}"></label>
         <label>Product or collection category
             <select name="product_scope">
                 <option value="">All products</option>
@@ -59,6 +59,7 @@
                     <tr class="hover:bg-gray-800/50 {{ $loop->even ? 'bg-gray-800/20' : '' }}">
                         <td class="px-4 py-3 text-white font-medium">
                             <a href="{{ route('saas.admin.companies.show', $stat->company_id) }}" class="hover:text-indigo-400 transition">{{ $stat->company->name ?? 'Unknown' }}</a>
+                            <span class="block font-mono text-xs">{{ \App\Services\CompanyProductId::display($stat->company) }}</span>
                             @if(auth('admin')->user()?->canManageSensitiveConfiguration())<a class="block text-xs text-indigo-400" href="{{ route('admin.company-ai-usage',$stat->company_id) }}">AI usage / budget</a>@endif
                             <span class="block text-xs text-gray-500">{{ \App\Support\ProductCatalog::label($stat->company->product_type) }}</span>
                         </td>

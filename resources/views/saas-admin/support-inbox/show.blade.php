@@ -93,7 +93,7 @@
                             <option value="">Select company…</option>
                             @foreach($supportCompanies as $company)
                                 <option value="{{ $company->id }}" @selected((int) old('company_id') === (int) $company->id)>
-                                    {{ $company->account_code ? $company->account_code.' · ' : '' }}{{ $company->name }} ({{ strtoupper($company->product_type ?? 'unknown') }})
+                                    {{ \App\Services\CompanyProductId::display($company) }} · {{ $company->name }} ({{ strtoupper($company->product_type ?? 'unknown') }})
                                 </option>
                             @endforeach
                         </select>
@@ -118,7 +118,7 @@
                 @endif
             @else
                 <dl class="mt-4 grid gap-3 sm:grid-cols-2 text-xs">
-                    <div><dt class="text-gray-500">Company</dt><dd class="mt-0.5 font-semibold text-gray-200">{{ $supportCase->company?->account_code ? $supportCase->company->account_code.' · ' : '' }}{{ $supportCase->company?->name ?? $supportCase->company_name_snapshot ?? 'Deleted company record' }}</dd></div>
+                    <div><dt class="text-gray-500">Company</dt><dd class="mt-0.5 font-semibold text-gray-200">@if($supportCase->company){{ \App\Services\CompanyProductId::display($supportCase->company) }} · @endif{{ $supportCase->company?->name ?? $supportCase->company_name_snapshot ?? 'Deleted company record' }}</dd></div>
                     <div><dt class="text-gray-500">Owner</dt><dd class="mt-0.5 font-semibold text-gray-200">{{ $supportCase->assignedAdmin?->name ?? 'Unassigned' }}</dd></div>
                     <div><dt class="text-gray-500">Priority</dt><dd class="mt-0.5 font-semibold text-gray-200">{{ strtoupper($supportCase->priority ?? \App\Models\SupportCase::PRIORITY_NORMAL) }}</dd></div>
                     <div><dt class="text-gray-500">SLA due</dt><dd class="mt-0.5 font-semibold text-gray-200">{{ $supportCase->sla_due_at?->format('d M Y, h:i A') ?? 'Not set' }}</dd></div>

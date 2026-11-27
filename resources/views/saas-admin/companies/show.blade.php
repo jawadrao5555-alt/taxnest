@@ -72,6 +72,12 @@
                 <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">Address</span><span class="text-white text-right min-w-0 break-words">{{ $company->address ?? '—' }}</span></div>
                 <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">Province</span><span class="text-white text-right min-w-0 break-words">{{ $company->province ?? '—' }}</span></div>
                 <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">Franchise</span><span class="text-white text-right min-w-0 break-words">{{ $company->franchise->name ?? 'None' }}</span></div>
+                @if($company->product_company_id ?? null)
+                    <div class="flex justify-between gap-2"><span class="text-gray-400">Company ID</span><span class="font-mono font-semibold text-white">{{ $company->product_company_id }}</span></div>
+                @endif
+                @if($company->account_code ?? null)
+                    <div class="flex justify-between gap-2"><span class="text-gray-400">Legacy account code</span><span class="font-mono text-white">{{ $company->account_code }}</span></div>
+                @endif
                 <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">Created</span><span class="text-white text-right min-w-0">{{ $company->created_at->format('d M Y, h:i A') }}</span></div>
             </div>
         </div>
@@ -329,7 +335,7 @@
             </div>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
-                    <label class="block text-xs text-gray-400 mb-1">Company ID</label>
+                    <label class="block text-xs text-gray-400 mb-1">Agent Company ID (numeric)</label>
                     <div class="flex gap-2">
                         <input type="text" readonly value="{{ $company->id }}" x-ref="cid" class="w-full min-w-0 rounded-lg bg-gray-800 border-gray-700 text-gray-200 text-xs font-mono">
                         <button type="button" @click="copy($refs.cid, $el)" class="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-200 text-xs rounded-lg">Copy</button>

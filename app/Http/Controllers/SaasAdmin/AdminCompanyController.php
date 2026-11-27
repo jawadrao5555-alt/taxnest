@@ -18,6 +18,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\Http\Request;
 use App\Services\CredentialLedgerService;
+use App\Services\CompanyProductId;
 use App\Services\LocalViewerService;
 use App\Services\ViewablePasswordService;
 use App\Models\Notification;
@@ -328,13 +329,15 @@ class AdminCompanyController extends Controller
         if ($request->filled('status')) {
             $query->where('status', $request->status);
         }
-        if ($request->filled('search')) {
-            $search = $request->search;
+        $search = $request->query('search');
+        if (is_string($search) && trim($search) !== '') {
+            $search = trim($search);
             $like = \App\Helpers\DbCompat::like();
             $query->where(function ($q) use ($search, $like) {
                 $q->where('name', $like, "%{$search}%")
                   ->orWhere('ntn', $like, "%{$search}%")
-                  ->orWhere('owner_name', $like, "%{$search}%");
+                  ->orWhere('owner_name', $like, "%{$search}%")
+                  ->orWhere(fn ($companies) => CompanyProductId::matching($companies, $search));
             });
         }
 

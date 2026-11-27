@@ -9,7 +9,7 @@
         <div class="tn-page-header flex flex-wrap items-end justify-between gap-3">
             <div>
                 <h1 class="text-xl sm:text-2xl font-black tracking-tight">{{ __('health.welcome_back', ['name' => $healthUser->name ?? '']) }}</h1>
-                <p class="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+                <p class="text-sm text-gray-700 dark:text-gray-300 mt-0.5">
                     {{ $company->name ?? '' }} &middot; {{ __(HealthPanel::orgTypeLabelKey($orgType)) }}
                 </p>
             </div>
@@ -64,7 +64,7 @@
                         'appt_count_completed' => $opdToday['completed'],
                     ] as $key => $value)
                         <div class="rounded-xl border border-gray-200 dark:border-gray-700 p-4">
-                            <p class="text-[11px] font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ __('health.' . $key) }}</p>
+                            <p class="text-[11px] font-bold uppercase tracking-wide text-gray-700 dark:text-gray-300">{{ __('health.' . $key) }}</p>
                             <p class="mt-1 text-2xl font-black">{{ $value }}</p>
                         </div>
                     @endforeach
@@ -86,7 +86,7 @@
             @endphp
             @foreach($tiles as $tile)
                 <div class="tn-stat-card rounded-2xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-4">
-                    <p class="text-[11px] font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ $tile['label'] }}</p>
+                    <p class="text-[11px] font-bold uppercase tracking-wide text-gray-700 dark:text-gray-300">{{ $tile['label'] }}</p>
                     <p class="mt-1 text-2xl font-black">{{ $tile['value'] }}</p>
                 </div>
             @endforeach

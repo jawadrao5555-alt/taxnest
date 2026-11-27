@@ -9,6 +9,11 @@ Local Chromium reproduced these rendered failures before the correction.
 | Admin Settings Send Test Email | 3.19:1 |
 | Digital Invoice and FBR POS FAQ indicators | 2.21:1 |
 | PRA POS FAQ indicators | 2.54:1 |
+| Digital Invoice company billing quoted savings | 3.77:1 |
+| PRA POS company billing comparison add-on pill | 4.45:1 |
+| PRA POS company billing comparison prices | 4.49:1 |
+| Healthcare dashboard labels | 4.46:1 |
+| Healthcare Settings and Billing counter descriptions | 4.18:1 |
 
 The branch pairs text and surface colours on the affected Admin actions.
 Admin tabs preserve the selected palette and identify the selected product
@@ -25,9 +30,15 @@ palettes, light and dark. It opens the fictional proof panels without submitting
 the approval or rejection. The thresholds are 4.5:1 for normal text and 3:1 for
 the checked icons and focus rings.
 
-Follow-up audit surfaces include logged-in DI, PRA POS, FBR POS and ERP
-workspaces, checkout and report tables. Check the product-specific palette and
-mode combinations, including POS Midnight, and exercise populated, empty,
-validation and disabled states on desktop and mobile. The homepage and
-comparison focus fix belongs to #470. The Website Clients management form
-belongs to #468.
+The signed-in billing changes pair company plan cards with their shell surface
+tokens and apply focus, text and field contrast to quote and receipt controls.
+The DI package selection journey also checks the checkout billing period,
+review button, keyboard focus, paid amount and receipt-review action.
+Healthcare dashboard, Settings and Billing counter labels reached at least
+9.18:1 on the sampled surfaces in both themes at 390px and 1366px.
+
+Follow-up audit surfaces include other logged-in workspace controls and
+populated report tables. Check the product-specific palettes,
+including POS Midnight, and exercise populated, empty, validation and disabled
+states. The homepage and comparison focus fix belongs to #470. The Website
+Clients management form belongs to #468.

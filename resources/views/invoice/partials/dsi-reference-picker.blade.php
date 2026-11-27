@@ -1,3 +1,8 @@
+<div x-data="diProductProfileCheck()" x-effect="queue(item.di_tax_profile_revision ? [item.product_id, item.di_tax_profile_revision, invoice_date, referenceBranchId, item.di_tax_profile_values === JSON.stringify([item.hs_code, item.pct_code, item.default_uom, item.schedule_type, Number(item.tax_rate), item.sro_schedule_no, item.serial_no])] : null)"
+    x-show="message" x-cloak class="mb-3 text-xs">
+    <p x-text="message" role="status"></p>
+    <button type="button" x-show="retryable" @click="retry()" class="underline">Recheck saved tax defaults</button>
+</div>
 <details class="mb-3 rounded-lg border border-gray-200 dark:border-gray-700"
     x-data="dsiReferencePicker()"
     x-effect="queueLookup(live ? [invoice_date, referenceBranchId, item.hs_code, item.schedule_type, item.tax_rate, item.sro_schedule_no] : null)">
@@ -10,7 +15,7 @@
             <input type="checkbox" x-model="live"> Use FBR options for this invoice
         </label>
         <label class="block text-xs font-medium" x-show="live || item.fbr_reference_checked">
-            <input type="checkbox" x-model="item.fbr_reference_checked"> Check this line against FBR references before submission
+            <input type="checkbox" x-model="item.fbr_reference_checked" :disabled="Boolean(item.di_tax_profile_revision)"> Check this line against FBR references before submission
         </label>
         <p x-show="live && liveStatus" x-text="liveStatus" role="status" class="text-xs text-gray-600 dark:text-gray-300"></p>
         <button type="button" x-show="live && liveStatus && !loading" @click="retryLookup()"

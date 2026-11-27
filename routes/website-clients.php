@@ -7,6 +7,9 @@ use Illuminate\Support\Facades\Route;
 Route::get('/website-clients/{client}/logo/{revision}', WebsiteClientLogoController::class)
     ->whereNumber(['client', 'revision'])->name('website-clients.logo');
 
+Route::get('/admin/website-clients/company/{company}/logo', [WebsiteClientLogoController::class, 'preview'])
+    ->middleware('admin.auth')->whereNumber('company')->name('saas.admin.website-clients.company-logo');
+
 Route::prefix('admin/website-clients')->middleware('admin.auth')->name('saas.admin.website-clients.')
     ->controller(WebsiteClientController::class)->group(function () {
         Route::get('/', 'index')->name('index');

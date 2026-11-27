@@ -112,6 +112,7 @@
     </style>
     {{-- Urdu-script font (Task 1287) — inert unless the app locale is ever 'ur'. --}}
     @include('partials.urdu-font')
+    <link rel="stylesheet" href="{{ asset('css/public-controls.css') }}?v={{ @filemtime(public_path('css/public-controls.css')) }}">
 </head>
 <body x-data="{ scrolled: false, mobileOpen: false, showLoginModal: {{ ($errors->any() || old('login')) ? 'true' : 'false' }} }" @scroll.window="scrolled = (window.pageYOffset > 20)">
     <div id="tn-boot" aria-hidden="true"><span>FBR&nbsp;<b>POS</b></span></div>
@@ -140,12 +141,12 @@
                         <h3 class="text-lg font-serif text-[#052730] font-bold">FBR POS Login</h3>
                     </div>
                 </div>
-                <button @click="showLoginModal = false" class="text-gray-400 hover:text-gray-600 transition">
+                <button type="button" aria-label="Close login" @click="showLoginModal = false" class="tn-public-control tn-public-close transition p-2">
                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                 </button>
             </div>
             
-            <form method="POST" action="/fbr-pos/login" class="p-6 space-y-5 bg-white">
+            <form method="POST" action="/fbr-pos/login" class="tn-public-login p-6 space-y-5 bg-white">
                 @csrf
                 <div>
                     <label class="block text-sm font-semibold text-[#052730] mb-1.5">Email, Phone, Username, CNIC or NTN</label>
@@ -656,32 +657,32 @@
             </div>
             <div class="space-y-4" x-data="{ open: null }">
                 <div class="bg-white border border-gray-200 fade-in-up">
-                    <button @click="open = (open === 1 ? null : 1)" class="w-full flex items-center justify-between p-6 text-left hover:bg-gray-50 transition-colors">
+                    <button type="button" @click="open = (open === 1 ? null : 1)" :aria-expanded="open === 1" aria-controls="fbr-pos-faq-answer-1" class="tn-public-control w-full flex items-center justify-between p-6 text-left hover:bg-gray-50 transition-colors">
                         <span class="font-bold text-[#052730]">Are bills really submitted to FBR in real time?</span>
-                        <span class="text-gray-400 text-xl font-light" x-text="open === 1 ? '−' : '+'"></span>
+                        <span aria-hidden="true" class="tn-disclosure-indicator text-xl font-light" x-text="open === 1 ? '−' : '+'"></span>
                     </button>
-                    <div x-show="open === 1" x-collapse class="px-6 pb-6 text-gray-600 leading-relaxed text-sm">Check the saved submission status and fiscal number. School and hospital collection desks with IMS reporting configured can reprint an accepted receipt with its recorded fiscal number and QR.</div>
+                    <div id="fbr-pos-faq-answer-1" x-show="open === 1" x-collapse class="px-6 pb-6 text-gray-600 leading-relaxed text-sm">Check the saved submission status and fiscal number. School and hospital collection desks with IMS reporting configured can reprint an accepted receipt with its recorded fiscal number and QR.</div>
                 </div>
                 <div class="bg-white border border-gray-200 fade-in-up" style="transition-delay: 50ms;">
-                    <button @click="open = (open === 2 ? null : 2)" class="w-full flex items-center justify-between p-6 text-left hover:bg-gray-50 transition-colors">
+                    <button type="button" @click="open = (open === 2 ? null : 2)" :aria-expanded="open === 2" aria-controls="fbr-pos-faq-answer-2" class="tn-public-control w-full flex items-center justify-between p-6 text-left hover:bg-gray-50 transition-colors">
                         <span class="font-bold text-[#052730]">Can I run the whole sale from the keyboard?</span>
-                        <span class="text-gray-400 text-xl font-light" x-text="open === 2 ? '−' : '+'"></span>
+                        <span aria-hidden="true" class="tn-disclosure-indicator text-xl font-light" x-text="open === 2 ? '−' : '+'"></span>
                     </button>
-                    <div x-show="open === 2" x-collapse class="px-6 pb-6 text-gray-600 leading-relaxed text-sm">Yes. Scan or type in one smart input, adjust quantities, take payment and print, all without touching the mouse. Barcode scanners work out of the box.</div>
+                    <div id="fbr-pos-faq-answer-2" x-show="open === 2" x-collapse class="px-6 pb-6 text-gray-600 leading-relaxed text-sm">Yes. Scan or type in one smart input, adjust quantities, take payment and print, all without touching the mouse. Barcode scanners work out of the box.</div>
                 </div>
                 <div class="bg-white border border-gray-200 fade-in-up" style="transition-delay: 100ms;">
-                    <button @click="open = (open === 3 ? null : 3)" class="w-full flex items-center justify-between p-6 text-left hover:bg-gray-50 transition-colors">
+                    <button type="button" @click="open = (open === 3 ? null : 3)" :aria-expanded="open === 3" aria-controls="fbr-pos-faq-answer-3" class="tn-public-control w-full flex items-center justify-between p-6 text-left hover:bg-gray-50 transition-colors">
                         <span class="font-bold text-[#052730]">Do I need to install anything?</span>
-                        <span class="text-gray-400 text-xl font-light" x-text="open === 3 ? '−' : '+'"></span>
+                        <span aria-hidden="true" class="tn-disclosure-indicator text-xl font-light" x-text="open === 3 ? '−' : '+'"></span>
                     </button>
-                    <div x-show="open === 3" x-collapse class="px-6 pb-6 text-gray-600 leading-relaxed text-sm">No complex server setups. It runs in the browser and installs as a PWA for a full-screen, desktop-like terminal on any PC or tablet. Updates are seamless.</div>
+                    <div id="fbr-pos-faq-answer-3" x-show="open === 3" x-collapse class="px-6 pb-6 text-gray-600 leading-relaxed text-sm">No complex server setups. It runs in the browser and installs as a PWA for a full-screen, desktop-like terminal on any PC or tablet. Updates are seamless.</div>
                 </div>
                 <div class="bg-white border border-gray-200 fade-in-up" style="transition-delay: 150ms;">
-                    <button @click="open = (open === 4 ? null : 4)" class="w-full flex items-center justify-between p-6 text-left hover:bg-gray-50 transition-colors">
+                    <button type="button" @click="open = (open === 4 ? null : 4)" :aria-expanded="open === 4" aria-controls="fbr-pos-faq-answer-4" class="tn-public-control w-full flex items-center justify-between p-6 text-left hover:bg-gray-50 transition-colors">
                         <span class="font-bold text-[#052730]">Who controls sensitive actions?</span>
-                        <span class="text-gray-400 text-xl font-light" x-text="open === 4 ? '−' : '+'"></span>
+                        <span aria-hidden="true" class="tn-disclosure-indicator text-xl font-light" x-text="open === 4 ? '−' : '+'"></span>
                     </button>
-                    <div x-show="open === 4" x-collapse class="px-6 pb-6 text-gray-600 leading-relaxed text-sm">A strict PIN gates sensitive areas. Cashiers ring up sales; only an authorized manager with the PIN can open the provisional-bill list or view day-end reports.</div>
+                    <div id="fbr-pos-faq-answer-4" x-show="open === 4" x-collapse class="px-6 pb-6 text-gray-600 leading-relaxed text-sm">A strict PIN gates sensitive areas. Cashiers ring up sales; only an authorized manager with the PIN can open the provisional-bill list or view day-end reports.</div>
                 </div>
             </div>
         </div>

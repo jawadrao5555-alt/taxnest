@@ -13,6 +13,7 @@ use App\Models\User;
 use App\Models\Subscription;
 use App\Models\PricingPlan;
 use App\Models\Franchise;
+use App\Models\WebsiteClient;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -483,7 +484,10 @@ class AdminCompanyController extends Controller
             ->filter(fn ($p) => !\App\Services\PlanSellabilityService::isRetired($p))
             ->values();
 
-        return view('saas-admin.companies.show', compact('company', 'usageStats', 'extraStats', 'archiveViewers', 'localViewers', 'companyAdmin', 'teamUsers', 'exemptInternalBills', 'grantPlans', 'groupMember', 'groupSiblings', 'accountOverview', 'companyDeletionRequest', 'canManageCompanyLifecycle', 'canManageBilling', 'isSuperAdmin'));
+        $canReviewWebsiteClient = $currentAdmin?->canManageRelease()
+            && WebsiteClient::companySources()->whereKey($company->id)->exists();
+
+        return view('saas-admin.companies.show', compact('company', 'usageStats', 'extraStats', 'archiveViewers', 'localViewers', 'companyAdmin', 'teamUsers', 'exemptInternalBills', 'grantPlans', 'groupMember', 'groupSiblings', 'accountOverview', 'companyDeletionRequest', 'canManageCompanyLifecycle', 'canManageBilling', 'isSuperAdmin', 'canReviewWebsiteClient'));
     }
 
     /**

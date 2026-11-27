@@ -6,11 +6,13 @@ use App\Models\AdminUser;
 use App\Models\Company;
 use App\Models\User;
 use App\Services\CredentialLedgerService;
+use App\Services\ErpPublicPricing;
 use App\Services\HealthAccessService;
 use App\Services\HealthAudit\HealthAuditRecorder;
 use App\Services\HealthModuleService;
 use App\Services\HealthPlatformService;
 use App\Services\LoginIdentifierResolver;
+use App\Services\ProspectiveSubscriptionPolicy;
 use App\Services\RequestedPackageService;
 use App\Support\HealthPanel;
 use App\Support\NestErps;
@@ -197,11 +199,21 @@ class HealthAuthController extends Controller
             return $this->redirectToPortal();
         }
 
-        $picked = RequestedPackageService::resolvePlan(request('plan'), HealthPanel::PRODUCT_TYPE);
+        $packages = ErpPublicPricing::packages(NestErps::HEALTH);
+        $picked = $packages->firstWhere('id', request()->integer('plan_id'))
+            ?? $packages->firstWhere('name', request()->query('plan'));
+        $signupPeriods = $packages->mapWithKeys(fn ($plan) => [
+            $plan->id => collect(ErpPublicPricing::prices($plan))->map(fn ($total, $cycle) => [
+                'cycle' => $cycle,
+                'label' => \App\Models\Subscription::getCycleLabel($cycle).' · PKR '.number_format($total, 2),
+            ])->values(),
+        ]);
 
         return view('health.auth.register', [
             'pickedPlanName' => $picked?->name,
-            'registrationPlans' => \App\Services\ProspectiveSubscriptionPolicy::registrationPlans(HealthPanel::PRODUCT_TYPE),
+            'pickedPlanId' => $picked?->id,
+            'registrationPlans' => $packages,
+            'signupPeriods' => $signupPeriods,
             'orgTypes' => HealthPanel::ORG_TYPES,
         ]);
     }
@@ -233,6 +245,9 @@ class HealthAuthController extends Controller
             'email' => ['required', 'string', 'email', 'max:255', \App\Support\IdentityScope::uniqueEmail(\App\Support\ProductCatalog::ERPS)],
             'phone' => 'nullable|string|max:20',
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
+            'requested_plan' => 'nullable|string|max:100',
+            'pricing_plan_id' => 'nullable|integer|min:1',
+            'billing_cycle' => 'nullable|in:monthly,quarterly,semi_annual,annual',
         ], LoginIdentifierResolver::cnicMessages('company_cnic'));
 
         // Anti free-trial-abuse: the same platform ledger every product uses.
@@ -247,9 +262,12 @@ class HealthAuthController extends Controller
 
         $orgType = HealthPanel::normalizeOrgType($request->input('org_type'));
 
-        $selectedPlan=\App\Services\ProspectiveSubscriptionPolicy::resolveRegistrationSelection($request,HealthPanel::PRODUCT_TYPE);
-        \App\Services\ProspectiveSubscriptionPolicy::requireSelection($selectedPlan);
-        $requestedPackage = RequestedPackageService::companyAttributes($selectedPlan);
+        $selectedPlan = ErpPublicPricing::registrationPlan(
+            $request->filled('pricing_plan_id') ? $request->integer('pricing_plan_id') : null,
+            $request->input('requested_plan'),
+        );
+        ProspectiveSubscriptionPolicy::requireSelection($selectedPlan);
+        $requestedPackage = RequestedPackageService::companyAttributes($selectedPlan, $request->input('billing_cycle'));
 
         // hasColumn guards: a deploy-before-migrate window must never 500 a signup.
         $healthDefaults = [];

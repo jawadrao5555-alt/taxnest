@@ -2,7 +2,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\{Company,PricingPlan};
-use App\Services\{DistributorDiscountService,PendingSubscriptionSelection,PlanCompanyCompatibility,PlanSellabilityService,SubscriptionAssignmentService};
+use App\Services\{DistributorDiscountService,ErpPublicPricing,PendingSubscriptionSelection,PlanCompanyCompatibility,PlanSellabilityService,SubscriptionAssignmentService};
+use App\Support\NestErps;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -22,7 +23,9 @@ class PackageCheckoutController extends Controller
     {
         [$company,$guard]=$this->context($request);
         $policySubscription=$company->subscriptions()->where('active',true)->orderByDesc('id')->first();
-        $plans=PricingPlan::where('is_trial',false)->get()->filter(fn ($plan)=>PlanCompanyCompatibility::matches($company,$plan) && !PlanSellabilityService::isRetired($plan) && ($plan->is_public ?? true));
+        $plans=PricingPlan::where('is_trial',false)->get()->filter(fn ($plan)=>PlanCompanyCompatibility::matches($company,$plan)
+            && !PlanSellabilityService::isRetired($plan) && ($plan->is_public ?? true)
+            && (!NestErps::isProductType($plan->product_type) || ErpPublicPricing::availableForPurchase($plan)));
         $selectedPlan=$plans->firstWhere('id',(int)$request->query('plan_id'));
         $quote=$selectedPlan ? PendingSubscriptionSelection::quote($company,$selectedPlan) : null;
         $checkoutRoute=$guard==='web' ? 'billing.package-checkout' : $guard.'.package-checkout';
@@ -40,6 +43,7 @@ class PackageCheckoutController extends Controller
             $plan=PricingPlan::whereKey($data['plan_id'])->lockForUpdate()->firstOrFail();
             abort_unless(!$plan->is_trial && ($plan->is_public ?? true) && !PlanSellabilityService::isRetired($plan),422);
             PlanCompanyCompatibility::assertMatches($company,$plan);
+            abort_unless(!NestErps::isProductType($plan->product_type) || ErpPublicPricing::availableForPurchase($plan), 422);
             $quote=PendingSubscriptionSelection::quote($company,$plan,$data['billing_cycle']);
             if (!$quote) {
                 SubscriptionAssignmentService::cycleForPlan($plan,$data['billing_cycle']);

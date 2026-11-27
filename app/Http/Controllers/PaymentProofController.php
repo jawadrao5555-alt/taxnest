@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\PaymentProof;
+use App\Services\ErpPublicPricing;
+use App\Services\PendingSubscriptionSelection;
 use App\Services\PlanCompanyCompatibility;
 use App\Support\NestErps;
 use Illuminate\Http\Request;
@@ -92,7 +94,11 @@ class PaymentProofController extends Controller
                 ->with('payment_proof', 'error');
         }
 
-        if (!\App\Services\PendingSubscriptionSelection::quote($company, $plan, $validated['billing_cycle'])) {
+        if (!PendingSubscriptionSelection::quote($company, $plan, $validated['billing_cycle'])) {
+            if (NestErps::isProductType($productType) && !ErpPublicPricing::availableForPurchase($plan)) {
+                return back()->withErrors(['pricing_plan_id' => 'This ERP package is not open for online purchase.'])
+                    ->withInput()->with('payment_proof', 'error');
+            }
             \App\Services\SubscriptionAssignmentService::cycleForPlan($plan, $validated['billing_cycle']);
         }
 

@@ -2,6 +2,7 @@
     use App\Services\HealthModuleService;
     use App\Support\HealthPanel;
     use App\Support\NestErps;
+    $healthOwner = in_array(auth('health')->user()?->role, ['company_admin', 'super_admin'], true);
 @endphp
 <!DOCTYPE html>
 <html lang="en">
@@ -144,26 +145,48 @@
 </section>
 
 @if($publicPlans->isNotEmpty())
-<section id="pricing" class="py-16 lg:py-20" aria-labelledby="healthcare-pricing-title">
+<section id="pricing" class="py-16 lg:py-20" aria-label="ERP package pricing">
     <div class="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8">
-        <h2 id="healthcare-pricing-title" class="text-2xl font-extrabold tracking-tight">Healthcare package prices</h2>
+        @foreach($publicPlans as $vertical => $packages)
+        <h2 class="text-2xl font-extrabold tracking-tight">{{ NestErps::verticalLabel($vertical) }} package prices</h2>
         <p class="mt-2 text-sm text-gray-600">Prices in PKR for the full billing period.</p>
         <div class="mt-6 grid gap-4 sm:grid-cols-2">
-            @foreach($publicPlans as $plan)
+            @foreach($packages as $plan)
                 <article class="rounded-2xl border border-gray-200 p-5">
-                    <h3 class="font-extrabold text-[#0A4D5C]">{{ $plan['name'] }}</h3>
+                    <h3 class="font-extrabold text-[#0A4D5C]">{{ $plan->name }}</h3>
+                    @if($plan->branch_limit !== null || $plan->user_limit !== null || $plan->health_department_limit !== null)
+                    <p class="mt-2 flex flex-wrap gap-3 text-sm text-gray-600">
+                        @if($plan->branch_limit !== null)<span>Branches: {{ $plan->getBranchLimitDisplay() }}</span>@endif
+                        @if($plan->user_limit !== null)<span>Users: {{ $plan->getUserLimitDisplay() }}</span>@endif
+                        @if($vertical === NestErps::HEALTH && $plan->health_department_limit !== null)<span>Departments: {{ $plan->health_department_limit === -1 ? 'Unlimited' : $plan->health_department_limit }}</span>@endif
+                    </p>
+                    @endif
+                    @if($vertical === NestErps::HEALTH && $plan->health_modules)
+                    <p class="mt-2 text-sm text-gray-600">{{ collect(HealthModuleService::normalize($plan->health_modules))->map(fn ($module) => __(HealthModuleService::moduleLabelKey($module), [], 'en'))->join(' · ') }}</p>
+                    @endif
                     <dl class="mt-3 divide-y divide-gray-100">
-                        @foreach($plan['periods'] as $label => $total)
+                        @foreach(\App\Services\ErpPublicPricing::prices($plan) as $cycle => $total)
+                            @php
+                                $periodLink = match (true) {
+                                    $vertical === NestErps::HEALTH && $healthOwner => route('health.package-checkout', ['plan_id' => $plan->id, 'billing_cycle' => $cycle]),
+                                    $vertical === NestErps::HEALTH && auth('health')->guest() && HealthPanel::registrationOpen() => url(NestErps::registerPath($vertical)).'?'.http_build_query(['plan_id' => $plan->id, 'billing_cycle' => $cycle]),
+                                    default => null,
+                                };
+                            @endphp
                             <div class="flex justify-between gap-4 py-2 text-sm">
-                                <dt>{{ $label }}</dt>
-                                <dd class="text-right font-semibold tabular-nums">PKR {{ number_format($total, 2) }}</dd>
+                                <dt>{{ \App\Models\Subscription::getCycleLabel($cycle) }}</dt>
+                                <dd class="flex flex-wrap justify-end gap-3 text-right font-semibold tabular-nums">
+                                    <span>PKR {{ number_format($total, 2) }}</span>
+                                    @if($periodLink)<a href="{{ $periodLink }}" class="text-[#0A4D5C] underline" aria-label="Choose {{ $plan->name }}, {{ \App\Models\Subscription::getCycleLabel($cycle) }}">Choose</a>@endif
+                                </dd>
                             </div>
                         @endforeach
                     </dl>
-                    <a href="{{ url('/contact') }}" class="mt-4 inline-block font-semibold text-[#0A4D5C] underline">Enquire about {{ $plan['name'] }}</a>
+                    <a href="{{ url('/contact') }}" class="mt-4 inline-block font-semibold text-[#0A4D5C] underline">Enquire about {{ $plan->name }}</a>
                 </article>
             @endforeach
         </div>
+        @endforeach
     </div>
 </section>
 @endif

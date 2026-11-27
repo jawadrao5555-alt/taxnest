@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\AdminUser;
 use App\Models\Company;
+use App\Models\PricingPlan;
 use App\Models\User;
 use App\Services\CredentialLedgerService;
 use App\Services\ErpPublicPricing;
@@ -267,7 +268,6 @@ class HealthAuthController extends Controller
             $request->input('requested_plan'),
         );
         ProspectiveSubscriptionPolicy::requireSelection($selectedPlan);
-        $requestedPackage = RequestedPackageService::companyAttributes($selectedPlan, $request->input('billing_cycle'));
 
         // hasColumn guards: a deploy-before-migrate window must never 500 a signup.
         $healthDefaults = [];
@@ -285,7 +285,15 @@ class HealthAuthController extends Controller
             $healthDefaults[NestErps::VERTICAL_COLUMN] = NestErps::HEALTH;
         }
 
-        $user = \Illuminate\Support\Facades\DB::transaction(function () use ($request,$healthDefaults,$requestedPackage,$selectedPlan) {
+        $user = \Illuminate\Support\Facades\DB::transaction(function () use ($request,$healthDefaults,$selectedPlan) {
+        if ($selectedPlan) {
+            $selectedPlan = PricingPlan::whereKey($selectedPlan->id)->lockForUpdate()->first();
+            if (!$selectedPlan || !ErpPublicPricing::availableForPurchase($selectedPlan)
+                || NestErps::verticalOf($selectedPlan) !== NestErps::HEALTH) {
+                throw ValidationException::withMessages(['pricing_plan_id' => 'Select an available Healthcare package.']);
+            }
+        }
+        $requestedPackage = RequestedPackageService::companyAttributes($selectedPlan, $request->input('billing_cycle'));
         $company = Company::create([
             'name' => $request->company_name,
             'ntn' => $request->company_ntn,

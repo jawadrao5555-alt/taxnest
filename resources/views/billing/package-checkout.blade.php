@@ -30,6 +30,9 @@
             </form>
         @endforeach
         </section>
+        @if($layout === 'health-layout' && $plans->isEmpty() && !$quote)
+            <p>No Healthcare packages are currently available for online purchase. <a href="{{ url('/contact') }}" class="underline">Request a quote</a>.</p>
+        @endif
         @if($selectedPlan && $quote)
         <section id="selected-package-quote" class="rounded-xl border p-4 space-y-3">
             <h2 class="font-bold">Selected package: {{ $selectedPlan->name }}</h2>

@@ -78,7 +78,7 @@ final class ErpPublicPricingTest extends TestCase
         $this->withoutMiddleware();
         view()->share('errors', new ViewErrorBag);
         config(['billing.shared_configured_cycles' => true]);
-        $plan = PricingPlan::create($this->planFields() + ['health_modules' => ['opd']]);
+        $plan = PricingPlan::create(array_replace($this->planFields(), ['erp_website_price_visible' => true]));
         $company = Company::create([
             'name' => 'Synthetic ERP company', 'ntn' => 'ERP-WEB-RATE', 'product_type' => NestErps::PRODUCT_TYPE,
         ]);
@@ -90,6 +90,9 @@ final class ErpPublicPricingTest extends TestCase
         $this->post(route('health.package-checkout.select'), [
             'plan_id' => $plan->id, 'billing_cycle' => 'annual',
         ])->assertRedirect()->assertSessionHasNoErrors();
+        $plan->update(['erp_website_price_visible' => false, 'price' => '48000.25', 'branch_limit' => 8, 'health_modules' => ['hr']]);
+        $this->get(route('health.package-checkout', ['plan_id' => $plan->id]))->assertOk()
+            ->assertSee('Payable total: PKR 36,000.75')->assertDontSee('48,000.25');
         $this->post(route('health.payment-proof.store'), [
             'pricing_plan_id' => $plan->id, 'billing_cycle' => 'annual', 'amount' => '36000.75',
             'payment_method' => 'bank', 'proof' => UploadedFile::fake()->create('synthetic.pdf', 2, 'application/pdf'),
@@ -97,7 +100,6 @@ final class ErpPublicPricingTest extends TestCase
         $proof = PaymentProof::where('company_id', $company->id)->sole();
         $this->assertEquals(36000.75, $proof->distributor_quote_snapshot['net_quote']);
 
-        $plan->update(['price' => '48000.25', 'branch_limit' => 8, 'health_modules' => ['hr']]);
         $otherPlan = PricingPlan::create(array_replace($this->planFields(), ['name' => 'Other ERP package']));
         $approval = route('saas.admin.payment-proofs.approve', $proof->id);
         $this->actingAs($this->admin(), 'admin')->post($approval, [
@@ -113,6 +115,54 @@ final class ErpPublicPricingTest extends TestCase
         $this->assertEquals(36000.75, $subscription->final_price);
         $this->assertSame(3, $subscription->entitlementPlan()->branch_limit);
         $this->assertSame(['opd'], $subscription->entitlementPlan()->health_modules);
+    }
+
+    public function test_quote_only_plan_cannot_be_requested_or_bought_online_and_remains_assignable_by_admin(): void
+    {
+        $this->withoutVite();
+        Mail::fake();
+        Storage::fake('local');
+        config(['health.registration_open' => true]);
+        PricingPlan::whereIn('product_type', NestErps::PRODUCT_TYPES)->update(['erp_website_price_visible' => false]);
+        $plan = PricingPlan::create($this->planFields());
+
+        $this->get('/nest-erps')->assertOk()->assertDontSee($plan->name)->assertDontSee('36,000.75')
+            ->assertSee('Request a quote');
+        $this->get('/health/register?plan_id='.$plan->id)->assertOk()->assertDontSee($plan->name)
+            ->assertDontSee('36,000.75')->assertSee('Request a quote');
+        $signup = [
+            'company_name' => 'Synthetic quote-only signup', 'company_ntn' => '8790071', 'company_cnic' => '3520212345673',
+            'name' => 'Synthetic owner', 'email' => 'erp-quote-only-signup@example.test', 'org_type' => 'clinic',
+            'password' => 'Synthetic123!', 'password_confirmation' => 'Synthetic123!', 'billing_cycle' => 'annual',
+        ];
+        $this->post('/health/register', $signup + ['pricing_plan_id' => $plan->id])->assertSessionHasErrors('pricing_plan_id');
+        $this->post('/health/register', $signup + ['requested_plan' => $plan->name])->assertSessionHasErrors('requested_plan');
+        $this->assertDatabaseMissing('companies', ['email' => $signup['email']]);
+        $this->assertDatabaseCount('signup_package_requests', 0);
+
+        $this->withoutMiddleware();
+        view()->share('errors', new ViewErrorBag);
+        $company = Company::create(['name' => 'Synthetic assigned ERP', 'ntn' => 'ERP-QUOTE-ONLY', 'product_type' => NestErps::PRODUCT_TYPE]);
+        $user = User::create([
+            'name' => 'Synthetic owner', 'email' => 'erp-quote-only-owner@example.test', 'password' => 'unused',
+            'role' => 'company_admin', 'company_id' => $company->id,
+        ]);
+        $this->actingAs($user, 'health')->get(route('health.package-checkout', ['plan_id' => $plan->id]))
+            ->assertOk()->assertDontSee($plan->name)->assertDontSee('36,000.75')->assertSee('Request a quote');
+        $this->post(route('health.package-checkout.select'), ['plan_id' => $plan->id, 'billing_cycle' => 'annual'])
+            ->assertUnprocessable();
+        $this->post(route('health.payment-proof.store'), [
+            'pricing_plan_id' => $plan->id, 'billing_cycle' => 'annual', 'amount' => '36000.75',
+            'payment_method' => 'bank', 'proof' => UploadedFile::fake()->create('synthetic.pdf', 2, 'application/pdf'),
+        ])->assertSessionHasErrors('pricing_plan_id');
+        $this->assertDatabaseCount('payment_proofs', 0);
+        $this->assertSame([], Storage::disk('local')->allFiles());
+
+        $this->actingAs($this->admin(), 'admin')->post(route('saas.admin.subscriptions.assign'), [
+            'company_id' => $company->id, 'pricing_plan_id' => $plan->id, 'billing_cycle' => 'annual',
+            'assignment_mode' => 'unpaid',
+        ])->assertSessionHas('success');
+        $this->assertDatabaseHas('subscriptions', ['company_id' => $company->id, 'pricing_plan_id' => $plan->id, 'active' => true]);
     }
 
     private function planFields(): array

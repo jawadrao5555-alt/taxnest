@@ -11,7 +11,7 @@ use Illuminate\Validation\ValidationException;
 
 final class ErpPublicPricing
 {
-    /** Private packages remain assignable through admin workflows. */
+    /** Quote-only and private packages remain assignable through admin workflows. */
     public static function availableForPurchase(PricingPlan $plan): bool
     {
         if (!NestErps::isProductType($plan->product_type)) {
@@ -21,6 +21,7 @@ final class ErpPublicPricing
         $vertical = $plan->getAttribute(NestErps::VERTICAL_COLUMN) ?: NestErps::DEFAULT_VERTICAL;
 
         return $plan->is_public !== false
+            && $plan->erp_website_price_visible !== false
             && !$plan->is_trial
             && (float) $plan->price > 0
             && NestErps::hasVertical($vertical)

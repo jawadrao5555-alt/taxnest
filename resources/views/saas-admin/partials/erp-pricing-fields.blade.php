@@ -10,6 +10,7 @@
             <option value="" selected>Keep existing website visibility</option>
             @endif
         </select>
+        <span class="mt-1 block text-xs">Quote-only packages are available for admin assignment. Customers can finish quotes they already saved.</span>
     </label>
     @endif
     @foreach(['branch_limit' => 'Branch limit', 'user_limit' => 'User limit', 'health_department_limit' => 'Healthcare department limit'] as $field => $label)

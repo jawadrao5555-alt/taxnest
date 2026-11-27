@@ -23,11 +23,20 @@ class PackageCheckoutController extends Controller
     {
         [$company,$guard]=$this->context($request);
         $policySubscription=$company->subscriptions()->where('active',true)->orderByDesc('id')->first();
-        $plans=PricingPlan::where('is_trial',false)->get()->filter(fn ($plan)=>PlanCompanyCompatibility::matches($company,$plan)
-            && !PlanSellabilityService::isRetired($plan) && ($plan->is_public ?? true)
+        $compatiblePlans=PricingPlan::where('is_trial',false)->get()->filter(fn ($plan)=>PlanCompanyCompatibility::matches($company,$plan)
+            && !PlanSellabilityService::isRetired($plan));
+        $plans=$compatiblePlans->filter(fn ($plan)=>($plan->is_public ?? true)
             && (!NestErps::isProductType($plan->product_type) || ErpPublicPricing::availableForPurchase($plan)));
-        $selectedPlan=$plans->firstWhere('id',(int)$request->query('plan_id'));
+        $planId=$request->integer('plan_id');
+        $selectedPlan=$plans->firstWhere('id',$planId);
         $quote=$selectedPlan ? PendingSubscriptionSelection::quote($company,$selectedPlan) : null;
+        if (!$selectedPlan && $guard === 'health') {
+            // A company can finish its saved quote after the plan becomes quote-only.
+            $previousPlan = $compatiblePlans->firstWhere('id', $planId);
+            $quote = $previousPlan && NestErps::isProductType($previousPlan->product_type)
+                ? PendingSubscriptionSelection::quote($company, $previousPlan) : null;
+            $selectedPlan = $quote ? $previousPlan : null;
+        }
         $checkoutRoute=$guard==='web' ? 'billing.package-checkout' : $guard.'.package-checkout';
         $proofRoute=$guard==='web' ? 'payment-proof.store' : $guard.'.payment-proof.store';
         $layout=match($guard){'pos'=>'pos-layout','fbrpos'=>'fbr-pos-layout','health'=>'health-layout',default=>'app-layout'};

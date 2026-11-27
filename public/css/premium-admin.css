@@ -586,10 +586,63 @@ body.admin-themed .tn-admin-notice--success { background: #ecfdf5 !important; co
 body.admin-themed .tn-admin-notice--warning { background: #fffbeb !important; color: #78350f !important; border-color: #b45309 !important; }
 body.admin-themed .tn-admin-notice :is(div, ul, ol, h1, h2, h3, h4, p, li, span, a, svg, code, strong) { color: inherit !important; }
 body.admin-themed .tn-admin-notice a { text-decoration: underline; }
-body.admin-themed .tn-admin-plan-tabs button[aria-pressed="true"] {
-    background-color: var(--admin-accent-hover) !important;
-    color: #ffffff !important;
-    box-shadow: inset 0 -3px 0 #ffffff;
+/* Pair the ink and surface on opt-in actions, including hover states. The
+   dual focus ring gives an edge on both light canvases and legacy dark cards. */
+body.admin-themed main .tn-admin-action {
+    --tn-action-bg: #e2e8f0;
+    --tn-action-hover: #cbd5e1;
+    --tn-action-ink: #1e293b;
+    --tn-action-border: #64748b;
+    color: var(--tn-action-ink);
+    background-color: var(--tn-action-bg);
+    border: 1px solid var(--tn-action-border);
+    transition-property: none;
+}
+
+.dark body.admin-themed main :where(.tn-admin-action) {
+    --tn-action-bg: #334155;
+    --tn-action-hover: #475569;
+    --tn-action-ink: #f8fafc;
+    --tn-action-border: #94a3b8;
+}
+
+body.admin-themed main .tn-admin-action:hover {
+    background-color: var(--tn-action-hover);
+}
+
+body.admin-themed main .tn-admin-action:focus-visible {
+    outline: 2px solid #0f172a;
+    outline-offset: 2px;
+    box-shadow: 0 0 0 6px #f8fafc;
+}
+
+body.admin-themed main .tn-admin-action--confirm {
+    --tn-action-bg: #065f46;
+    --tn-action-hover: #064e3b;
+}
+
+body.admin-themed main .tn-admin-action--caution {
+    --tn-action-bg: #92400e;
+    --tn-action-hover: #78350f;
+}
+
+body.admin-themed main .tn-admin-action--danger {
+    --tn-action-bg: #b91c1c;
+    --tn-action-hover: #991b1b;
+}
+
+body.admin-themed main :is(.tn-admin-action--confirm, .tn-admin-action--caution, .tn-admin-action--danger) {
+    --tn-action-ink: #ffffff;
+    --tn-action-border: transparent;
+}
+
+body.admin-themed main .tn-admin-plan-tabs button[aria-pressed="true"] {
+    --tn-action-bg: var(--admin-accent-hover);
+    --tn-action-hover: var(--admin-accent-hover);
+    --tn-action-ink: #ffffff;
+    --tn-action-border: transparent;
+    text-decoration: underline;
+    text-underline-offset: .25em;
 }
 body.admin-themed main :is(a, button).text-indigo-400 { color: var(--admin-accent-hover) !important; }
 body.admin-themed main :is(.bg-gray-900, .bg-gray-950, .bg-gray-800):not(:where(.tn-company-directory, .tn-company-directory *, .tn-company-panel, .tn-company-panel *, .tn-metric-ledger *, .tn-channel-ledger *, .tn-information-grid *, .tn-audit-panel, .tn-audit-panel *)) :is(a, button).text-indigo-400 {

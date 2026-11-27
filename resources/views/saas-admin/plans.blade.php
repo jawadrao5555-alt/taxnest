@@ -72,10 +72,10 @@
 
     @endif
     <div class="tn-admin-plan-tabs flex flex-wrap items-center gap-2 mb-6">
-        <button :aria-pressed="activeTab === 'di'" @click="activeTab = 'di'" :class="activeTab === 'di' ? 'bg-emerald-600 text-white' : 'bg-gray-800 text-gray-400 hover:text-white'" class="px-4 py-2 rounded-lg text-sm font-semibold transition">Digital Invoice Plans</button>
-        <button :aria-pressed="activeTab === 'pos'" @click="activeTab = 'pos'" :class="activeTab === 'pos' ? 'bg-purple-600 text-white' : 'bg-gray-800 text-gray-400 hover:text-white'" class="px-4 py-2 rounded-lg text-sm font-semibold transition">PRA POS Plans</button>
-        <button :aria-pressed="activeTab === 'fbrpos'" @click="activeTab = 'fbrpos'" :class="activeTab === 'fbrpos' ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-400 hover:text-white'" class="px-4 py-2 rounded-lg text-sm font-semibold transition">FBR POS Plans</button>
-        <button :aria-pressed="activeTab === 'erps'" @click="activeTab = 'erps'" :class="activeTab === 'erps' ? 'bg-teal-600 text-white' : 'bg-gray-800 text-gray-400 hover:text-white'" class="px-4 py-2 rounded-lg text-sm font-semibold transition">{{ \App\Support\NestErps::LABEL }} Plans</button>
+        <button :aria-pressed="activeTab === 'di'" @click="activeTab = 'di'" class="tn-admin-action px-4 py-2 rounded-lg text-sm font-semibold transition">Digital Invoice Plans</button>
+        <button :aria-pressed="activeTab === 'pos'" @click="activeTab = 'pos'" class="tn-admin-action px-4 py-2 rounded-lg text-sm font-semibold transition">PRA POS Plans</button>
+        <button :aria-pressed="activeTab === 'fbrpos'" @click="activeTab = 'fbrpos'" class="tn-admin-action px-4 py-2 rounded-lg text-sm font-semibold transition">FBR POS Plans</button>
+        <button :aria-pressed="activeTab === 'erps'" @click="activeTab = 'erps'" class="tn-admin-action px-4 py-2 rounded-lg text-sm font-semibold transition">{{ \App\Support\NestErps::LABEL }} Plans</button>
     </div>
 
     @if($canManageBilling)

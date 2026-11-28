@@ -3,7 +3,8 @@
     $logos = $clients->filter(fn ($client) => \App\Services\WebsiteClientLogo::hasPublicLogo($client))
         ->mapWithKeys(fn ($client) => [$client->id => route('website-clients.logo', [$client->id, $client->revision])]);
     $moving = $clients->count() > 1;
-    $repetitions = $moving ? (int) ceil(4 / $clients->count()) : 1;
+    $products = \App\Models\WebsiteClient::PRODUCTS;
+    $repetitions = $moving ? (int) ceil(12 / $clients->count()) : 1;
 @endphp
 
 @if($clients->isNotEmpty())
@@ -34,11 +35,14 @@
                             @foreach($clients as $client)
                                 <li class="client-reel__card{{ $repeat ? ' client-reel__card--repeat' : '' }}" @if($repeat) aria-hidden="true" @endif>
                                     @if(isset($logos[$client->id]))
-                                        <img src="{{ $logos[$client->id] }}" width="44" height="36" alt="">
+                                        <img src="{{ $logos[$client->id] }}" width="72" height="64" alt="">
                                     @else
                                         <span class="client-reel__monogram" aria-hidden="true">{{ mb_strtoupper(mb_substr($client->display_name, 0, 1)) }}</span>
                                     @endif
-                                    <span class="client-reel__name" title="{{ $client->display_name }}">{{ $client->display_name }}</span>
+                                    <div class="client-reel__details">
+                                        <span class="client-reel__name">{{ $client->display_name }}</span>
+                                        <span class="client-reel__product">{{ $products[$client->product] }}</span>
+                                    </div>
                                 </li>
                             @endforeach
                         @endfor

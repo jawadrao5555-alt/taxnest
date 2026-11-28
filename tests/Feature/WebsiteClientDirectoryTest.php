@@ -80,6 +80,23 @@ class WebsiteClientDirectoryTest extends TestCase
             ->assertSee('No clients to show for Digital Invoice yet.')->assertDontSee('Fictional Counter');
     }
 
+    public function test_homepage_reel_and_directory_show_full_names_and_product_labels_for_each_client(): void
+    {
+        $name = 'Fictional Long Name Restaurant and Catering Company for Business Events and Weekend Celebrations';
+        $this->card($name, 'pos');
+        $this->card('Fictional Invoice Company', 'di');
+
+        $this->get('/')->assertOk()->assertSeeInOrder([
+            'class="client-reel__name">'.$name,
+            'class="client-reel__product">PRA POS',
+        ], false)->assertSee('class="client-reel__product">Digital Invoice', false);
+
+        $this->get(route('website-clients.index'))->assertOk()->assertSeeInOrder([
+            'class="directory-card-name">'.$name,
+            'class="directory-card-product">PRA POS',
+        ], false)->assertSee('class="directory-card-product">Digital Invoice', false);
+    }
+
     private function card(string $name, string $product, bool $paid = true, bool $published = true): WebsiteClient
     {
         $type = match ($product) {

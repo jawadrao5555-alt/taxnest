@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Hr\HrAuthController;
+use App\Http\Controllers\Hr\HrEmployeeInvitationController;
 use App\Http\Controllers\Hr\HrFieldDutyController;
 use App\Http\Controllers\Hr\HrLeaveController;
 use App\Http\Controllers\Hr\HrPayrollController;
@@ -15,6 +16,10 @@ Route::prefix('hr')->name('hr.')->group(function () {
     Route::get('login', [HrAuthController::class, 'show'])->name('login');
     Route::post('login', [HrAuthController::class, 'login'])->middleware('throttle:hr-login')->name('login.store');
     Route::post('logout', [HrAuthController::class, 'logout'])->name('logout');
+    Route::get('invitations/{token}', [HrEmployeeInvitationController::class, 'showAcceptance'])
+        ->where('token', '[a-f0-9]{64}')->name('invitations.show');
+    Route::post('invitations/{token}', [HrEmployeeInvitationController::class, 'accept'])
+        ->where('token', '[a-f0-9]{64}')->middleware('throttle:hr-invitations')->name('invitations.accept');
 
     Route::middleware(HrAuthenticate::class)->controller(HrWorkspaceController::class)->group(function () {
         Route::get('dashboard', 'dashboard')->name('dashboard');
@@ -22,6 +27,11 @@ Route::prefix('hr')->name('hr.')->group(function () {
             Route::get('/', 'show')->name('organizations.show');
             Route::post('employees', 'createEmployee')->name('employees.store');
             Route::patch('employees/{employee}', 'updateEmployee')->whereNumber('employee')->name('employees.update');
+            Route::prefix('employees/{employee}/invitation')->whereNumber('employee')->controller(HrEmployeeInvitationController::class)->group(function () {
+                Route::get('/', 'show')->name('employees.invitation');
+                Route::post('/', 'issue')->name('employees.invitation.issue');
+                Route::delete('{invitation}', 'revoke')->whereNumber('invitation')->name('employees.invitation.revoke');
+            });
             Route::post('shifts', 'assignShift')->name('shifts.store');
             Route::post('shifts/{shift}/punch', 'punch')->whereNumber('shift')->middleware('throttle:hr-attendance')->name('attendance.punch');
             Route::get('policy', [HrPolicyController::class, 'show'])->name('policy.show');

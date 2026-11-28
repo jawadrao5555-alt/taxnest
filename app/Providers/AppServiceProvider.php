@@ -49,6 +49,15 @@ class AppServiceProvider extends ServiceProvider
             ];
         });
 
+        \Illuminate\Support\Facades\RateLimiter::for('hr-invitations', function (\Illuminate\Http\Request $request) {
+            $token = hash('sha256', (string) $request->route('token'));
+
+            return [
+                \Illuminate\Cache\RateLimiting\Limit::perMinute(30)->by('ip:'.$request->ip()),
+                \Illuminate\Cache\RateLimiting\Limit::perMinute(6)->by('invitation:'.$token),
+            ];
+        });
+
         \Illuminate\Support\Facades\RateLimiter::for('hr-attendance', function (\Illuminate\Http\Request $request) {
             $account = $request->user('hr');
             $identity = $account ? 'user:'.$account->id : 'ip:'.$request->ip();

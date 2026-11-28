@@ -3,11 +3,17 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class HrOrganization extends Model
 {
-    protected $fillable = ['name', 'timezone', 'status'];
+    protected $fillable = ['name', 'timezone', 'status', 'linked_company_id'];
+
+    public function linkedCompany(): BelongsTo
+    {
+        return $this->belongsTo(Company::class, 'linked_company_id');
+    }
 
     public function employees(): HasMany { return $this->hasMany(HrEmployee::class, 'organization_id'); }
     public function memberships(): HasMany { return $this->hasMany(HrOrganizationMembership::class, 'organization_id'); }

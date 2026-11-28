@@ -24,11 +24,17 @@ final class PosReportPresentation
 
     public static function fromHistory(array $history): array
     {
+        $total = $history['summary']['net'];
+        $provisional = $history['provisional']['net'];
+
         return [
-            'total' => $history['summary']['net'], 'tax' => $history['summary']['tax'],
+            'total' => $total, 'tax' => $history['summary']['tax'],
             'gross' => $history['summary']['gross'] ?? 0, 'discount' => $history['summary']['discount'] ?? 0, 'returns_count' => $history['summary']['returns'] ?? 0,
             'count' => $history['summary']['sales'], 'returns' => $history['summary']['returned'],
-            'provisional' => $history['provisional']['net'], 'complete' => $history['complete'],
+            'provisional' => $provisional, 'complete' => $history['complete'],
+            'net_including_provisional' => in_array($history['tab'], ['local', 'combined'], true) && abs($provisional) >= 0.01
+                ? round($total + $provisional, 2)
+                : null,
             'payments' => $history['payments'], 'order_types' => $history['order_types'],
             'products' => $history['products'], 'streams' => $history['streams'] ?? [],
             'delivery' => $history['delivery'] ?? null,

@@ -16,6 +16,7 @@ class PosAddon extends Model
         'ends_at',
         'payment_proof_id',
         'subscription_id',
+        'historical_purchase',
     ];
 
     protected $casts = [
@@ -23,5 +24,6 @@ class PosAddon extends Model
         'amount' => 'decimal:2',
         'starts_at' => 'date',
         'ends_at' => 'date',
+        'historical_purchase' => 'array',
     ];
 }

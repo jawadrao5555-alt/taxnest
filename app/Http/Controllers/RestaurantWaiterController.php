@@ -302,7 +302,7 @@ class RestaurantWaiterController extends Controller
         return '"waiter-tables-' . $companyId . '-' . md5($payload) . '"';
     }
 
-    /** Waiter's own open (still-held) sent orders — for append + status view. */
+    /** Waiter's own open orders, including those ready in the kitchen. */
     public function myOrders()
     {
         $companyId = app('currentCompanyId');
@@ -312,7 +312,8 @@ class RestaurantWaiterController extends Controller
             // 'agent_core' = the waiter's own offline order replayed by the shop
             // PC once the net returned (Sep 2026) — still theirs, still open.
             ->whereIn('source', ['waiter', 'agent_core'])
-            ->where('status', 'held')
+            // Settlement sets completed atomically with the payment fields.
+            ->whereIn('status', ['held', 'preparing', 'ready'])
             ->where('created_by', $user->id)
             // 'creator' MUST be eager-loaded: orderJson() reads $o->creator?->name
             // and production has lazy-loading disabled (62 live 500s, Jul-Aug 2026).
@@ -1647,6 +1648,7 @@ class RestaurantWaiterController extends Controller
             'id' => $o->id,
             'order_number' => $o->order_number,
             'order_type' => $o->order_type,
+            'status' => $o->status,
             'table_id' => $o->table_id !== null ? (int) $o->table_id : null,
             'table' => $o->table ? $o->table->table_number : null,
             'customer_name' => $o->customer_name,

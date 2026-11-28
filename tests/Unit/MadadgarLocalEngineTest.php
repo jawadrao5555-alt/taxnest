@@ -100,11 +100,20 @@ class MadadgarLocalEngineTest extends TestCase
         $knowledge = file_get_contents(resource_path('madadgar/knowledge-pos.md'));
 
         $this->assertIsString($knowledge);
-        $this->assertStringContainsString('Business (Rs 29,999/year): Starter + poora Restaurant module', $knowledge);
-        $this->assertStringContainsString('Delivery Riders, public QR Menu', $knowledge);
-        $this->assertStringContainsString('Unlimited (Rs 37,999/year): Business ke sab features + Rider Live Tracking aur Caller ID', $knowledge);
-        $this->assertStringContainsString('Sirf do optional paid POS feature add-ons hain: Rider Live Tracking aur Caller ID', $knowledge);
-        $this->assertStringNotContainsString('Riders, Hazri aur public QR Menu ismein NAHI', $knowledge);
+        $this->assertStringContainsString('/pos/billing par Compare packages', $knowledge);
+        $this->assertStringContainsString('Rider Live Tracking aur Caller ID package mein included hon to alag payment nahin', $knowledge);
+        $this->assertStringContainsString('FBR Digital Invoice ya FBR POS (IMS) mein se aik channel', $knowledge);
+
+        $package = MadadgarLocalEngine::answer('Package upgrade kaise karun?');
+        $this->assertStringContainsString('/pos/billing', $package);
+        $this->assertStringContainsString('FBR Digital Invoice ya FBR POS (IMS)', $package);
+        $this->assertDoesNotMatchRegularExpression('/Rs\s*\d/i', $package);
+        $this->assertDoesNotMatchRegularExpression('/\d+%/', MadadgarLocalEngine::answer('Tax rate kahan set hota hai?'));
+
+        $fbrReceipt = MadadgarLocalEngine::answer('Provisional bill kaise final karun?', 'fbrpos');
+        $this->assertStringContainsString('FBR reporting enabled', $fbrReceipt);
+        $this->assertStringContainsString('accepted number', $fbrReceipt);
+        $this->assertStringContainsString('/fbr-pos/billing', MadadgarLocalEngine::answer('FBR POS package kaise upgrade karun?', 'fbrpos'));
     }
 
     public function test_declines_when_unsure(): void

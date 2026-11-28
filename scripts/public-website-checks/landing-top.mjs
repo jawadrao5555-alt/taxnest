@@ -41,6 +41,8 @@ export default async function check(page, baseUrl) {
     for (const width of [390, 768, 1024, 1366]) {
       await page.setViewportSize({width, height: 900});
       assert.equal((await page.goto(baseUrl, {waitUntil: 'networkidle'})).status(), 200);
+      const reel = page.locator('[data-client-reel]');
+      if (await reel.isVisible()) await reel.locator('[data-client-reel-close]').click();
       const nav = page.locator('nav').first();
       const menu = nav.getByRole('button', {name: 'Menu', exact: true});
       const action = nav.getByRole('link', {name: 'Get Started', exact: true});

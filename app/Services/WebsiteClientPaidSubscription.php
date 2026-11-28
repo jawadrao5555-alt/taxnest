@@ -157,6 +157,60 @@ final class WebsiteClientPaidSubscription
                 ->whereColumn('subscription_invoices.payment_proof_id', 'payment_proofs.id'))
             ->distinct()->pluck('payment_proofs.subscription_id');
 
-        return array_fill_keys($settled->concat($verified)->all(), true);
+        $discounted = self::paidHistoricalDiscounts(array_diff($subscriptionIds, $settled->all(), $verified->all()), $now);
+
+        return array_fill_keys($settled->concat($verified)->concat($discounted)->all(), true);
+    }
+
+    private static function paidHistoricalDiscounts(array $subscriptionIds, CarbonImmutable $now): array
+    {
+        if ($subscriptionIds === [] || !Schema::hasColumn('payment_proofs', 'admin_settlement_origin')) {
+            return [];
+        }
+
+        return SubscriptionInvoice::query()->packageCharge()
+            ->join('subscriptions', function (JoinClause $join) {
+                $join->on('subscriptions.id', '=', 'subscription_invoices.subscription_id')
+                    ->on('subscriptions.company_id', '=', 'subscription_invoices.company_id');
+            })
+            ->join('payment_proofs', function (JoinClause $join) {
+                $join->on('payment_proofs.id', '=', 'subscription_invoices.payment_proof_id')
+                    ->on('payment_proofs.company_id', '=', 'subscriptions.company_id')
+                    ->on('payment_proofs.subscription_id', '=', 'subscriptions.id')
+                    ->on('payment_proofs.pricing_plan_id', '=', 'subscriptions.pricing_plan_id')
+                    ->on('payment_proofs.billing_cycle', '=', 'subscriptions.billing_cycle');
+            })
+            ->whereIn('subscription_invoices.subscription_id', $subscriptionIds)
+            ->where('subscription_invoices.status', 'paid')
+            ->where('subscription_invoices.paid_at', '<=', $now)
+            ->where('payment_proofs.status', 'verified')
+            ->where('payment_proofs.request_type', 'subscription')
+            ->where('payment_proofs.admin_settlement_origin', PaymentProof::HISTORICAL_DISCOUNT_ORIGIN)
+            ->where('payment_proofs.verified_by', '>', 0)
+            ->where('payment_proofs.verified_at', '<=', $now)
+            ->whereColumn('payment_proofs.amount', 'subscription_invoices.amount')
+            ->whereColumn('payment_proofs.distributor_net_amount', 'subscription_invoices.amount')
+            ->select(['subscription_invoices.*', 'subscriptions.final_price as recorded_gross'])
+            ->selectRaw('DATE(payment_proofs.payment_date) as reviewed_payment_date')
+            ->with('payments')
+            ->get()
+            ->filter(function (SubscriptionInvoice $invoice) {
+                $key = VerifiedSubscriptionDocuments::HISTORICAL_DISCOUNT;
+                $discount = $invoice->document_snapshot[$key] ?? null;
+                $receipt = $invoice->payments->count() === 1 ? $invoice->payments->first() : null;
+                $net = number_format($invoice->amount, 2, '.', '');
+                return is_array($discount) && $receipt && $receipt->hasDownloadableReceipt()
+                    && VerifiedSubscriptionDocuments::matchesHistoricalDiscount($discount, $invoice->recorded_gross, $invoice->amount)
+                    && ($invoice->document_snapshot['kind'] ?? null) === 'subscription'
+                    && ($invoice->document_snapshot['payment_origin'] ?? null) === PaymentProof::HISTORICAL_DISCOUNT_ORIGIN
+                    && ($receipt->receipt_snapshot['payment_origin'] ?? null) === PaymentProof::HISTORICAL_DISCOUNT_ORIGIN
+                    && ($receipt->receipt_snapshot[$key] ?? null) === $discount
+                    && ($receipt->receipt_snapshot['verified_received'] ?? null) === $net
+                    && ($receipt->receipt_snapshot['allocated'] ?? null) === $net
+                    && ($receipt->receipt_snapshot['remaining_balance'] ?? null) === '0.00'
+                    && number_format($receipt->amount, 2, '.', '') === $net
+                    && $receipt->paid_at?->toDateString() === $invoice->paid_at?->toDateString()
+                    && $receipt->paid_at?->toDateString() === $invoice->reviewed_payment_date;
+            })->pluck('subscription_id')->all();
     }
 }

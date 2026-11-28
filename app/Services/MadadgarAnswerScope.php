@@ -27,6 +27,8 @@ final class MadadgarAnswerScope
             return $read;
         } elseif (preg_match('/(show|batao|dikhao|kitn[aiye]|total).{0,35}(today|aaj|balance|revenue|sales|collection)|(?:aaj|today).{0,30}(sales|collection|balance|kitn)|(?:doosri|other|foreign)\s*(company|tenant)|(?:company|tenant)\s*(?:id|#)\s*\d+/iu',$question)) {
             $text='Yeh sawal bounded read tools mein supported nahin. Owner exact commands today billing, today collections, today tax breakdown, stock summary, recipe summary ya today day close use kar sakta hai. Doosri company, arbitrary dates aur individual records ka access is chat se nahin milta.';$reason='live_data_unavailable';
+        } elseif (($guide = self::productGuide($question, $product, $company, $actor)) !== null) {
+            [$text, $reason] = $guide;
         } elseif ($company?->isLocalCollectionPilot()) {
             if (preg_match('/fbr|pra|fiscal|tax|submit|sandbox|certif|production|reporting/iu',$question)) {
                 $text='School aur Hospital local collection pilot mein fiscal submission OFF/blocked hai. Official reporting route aur sandbox verification ke baghair FBR/PRA submit, retry, queue ya enable karne ka mashwara nahin diya ja sakta. Receipt local collection ka record hai, fiscal certification nahin.';$reason='local_pilot_fiscal_block';
@@ -42,6 +44,57 @@ final class MadadgarAnswerScope
         }
         return $text===null ? null : ['text'=>$text,'escalation'=>null,'source'=>'scope','scope_reason'=>$reason];
     }
+
+    private static function productGuide(string $question, string $product, ?Company $company, ?User $actor): ?array
+    {
+        if (preg_match('/\b(?:erps?|hmis)\b/iu', $question)) {
+            return ['School, Lab aur Hospital ERP ke workflows aur demo ka rasta /product-guide#erps par dekhein. ERP package, access aur onboarding TaxNest ERP ke apne panel/support se confirm hote hain.', 'erp_guide'];
+        }
+
+        $digitalInvoice = preg_match('/\b(?:digital[\s-]+invoic(?:e|ing)|fbr[\s-]+di)\b/iu', $question);
+        $fbrPos = preg_match('/\b(?:fbr[\s-]+pos|ims)\b/iu', $question);
+        $pra = preg_match('/\bpra\b/iu', $question);
+        $addOn = preg_match('/\badd[\s-]*ons?\b/iu', $question);
+        $federal = $digitalInvoice || $fbrPos || preg_match('/\b(?:federal|fbr)\b/iu', $question);
+
+        if ($product === 'pos' && $company?->pos_integration_mode === 'standalone'
+            && ($pra || $federal || preg_match('/\b(?:fiscal|packages?|plans?|upgrade)\b/iu', $question))) {
+            return ['Standalone POS mein sales aur receipts local rehti hain. PRA/FBR reporting aur federal add-ons is edition mein available nahin. Apne current package ke liye /pos/billing ya product options ke liye /product-guide#pra dekhein.', 'standalone_pos_guide'];
+        }
+
+        if ($product === 'pos' && $federal && ($addOn || ($pra && $digitalInvoice))) {
+            if ($actor && !$actor->isCompanyAdmin()) {
+                return ['Federal add-on ki availability aur setup company owner verify kar sakta hai. Owner apne PRA POS Billing aur Tax Integrations mein current status dekhein.', 'role_limited_guidance'];
+            }
+            return ['PRA POS owner /pos/billing par Federal add-ons mein FBR Digital Invoice ya FBR POS (IMS) ka option check karein. Ek eligible paid package term par aik federal channel select hota hai. Price ya purchase option account eligibility aur configured rate par depend karta hai. Add-on active hona aur fiscal connection setup alag hain. Setup ke liye /pos/tax-integrations dekhein.', 'pra_federal_addon_guide'];
+        }
+
+        if ($product === 'fbrpos' && $fbrPos && $addOn) {
+            return ['Is FBR POS panel ka apna package /fbr-pos/billing par hai. Iske IMS connection ka status authorized admin /fbr-pos/settings mein dekhein. Optional federal add-on ka purchase eligible PRA POS account ki Billing mein hota hai. Dono products ka guide /product-guide par dekhein.', 'fbr_pos_ims_guide'];
+        }
+
+        if ($pra && $fbrPos && preg_match('/\b(?:compare|difference|farq|muqabla|versus|vs)\b/iu', $question)) {
+            return ['PRA POS Punjab Revenue Authority ki reporting ke liye apna POS product hai. FBR POS ka alag panel FBR IMS ki reporting ke liye hai. Product selection aur setup ka muqabla /product-guide par dekhein.', 'pos_product_comparison'];
+        }
+
+        if ($digitalInvoice && ($product === 'fbrpos' || !$pra)) {
+            $text = 'TaxNest Digital Invoice ka apna workflow /product-guide#di par hai. Digital Invoice company owner ka read-only Madadgar console /madadgar/di-read par milta hai.';
+            if ($product === 'pos') {
+                $text .= ' PRA POS ke optional federal connection ka status PRA POS Billing mein dekhein.';
+            }
+            return [$text, 'digital_invoice_guide'];
+        }
+
+        if ($fbrPos && $product === 'pos' && !$pra) {
+            return ['TaxNest FBR POS ke alag product aur login ka guide /product-guide#fbr par hai. Agar sawal PRA POS ke optional IMS add-on ka hai, apne PRA POS Billing mein availability check karein.', 'fbr_pos_guide'];
+        }
+        if ($pra && $product === 'fbrpos') {
+            return ['PRA POS ka alag login aur setup hai. Uski billing aur reporting ke steps /product-guide#pra par dekhein.', 'pra_pos_guide'];
+        }
+
+        return null;
+    }
+
     public static function metadata(array $result,string $product,?Company $company,?User $actor): array
     {
         if (isset($result['read_evidence'])) {

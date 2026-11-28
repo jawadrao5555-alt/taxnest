@@ -7181,6 +7181,7 @@ Once reported, the bill will be locked — no more edit or delete. Continue?',
     'hotel_reports_hint' => 'Occupancy and today’s folio money for this branch. Tax invoices stay on the guest folio.',
     // ---- Task 1582 end ----
     'waiter_edit_save_kitchen' => 'Save & Send Kitchen Update',
+    'waiter_order_edit_opened' => 'Order :order opened. Add items and save, or take payment when the customer is ready.',
     'waiter_edit_take_payment' => 'Take Payment',
     'waiter_edit_saving' => 'Saving…',
     'waiter_edit_saved' => 'Kitchen update saved for this waiter order.',

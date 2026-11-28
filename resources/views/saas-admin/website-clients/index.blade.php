@@ -10,19 +10,28 @@
         <div class="grid gap-4 lg:grid-cols-2">
             @include('saas-admin.website-clients.company-lookup')
             <form method="GET" action="{{ route('saas.admin.website-clients.index') }}" class="flex flex-wrap items-end gap-2">
-                <label class="block min-w-0 flex-auto text-sm font-medium">Company name or account code
+                <label class="block min-w-0 flex-auto text-sm font-medium">Company name, public name or account code
                     <input name="q" value="{{ $search }}" maxlength="120" class="tn-website-client-field mt-1 block w-full rounded-lg">
+                </label>
+                <label class="block min-w-0 flex-auto text-sm font-medium">Product
+                    <select name="product" class="tn-website-client-field mt-1 block w-full rounded-lg">
+                        <option value="">All products</option>
+                        @foreach(\App\Models\WebsiteClient::PRODUCTS as $code => $name)
+                            <option value="{{ $code }}" @selected($product === $code)>{{ $name }}</option>
+                        @endforeach
+                    </select>
                 </label>
                 <button type="submit" class="tn-website-client-action">Search</button>
             </form>
         </div>
-        @if($search !== '')<a href="{{ route('saas.admin.website-clients.index') }}" class="inline-block text-sm underline">Clear search</a>@endif
+        @if($search !== '' || $product !== null)<a href="{{ route('saas.admin.website-clients.index') }}" class="inline-block text-sm underline">Clear filters</a>@endif
         <ul class="tn-website-client-candidates divide-y">
             @forelse($candidates as $candidate)
             <li class="flex flex-wrap items-center justify-between gap-2 py-3">
                 <div class="min-w-0 break-words">
                     <p class="font-semibold">{{ $candidate->name }}</p>
                     <p class="text-sm">{{ \App\Models\WebsiteClient::PRODUCTS[$candidate->website_product] }} · Company ID {{ $candidate->product_company_id ?? $candidate->id }}@if($candidate->account_code) · {{ $candidate->account_code }}@endif</p>
+                    <p class="text-sm">{{ in_array($candidate->id, $paidCandidateIds, true) ? 'Active paid subscription' : 'No active paid subscription' }}</p>
                 </div>
                 <a href="{{ route('saas.admin.website-clients.create', ['company' => $candidate->id]) }}" class="tn-website-client-action" aria-label="Review {{ $candidate->name }}">Review candidate</a>
             </li>
@@ -67,7 +76,7 @@
         @endif
     </article>
     @empty
-        <p class="tn-website-client-panel rounded-xl border p-4 text-sm">No clients have been added.</p>
+        <p class="tn-website-client-panel rounded-xl border p-4 text-sm">{{ $search !== '' || $product !== null ? 'No saved client cards match.' : 'No clients have been added.' }}</p>
     @endforelse
     {{ $entries->links() }}
 </div>

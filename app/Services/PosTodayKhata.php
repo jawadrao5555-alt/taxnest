@@ -65,7 +65,7 @@ class PosTodayKhata
             : '0';
         // Task 1163: sale split by payment bucket — same signed sums and the
         // same payment_method drift guard as the tax split above (cash =
-        // exactly 'cash', card = full alias bucket; anything else is neither).
+        // exactly 'cash', card = full alias bucket).
         $cashSaleExpr = $hasPayMethod
             ? "COALESCE(SUM(CASE WHEN payment_method = '{$cash}' THEN ({$signExpr}) * total_amount ELSE 0 END),0)"
             : '0';
@@ -73,7 +73,7 @@ class PosTodayKhata
             ? "COALESCE(SUM(CASE WHEN payment_method IN ({$cardIn}) THEN ({$signExpr}) * total_amount ELSE 0 END),0)"
             : '0';
 
-        $agg = function (string $tab) use ($companyId, $bizToday, $signExpr, $saleRowExpr, $exemptExpr, $taxExpr, $cashTaxExpr, $cardTaxExpr, $cashSaleExpr, $cardSaleExpr, $onlyCreatedBy, $branchFilter) {
+        $agg = function (string $tab) use ($companyId, $bizToday, $signExpr, $saleRowExpr, $exemptExpr, $taxExpr, $cashTaxExpr, $cardTaxExpr, $cashSaleExpr, $cardSaleExpr, $hasPayMethod, $onlyCreatedBy, $branchFilter) {
             $row = PosTransaction::where('company_id', $companyId)
                 ->where('status', 'completed')
                 ->where('business_date', $bizToday)
@@ -83,6 +83,7 @@ class PosTodayKhata
                 ->selectRaw("
                     COALESCE(SUM({$saleRowExpr}),0) as bills,
                     COALESCE(SUM(({$signExpr}) * total_amount),0) as sale,
+                    COALESCE(SUM(CASE WHEN invoice_mode = 'local' THEN ({$signExpr}) * total_amount ELSE 0 END),0) as provisional_sale,
                     {$cashSaleExpr} as cash_sale,
                     {$cardSaleExpr} as card_sale,
                     COALESCE(SUM(({$signExpr}) * {$taxExpr}),0) as tax,
@@ -92,11 +93,18 @@ class PosTodayKhata
                     COALESCE(SUM(CASE WHEN pra_status = 'submitted' THEN ({$signExpr}) * total_amount ELSE 0 END),0) as reported
                 ")->first();
 
+            $sale = (float) ($row->sale ?? 0);
+            $cashSale = (float) ($row->cash_sale ?? 0);
+            $cardSale = (float) ($row->card_sale ?? 0);
+
             return [
                 'bills'        => (int) ($row->bills ?? 0),
-                'sale'         => (float) ($row->sale ?? 0),
-                'cash_sale'    => (float) ($row->cash_sale ?? 0),
-                'card_sale'    => (float) ($row->card_sale ?? 0),
+                'sale'         => $sale,
+                // The final-sales report presents L-series activity separately.
+                'provisional_sale' => (float) ($row->provisional_sale ?? 0),
+                'cash_sale'    => $cashSale,
+                'card_sale'    => $cardSale,
+                'other_sale'   => $hasPayMethod ? round($sale - $cashSale - $cardSale, 2) : 0.0,
                 'tax'          => (float) ($row->tax ?? 0),
                 'cash_tax'     => (float) ($row->cash_tax ?? 0),
                 'card_tax'     => (float) ($row->card_tax ?? 0),

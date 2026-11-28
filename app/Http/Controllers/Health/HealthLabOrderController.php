@@ -13,7 +13,7 @@ use App\Services\HealthLabWorkflow;
 use App\Services\HealthPatientService;
 use App\Services\HealthPlatformService;
 use App\Services\HealthScopeService;
-use App\Support\MpdfRenderer;
+use App\Support\HealthLabPdfRenderer;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
@@ -134,10 +134,10 @@ class HealthLabOrderController extends HealthPanelController
         $requested = $record->items->firstWhere('id', $item)?->specimens->firstWhere('id', $specimen);
         abort_if(!$requested || $requested->status === HealthLabSpecimen::REJECTED, 404);
 
-        return MpdfRenderer::render('health.lab.label', [
+        return HealthLabPdfRenderer::label([
             'specimen' => $requested,
             'order' => $record,
-        ], [80, 35], $requested->barcode.'.pdf', true)->header('Cache-Control', 'private, no-store');
+        ], $requested->barcode)->header('Cache-Control', 'private, no-store');
     }
 
     public function report(int $order)
@@ -163,11 +163,11 @@ class HealthLabOrderController extends HealthPanelController
             'sensitive' => true,
         ]);
 
-        return MpdfRenderer::render('health.lab.report', [
+        return HealthLabPdfRenderer::report([
             'order' => $record,
             'company' => $this->company(),
             'lines' => $lines,
-        ], 'a4', $record->order_no.'.pdf', true)->header('Cache-Control', 'private, no-store');
+        ], $record->order_no)->header('Cache-Control', 'private, no-store');
     }
 
     private function findOrder(int $order): HealthLabOrder

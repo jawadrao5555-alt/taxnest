@@ -1549,10 +1549,10 @@ window.addEventListener('popstate', function() {
                         <template x-if="hasDeliveryPortion()">
                             <div class="mt-1 space-y-1">
                                 <div class="flex items-center gap-1">
-                                    <select x-model="selectedDeliveryAddress" @change="_deliveryAddressChoiceVersion = (_deliveryAddressChoiceVersion || 0) + 1" class="flex-1 min-w-0 text-sm font-medium rounded-md border-blue-200 dark:border-blue-800 dark:bg-gray-800 dark:text-white py-1.5 px-2 focus:ring-blue-500 focus:border-blue-400">
+                                    <select x-model="selectedDeliveryAddress" aria-label="{{ __('pos.ph_full_delivery_address') }}" @change="_deliveryAddressChoiceVersion = (_deliveryAddressChoiceVersion || 0) + 1" class="flex-1 min-w-0 text-sm font-medium rounded-md border-blue-200 dark:border-blue-800 dark:bg-gray-800 dark:text-white py-1.5 px-2 focus:ring-blue-500 focus:border-blue-400">
                                         <option value="">{{ __('pos.delivery_address_divider') }}</option>
                                         <template x-for="(a, ai) in customerAddresses" :key="a.id ?? ('t' + ai)">
-                                            <option :value="a.address" x-text="(a.label ? a.label + ': ' : '') + a.address"></option>
+                                            <option :value="a.address" :selected="a.address === selectedDeliveryAddress" x-text="(a.label ? a.label + ': ' : '') + a.address"></option>
                                         </template>
                                     </select>
                                     {{-- ZFC (Aug 2026): purana address wahin se DELETE bhi ho sake —
@@ -1560,13 +1560,14 @@ window.addEventListener('popstate', function() {
                                     <button x-show="selectedDeliveryAddress && customerAddresses.some(a => a.address === selectedDeliveryAddress)" @click="deleteSelectedAddress()" title="{{ __('pos.ti_delete_address') }}" class="text-xs font-bold text-red-500 dark:text-red-400 px-2 py-1.5 rounded-md border border-red-200 dark:border-red-800 hover:bg-red-50 dark:hover:bg-red-900/30 whitespace-nowrap">✕</button>
                                     <button @click="showAddrNew = !showAddrNew; if (showAddrNew) { addressSaveError = ''; $nextTick(() => document.getElementById('tnNewAddrInput')?.focus()) }" class="text-xs font-bold text-blue-600 dark:text-blue-300 px-2 py-1.5 rounded-md border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/30 whitespace-nowrap">{{ __('pos.new_short') }}</button>
                                 </div>
+                                <p x-show="selectedDeliveryAddress" x-text="selectedDeliveryAddress" class="whitespace-pre-wrap break-words text-sm text-blue-900 dark:text-blue-100"></p>
                                 <div x-show="showAddrNew" x-cloak class="space-y-2">
                                     <label for="tnNewAddrLabel" class="block text-xs font-semibold">{{ __('pos.ph_addr_label') }}</label>
                                     <input id="tnNewAddrLabel" type="text" maxlength="50" x-model="newAddrLabel" :disabled="addressSaving" @keydown.enter.prevent="saveNewAddress()" autocomplete="off" name="pos_new_addr_label_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore class="w-full text-sm rounded-md border-blue-200 dark:border-blue-800 dark:bg-gray-800 dark:text-white py-1.5 px-2">
                                     <label for="tnNewAddrInput" class="block text-xs font-semibold">{{ __('pos.ph_full_delivery_address') }}</label>
-                                    <textarea id="tnNewAddrInput" rows="2" maxlength="500" x-model="newAddrText" :disabled="addressSaving" @keydown.escape.prevent="if (!addressSaving) showAddrNew = false" autocomplete="off" name="pos_new_addr_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore class="w-full text-sm rounded-md border-blue-200 dark:border-blue-800 dark:bg-gray-800 dark:text-white py-1.5 px-2"></textarea>
-                                    <p x-show="addressSaveError" x-text="addressSaveError" role="alert" class="text-xs text-red-700 dark:text-red-300"></p>
-                                    <button type="button" @click="saveNewAddress()" :disabled="addressSaving || !newAddrText.trim()" class="text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 px-2 py-1.5 rounded-md disabled:opacity-50" :aria-busy="addressSaving">{{ __('pos.save_btn') }}</button>
+                                    <textarea id="tnNewAddrInput" rows="3" maxlength="500" x-model="newAddrText" aria-required="true" aria-describedby="tnNewAddrError" data-required-message="{{ __('validation.required', ['attribute' => __('pos.ph_full_delivery_address')]) }}" @input="addressSaveError = ''" :disabled="addressSaving" @keydown.escape.prevent="if (!addressSaving) showAddrNew = false" autocomplete="off" name="pos_new_addr_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore class="w-full text-sm rounded-md border-blue-200 dark:border-blue-800 dark:bg-gray-800 dark:text-white py-1.5 px-2"></textarea>
+                                    <p id="tnNewAddrError" x-show="addressSaveError" x-text="addressSaveError" role="alert" class="text-xs text-red-700 dark:text-red-300"></p>
+                                    <button type="button" @click="saveNewAddress()" :disabled="addressSaving" class="text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 px-2 py-1.5 rounded-md disabled:opacity-50" :aria-busy="addressSaving">{{ __('pos.save_btn') }}</button>
                                 </div>
                             </div>
                         </template>
@@ -2397,7 +2398,7 @@ window.addEventListener('popstate', function() {
                                      <p class="mt-1 text-[10px] font-black uppercase tracking-wide text-indigo-600 dark:text-indigo-300">{{ __('pos.online_payment_pending_status') }}</p>
                                  </div>
                              </template>
-                            <button @click="boardViewEdit()" :disabled="boardBusy" class="w-full py-2.5 rounded-xl text-sm font-bold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 hover:bg-purple-100 disabled:opacity-40 transition" x-text="boardBusy ? window.TXT.loading_generic : window.TXT.open_edit_bill"></button>
+                            <button @click="boardViewEdit()" :disabled="boardBusy" class="w-full py-2.5 rounded-xl text-sm font-bold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 hover:bg-purple-100 disabled:opacity-40 transition" x-text="boardBusy ? window.TXT.loading_generic : (boardMenuTable.order.source === 'waiter' ? window.TXT.add_items : window.TXT.open_edit_bill)"></button>
                             {{-- Proof Bill (Pizza Master feedback, Jul 2026): customer ko bill
                                  dikhana ho to FINAL kiye BAGHAIR parchi — koi invoice nahi banta. --}}
                             <button @click="boardProofBill('cash')" :disabled="boardBusy" class="w-full py-2.5 rounded-xl text-sm font-bold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 disabled:opacity-40 transition">{{ __('pos.sale_proof_cash') }}</button>
@@ -3688,7 +3689,7 @@ window.addEventListener('popstate', function() {
                             {{-- Route through the atomic claim (Table-se-Bill, Jul 2026): a direct
                                  loadIncomingToCart here would bypass single-winner claiming and two
                                  terminals could finalize the same order twice. --}}
-                            <button @click="claimAndLoadIncoming(o)" class="px-4 py-2 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold transition">{{ __('pos.load_to_cart') }}</button>
+                            <button @click="claimAndLoadIncoming(o)" class="px-4 py-2 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold transition">{{ __('pos.add_items') }}</button>
                             {{-- Task 1379: the FULL ticket is a reprint only once EVERY
                                  line has already been printed — exactly the server's
                                  rule (KotPrintService::isReprintRender). An order the
@@ -8858,19 +8859,16 @@ function restaurantPos() {
             if (!this._recallCartBaseline) return false;
             return this.cartEditFingerprint() !== this._recallCartBaseline;
         },
-        // Save-first option sirf wahan jahan Hold/F5 sach mein chalega: claimed
-        // waiter orders payment par settle hote hain (P7 re-hold guard) aur
-        // manual/deal lines ko YE SCREEN hold se rokti hai (endpoint khud unhein
-        // qubool kar leta hai — rule cart ka hai, server ka nahi) — un cases mein
-        // prompt sirf discard/cancel dikhata hai. Order TYPE ab rukawat nahi:
-        // har type park hota hai (25 Aug 2026).
+        // Save-first uses the same update as Hold/F5. Incoming waiter orders
+        // save in place. Regular cashier holds reject manual and deal lines.
         //
         // Delivery fee ko yahan se chhoot dene ki koshish mat karna: wo ek
         // synthetic MANUAL line hai, aur manual cart payment processPaymentManual
         // se jata hai jo recalled restaurant order ko settle NAHI karta — parked
         // order latak kar roz day-close block karega. Pehle wo settlement banao.
         canSaveRecalledEdits() {
-            return !!(this.recalledOrderId || this.incomingOrderId) && !this.editingBillId
+            if (this.incomingOrderId) return this.cart.length > 0 && !this.hasDealItems();
+            return !!this.recalledOrderId && !this.editingBillId
                 && !this.holdBlockedByManual() && !this.hasDealItems()
                 && !(this.tableBoardEnabled && this.orderType === 'dine_in' && !this.selectedTable);
         },
@@ -9077,7 +9075,13 @@ function restaurantPos() {
         },
         async saveNewAddress() {
             const text = (this.newAddrText || '').trim();
-            if (!text || this.addressSaving) return;
+            if (this.addressSaving) return;
+            if (!text) {
+                const field = document.getElementById('tnNewAddrInput');
+                this.addressSaveError = field?.dataset.requiredMessage || '';
+                field?.focus();
+                return;
+            }
             this.addressSaveError = '';
             const label = (this.newAddrLabel || '').trim();
             const customer = this.selectedCustomer;
@@ -9203,11 +9207,6 @@ function restaurantPos() {
             const h = Math.floor(mins / 60), m = mins % 60;
             return h > 0 ? (h + 'h ' + m + 'm') : (m + 'm');
         },
-        // Task 1109: If-None-Match ETag fast-path — 304 means floor hasn't
-        // changed; skip the body parse and leave tableFloors untouched.
-        // A weak/briefly interrupted shop connection must not leave the table
-        // board on "Loading..." forever. Preserve the last board and surface
-        // the existing retry state when the request exceeds the timeout.
         async _fetchWithTimeout(url, options = {}, timeoutMs = 12000) {
             const controller = new AbortController();
             const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -9222,13 +9221,17 @@ function restaurantPos() {
             if (this.tablesErrorKind === 'server') return window.TXT.tables_server_error;
             return window.TXT.tables_offline;
         },
+        // A 304 revalidates the board already on screen without parsing a body.
         async loadTableStatus() {
             const serial = ++this._tableRequestSerial;
+            // Keep the request deadline active while reading the response body.
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), 12000);
             this.tablesLoading = true;
             try {
                 const hdrs = { 'Accept': 'application/json' };
                 if (this._tableEtag) hdrs['If-None-Match'] = this._tableEtag;
-                const res = await this._fetchWithTimeout('/pos/restaurant/api/table-status', { headers: hdrs });
+                const res = await fetch('/pos/restaurant/api/table-status', { headers: hdrs, signal: controller.signal });
                 if (serial !== this._tableRequestSerial) return;
                 if (res.status === 304) {
                     if (!this._tableEtag) throw new Error('Uncached table response');
@@ -9259,6 +9262,7 @@ function restaurantPos() {
                     this.tablesErrorKind = e instanceof TypeError || e.name === 'AbortError' ? 'network' : 'server';
                 }
             } finally {
+                clearTimeout(timer);
                 if (serial === this._tableRequestSerial) this.tablesLoading = false;
             }
         },
@@ -11338,6 +11342,12 @@ function restaurantPos() {
         },
 
         async holdOrder(opts) {
+            // Hold/F5, Send to Kitchen and save before switching all update the
+            // existing waiter order. Payment is a separate action.
+            if (this.incomingOrderId) {
+                if (!this.cart.length || this.submitting) return null;
+                return this.saveIncomingOrder();
+            }
             if (this.hasDeliveryPortion() && await this.waitForDeliveryAddress() === false) return;
             if (this.hasMixedService() && this.hasDeliveryPortion() && (!this.orderCustomerPhone || !this.selectedDeliveryAddress?.trim())) { this.showToast(window.TXT.fulfill_delivery_contact, 'error'); return; }
             // EDIT MODE: a provisional bill can't be turned into a held order —
@@ -11362,12 +11372,6 @@ function restaurantPos() {
             // cashier doesn't lose the cart on a server reject.
             if (this.holdBlockedByManual() || this.hasDealItems()) {
                 this.showToast(window.TXT.manual_deals_billing_only_hold, 'error');
-                return null;
-            }
-            // P7 guard — an incoming WAITER order already exists as a held restaurant
-            // order (KDS sees it). Re-holding would duplicate it; settle via payment.
-            if (this.incomingOrderId) {
-                this.showToast(window.TXT.waiter_order_loaded_settle, 'info');
                 return null;
             }
             const now = Date.now();
@@ -12790,6 +12794,7 @@ function restaurantPos() {
                     : @json(__('pos.waiter_edit_saved')),
                     data.kot_status === 'action_required' ? 'warning' : 'success');
                 this.loadIncoming();
+                if (this.tableBoardEnabled) this.loadTableStatus();
                 return true;
             } catch (e) {
                 this.showToast(@json(__('pos.waiter_edit_error')), 'error');
@@ -12938,7 +12943,7 @@ function restaurantPos() {
             this.showIncoming = false;
             this.activeCartIndex = this.cart.length ? 0 : -1;
             this.flowStep = 'cart';
-            this.showToast(window.TXT.waiter_order_prefix + o.order_number + ' loaded — take payment to settle it', 'success');
+            this.showToast(window.TXT.waiter_order_edit_opened.replace(':order', o.order_number), 'success');
         },
         // Full KOT reprint (all items) or delta print (only newly-added items).
         printIncomingKot(o, delta = false) {

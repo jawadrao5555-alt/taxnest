@@ -5,9 +5,12 @@
   <tr><td>{{ __('pos_history.gross') }}</td><td class="r">PKR {{ number_format($presentation['gross'],2) }}</td></tr>
   <tr><td>{{ __('pos_history.discount_included') }}</td><td class="r">PKR {{ number_format($presentation['discount'],2) }}</td></tr>
   <tr><td>{{ __('pos.dc_returns_row',['count'=>$presentation['returns_count']]) }}</td><td class="r">PKR {{ number_format($presentation['returns'],2) }}</td></tr>
-  <tr><td><strong>{{ __('pos.dc_total_revenue') }}</strong></td><td class="r"><strong>PKR {{ number_format($presentation['total'],2) }}</strong></td></tr>
+  <tr><td><strong>{{ isset($presentation['net_including_provisional']) ? __('pos_history.net') : __('pos.dc_total_revenue') }}</strong></td><td class="r"><strong>PKR {{ number_format($presentation['total'],2) }}</strong></td></tr>
   <tr><td>{{ __('pos.dc_sales_tax') }}</td><td class="r">PKR {{ number_format($presentation['tax'],2) }}</td></tr>
   <tr><td>{{ __('pos_history.provisional',['amount'=>number_format($presentation['provisional'],2)]) }}</td><td></td></tr>
+  @if(isset($presentation['net_including_provisional']))
+  <tr data-report-net-including-provisional><td>{{ __('pos_history.net_including_provisional') }}{{ !$presentation['complete'] ? ' · ' . __('pos_history.known_only') : '' }}</td><td class="r">PKR {{ number_format($presentation['net_including_provisional'], 2) }}</td></tr>
+  @endif
  </tbody></table>
  @if(!$presentation['complete'])<p role="status">{{ __('pos_history.partial') }} {{ __('pos_history.gap_explanation') }}</p>@endif
  <div class="section-title">{{ __('pos.dc_summary_streams') }}</div>

@@ -7,6 +7,7 @@ return [
     'price_pending' => 'Qeemat ki setup baqi hai',
     'review_account' => 'Apni PRA POS billing dekhein',
     'active' => 'Aap ke package par active hai',
+    'setup_optional' => 'Jab zaroorat ho, connection set up karein.',
     'signup_heading' => 'Signup ke ikhtiyari add-ons',
     'signup_policy' => 'Saalana plan mein aik FBR option shamil kar sakte hain. Mehdood branch wale package mein izafi slots bhi shamil kar sakte hain. Rasai tasdeeq shuda paid muddat se shuru hogi.',
     'none' => 'Koi federal integration nahin',

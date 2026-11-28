@@ -90,6 +90,67 @@ class PosReportsActiveBusinessDayTest extends TestCase
         }
     }
 
+    public function test_local_dashboard_and_report_show_why_final_revenue_can_be_zero(): void
+    {
+        config(['app.timezone' => 'Asia/Karachi']);
+        Carbon::setTestNow(Carbon::parse('2026-10-22 00:30:00', 'Asia/Karachi'));
+        $company = $this->company('06:00');
+        DB::table('companies')->where('id', $company->id)->update([
+            'is_internal_account' => true,
+            'pos_setup_completed' => true,
+        ]);
+        $owner = \App\Models\User::factory()->create([
+            'company_id' => $company->id, 'pos_role' => 'pos_admin', 'role' => 'company_admin', 'is_active' => true,
+        ]);
+        $cashier = \App\Models\User::factory()->create(['company_id' => $company->id, 'pos_role' => 'pos_cashier']);
+        $branch = DB::table('branches')->insertGetId(['company_id' => $company->id, 'name' => 'Main', 'is_active' => true]);
+        $otherBranch = DB::table('branches')->insertGetId(['company_id' => $company->id, 'name' => 'Second', 'is_active' => true]);
+        $date = '2026-10-21';
+        $sale = function (string $number, float $amount, array $extra = []) use ($company, $cashier, $date, $branch) {
+            DB::table('pos_transactions')->insert($extra + [
+                'company_id' => $company->id, 'branch_id' => $branch, 'business_date' => $date,
+                'created_by' => $cashier->id, 'invoice_number' => $number,
+                'status' => 'completed', 'transaction_type' => 'sale', 'invoice_mode' => 'local', 'pra_status' => 'local',
+                'subtotal' => $amount, 'total_amount' => $amount, 'payment_method' => 'cash',
+                'created_at' => now(), 'updated_at' => now(),
+            ]);
+        };
+        $sale('QA-LOCAL-CASH', 100);
+        $sale('QA-LOCAL-CARD', 75, ['payment_method' => 'debit_card']);
+        $sale('QA-LOCAL-OTHER', 50, ['payment_method' => 'qr_payment']);
+        $sale('QA-LOCAL-REFUND', 10, ['payment_method' => 'qr_payment', 'transaction_type' => 'return']);
+        $sale('QA-OTHER-CASHIER', 500, ['created_by' => $owner->id]);
+        $sale('QA-OTHER-BRANCH', 800, ['branch_id' => $otherBranch]);
+        $sale('QA-NEXT-DATE', 1200, ['business_date' => '2026-10-22']);
+        $sale('QA-PRA-FINAL', 400, ['invoice_mode' => 'pra', 'pra_status' => 'submitted']);
+
+        $this->actingAs($owner, 'pos')->withSession([\App\Services\BranchContextService::SESSION_KEY => $branch]);
+        $dashboard = $this->get(route('pos.dashboard', ['cashier' => $cashier->id]));
+        $dashboard->assertOk();
+        $dashboardHtml = new \DOMDocument();
+        @$dashboardHtml->loadHTML($dashboard->getContent());
+        $local = (new \DOMXPath($dashboardHtml))->query('//a[@data-ledger-stream="local"]')->item(0);
+        $this->assertNotNull($local);
+        $this->assertStringContainsString('Rs 215', $local->textContent);
+        $this->assertStringContainsString(__('pos_history.khata_other_sale'), $local->textContent);
+        $this->assertStringContainsString('Rs 40', $local->textContent);
+        $this->assertStringContainsString(__('pos_history.khata_includes_provisional', ['amount' => '215.00']), $local->textContent);
+
+        parse_str(parse_url($local->getAttribute('href'), PHP_URL_QUERY), $scope);
+        $this->assertSame(['tab' => 'local', 'from' => $date, 'to' => $date, 'cashier' => (string) $cashier->id], $scope);
+        $report = $this->get($local->getAttribute('href'));
+        $report->assertOk()->assertSee(__('pos_history.net'))->assertSee(__('pos_history.net_including_provisional'));
+        $report->assertViewHas('financialHistory', fn (array $history) => (float) $history['summary']['net'] === 0.0
+            && (float) $history['provisional']['net'] === 215.0);
+        $reportHtml = new \DOMDocument();
+        @$reportHtml->loadHTML($report->getContent());
+        $recon = (new \DOMXPath($reportHtml))->query('//tr[@data-report-net-including-provisional]')->item(0);
+        $this->assertNotNull($recon);
+        $this->assertStringContainsString('PKR 215.00', $recon->textContent);
+        $this->get(route('pos.reports', array_replace($scope, ['tab' => 'pra'])))
+            ->assertOk()->assertDontSee(__('pos_history.net_including_provisional'));
+    }
+
     public function test_top_customers_view_all_matches_the_reports_scope_and_includes_ranked_customers_beyond_ten(): void
     {
         $company = $this->company('06:00');

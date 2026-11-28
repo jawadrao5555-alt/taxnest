@@ -8,7 +8,9 @@ use Illuminate\Support\Facades\{DB, Schema};
 /** Documents the existing reviewed assignment; does not grant access or move money. */
 final class VerifiedSubscriptionDocuments
 {
-    public static function record(PaymentProof $proof, Subscription $subscription, float $received, ?\Carbon\CarbonInterface $paidOn = null, ?SubscriptionInvoice $legacy = null): ?SubscriptionInvoice
+    public const HISTORICAL_DISCOUNT = 'historical_package_discount';
+
+    public static function record(PaymentProof $proof, Subscription $subscription, float $received, ?\Carbon\CarbonInterface $paidOn = null, ?SubscriptionInvoice $legacy = null, ?array $historicalDiscount = null): ?SubscriptionInvoice
     {
         // Keep the existing deploy-before-migrate / minimal legacy-schema path.
         // A partially migrated document schema must fail and roll back approval.
@@ -18,9 +20,31 @@ final class VerifiedSubscriptionDocuments
             || (int) $proof->subscription_id !== (int) $subscription->id || !is_finite($received) || $received <= 0) {
             throw new \LogicException('Verified subscription documents require an atomic, scoped reviewed payment.');
         }
-        return self::recordDocument($proof, $subscription, $received,
-            round((float) (($proof->distributor_quote_snapshot)['net_quote'] ?? $subscription->final_price), 2),
-            'subscription', $subscription->purchase_snapshot, $proof->distributor_quote_snapshot, $paidOn, $legacy);
+        if (($proof->admin_settlement_origin === PaymentProof::HISTORICAL_DISCOUNT_ORIGIN) !== ($historicalDiscount !== null)
+            || ($historicalDiscount !== null && (!$paidOn || $legacy || !self::matchesHistoricalDiscount($historicalDiscount, $subscription->final_price, $received)))) {
+            throw new \LogicException('Historical discounts require a reconciled amount and original payment date on a new document.');
+        }
+        $expected = $historicalDiscount !== null ? $historicalDiscount['net_paisa'] / 100
+            : round((float) (($proof->distributor_quote_snapshot)['net_quote'] ?? $subscription->final_price), 2);
+        return self::recordDocument($proof, $subscription, $received, $expected,
+            'subscription', $subscription->purchase_snapshot, $proof->distributor_quote_snapshot, $paidOn, $legacy, $historicalDiscount);
+    }
+
+    public static function matchesHistoricalDiscount(array $discount, mixed $gross, mixed $net): bool
+    {
+        if (!is_numeric($gross) || !is_numeric($net)) return false;
+
+        $grossPaisa = (int) round((float) $gross * 100);
+        $netPaisa = (int) round((float) $net * 100);
+        $basisPoints = $discount['discount_basis_points'] ?? null;
+        return ($discount['version'] ?? null) === 1
+            && is_int($basisPoints) && $basisPoints > 0 && $basisPoints < 10000
+            && $netPaisa > 0 && $grossPaisa > $netPaisa
+            && ($discount['gross_paisa'] ?? null) === $grossPaisa
+            && ($discount['net_paisa'] ?? null) === $netPaisa
+            && ($discount['discount_paisa'] ?? null) === $grossPaisa - $netPaisa
+            && $grossPaisa - $netPaisa === intdiv($grossPaisa * $basisPoints + 5000, 10000)
+            && filled($discount['reason'] ?? null) && filled($discount['reference'] ?? null);
     }
 
     public static function recordAddon(
@@ -29,7 +53,8 @@ final class VerifiedSubscriptionDocuments
         float $received,
         float $expected,
         string $kind,
-        array $purchase
+        array $purchase,
+        ?\Carbon\CarbonInterface $paidOn = null
     ): ?SubscriptionInvoice {
         if (!in_array($kind, ['extra_branch', 'pos_addon', 'ai_pages'], true)) {
             throw new \LogicException('Unknown verified add-on document kind.');
@@ -41,7 +66,7 @@ final class VerifiedSubscriptionDocuments
             throw new \LogicException('Verified add-on documents require an atomic, scoped reviewed payment.');
         }
 
-        return self::recordDocument($proof, $subscription, $received, $expected, $kind, $purchase, null);
+        return self::recordDocument($proof, $subscription, $received, $expected, $kind, $purchase, null, $paidOn);
     }
 
     private static function recordDocument(
@@ -53,7 +78,8 @@ final class VerifiedSubscriptionDocuments
         ?array $purchase,
         ?array $quote,
         ?\Carbon\CarbonInterface $paidOn = null,
-        ?SubscriptionInvoice $legacy = null
+        ?SubscriptionInvoice $legacy = null,
+        ?array $historicalDiscount = null
     ): SubscriptionInvoice {
         $existing = SubscriptionInvoice::where('payment_proof_id', $proof->id)->lockForUpdate()->first();
         if ($existing) {
@@ -83,6 +109,9 @@ final class VerifiedSubscriptionDocuments
             'unallocated_excess' => number_format($excess, 2, '.', '')];
         if (isset($quote[PosSignupBundle::KEY])) {
             $common[PosSignupBundle::KEY] = $quote[PosSignupBundle::KEY];
+        }
+        if ($historicalDiscount !== null) {
+            $common[self::HISTORICAL_DISCOUNT] = $historicalDiscount;
         }
         if ($paidOn !== null) {
             $common['payment_date'] = $paidOn->toDateString();

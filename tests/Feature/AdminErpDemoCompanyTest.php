@@ -32,7 +32,8 @@ class AdminErpDemoCompanyTest extends TestCase
             $response = $this->actingAs($admin, 'admin')->post(route('saas.admin.companies.store'), $data);
             $company = Company::where('ntn', 'ERP-DEMO-'.strtoupper($data['demo_request_key']))->sole();
             $owner = User::where('company_id', $company->id)->sole();
-            $plan = Subscription::where('company_id', $company->id)->sole()->pricingPlan;
+            $subscription = Subscription::where('company_id', $company->id)->sole();
+            $plan = $subscription->pricingPlan;
             $school = $type === 'school';
             $this->assertSame(NestErps::PRODUCT_TYPE, $company->product_type);
             $this->assertSame($school ? NestErps::SCHOOL : NestErps::HEALTH, $company->erps_vertical);
@@ -61,6 +62,15 @@ class AdminErpDemoCompanyTest extends TestCase
             $this->assertSame(1, AdminAuditLog::where('action', 'ERP demo company created')
                 ->where('target_id', $company->id)->count());
             $this->assertSame($owner->getAuthPassword(), $owner->fresh()->getAuthPassword());
+
+            $this->get(route('saas.admin.companies.show', $company->id))->assertOk()
+                ->assertSee('ERP Workspace')
+                ->assertSee('href="'.$loginPath.'"', false)
+                ->assertSee($owner->email)
+                ->assertSee('Recorded demo expiry')
+                ->assertSee($subscription->trial_ends_at->format('d M Y, H:i T'))
+                ->assertDontSee('PRA Integration')
+                ->assertDontSee($data['password']);
 
             if ($school) {
                 $this->post($loginPath, ['email' => $owner->email, 'password' => $data['password']])

@@ -152,12 +152,17 @@ class MadadgarService
             $kb = '';
         }
 
-        // Product identity line + regulator wording — everything else identical.
         $identity = $product === 'fbrpos'
             ? 'Tum "Madadgar" ho — Nest FBR POS (Pakistan ka FBR-integrated Point of Sale system, SRO 1279 IMS fiscalization) ka official support assistant.'
             : 'Tum "Madadgar" ho — NestPOS (Pakistan ka PRA-integrated Point of Sale system) ka official support assistant.';
         $productName = $product === 'fbrpos' ? 'Nest FBR POS' : 'NestPOS';
         $regulator = $product === 'fbrpos' ? 'FBR (POS ID, token, sandbox/production, Tax Asaan)' : 'PRA';
+        $standalone = $product === 'pos' && $company?->pos_integration_mode === 'standalone';
+        if ($standalone) {
+            $identity = 'Tum "Madadgar" ho — NestPOS Standalone (local Point of Sale) ka official support assistant.';
+            $productName = 'NestPOS Standalone';
+            $regulator = 'local tax configuration';
+        }
         $profile = PosFeatureService::profile($company);
         $available = self::availableModules($company);
         $moduleLabels = array_map(
@@ -173,6 +178,9 @@ class MadadgarService
             ."Shop examples: {$examples}\n"
             ."AVAILABLE modules: {$availableList}\n"
             ."Use the shop's own examples; never suggest features that are not in its available list; if asked about one, say it is not part of their business type.";
+        if ($standalone) {
+            $shopContext .= "\nThis is the local-only edition. Fiscal setup, sending or retrying with PRA or FBR, and federal add-ons do not apply. Follow the Standalone POS section and describe local workflows.";
+        }
 
         return <<<PROMPT
 {$identity}

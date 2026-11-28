@@ -1,5 +1,24 @@
 <x-admin-layout>
-    <div class="min-h-[calc(100dvh-4rem)] bg-slate-950 text-slate-100">
+    <style>
+        .tn-deployment-approvals :is(input:not([type="hidden"]), select) {
+            border: 1px solid #8999af;
+            color-scheme: dark;
+        }
+        .tn-deployment-approvals input::placeholder {
+            color: #a8b6c8;
+            opacity: 1;
+        }
+        .tn-deployment-approvals :is(a, button, input, select, summary):focus-visible {
+            outline: 2px solid #67e8f9;
+            outline-offset: 3px;
+        }
+        .tn-deployment-approvals button:disabled {
+            background-color: #334155;
+            color: #e2e8f0;
+            opacity: 1;
+        }
+    </style>
+    <div class="tn-deployment-approvals min-h-[calc(100dvh-4rem)] bg-slate-950 text-slate-100">
         <div class="mx-auto max-w-5xl px-4 py-6 sm:px-6 sm:py-10">
             <div class="mb-8 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
                 <div>
@@ -11,7 +30,7 @@
                     <p class="mt-2 max-w-xl text-sm leading-6 text-slate-400">Review the exact build before it reaches production. Approve only when the commit, requester, and result are expected. One TaxNest Admin approval is the normal path.</p>
                 </div>
                 <div class="rounded-xl border border-slate-800 bg-slate-900/70 px-4 py-3 text-left sm:min-w-[190px]">
-                    <p class="text-xs font-medium uppercase tracking-wider text-slate-500">Owner decision</p>
+                    <p class="text-xs font-medium uppercase tracking-wider text-slate-300">Owner decision</p>
                     <p class="mt-1 text-sm font-semibold text-slate-200">One approval. One release.</p>
                 </div>
             </div>
@@ -33,7 +52,7 @@
                         <p class="mt-2 max-w-3xl text-sm leading-6 {{ !empty($poller['recovery_needed']) ? 'text-amber-100' : 'text-slate-400' }}">{{ $poller['guidance'] ?? '' }}</p>
                     </div>
                     <div class="rounded-xl border border-slate-800 bg-slate-950/70 px-4 py-3 text-left sm:min-w-[220px]">
-                        <p class="text-xs font-medium uppercase tracking-wider text-slate-500">Last poller heartbeat</p>
+                        <p class="text-xs font-medium uppercase tracking-wider text-slate-300">Last poller heartbeat</p>
                         <p class="mt-1 text-sm font-semibold text-slate-200" data-poller-heartbeat>
                             {{ $poller['last_poller_at'] ? $poller['last_poller_at']->timezone(config('app.timezone'))->format('Y-m-d H:i:s T') : 'No authenticated poll yet' }}
                         </p>
@@ -52,7 +71,7 @@
             </section>
 
             <section class="mb-6 rounded-2xl border border-slate-800 bg-slate-900 px-5 py-4 sm:px-6" data-immediate-dispatch-status>
-                <p class="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">Approval transport</p>
+                <p class="text-xs font-bold uppercase tracking-[0.16em] text-slate-300">Approval transport</p>
                 <p class="mt-1 text-sm font-semibold text-slate-200">{{ $immediateDispatch['label'] ?? 'Scheduled OIDC relay active' }}</p>
                 <p class="mt-1 text-sm leading-6 text-slate-400">{{ $immediateDispatch['guidance'] ?? '' }}</p>
             </section>
@@ -100,9 +119,9 @@
                     </label>
                     <label class="block">
                         <span class="mb-2 block text-sm font-semibold text-slate-200">Current admin password</span>
-                        <input class="min-h-12 w-full rounded-xl border border-slate-700 bg-slate-950 px-4 text-base text-white outline-none placeholder:text-slate-600 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20" type="password" name="password" required autocomplete="current-password" placeholder="Confirm this production release">
+                        <input class="min-h-12 w-full rounded-xl border border-slate-700 bg-slate-950 px-4 text-base text-white outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20" type="password" name="password" required autocomplete="current-password" placeholder="Confirm this production release">
                     </label>
-                    <button type="submit" @disabled(empty($eligiblePullRequests)) class="min-h-12 rounded-xl bg-cyan-400 px-5 text-sm font-bold text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-40 focus:outline-none focus:ring-2 focus:ring-cyan-300 focus:ring-offset-2 focus:ring-offset-slate-900 sm:col-span-2">Approve &amp; release automatically</button>
+                    <button type="submit" @disabled(empty($eligiblePullRequests)) class="min-h-12 rounded-xl bg-cyan-400 px-5 text-sm font-bold text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-cyan-300 focus:ring-offset-2 focus:ring-offset-slate-900 sm:col-span-2">Approve &amp; release automatically</button>
                 </form>
             </section>
 
@@ -127,9 +146,9 @@
                         <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                             <div>
                                 <div class="flex flex-wrap items-center gap-2">
-                                    <span class="font-mono text-sm text-slate-500">#{{ $row->pull_request_number }}</span>
+                                    <span class="font-mono text-sm text-slate-300">#{{ $row->pull_request_number }}</span>
                                     <span class="rounded-full border px-2.5 py-1 text-xs font-bold uppercase tracking-wider {{ $statusClasses }}">{{ $pickup['label'] }}</span>
-                                    <span class="font-mono text-[11px] text-slate-500">{{ $row->status }}</span>
+                                    <span class="font-mono text-[11px] text-slate-300">{{ $row->status }}</span>
                                 </div>
                                 <p class="mt-2 break-all font-mono text-xs text-slate-400">{{ $row->request_id }}</p>
                                 @if(!empty($pickup['message']))
@@ -140,15 +159,15 @@
                         </div>
                     </div>
                     <div class="grid gap-5 px-5 py-5 sm:grid-cols-2 sm:px-6 lg:grid-cols-4">
-                        <div class="sm:col-span-2 lg:col-span-4"><p class="text-xs font-bold uppercase tracking-wider text-slate-500">Repository</p><p class="mt-1 break-all font-mono text-sm text-slate-200">{{ $row->repository }}</p></div>
-                        <div class="sm:col-span-2 lg:col-span-4"><p class="text-xs font-bold uppercase tracking-wider text-slate-500">Exact commit SHA</p><p class="mt-1 break-all font-mono text-sm text-slate-200">{{ $row->head_sha }}</p></div>
-                        <div><p class="text-xs font-bold uppercase tracking-wider text-slate-500">Expires</p><p class="mt-1 text-sm text-slate-200">{{ $row->expires_at ?? 'Not set' }}</p></div>
-                        <div><p class="text-xs font-bold uppercase tracking-wider text-slate-500">Requested by</p><p class="mt-1 break-words text-sm text-slate-200">{{ $row->requestedBy?->name ?? 'Not recorded' }}</p></div>
-                        <div><p class="text-xs font-bold uppercase tracking-wider text-slate-500">Approved by</p><p class="mt-1 break-words text-sm text-slate-200">{{ $row->approvedBy?->name ?? 'Awaiting approval' }}</p></div>
+                        <div class="sm:col-span-2 lg:col-span-4"><p class="text-xs font-bold uppercase tracking-wider text-slate-300">Repository</p><p class="mt-1 break-all font-mono text-sm text-slate-200">{{ $row->repository }}</p></div>
+                        <div class="sm:col-span-2 lg:col-span-4"><p class="text-xs font-bold uppercase tracking-wider text-slate-300">Exact commit SHA</p><p class="mt-1 break-all font-mono text-sm text-slate-200">{{ $row->head_sha }}</p></div>
+                        <div><p class="text-xs font-bold uppercase tracking-wider text-slate-300">Expires</p><p class="mt-1 text-sm text-slate-200">{{ $row->expires_at ?? 'Not set' }}</p></div>
+                        <div><p class="text-xs font-bold uppercase tracking-wider text-slate-300">Requested by</p><p class="mt-1 break-words text-sm text-slate-200">{{ $row->requestedBy?->name ?? 'Not recorded' }}</p></div>
+                        <div><p class="text-xs font-bold uppercase tracking-wider text-slate-300">Approved by</p><p class="mt-1 break-words text-sm text-slate-200">{{ $row->approvedBy?->name ?? 'Awaiting approval' }}</p></div>
                     </div>
                     @if($row->deploy_result)
                         <div class="mx-5 mb-5 rounded-xl border border-slate-800 bg-slate-950/70 px-4 py-3 sm:mx-6">
-                            <p class="text-xs font-bold uppercase tracking-wider text-slate-500">Deployment result</p>
+                            <p class="text-xs font-bold uppercase tracking-wider text-slate-300">Deployment result</p>
                             <p class="mt-1 text-sm font-semibold text-slate-200">{{ ucfirst($row->deploy_result) }}</p>
                             @if($row->deployed_sha)<p class="mt-2 break-all font-mono text-xs text-slate-400">{{ $row->deploy_result === 'success' ? 'Deployed SHA' : 'Target SHA' }}: {{ $row->deployed_sha }}</p>@endif
                             @if($row->failure_summary)<p class="mt-2 text-sm text-rose-300">{{ $row->failure_summary }}</p>@endif
@@ -161,7 +180,7 @@
                             <p class="mt-1 text-sm leading-6 text-slate-400">Enter your current admin password to approve PR #{{ $row->pull_request_number }}. This is the final production gate.</p>
                             <form method="post" action="{{ route('saas.admin.deployment-approval.approve', $row->request_id) }}" class="mt-4 flex flex-col gap-3 sm:flex-row">
                                 @csrf
-                                <label class="min-w-0 flex-1"><span class="sr-only">Current admin password</span><input class="min-h-12 w-full rounded-xl border border-slate-700 bg-slate-950 px-4 text-base text-white outline-none placeholder:text-slate-600 focus:border-amber-300 focus:ring-2 focus:ring-amber-300/20" type="password" name="password" required autocomplete="current-password" placeholder="Current admin password"></label>
+                                <label class="min-w-0 flex-1"><span class="sr-only">Current admin password</span><input class="min-h-12 w-full rounded-xl border border-slate-700 bg-slate-950 px-4 text-base text-white outline-none focus:border-amber-300 focus:ring-2 focus:ring-amber-300/20" type="password" name="password" required autocomplete="current-password" placeholder="Current admin password"></label>
                                 <button type="submit" class="min-h-12 rounded-xl bg-amber-300 px-6 text-sm font-bold text-slate-950 transition hover:bg-amber-200 focus:outline-none focus:ring-2 focus:ring-amber-300 focus:ring-offset-2 focus:ring-offset-slate-900">Approve deployment</button>
                             </form>
                         </div>

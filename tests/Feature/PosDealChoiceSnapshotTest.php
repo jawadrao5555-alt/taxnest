@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Http\Controllers\PosController;
 use App\Models\PosDeal;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
@@ -179,11 +180,14 @@ class PosDealChoiceSnapshotTest extends TestCase
 
     public function test_special_deal_with_only_choice_groups_can_reserve_for_billing(): void
     {
+        $saleTime = Carbon::parse('2026-08-12 12:00:00', config('app.timezone'));
+        $this->travelTo($saleTime);
+
         DB::table('pos_deal_items')->where('deal_id', $this->dealId)->delete();
         DB::table('pos_deals')->where('id', $this->dealId)->update([
             'deal_type' => 'special',
-            'starts_on' => now()->toDateString(),
-            'ends_on' => now()->toDateString(),
+            'starts_on' => $saleTime->toDateString(),
+            'ends_on' => $saleTime->toDateString(),
             'special_start_time' => '00:00',
             'special_end_time' => '23:59',
         ]);

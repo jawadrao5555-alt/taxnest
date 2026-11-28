@@ -32,3 +32,19 @@ The [per-PR history](taxnest-pr-history-001-476.md) records 437 PRs and 39 separ
 ## Verification
 
 The initial #8 isolated PHPUnit run passed 48 tests with 285 assertions. The initial #6 isolated run passed 18 tests with 84 assertions, plus disposable MariaDB migration and desktop dashboard DOM checks. The local executor disconnected before integrated testing. The reconstructed PR head needs the full CI and scoped browser checks. Device, actual tenant and vendor outcomes require evidence from their authorised systems. Keep private customer records, operational screenshots and payment details out of the PR.
+
+## Live Admin and ERP follow-up on 28 November 2026
+
+The signed-in SaaS Admin and public download page confirmed the deployed #476 build and the Windows Agent v1.13.40 card. The card offered both the installer and ZIP. This verifies the visible published download options. The installed Agent and printer still need acceptance on the intended devices.
+
+| ERP | Verified in production using the retained fictional demo | Remaining release acceptance |
+| --- | --- | --- |
+| Hospital | Dedicated Healthcare sign-in reached the expected tenant. Patients, appointments, clinical queue, inpatient, pharmacy, laboratory, billing and accounts opened. | Verify transactional and staff roles, recovery, accounting and authorised integrations for the intended rollout. |
+| Standalone Lab | Dedicated Healthcare sign-in reached the expected tenant. Patients, Laboratory, costs, billing and accounts opened. One zero-price Lab order for the fictional patient persisted and its specimen reached Collected. Standalone Lab received 403 on the Hospital clinical route. | Finish role-specific results/review and print, inventory and authorised external connections. |
+| School | Dedicated School sign-in reached the expected tenant. Attendance, gradebook, fees, family access, announcements and package checkout opened. Saving Present for the fictional student returned Attendance saved and displayed the record. | Verify staff/family sign-ins, paid package and migration acceptance and any local rollout settings. |
+
+The three demo companies and their test data are retained for owner review. The creation form creates private demo access. Keep login secrets in the owner’s approved channel. The ERP Admin record in #477 adds the dedicated workspace sign-in and recorded demo expiry and removes PRA-only diagnostics for ERP accounts.
+
+Colour contrast was sampled on all 28 main Admin navigation screens and on a retained company record. Solid-background samples showed dark labels on dark cards (1.31:1), pale text on Package Requests and Subscriptions filters (as low as 1.02:1), and faint button labels or placeholders on other screens. #477 updates shared Admin styles and extends the browser checks. Local Chromium samples across six palettes, two modes and desktop/mobile widths reached at least 5.02:1. The new theme changes need deployed acceptance after owner approval.
+
+The previous exact GitHub run of #477 identified two fixture failures. The Family Combo test ran after its second-precision closing time, so the test now uses a fixed sale clock. The address browser fixture had directly set customer state before switching addresses, so it now loads the real address book and waits for the persisted default option. Production deal availability rules and the existing address/receipt assertions remain covered. Require a fresh green `validate` for the combined head.

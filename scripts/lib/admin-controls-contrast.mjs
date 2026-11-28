@@ -26,6 +26,15 @@ export async function verifyAdminControlContrast(page, baseUrl, proofCompanyId) 
   };
 
   try {
+    assert.equal((await page.goto(baseUrl + '/admin/dashboard')).status(), 200);
+    const finance = page.getByRole('region', {name: 'ERP invoicing and collections'});
+    await check([
+      [finance.getByRole('heading', {name: 'ERP invoicing and collections'}), 'ERP collections heading'],
+      [finance.getByRole('heading', {name: 'Healthcare company billing'}), 'Healthcare billing heading'],
+      [finance.locator('.tn-dashboard-detail-filters label').first(), 'ERP date label'],
+      [finance.getByRole('link', {name: 'View ERP company reports'}), 'ERP company reports link'],
+    ]);
+
     assert.equal((await page.goto(baseUrl + '/admin/plans')).status(), 200);
     const tabs = page.locator('.tn-admin-plan-tabs button');
     await tabs.first().waitFor({state: 'visible'});
@@ -53,7 +62,18 @@ export async function verifyAdminControlContrast(page, baseUrl, proofCompanyId) 
     assert.equal((await page.goto(baseUrl + '/admin/settings')).status(), 200);
     const settingsActions = ['Save Settings', 'Save Email Settings', 'Save WhatsApp Settings', 'Send Test Email']
       .map(label => [page.getByRole('button', {name: label, exact: true}), label]);
-    await check(settingsActions, settingsActions.at(-1)[0]);
+    const smtpLabel = page.locator('label').filter({has: page.locator('input[name="smtp_enabled"]')});
+    await check([...settingsActions, [smtpLabel, 'SMTP settings label']], settingsActions.at(-1)[0]);
+
+    assert.equal((await page.goto(baseUrl + '/admin/package-requests')).status(), 200);
+    await check([[page.getByRole('heading', {name: 'Signup package requests'}), 'Signup package requests heading']]);
+
+    assert.equal((await page.goto(baseUrl + '/admin/subscriptions')).status(), 200);
+    const subscriptionFilters = page.locator('form[action$="/admin/subscriptions"]');
+    await check([
+      [subscriptionFilters.locator('label').first(), 'Subscription product filter label'],
+      [subscriptionFilters.getByRole('button', {name: 'Apply filters'}), 'Apply subscription filters'],
+    ]);
 
     assert.equal((await page.goto(baseUrl + '/admin/payment-proofs?status=pending&company_id=' + proofCompanyId)).status(), 200);
     await page.getByRole('button', {name: 'Approve', exact: true}).click();

@@ -2640,9 +2640,15 @@ async function deliveryAddressSnapshotWorkflow(page,t,v) {
   });
   const data=await response.json();
   if(!response.ok()||!data.success||!data.customer?.id)throw new Error('Synthetic delivery customer setup failed');
-  await page.evaluate(customer=>{
-    const d=window.Alpine.$data(document.querySelector('[data-tn-sale-root]'));d.selectedCustomer=customer;
-  },data.customer);
+  const bookUrl=baseUrl+'/pos/api/customer-addresses?customer_id='+data.customer.id;
+  const [bookResponse]=await Promise.all([
+    page.waitForResponse(r=>r.url()===bookUrl&&r.request().method()==='GET'),
+    page.evaluate(customer=>{
+      window.Alpine.$data(document.querySelector('[data-tn-sale-root]')).selectCustomerFromPhone(customer);
+    },data.customer),
+  ]);
+  const book=await bookResponse.json();
+  if(!bookResponse.ok()||!book.addresses?.some(entry=>entry.address===address))throw new Error('Saved default address missing from the real customer address book');
   await openMobileCart(page,v,['Current Order']);
   let contactPrompts=0;
   const correctedPhone='0300'+String(3000000+v.width);
@@ -2660,6 +2666,10 @@ async function deliveryAddressSnapshotWorkflow(page,t,v) {
   await saveEvidenceScreenshot(page,'customer-contact-corrected-'+v.width+'.png');
 
   const addressPicker = page.locator('select[x-model="selectedDeliveryAddress"]');
+  await page.waitForFunction(defaultAddress=>{
+    const picker=document.querySelector('select[x-model="selectedDeliveryAddress"]');
+    return picker?.value===defaultAddress;
+  },address);
   await addressPicker.locator('..').getByRole('button', { name: '+ New', exact: true }).click();
   const addressInput = page.locator('#tnNewAddrInput');
   const addressError = page.locator('#tnNewAddrError');
@@ -2704,7 +2714,6 @@ async function deliveryAddressSnapshotWorkflow(page,t,v) {
   await addressPicker.selectOption(address);
 
   let release;const gate=new Promise(resolve=>release=resolve);
-  const bookUrl=baseUrl+'/pos/api/customer-addresses?customer_id='+data.customer.id;
   await page.route(bookUrl,async route=>{await gate;await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({addresses:[{id:0,label:'Default',address}]})});});
   let moneyPosts=0;
   page.on('request',request=>{if(request.method()==='POST'&&request.url()===baseUrl+'/pos/invoice/store')moneyPosts++;});

@@ -2,7 +2,8 @@
 namespace Tests\Feature;
 use App\Http\Controllers\MadadgarController;
 use App\Models\{Company,User,SystemSetting};
-use App\Services\{MadadgarService,MadadgarAnswerScope};
+use App\Services\{MadadgarService,MadadgarAnswerScope,MadadgarLocalEngine,PosCategoryProfiles};
+use App\Support\PosVocabulary;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\{DB,Schema,Http};
 use Illuminate\Http\Request;
@@ -11,7 +12,7 @@ class MadadgarScopedAssistantTest extends TestCase
 {
     protected function setUp():void {
         parent::setUp();Schema::dropAllTables();Http::preventStrayRequests();
-        Schema::create('companies',function(Blueprint $t){$t->id();$t->string('name');$t->string('product_type');$t->string('pos_type')->nullable();$t->string('business_category')->nullable();$t->softDeletes();$t->timestamps();});
+        Schema::create('companies',function(Blueprint $t){$t->id();$t->string('name');$t->string('product_type');$t->string('pos_type')->nullable();$t->string('business_category')->nullable();$t->string('pos_integration_mode')->nullable();$t->softDeletes();$t->timestamps();});
         Schema::create('users',function(Blueprint $t){$t->id();$t->unsignedBigInteger('company_id');$t->string('name');$t->string('role');$t->string('pos_role')->nullable();$t->boolean('is_active')->default(true);$t->timestamps();});
         Schema::create('subscriptions',function(Blueprint $t){$t->id();$t->unsignedBigInteger('company_id');$t->boolean('active');});
         Schema::create('system_settings',function(Blueprint $t){$t->id();$t->string('key');$t->text('value')->nullable();$t->text('description')->nullable();$t->timestamps();});
@@ -62,6 +63,57 @@ class MadadgarScopedAssistantTest extends TestCase
         $this->assertSame($first['provenance']['source_sha256'],$second['provenance']['source_sha256']);
         $this->assertNull($second['provenance']['source_reviewed_at']);$this->assertSame('guide_only_not_live_verified',$second['provenance']['uncertainty']);
     }
+
+    public function test_authenticated_panels_route_product_questions_to_the_matching_workflow(): void
+    {
+        $question = 'FBR POS IMS add-on package kaise milega?';
+        $session = '11111111-1111-4111-8111-111111111111';
+        $controller = new MadadgarController();
+
+        foreach (['pos' => 'pos', 'fbrpos' => 'fbr-pos'] as $product => $prefix) {
+            $owner = $this->user($this->company($product));
+            $owner->update(['role' => 'company_admin', 'pos_role' => 'pos_admin']);
+            auth($product)->setUser($owner);
+            $route = "/{$prefix}/madadgar/message";
+            $reply = $controller->message(Request::create($route, 'POST', ['content' => $question, 'session_id' => $session]))->getData(true);
+            $this->assertSame($product, $reply['provenance']['product']);
+            $this->assertSame('scope', $reply['provenance']['answer_source']);
+            $this->assertStringContainsString("/{$prefix}/billing", $reply['reply']);
+            $this->assertStringContainsString($product === 'pos' ? '/pos/tax-integrations' : '/fbr-pos/settings', $reply['reply']);
+            $this->assertSame($product === 'pos' ? 'pra_federal_addon_guide' : 'fbr_pos_ims_guide', $reply['provenance']['scope_reason']);
+
+            foreach (['School ERP fee package kaise milega?' => '#erps', 'Digital Invoice package kaise milega?' => '#di'] as $prompt => $section) {
+                $reply = $controller->message(Request::create($route, 'POST', ['content' => $prompt, 'session_id' => $session]))->getData(true);
+                $this->assertStringContainsString('/product-guide'.$section, $reply['reply']);
+                $this->assertStringNotContainsString("/{$prefix}/billing", $reply['reply']);
+            }
+        }
+
+        Http::assertNothingSent();
+    }
+
+    public function test_product_scope_precedes_stale_cache_and_standalone_stays_local(): void
+    {
+        SystemSetting::set('madadgar_mode', 'hybrid');
+        $question = 'School ERP fee package kaise milega?';
+        MadadgarLocalEngine::cacheAnswer($question, 'Stale POS package answer', 'local', 'pos', PosVocabulary::for(null), PosCategoryProfiles::knownModules());
+        $this->assertSame('Stale POS package answer', MadadgarLocalEngine::cachedAnswer($question, 'pos', PosVocabulary::for(null), PosCategoryProfiles::knownModules()));
+        $this->assertSame('erp_guide', MadadgarService::respond([], $question)['scope_reason']);
+
+        $company = $this->company();
+        $company->update(['pos_integration_mode' => 'standalone']);
+        $reply = MadadgarService::respond([], 'PRA POS reporting kaise enable karo?', 'pos', $company, $this->user($company));
+        $this->assertSame('standalone_pos_guide', $reply['scope_reason']);
+        $this->assertStringContainsString('sales aur receipts local', $reply['text']);
+        $this->assertStringNotContainsString('/pos/pra-settings', $reply['text']);
+
+        $company = $this->company();
+        $reply = MadadgarService::respond([], 'PRA POS federal add-on enable karo', 'pos', $company, $this->user($company));
+        $this->assertSame('role_limited_guidance', $reply['scope_reason']);
+        $this->assertFalse($reply['provenance']['capabilities']['fiscal_submit']);
+        Http::assertNothingSent();
+    }
+
     public function test_unknown_provider_tool_cannot_write_or_change_company():void {
         $c=$this->company();$before=$c->fresh()->getAttributes();
         Http::fake(['api.openai.com/*'=>Http::response(['choices'=>[['message'=>['content'=>'Some guidance','tool_calls'=>[['function'=>['name'=>'delete_company','arguments'=>json_encode(['company_id'=>$c->id])]]]]]]],200)]);

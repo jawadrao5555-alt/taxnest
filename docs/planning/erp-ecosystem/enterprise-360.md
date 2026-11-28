@@ -1,0 +1,22 @@
+# TaxNest Enterprise 360 scope register
+
+**Status** Planned independent product. Existing organization group and company-level report data are reusable. Authorized group management, consolidated books and a commercial release remain planned.
+
+**Authority** Final approval §11 and original ecosystem brief §§8–9. Existing TaxNest customers opt in without reentering native records. External migrations use Switch and hybrid overlap obeys the same consent and traceability. Group access and native product billing/identity remain independent.
+
+## Existing and reusable
+
+`CompanyGroupService`, `IdentityScope`, `CompanyReadReports`, `HealthLedgerService` and native dashboards provide scoped building blocks. Verified acceptance by the native owner, separately assessed permissions, exact posting and source accounting remain new work. Consolidation perimeter verification is a separate financial approval. Use a distinct reporting book and explicit posting approval.
+
+## Phases and acceptance
+
+| ID | Full scope and acceptance | Status and dependency |
+| --- | --- | --- |
+| EC-01 | Multiple legal entities, businesses, brands, branches, warehouses, scoped installations and verified owner. Support expiring, revocable owner link and optional safe SSO, central roles, individual business permissions, audited acceptance/revocation, new-business wizard, subscription independence and marketplace/activation/bundles. Connecting existing customers must not duplicate company/invoice/stock/employee/history or change their billing. Disconnect retains native data, receipts and terms. | Planned. Shared ownership, entitlements, roles and product adapters. |
+| EC-02 Monitor | Central owner/portfolio and individual business dashboards, consolidated authorized reads with coverage, freshness and drill-down, tax/inventory overview, payroll aggregates, performance, recovery, sales, profitability and auditable business intelligence. Reconcile source totals by entity/currency/time and distinguish partial, stale and absent data. Deduplicate native sales and companion fiscal acknowledgements. | Planned. Read-only scoped source metric and finance/stock contract. |
+| EC-03 Manage | Target-native approved settings/operations, central procurement/approvals/HR, changed state and audit, secure native handoff, native permission/entitlement recheck and safe retry. Demonstrate a group manager with different permissions by installation, denied stale links and idempotent action after restart. | Planned. EC-01/02, native operations and workflow contract. |
+| EC-04 Full Enterprise | Central accounting, scoped treasury, budgets, cost/profit centers, group reporting periods, approved consolidation perimeter, currency conversion, intercompany matching/entries/elimination journals, distinct consolidation book, balance sheet, P&L, cash flow and legal/source balances. Reconcile entity totals to eliminated figures and source currency and track reversal/approval. Preserve separate legal accounts, native books and tax registrations. | Planned. Verified trial balances, policies and responsible finance acceptance. |
+| EC-05 Connected UX | Guided, role-specific owner web and mobile, contextual Madadgar, search/workspaces, widgets/filters, offline/read status and approvals. Verified standalone, existing ERP, external authorized Switch migrations and hybrid integrations. Demonstrate branch and tenant scope, stale/offline state, source excerpt and accepted link/unlink on actual UI. | Planned. Individual products and Switch adapters. |
+| EC-06 Commercial | Independent packages/limits and optional group bundles, durable fictional demo, documentation/guide/tutorials/help and all [common launch requirements](README.md#common-commercial-and-acceptance-requirements), with separate Monitor, Manage and Full evidence. | Planned. Owner commercial/evidence milestones and protected production acceptance. |
+
+Define PRs by verified link foundation, Monitor, then Manage, then Full accounting after evidence. Record exact linked grants, read/write rejection, reversible unlink and no billing mutation in tests with fictional tenants. Test duplicated POS/fiscal data, suppressed inaccessible entities, stale numbers, currency adjustments, blank sources, intercompany both sides, reversals and period closing with MariaDB and real browser evidence. Prices, financial policies/FX and verification for external data and own mobile device builds remain external constraints. No approved independent PR or release SHA yet.

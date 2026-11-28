@@ -16,7 +16,7 @@ use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 /**
- * Task 140: DI Premium white-label branding (gate key `white_label`).
+ * Digital Invoice branding (gate key `white_label`).
  *
  * Locks in:
  *  - DiBrandingService fails closed: branding only activates when the plan
@@ -25,11 +25,10 @@ use Tests\TestCase;
  *    accent / footer lines / logo and can hide the platform credit line.
  *  - FBR-required elements (FBR invoice number, QR, tax breakdown) render
  *    regardless of branding choices.
- *  - Non-premium output is byte-for-byte free of custom branding, and the
- *    BW template stays pure B&W when branding is off.
- *  - /company/branding settings page: premium admins get the form,
- *    non-premium get the upgrade nudge; PUT persists (incl. logo upload),
- *    is rejected for non-premium plans, and validates the accent color.
+ *  - Expired subscriptions use the standard design, and the BW template
+ *    stays black and white when branding is off.
+ *  - Asaan admins can upload a logo and save settings. Expired subscriptions
+ *    cannot save settings, and the form validates the accent color.
  */
 class DiWhiteLabelBrandingTest extends TestCase
 {
@@ -216,7 +215,7 @@ class DiWhiteLabelBrandingTest extends TestCase
     // Fixtures
     // ------------------------------------------------------------------
 
-    private function makeCompany(string $planName = 'Premium', ?array $branding = null): Company
+    private function makeCompany(string $planName = 'Asaan', ?array $branding = null, bool $expired = false): Company
     {
         $companyId = DB::table('companies')->insertGetId([
             'name' => 'Branded Traders',
@@ -248,7 +247,7 @@ class DiWhiteLabelBrandingTest extends TestCase
             'pricing_plan_id' => $planId,
             'active' => true,
             'start_date' => now()->subDays(10)->toDateString(),
-            'end_date' => now()->addDays(355)->toDateString(),
+            'end_date' => ($expired ? now()->subDay() : now()->addDays(355))->toDateString(),
             'created_at' => now(),
             'updated_at' => now(),
         ]);
@@ -376,9 +375,9 @@ class DiWhiteLabelBrandingTest extends TestCase
     // Service gating
     // ------------------------------------------------------------------
 
-    public function test_non_premium_company_gets_defaults_even_with_branding_enabled(): void
+    public function test_expired_subscription_company_gets_defaults_even_with_branding_enabled(): void
     {
-        $company = $this->makeCompany('Retail', $this->brandingOn());
+        $company = $this->makeCompany('Asaan', $this->brandingOn(), expired: true);
 
         $brand = DiBrandingService::forCompany($company);
 
@@ -390,10 +389,10 @@ class DiWhiteLabelBrandingTest extends TestCase
         $this->assertNull($brand['logo_data_uri']);
     }
 
-    public function test_premium_company_with_toggle_on_gets_active_branding(): void
+    public function test_asaan_company_with_toggle_on_gets_active_branding(): void
     {
         $logoPath = $this->putLogoOnDisk();
-        $company = $this->makeCompany('Premium', $this->brandingOn(['logo_path' => $logoPath]));
+        $company = $this->makeCompany('Asaan', $this->brandingOn(['logo_path' => $logoPath]));
 
         $brand = DiBrandingService::forCompany($company);
 
@@ -407,9 +406,9 @@ class DiWhiteLabelBrandingTest extends TestCase
         $this->assertNotNull($brand['logo_url']);
     }
 
-    public function test_premium_company_with_toggle_off_stays_default(): void
+    public function test_asaan_company_with_toggle_off_stays_default(): void
     {
-        $company = $this->makeCompany('Premium', $this->brandingOn(['enabled' => false]));
+        $company = $this->makeCompany('Asaan', $this->brandingOn(['enabled' => false]));
 
         $brand = DiBrandingService::forCompany($company);
 
@@ -423,7 +422,7 @@ class DiWhiteLabelBrandingTest extends TestCase
     public function test_accent_is_revalidated_at_render_time(): void
     {
         // A hostile/corrupt DB value must never reach a <style> block.
-        $company = $this->makeCompany('Premium', $this->brandingOn([
+        $company = $this->makeCompany('Asaan', $this->brandingOn([
             'accent' => 'red;}body{display:none}',
         ]));
 
@@ -445,10 +444,10 @@ class DiWhiteLabelBrandingTest extends TestCase
     // PDF templates
     // ------------------------------------------------------------------
 
-    public function test_all_pdf_templates_apply_branding_for_premium_company(): void
+    public function test_all_pdf_templates_apply_branding_for_asaan_company(): void
     {
         $logoPath = $this->putLogoOnDisk();
-        $company = $this->makeCompany('Premium', $this->brandingOn(['logo_path' => $logoPath]));
+        $company = $this->makeCompany('Asaan', $this->brandingOn(['logo_path' => $logoPath]));
         $invoice = $this->makeInvoice($company);
 
         foreach (self::PDF_TEMPLATES as $template) {
@@ -467,17 +466,17 @@ class DiWhiteLabelBrandingTest extends TestCase
         }
     }
 
-    public function test_all_pdf_templates_stay_default_for_non_premium_company(): void
+    public function test_all_pdf_templates_stay_default_for_expired_subscription_company(): void
     {
         $logoPath = $this->putLogoOnDisk();
-        $company = $this->makeCompany('Retail', $this->brandingOn(['logo_path' => $logoPath]));
+        $company = $this->makeCompany('Asaan', $this->brandingOn(['logo_path' => $logoPath]), expired: true);
         $invoice = $this->makeInvoice($company);
 
         foreach (self::PDF_TEMPLATES as $template) {
             DiBrandingService::flushCache();
             $html = $this->renderPdf($template, $invoice);
 
-            $this->assertStringNotContainsString(self::ACCENT, $html, "$template: accent leaked to non-premium");
+            $this->assertStringNotContainsString(self::ACCENT, $html, "$template: accent leaked after expiry");
             $this->assertStringNotContainsString('Karobar ki sharait apply hoti hain', $html, "$template: footer leaked");
             $this->assertStringNotContainsString('data:image/png;base64,' . self::PNG_1PX, $html, "$template: logo leaked");
             $this->assertStringContainsString('Invoice Management System', $html, "$template: platform credit missing");
@@ -485,9 +484,9 @@ class DiWhiteLabelBrandingTest extends TestCase
         }
     }
 
-    public function test_bw_template_stays_pure_when_premium_toggle_off(): void
+    public function test_bw_template_stays_pure_when_branding_is_off(): void
     {
-        $company = $this->makeCompany('Premium', $this->brandingOn(['enabled' => false]));
+        $company = $this->makeCompany('Asaan', $this->brandingOn(['enabled' => false]));
         $invoice = $this->makeInvoice($company);
 
         $html = $this->renderPdf('pdf-bw', $invoice);
@@ -503,7 +502,7 @@ class DiWhiteLabelBrandingTest extends TestCase
     public function test_share_page_applies_branding(): void
     {
         $logoPath = $this->putLogoOnDisk();
-        $company = $this->makeCompany('Premium', $this->brandingOn(['logo_path' => $logoPath]));
+        $company = $this->makeCompany('Asaan', $this->brandingOn(['logo_path' => $logoPath]));
         $invoice = $this->makeInvoice($company);
 
         $response = $this->get('/share/invoice/' . $invoice->share_uuid);
@@ -515,9 +514,9 @@ class DiWhiteLabelBrandingTest extends TestCase
         $response->assertSee('FBR1234567890142');
     }
 
-    public function test_share_page_stays_default_for_non_premium(): void
+    public function test_share_page_stays_default_for_expired_subscription(): void
     {
-        $company = $this->makeCompany('Retail', $this->brandingOn());
+        $company = $this->makeCompany('Asaan', $this->brandingOn(), expired: true);
         $invoice = $this->makeInvoice($company);
 
         $response = $this->get('/share/invoice/' . $invoice->share_uuid);
@@ -535,7 +534,7 @@ class DiWhiteLabelBrandingTest extends TestCase
 
     public function test_delivery_email_view_applies_branding(): void
     {
-        $company = $this->makeCompany('Premium', $this->brandingOn());
+        $company = $this->makeCompany('Asaan', $this->brandingOn());
         $invoice = $this->makeInvoice($company);
 
         $html = view('emails.invoice-delivery', [
@@ -550,9 +549,9 @@ class DiWhiteLabelBrandingTest extends TestCase
         $this->assertStringContainsString('Sales Tax', $html);
     }
 
-    public function test_delivery_email_view_default_for_non_premium(): void
+    public function test_delivery_email_view_default_for_expired_subscription(): void
     {
-        $company = $this->makeCompany('Retail', $this->brandingOn());
+        $company = $this->makeCompany('Asaan', $this->brandingOn(), expired: true);
         $invoice = $this->makeInvoice($company);
 
         $html = view('emails.invoice-delivery', [
@@ -569,9 +568,9 @@ class DiWhiteLabelBrandingTest extends TestCase
     // Settings page + update endpoint
     // ------------------------------------------------------------------
 
-    public function test_premium_admin_sees_branding_form(): void
+    public function test_asaan_admin_sees_branding_form(): void
     {
-        $company = $this->makeCompany('Premium');
+        $company = $this->makeCompany('Asaan');
         $user = $this->makeAdmin($company);
 
         $response = $this->actingAs($user)->get('/company/branding');
@@ -581,21 +580,21 @@ class DiWhiteLabelBrandingTest extends TestCase
         $response->assertSee('name="branding_enabled"', false);
     }
 
-    public function test_non_premium_admin_sees_upgrade_nudge(): void
+    public function test_expired_subscription_admin_sees_active_package_requirement(): void
     {
-        $company = $this->makeCompany('Retail');
+        $company = $this->makeCompany(expired: true);
         $user = $this->makeAdmin($company);
 
         $response = $this->actingAs($user)->get('/company/branding');
 
         $response->assertOk();
-        $response->assertSee('DI Premium');
+        $response->assertSee('Invoice Branding requires an active Digital Invoice package');
         $response->assertDontSee('name="accent_color"', false);
     }
 
-    public function test_update_persists_settings_and_logo_for_premium(): void
+    public function test_update_persists_settings_and_logo_for_asaan(): void
     {
-        $company = $this->makeCompany('Premium');
+        $company = $this->makeCompany('Asaan');
         $user = $this->makeAdmin($company);
 
         $response = $this->actingAs($user)->put('/company/branding', [
@@ -626,9 +625,9 @@ class DiWhiteLabelBrandingTest extends TestCase
         $this->assertDatabaseHas('security_logs', ['action' => 'di_branding_updated']);
     }
 
-    public function test_update_rejected_for_non_premium_saves_nothing(): void
+    public function test_update_rejected_for_expired_subscription_saves_nothing(): void
     {
-        $company = $this->makeCompany('Retail');
+        $company = $this->makeCompany(expired: true);
         $user = $this->makeAdmin($company);
 
         $response = $this->actingAs($user)->put('/company/branding', [
@@ -643,7 +642,7 @@ class DiWhiteLabelBrandingTest extends TestCase
 
     public function test_update_rejects_invalid_accent(): void
     {
-        $company = $this->makeCompany('Premium');
+        $company = $this->makeCompany('Asaan');
         $user = $this->makeAdmin($company);
 
         $response = $this->actingAs($user)
@@ -661,7 +660,7 @@ class DiWhiteLabelBrandingTest extends TestCase
     public function test_remove_logo_deletes_file_and_clears_path(): void
     {
         $logoPath = $this->putLogoOnDisk();
-        $company = $this->makeCompany('Premium', $this->brandingOn(['logo_path' => $logoPath]));
+        $company = $this->makeCompany('Asaan', $this->brandingOn(['logo_path' => $logoPath]));
         $user = $this->makeAdmin($company);
 
         $response = $this->actingAs($user)->put('/company/branding', [

@@ -7,24 +7,11 @@
             </div>
 
             @if(!$allowed)
-            {{-- ═══ Upgrade nudge — plan does not include white_label ═══ --}}
             <div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-8 text-center">
-                <div class="mx-auto w-14 h-14 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center mb-4">
-                    <svg class="w-7 h-7 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
-                </div>
-                <h3 class="text-lg font-bold text-gray-800 dark:text-gray-100">White-Label Branding is a Premium feature</h3>
-                <p class="text-sm text-gray-500 dark:text-gray-400 mt-2 max-w-md mx-auto">Show your own logo, accent color and footer text on invoice PDFs, public share pages and invoice emails — and optionally remove TaxNest branding entirely.</p>
-                <ul class="text-sm text-gray-600 dark:text-gray-300 mt-5 space-y-2 max-w-xs mx-auto text-left">
-                    <li class="flex items-start gap-2"><svg class="w-4 h-4 text-emerald-500 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>Your logo on every invoice PDF style</li>
-                    <li class="flex items-start gap-2"><svg class="w-4 h-4 text-emerald-500 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>Custom accent color on PDFs &amp; share pages</li>
-                    <li class="flex items-start gap-2"><svg class="w-4 h-4 text-emerald-500 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>Your own footer lines</li>
-                    <li class="flex items-start gap-2"><svg class="w-4 h-4 text-emerald-500 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>Hide TaxNest branding completely</li>
-                </ul>
-                <a href="/billing/plans" class="inline-flex items-center gap-2 mt-6 px-6 py-3 rounded-lg text-sm font-semibold text-white" style="background-color: #0a4d5c;">
-                    Upgrade to Premium
-                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
+                <h3 class="text-lg font-bold text-gray-800 dark:text-gray-100">Invoice Branding requires an active Digital Invoice package</h3>
+                <a href="/billing/plans" class="inline-flex mt-4 px-5 py-2.5 rounded-lg text-sm font-semibold text-white" style="background-color: #0a4d5c;">
+                    View Digital Invoice packages
                 </a>
-                <p class="text-xs text-gray-400 mt-3">Available on the DI Premium plan.</p>
             </div>
             @else
 

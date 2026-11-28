@@ -14,13 +14,13 @@ use Illuminate\Support\Collection;
  * kept its hand-written bullet lists (pricing_plans.features JSON, which is
  * display-only — no PHP reads it for gating). Two things were invisible to a
  * buyer comparing the packages:
- *   • the four premium gates live in DiFeatureService::PLAN_FEATURES, and
- *     which package opens which was written nowhere the customer could see;
+ *   • the four features resolved by DiFeatureService were missing from the
+ *     public package comparison;
  *   • max_products is a real cap on the DI catalogue and appeared on no card.
  *
  * THE RULE: nothing below is a hand-typed tick.
  *   • Feature ticks come from DiFeatureService::planIncludes() — the same
- *     matrix lookup DiFeatureService::planAllows() ends on, so the table
+ *     entitlement lookup DiFeatureService::planAllows() uses, so the table
  *     cannot promise a gate the panel refuses.
  *   • Limit numbers come from the pricing_plans columns the DI middleware
  *     (CheckPlanLimit) and PlanLimitService really read.
@@ -28,8 +28,8 @@ use Illuminate\Support\Collection;
  * scripts/plan-gate-check.php blocks the deploy.
  *
  * DI HAS NO COLUMN GATES. PosFeatureService reads boolean plan columns; the DI
- * premium tier is a name-keyed matrix instead, so FEATURE_ROWS below carries
- * gate KEYS, not column names. That is the only structural difference from
+ * entitlement service uses a name-keyed matrix and shared DI features, so
+ * FEATURE_ROWS carries gate keys. That is the only structural difference from
  * PosPlanComparisonService / FbrPosPlanComparisonService.
  *
  * WHY PLAIN ENGLISH AND NOT LANG KEYS: /digital-invoice is a public English
@@ -87,8 +87,8 @@ class DiPlanComparisonService
         ],
         'white_label' => [
             'gate'  => 'white_label',
-            'label' => 'White-label branding',
-            'hint'  => 'Your own logo and colours on invoice PDFs and share pages.',
+            'label' => 'Invoice Branding',
+            'hint'  => 'Your logo, colours and footer on invoice PDFs, share pages and emails.',
         ],
         'ai_reader' => [
             'gate'  => 'ai_reader',

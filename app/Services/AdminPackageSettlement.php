@@ -83,6 +83,7 @@ final class AdminPackageSettlement
                 if ($legacy) self::invalid('An existing package charge needs separate reconciliation before recording a historical discount.');
                 $discount = self::historicalDiscount($company, $subscription, $data);
                 self::requireFullAmount($data, $discount['net_paisa'] / 100, 'The confirmed amount must equal the agreed historical net price.');
+                self::guardHistoricalDiscountBankPayment($companyId, $data);
 
                 return self::collect($company, $subscription, $data, $adminId, $origin, $fingerprint, null, historicalDiscount: $discount);
             }
@@ -249,6 +250,28 @@ final class AdminPackageSettlement
             'reason' => $data['historical_discount_reason'],
             'reference' => $data['historical_discount_reference'],
         ];
+    }
+
+    private static function guardHistoricalDiscountBankPayment(int $companyId, array $data): void
+    {
+        if ($data['payment_method'] !== 'bank') {
+            return;
+        }
+        $reference = $data['reference'];
+        if ($reference === null) {
+            throw ValidationException::withMessages(['reference' => 'Enter the original bank transfer reference for this payment.']);
+        }
+
+        $priorProof = PaymentProof::subscriptionKind()->where('company_id', $companyId)
+            ->where('status', 'verified')->where('payment_method', 'bank')
+            ->whereRaw('LOWER(TRIM(reference)) = LOWER(?)', [$reference])->exists();
+        $priorPayment = !$priorProof && SubscriptionPayment::where('payment_method', 'bank')
+            ->whereRaw('LOWER(TRIM(transaction_ref)) = LOWER(?)', [$reference])
+            ->whereHas('invoice', fn ($invoice) => $invoice->packageCharge()->where('company_id', $companyId))
+            ->exists();
+        if ($priorProof || $priorPayment) {
+            self::invalid('This bank transfer already appears in the company’s package payment records. Reconcile the original transfer before recording another receipt.');
+        }
     }
 
     private static function collect(Company $company, Subscription $sub, array $data, int $adminId, string $origin, string $fingerprint, ?array $quote, ?SubscriptionInvoice $legacy = null, ?array $historicalDiscount = null): SubscriptionInvoice

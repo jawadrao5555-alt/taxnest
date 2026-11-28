@@ -137,6 +137,65 @@ final class HistoricalPosFederalAddonTest extends TestCase
         $this->assertDatabaseCount('subscription_payments', 1);
     }
 
+    public function test_verified_federal_proof_without_a_grant_blocks_duplicate_payment_for_this_term(): void
+    {
+        [$company, $term] = $this->package();
+        $this->recordPackage($company, $term);
+        $action = route('saas.admin.companies.historical-federal-addon.record', $company->id);
+        $separate = $this->included($term) + [
+            'received_amount' => '3000', 'payment_date' => '2026-11-23', 'payment_method' => 'cash',
+        ];
+        $separate['purchase_mode'] = 'separate';
+        $proof = PaymentProof::create([
+            'company_id' => $company->id, 'subscription_id' => $term->id, 'request_type' => 'pos_addon',
+            'addon_codes' => null, 'addon_quote_snapshot' => ['codes' => ['federal_ims']],
+            'proof_path' => 'synthetic-payment-proof', 'status' => 'verified', 'amount' => 3000,
+        ]);
+
+        $this->get(route('saas.admin.companies.historical-federal-addon', $company->id))
+            ->assertOk()->assertSee('A verified FBR add-on payment already exists');
+        $this->postJson($action, $separate)->assertUnprocessable()->assertJsonValidationErrors('historical_addon');
+        $proof->update(['subscription_id' => null]);
+        $this->postJson($action, $this->included($term))->assertUnprocessable()->assertJsonValidationErrors('historical_addon');
+        $this->assertDatabaseCount('pos_addons', 0);
+        $this->assertDatabaseCount('payment_proofs', 2);
+        $this->assertDatabaseCount('subscription_payments', 1);
+
+        $older = $term->replicate();
+        $older->active = false;
+        $older->save();
+        $proof->update(['subscription_id' => $older->id]);
+        PaymentProof::create([
+            'company_id' => $company->id, 'subscription_id' => $term->id, 'request_type' => 'pos_addon',
+            'addon_codes' => '["rider_tracking"]', 'proof_path' => 'synthetic-rider-proof', 'status' => 'verified',
+        ]);
+
+        $this->post($action, $separate)->assertSessionHasNoErrors();
+        $this->assertDatabaseCount('pos_addons', 1);
+        $this->assertDatabaseCount('subscription_payments', 2);
+    }
+
+    public function test_retained_federal_addon_receipt_without_a_proof_blocks_duplicate_payment(): void
+    {
+        [$company, $term] = $this->package();
+        $this->recordPackage($company, $term);
+        $invoice = SubscriptionInvoice::create([
+            'company_id' => $company->id, 'subscription_id' => $term->id, 'amount' => 3000,
+            'status' => 'part_paid', 'due_date' => '2026-11-23',
+            'document_snapshot' => ['kind' => 'pos_addon', 'purchase' => ['codes' => ['federal_di']]],
+        ]);
+        SubscriptionPayment::create([
+            'subscription_invoice_id' => $invoice->id, 'amount' => 2300,
+            'payment_method' => 'cash', 'paid_at' => '2026-11-23',
+        ]);
+
+        $this->postJson(route('saas.admin.companies.historical-federal-addon.record', $company->id), $this->included($term))
+            ->assertUnprocessable()->assertJsonValidationErrors('historical_addon');
+        $this->assertDatabaseCount('pos_addons', 0);
+        $this->assertDatabaseCount('payment_proofs', 1);
+        $this->assertDatabaseCount('subscription_payments', 2);
+    }
+
     private function package(): array
     {
         $company = Company::create([

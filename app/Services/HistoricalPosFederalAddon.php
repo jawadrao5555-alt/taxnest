@@ -54,6 +54,9 @@ final class HistoricalPosFederalAddon
             || self::hasPendingFederalSignup($company)) {
             return 'An FBR add-on request is awaiting payment review. Review the original request first.';
         }
+        if (self::hasRetainedFederalPayment($company, $term)) {
+            return 'A verified FBR add-on payment already exists for this term or needs allocation. Review the existing payment before recording another.';
+        }
 
         return null;
     }
@@ -195,6 +198,30 @@ final class HistoricalPosFederalAddon
     private static function hasPendingFederalSignup(Company $company): bool
     {
         return (PosSignupBundle::pending($company)?->quote_snapshot[PosSignupBundle::KEY]['federal'] ?? null) !== null;
+    }
+
+    private static function hasRetainedFederalPayment(Company $company, Subscription $term): bool
+    {
+        $proofs = PaymentProof::posAddonKind()->where('company_id', $company->id)->where('status', 'verified')
+            ->where(fn ($scope) => $scope->where('subscription_id', $term->id)->orWhereNull('subscription_id'))->get();
+        if ($proofs->contains(fn (PaymentProof $proof) => self::includesFederalCode($proof->addonCodeList())
+            || self::includesFederalCode($proof->addon_quote_snapshot['codes'] ?? null))) {
+            return true;
+        }
+
+        // Some older financial imports retained a receipt but lost its proof or entitlement link.
+        return SubscriptionInvoice::where('company_id', $company->id)->where('document_snapshot->kind', 'pos_addon')
+            ->where(fn ($scope) => $scope->where('subscription_id', $term->id)->orWhereNull('subscription_id'))
+            ->where(fn ($settled) => $settled->where(fn ($invoice) => $invoice->where('status', 'paid')->whereNotNull('paid_at'))
+                ->orWhereHas('payments', fn ($receipt) => $receipt->where('amount', '>', 0)->whereNotNull('paid_at')))
+            ->get()->contains(fn (SubscriptionInvoice $invoice) =>
+                self::includesFederalCode($invoice->document_snapshot['purchase']['codes'] ?? null)
+                    || self::includesFederalCode($invoice->document_snapshot['purchase']['quote']['codes'] ?? null));
+    }
+
+    private static function includesFederalCode(mixed $codes): bool
+    {
+        return is_array($codes) && array_intersect(PosFederalAddonAccess::CODES, array_filter($codes, 'is_string')) !== [];
     }
 
     private static function isReplay(PosAddon $grant, string $key, string $fingerprint): bool

@@ -188,6 +188,72 @@ class AdminPackageSettlementTest extends TestCase
         $this->assertSame(0, PaymentProof::count());
     }
 
+    public function test_a_historical_discount_cannot_record_the_same_bank_transfer_for_two_package_terms(): void
+    {
+        [$company, $plan, $admin, $payment] = $this->sale();
+        $other = Company::create(['name' => 'Other bank collection company', 'ntn' => 'SALE-OTHER-BANK', 'product_type' => 'pos']);
+        $term = fn (Company $owner, int $years) => Subscription::create([
+            'company_id' => $owner->id, 'pricing_plan_id' => $plan->id, 'billing_cycle' => 'annual',
+            'start_date' => today()->subYears($years), 'end_date' => today()->subYears($years - 1),
+            'active' => false, 'final_price' => 12000,
+        ]);
+        $first = $term($company, 3);
+        $second = $term($company, 2);
+        $otherTerm = $term($other, 3);
+        $reference = 'Synthetic transfer TX-ONE';
+        $details = array_replace($payment, [
+            'verified_received_amount' => '9000.00', 'payment_method' => 'bank', 'reference' => $reference,
+            'historical_discount_percent' => '25', 'historical_discount_reason' => 'Reviewed annual discount',
+            'historical_discount_reference' => 'Original pricing agreement',
+        ]);
+        $record = fn (Subscription $sub) => route('saas.admin.companies.package-receipts.record', [$sub->company_id, $sub->id]);
+        $this->post($record($first), array_replace($details, ['reference' => ' ']))->assertSessionHasErrors('reference');
+        $this->assertSame(0, PaymentProof::count());
+
+        // The same transfer may already have paid a separate add-on allocation.
+        $addon = SubscriptionInvoice::create([
+            'company_id' => $company->id, 'subscription_id' => $first->id, 'due_date' => today(),
+            'amount' => 400, 'status' => 'paid', 'document_snapshot' => ['kind' => 'pos_addon'],
+        ]);
+        $addon->payments()->create(['amount' => 400, 'payment_method' => 'bank', 'transaction_ref' => $reference, 'paid_at' => today()]);
+
+        $invoice = AdminPackageSettlement::historical($company->id, $first->id, $details, $admin->id);
+        $this->assertSame($invoice->id, AdminPackageSettlement::historical($company->id, $first->id, $details, $admin->id)->id);
+
+        $secondDetails = array_replace($details, [
+            'reference' => ' '.strtolower($reference).' ', 'idempotency_key' => (string) Str::uuid(),
+        ]);
+        $this->post($record($second), $secondDetails)->assertSessionHasErrors('payment');
+        $this->assertSame(0, SubscriptionInvoice::packageCharge()->where('subscription_id', $second->id)->count());
+        $this->assertSame(1, PaymentProof::count());
+        $this->assertSame(2, SubscriptionPayment::count());
+
+        $this->post($record($otherTerm), $secondDetails)->assertSessionHasNoErrors();
+        $this->assertSame(2, SubscriptionInvoice::packageCharge()->count());
+        $this->assertSame(3, SubscriptionPayment::count());
+    }
+
+    public function test_a_historical_discount_checks_legacy_bank_allocations_without_a_proof(): void
+    {
+        [$company, $plan, $admin, $payment] = $this->sale();
+        $old = Subscription::create(['company_id' => $company->id, 'pricing_plan_id' => $plan->id, 'billing_cycle' => 'annual',
+            'start_date' => today()->subYears(2), 'end_date' => today()->subYear(), 'active' => false, 'final_price' => 9000]);
+        $target = Subscription::create(['company_id' => $company->id, 'pricing_plan_id' => $plan->id, 'billing_cycle' => 'annual',
+            'start_date' => today()->subYear(), 'end_date' => today(), 'active' => false, 'final_price' => 12000]);
+        $alreadyPaid = SubscriptionInvoice::create(['company_id' => $company->id, 'subscription_id' => $old->id,
+            'due_date' => today(), 'amount' => 9000, 'status' => 'paid', 'paid_at' => today()]);
+        $alreadyPaid->payments()->create(['amount' => 9000, 'payment_method' => 'bank',
+            'transaction_ref' => $payment['reference'], 'paid_at' => today()]);
+
+        $this->post(route('saas.admin.companies.package-receipts.record', [$company->id, $target->id]), array_replace($payment, [
+            'verified_received_amount' => '9000.00', 'payment_method' => 'bank', 'historical_discount_percent' => '25',
+            'historical_discount_reason' => 'Reviewed annual discount', 'historical_discount_reference' => 'Original pricing agreement',
+        ]))->assertSessionHasErrors('payment');
+        $this->assertSame(0, PaymentProof::count());
+        $this->assertSame(1, SubscriptionInvoice::packageCharge()->count());
+        $this->assertSame(1, SubscriptionPayment::count());
+    }
+
     public function test_verified_historical_recovery_uses_independent_amount_without_second_payment_or_activation(): void
     {
         [$company, $plan, $admin, $payment] = $this->sale();

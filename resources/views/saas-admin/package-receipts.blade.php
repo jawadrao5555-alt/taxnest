@@ -124,7 +124,7 @@
                         @if($termCharges->isEmpty())
                             <details class="space-y-2 sm:col-span-2">
                                 <summary class="cursor-pointer text-indigo-400">Record an agreed historical discount</summary>
-                                <p>Use the documented discount and payment for this term. Enter the exact net amount received above.</p>
+                                <p>Enter the exact net amount received. For a bank transfer, also enter the original bank transaction reference above.</p>
                                 <label>Agreed discount (%)
                                     <input type="number" name="historical_discount_percent" min="0.01" max="99.99" step="0.01" class="w-full rounded bg-gray-800">
                                 </label>

@@ -37,6 +37,15 @@
                     {{ __('lab_workflow.worklist_search') }}
                     <input name="q" value="{{ $search }}" maxlength="60" class="mt-1 block w-full rounded-lg border-gray-300 bg-white dark:border-gray-600 dark:bg-gray-800" dir="ltr">
                 </label>
+                <label class="text-sm font-medium">
+                    {{ __('lab_workflow.worklist_stage') }}
+                    <select name="stage" class="mt-1 block w-full rounded-lg border-gray-300 bg-white dark:border-gray-600 dark:bg-gray-800">
+                        <option value="">{{ __('lab_workflow.worklist_all') }}</option>
+                        @foreach($stages as $option)
+                            <option value="{{ $option }}" @selected($stage === $option)>{{ __('lab_workflow.worklist_'.$option) }}</option>
+                        @endforeach
+                    </select>
+                </label>
                 <button class="rounded-lg border border-gray-300 px-4 py-2 font-semibold dark:border-gray-600">{{ __('lab_workflow.search') }}</button>
             </form>
 

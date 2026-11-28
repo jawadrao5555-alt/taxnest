@@ -62,6 +62,12 @@ class HealthLabWorkflowTest extends TestCase
         $this->post(route('health.lab.orders.store'), $data)->assertRedirect($orderUrl);
         $this->assertDatabaseCount('health_lab_orders', 1);
         $this->assertDatabaseCount('health_lab_specimens', 1);
+        $collectionQueue = route('health.lab', ['stage' => 'collection']);
+        $resultQueue = route('health.lab', ['stage' => 'result']);
+        $verificationQueue = route('health.lab', ['stage' => 'verification']);
+        $this->get($collectionQueue)->assertOk()->assertSee('Awaiting collection')->assertSee($order->order_no);
+        $this->get($resultQueue)->assertOk()->assertDontSee($order->order_no);
+        $this->getJson(route('health.lab', ['stage' => 'unknown']))->assertUnprocessable()->assertJsonValidationErrors('stage');
 
         $otherPatient = $this->patient($company, 'DEMO-002');
         $this->postJson(route('health.lab.orders.store'), array_replace($data, ['patient_id' => $otherPatient->id]))
@@ -100,6 +106,8 @@ class HealthLabWorkflowTest extends TestCase
 
         $this->post(route('health.lab.orders.collect', $args), ['specimen_id' => $initial->id])->assertRedirect($orderUrl);
         $this->post(route('health.lab.orders.collect', $args), ['specimen_id' => $initial->id])->assertRedirect($orderUrl);
+        $this->get($collectionQueue)->assertOk()->assertDontSee($order->order_no);
+        $this->get($resultQueue)->assertOk()->assertSee($order->order_no);
         $this->post(route('health.lab.orders.reject', $args), [
             'specimen_id' => $initial->id, 'reason' => 'Fixture rejection',
         ])->assertRedirect($orderUrl);
@@ -108,6 +116,9 @@ class HealthLabWorkflowTest extends TestCase
         $this->assertSame('rejected', $initial->fresh()->status);
         $this->get(route('health.lab', ['q' => $initial->barcode]))->assertOk()->assertDontSee($order->order_no);
         $this->get(route('health.lab', ['q' => $replacement->barcode]))->assertOk()->assertSee($order->order_no);
+        $this->get(route('health.lab', ['stage' => 'collection', 'q' => $replacement->barcode]))
+            ->assertOk()->assertSee($order->order_no);
+        $this->get($resultQueue)->assertOk()->assertDontSee($order->order_no);
         $this->getJson(route('health.lab.orders.label', [...$args, $initial]))->assertNotFound();
         $this->postJson(route('health.lab.orders.collect', $args), ['specimen_id' => $initial->id])
             ->assertUnprocessable()->assertJsonValidationErrors('specimen');
@@ -116,6 +127,8 @@ class HealthLabWorkflowTest extends TestCase
         $result = ['specimen_id' => $replacement->id, 'expected_revision' => 0, 'expected_version' => 0, 'value' => 'First synthetic value'];
         $this->post(route('health.lab.orders.result', $args), $result)->assertRedirect($orderUrl);
         $draft = $item->results()->sole();
+        $this->get($resultQueue)->assertOk()->assertDontSee($order->order_no);
+        $this->get($verificationQueue)->assertOk()->assertSee($order->order_no)->assertDontSee('First synthetic value');
         $this->get($orderUrl)->assertOk()->assertSee('First synthetic value')->assertDontSee('Verify result');
         $this->postJson(route('health.lab.orders.verify', $args), ['result_id' => $draft->id, 'result_version' => 1])->assertForbidden();
 
@@ -131,6 +144,7 @@ class HealthLabWorkflowTest extends TestCase
         $this->postJson(route('health.lab.orders.verify', $args), ['result_id' => $draft->id, 'result_version' => 1])
             ->assertUnprocessable()->assertJsonValidationErrors('result');
         $this->post(route('health.lab.orders.verify', $args), ['result_id' => $draft->id, 'result_version' => 2])->assertRedirect($orderUrl);
+        $this->get($verificationQueue)->assertOk()->assertDontSee($order->order_no);
         $original = $draft->fresh();
         $this->assertEquals($verifier->id, $original->verified_by);
         $pdf = $this->get($report)->assertOk()->assertHeader('Content-Type', 'application/pdf');
@@ -177,11 +191,14 @@ class HealthLabWorkflowTest extends TestCase
         $this->post(route('health.lab.orders.result', $args), $amend + ['amendment_reason' => 'Fixture amendment'])->assertRedirect($orderUrl);
         $amended = $item->results()->firstOrFail();
         $this->get($report)->assertOk();
+        $this->get($verificationQueue)->assertOk()->assertSee($order->order_no)->assertSee('1 of 1 verified')
+            ->assertDontSee('Amended synthetic value');
         $this->postJson(route('health.lab.orders.verify', $args), ['result_id' => $amended->id, 'result_version' => 1])
             ->assertUnprocessable()->assertJsonValidationErrors('result');
 
         $this->actingAs($verifier, 'health');
         $this->post(route('health.lab.orders.verify', $args), ['result_id' => $amended->id, 'result_version' => 1])->assertRedirect($orderUrl);
+        $this->get($verificationQueue)->assertOk()->assertDontSee($order->order_no);
         $this->assertSame('Edited synthetic value', $draft->fresh()->value);
         $this->assertSame('Amended synthetic value', $amended->fresh()->value);
         $this->assertEquals($verifier->id, $amended->fresh()->verified_by);
@@ -216,12 +233,16 @@ class HealthLabWorkflowTest extends TestCase
         ]))->assertRedirect();
         $private = HealthLabOrder::query()->where('health_patient_id', $confidential->id)->sole();
         $this->get(route('health.lab'))->assertOk()->assertSee($order->order_no)->assertSee($private->order_no);
+        $queue = route('health.lab', ['stage' => 'collection']);
+        $this->get($queue)->assertOk()->assertSee($order->order_no)->assertSee($private->order_no);
 
         $this->actingAs($outside, 'health');
+        $this->get($queue)->assertOk()->assertDontSee($order->order_no)->assertDontSee($private->order_no);
         $this->getJson(route('health.lab.orders.show', $order))->assertNotFound();
         $this->getJson(route('health.lab.catalogue.edit', $test))->assertNotFound();
 
         $this->actingAs($secondTech, 'health');
+        $this->get($queue)->assertOk()->assertDontSee($order->order_no);
         $this->get(route('health.lab'))->assertOk()->assertDontSee($order->order_no);
         $this->getJson(route('health.lab.orders.show', $order))->assertNotFound();
         $this->postJson(route('health.lab.orders.collect', [$order, $order->items()->firstOrFail()]), [
@@ -229,6 +250,7 @@ class HealthLabWorkflowTest extends TestCase
         ])->assertNotFound();
 
         $this->actingAs($frontDesk, 'health');
+        $this->get($queue)->assertOk()->assertSee($order->order_no)->assertDontSee($private->order_no);
         $this->get(route('health.lab'))->assertOk()->assertSee($order->order_no)->assertDontSee($private->order_no);
         $this->getJson(route('health.lab.orders.show', $private))->assertNotFound();
         $this->get(route('health.lab.orders.report', $order))->assertForbidden();
@@ -237,6 +259,7 @@ class HealthLabWorkflowTest extends TestCase
         $this->actingAs($owner, 'health');
         $company->update(['health_modules' => json_encode(['accounts'])]);
         HealthModuleService::forget();
+        $this->get($queue)->assertForbidden();
         $this->get(route('health.lab.orders.show', $order))->assertForbidden();
     }
 

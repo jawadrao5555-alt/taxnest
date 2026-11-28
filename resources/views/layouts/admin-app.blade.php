@@ -129,6 +129,7 @@
 
                 @if(auth('admin')->user()?->isSuperAdmin())
                 <a href="{{ route('saas.admin.platform-expenses') }}" class="block px-3 py-2.5 text-sm text-gray-300">Platform expense records</a>
+                <a href="{{ route('saas.admin.upcoming-products.index') }}" class="block px-3 py-2.5 text-sm {{ request()->routeIs('saas.admin.upcoming-products.*') ? 'admin-active-link' : 'text-gray-300' }}">Upcoming Products</a>
                 @endif
 
                 <a href="{{ route('saas.admin.franchises') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm {{ $current === 'saas.admin.franchises' ? 'admin-active-link font-medium' : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200' }} transition">

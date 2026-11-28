@@ -16,8 +16,7 @@ use Tests\TestCase;
  * Locks the gate semantics every later premium task (white-label, public
  * API, AI reader, recurring invoices) builds on:
  *   - the four gate KEYS exist and never change silently;
- *   - Premium opens all four; Business/Industrial/Enterprise only
- *     recurring_invoices; Retail nothing;
+ *   - All DI packages include branding. Other gates follow the plan;
  *   - override grants follow their GRANTED plan (DI rule — unlike POS,
  *     an override does NOT unlock everything);
  *   - bare carrier rows (override without a plan) open no premium gates;
@@ -128,23 +127,28 @@ class DiPremiumFeatureGateTest extends TestCase
         }
     }
 
-    public function test_business_and_above_get_recurring_only(): void
+    public function test_legacy_business_tiers_get_branding_and_recurring_invoices(): void
     {
         foreach (['Business', 'Industrial', 'Enterprise'] as $name) {
             $company = $this->makeCompany(['name' => $name]);
             $this->assertTrue(DiFeatureService::planAllows($company, 'recurring_invoices'), "{$name} should allow recurring_invoices");
-            $this->assertFalse(DiFeatureService::planAllows($company, 'white_label'), "{$name} must NOT allow white_label");
+            $this->assertTrue(DiFeatureService::planAllows($company, 'white_label'), "{$name} should allow white_label");
             $this->assertFalse(DiFeatureService::planAllows($company, 'public_api'), "{$name} must NOT allow public_api");
             $this->assertFalse(DiFeatureService::planAllows($company, 'ai_reader'), "{$name} must NOT allow ai_reader");
         }
     }
 
-    public function test_retail_gets_no_premium_features(): void
+    public function test_branding_is_shared_by_sold_legacy_and_custom_di_plans(): void
     {
-        $company = $this->makeCompany(['name' => 'Retail']);
-        foreach (DiFeatureService::GATES as $gate) {
-            $this->assertFalse(DiFeatureService::planAllows($company, $gate), "Retail must NOT allow {$gate}");
+        foreach (['Asaan', 'Kaarobar', 'Unlimited', 'Trial', 'Retail', 'Custom Plan'] as $name) {
+            $company = $this->makeCompany(['name' => $name]);
+            $this->assertTrue(DiFeatureService::planAllows($company, 'white_label'), "{$name} should allow white_label");
         }
+
+        $asaan = $this->makeCompany(['name' => 'Asaan']);
+        $this->assertTrue(DiFeatureService::planAllows($asaan, 'ai_reader'));
+        $this->assertFalse(DiFeatureService::planAllows($asaan, 'public_api'));
+        $this->assertFalse(DiFeatureService::planAllows($asaan, 'recurring_invoices'));
     }
 
     public function test_override_grant_follows_its_granted_plan(): void
@@ -157,7 +161,8 @@ class DiPremiumFeatureGateTest extends TestCase
         // NOT everything (DI rule differs from POS here).
         $business = $this->makeCompany(['name' => 'Business'], ['override_type' => 'lifetime', 'end_date' => null]);
         $this->assertTrue(DiFeatureService::planAllows($business, 'recurring_invoices'));
-        $this->assertFalse(DiFeatureService::planAllows($business, 'white_label'));
+        $this->assertTrue(DiFeatureService::planAllows($business, 'white_label'));
+        $this->assertFalse(DiFeatureService::planAllows($business, 'public_api'));
     }
 
     public function test_bare_override_carrier_row_opens_no_premium_gates(): void
@@ -218,6 +223,9 @@ class DiPremiumFeatureGateTest extends TestCase
 
         $fbrpos = $this->makeCompany(['name' => 'Premium', 'product_type' => 'fbrpos'], [], ['product_type' => 'fbrpos']);
         $this->assertFalse(DiFeatureService::planAllows($fbrpos, 'public_api'));
+
+        $erp = $this->makeCompany(['name' => 'Asaan'], [], ['product_type' => 'erp', 'is_internal_account' => true]);
+        $this->assertFalse(DiFeatureService::planAllows($erp, 'white_label'));
     }
 
     public function test_internal_account_is_always_allowed(): void
@@ -248,6 +256,8 @@ class DiPremiumFeatureGateTest extends TestCase
     {
         $di = new PricingPlan(['name' => 'Premium', 'product_type' => 'di']);
         $pos = new PricingPlan(['name' => 'Premium', 'product_type' => 'pos']);
+        $legacy = new PricingPlan(['name' => 'Custom Plan']);
+        $this->assertTrue(DiFeatureService::planIncludes($legacy, 'white_label'));
         $this->assertTrue(DiFeatureService::planIncludes($di, 'white_label'));
         $this->assertFalse(DiFeatureService::planIncludes($pos, 'white_label'));
         $this->assertFalse(DiFeatureService::planIncludes(null, 'white_label'));

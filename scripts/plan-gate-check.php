@@ -722,10 +722,8 @@ try {
     }
 
     // ── 9. Digital Invoice comparison table (Task 1383) ─────────────────
-    //       DI has no boolean gate COLUMNS: its premium tier is the name-keyed
-    //       DiFeatureService::PLAN_FEATURES matrix, so the ticks are pinned by
-    //       gate key here and the limits by column, both written independently
-    //       of DiPlanComparisonService.
+    //       Pin feature availability by gate key and limits by column,
+    //       independently of the comparison and entitlement services.
     //       Sep 2026 restructure: only three packages are sold. The retired
     //       rows still exist for the companies sitting on them, so they are
     //       pinned separately below instead of being deleted.
@@ -737,7 +735,7 @@ try {
     $DI_BRANCH_LADDER  = ['Asaan' => 1, 'Kaarobar' => 3, 'Unlimited' => 'Unlimited'];
     $DI_PRODUCT_LADDER = ['Asaan' => 'Unlimited', 'Kaarobar' => 'Unlimited', 'Unlimited' => 'Unlimited'];
     $DI_GATE_MATRIX = [
-        'Asaan'     => ['ai_reader'],
+        'Asaan'     => ['ai_reader', 'white_label'],
         'Kaarobar'  => ['ai_reader', 'white_label', 'public_api'],
         'Unlimited' => ['ai_reader', 'white_label', 'public_api'],
     ];
@@ -745,10 +743,10 @@ try {
     // so they are NOT audited against the comparison table — they are only here
     // so a gate that survives on a legacy row still counts as pinned.
     $DI_RETIRED_GATE_MATRIX = [
-        'Retail'     => [],
-        'Business'   => ['recurring_invoices'],
-        'Industrial' => ['recurring_invoices'],
-        'Enterprise' => ['recurring_invoices'],
+        'Retail'     => ['white_label'],
+        'Business'   => ['recurring_invoices', 'white_label'],
+        'Industrial' => ['recurring_invoices', 'white_label'],
+        'Enterprise' => ['recurring_invoices', 'white_label'],
         'Premium'    => ['recurring_invoices', 'white_label', 'ai_reader', 'public_api'],
     ];
 
@@ -764,14 +762,10 @@ try {
     // Every pin above must still match DiFeatureService, retired rows included —
     // a legacy company's feature must not change silently.
     foreach (array_merge($DI_GATE_MATRIX, $DI_RETIRED_GATE_MATRIX) as $name => $granted) {
-        $matrixRow = \App\Services\DiFeatureService::PLAN_FEATURES[$name] ?? null;
-        check($matrixRow !== null, "di comparison: plan '{$name}' is pinned here but missing from DiFeatureService::PLAN_FEATURES.");
-        if ($matrixRow !== null) {
-            sort($granted);
-            sort($matrixRow);
-            check($granted === $matrixRow,
-                "di comparison: '{$name}' gates drifted — this file pins [" . implode(', ', $granted)
-                . '] but DiFeatureService grants [' . implode(', ', $matrixRow) . '].');
+        $plan = new \App\Models\PricingPlan(['name' => $name, 'product_type' => 'di']);
+        foreach (\App\Services\DiFeatureService::GATES as $gate) {
+            check(\App\Services\DiFeatureService::planIncludes($plan, $gate) === in_array($gate, $granted, true),
+                "di comparison: '{$name}' entitlement for '{$gate}' differs from this file's matrix.");
         }
     }
 

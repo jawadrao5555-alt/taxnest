@@ -14,7 +14,7 @@
                 'Review invoice status, download PDFs and reconcile sales, tax and payments.',
             ],
             'before' => 'Bring a small anonymised invoice sample. Ask for a demonstration of import mapping, a rejected row, its correction and the final PDF.',
-            'scope' => 'AI usage is subject to the selected package allowance. White-label PDFs and API access depend on the package.',
+            'scope' => 'AI usage is subject to the selected package allowance. Every Digital Invoice package includes invoice branding. API access depends on the package.',
             'image' => 'di-create.jpg',
             'alt' => 'Example Digital Invoice draft screen with blank buyer fields and Sandbox indicator',
         ],

@@ -7,24 +7,20 @@ use App\Models\PricingPlan;
 use App\Models\Subscription;
 
 /**
- * Digital Invoice plan feature gates (Aug 2026 — Premium tier foundation).
+ * Digital Invoice feature entitlements for runtime and pricing.
  *
- * DI historically only had LIMITS (invoice/user/branch). This service adds
- * POS-style HARD feature gates for the premium feature set that ships with
- * the Rs 12,999/mo Premium plan. Later premium tasks (white-label, public
- * API, AI reader, recurring invoices) must ONLY READ these gates via
- * planAllows() — the matrix below is the single source of truth and is not
- * edited by feature tasks.
+ * Invoice Branding belongs to every DI package. The matrix controls
+ * features whose availability depends on the DI plan.
  *
  * Resolution order (mirrors PosFeatureService::planAllows, with one DI
  * difference — override grants do NOT unlock everything, they unlock the
  * plan attached to the grant row):
  *   1. Unknown key            -> true  (not a gate, nothing to enforce)
- *   2. POS / FBR POS company  -> false (DI-only features)
+ *   2. POS / FBR POS company  -> false; Invoice Branding also requires DI
  *   3. Internal account       -> true
  *   4. SubscriptionAccessService::hasAccess denies -> false
  *      (expired/locked companies lose premium features with their access)
- *   5. EFFECTIVE plan's matrix row decides — for override grants
+ *   5. EFFECTIVE plan decides — for override grants
  *      (lifetime/temporary) that is the plan attached to the granted
  *      subscription row ("granted plan ke mutabiq").
  *   6. Active trial           -> true (evaluate-before-buying, same owner
@@ -39,9 +35,8 @@ class DiFeatureService
     public const GATES = ['white_label', 'public_api', 'ai_reader', 'recurring_invoices'];
 
     /**
-     * Central plan -> features matrix for DI plans (matched by plan name,
-     * product_type 'di'). Plans not listed here (e.g. self-built
-     * "Custom Plan" rows) get NO premium features — fail closed.
+     * Plan-specific entitlements by DI plan name. Custom plans receive
+     * shared DI features only.
      */
     public const PLAN_FEATURES = [
         // Sep 2026 restructure — the three packages that are actually sold.
@@ -49,8 +44,8 @@ class DiFeatureService
         // monthly page allowance); recurring_invoices is deliberately absent
         // because the feature has no implementation yet and must not be sold.
         'Asaan'      => ['ai_reader'],
-        'Kaarobar'   => ['ai_reader', 'white_label', 'public_api'],
-        'Unlimited'  => ['ai_reader', 'white_label', 'public_api'],
+        'Kaarobar'   => ['ai_reader', 'public_api'],
+        'Unlimited'  => ['ai_reader', 'public_api'],
 
         // Legacy rows — retired from sale, kept for existing subscriptions.
         'Trial'      => [],
@@ -58,14 +53,14 @@ class DiFeatureService
         'Business'   => ['recurring_invoices'],
         'Industrial' => ['recurring_invoices'],
         'Enterprise' => ['recurring_invoices'],
-        'Premium'    => ['recurring_invoices', 'white_label', 'public_api', 'ai_reader'],
+        'Premium'    => ['recurring_invoices', 'public_api', 'ai_reader'],
     ];
 
     /** Per-request cache: company_id => [feature => bool] */
     protected static array $gateCache = [];
 
     /**
-     * Does this DI company's effective plan include the given premium feature?
+     * Does this DI company's effective plan include the given feature?
      */
     public static function planAllows(?Company $company, string $feature): bool
     {
@@ -83,8 +78,8 @@ class DiFeatureService
     }
 
     /**
-     * Does a specific plan row include the feature? (Matrix lookup only —
-     * no company/override/trial logic. Used by billing/pricing surfaces.)
+     * Does a plan row include the feature? Used by billing and pricing;
+     * runtime access checks are performed separately.
      */
     public static function planIncludes(?PricingPlan $plan, string $feature): bool
     {
@@ -97,7 +92,8 @@ class DiFeatureService
             return false;
         }
 
-        return in_array($feature, self::PLAN_FEATURES[$plan->name] ?? [], true);
+        return $feature === 'white_label'
+            || in_array($feature, self::PLAN_FEATURES[$plan->name] ?? [], true);
     }
 
     /**
@@ -123,8 +119,9 @@ class DiFeatureService
 
     protected static function resolve(Company $company, string $feature): bool
     {
-        // DI gates never open for POS / FBR POS companies.
-        if (in_array($company->product_type, ['pos', 'fbrpos'], true)) {
+        // Invoice Branding is exclusive to DI. Legacy untyped companies are DI.
+        if (in_array($company->product_type, ['pos', 'fbrpos'], true)
+            || ($feature === 'white_label' && ($company->product_type ?: 'di') !== 'di')) {
             return false;
         }
 
@@ -146,7 +143,7 @@ class DiFeatureService
         // EFFECTIVE plan decides. Override grants (lifetime/temporary) carry
         // their granted plan on the same subscription row — a Business-plan
         // lifetime grant gets Business features, not everything. A bare
-        // carrier row (no plan) grants base access only, no premium gates.
+        // carrier row (no plan) grants base access only, without plan features.
         if (self::planIncludes($subscription->entitlementPlan(), $feature)) {
             return true;
         }

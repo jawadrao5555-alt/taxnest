@@ -6,7 +6,7 @@ use App\Models\Company;
 use Illuminate\Support\Facades\Storage;
 
 /**
- * Task 140: DI Premium white-label branding (plan gate key: `white_label`).
+ * Digital Invoice branding (plan gate key: `white_label`).
  *
  * Single resolver for the branding applied to DI invoice PDFs, the public
  * share page and invoice delivery emails. Hard rules:
@@ -17,8 +17,7 @@ use Illuminate\Support\Facades\Storage;
  *   - Fail closed: unless the company's plan CURRENTLY allows the
  *     `white_label` gate AND the company switched branding on, every field
  *     resolves to the platform default (null/empty/false) so templates
- *     render exactly as they did before this feature existed. Downgrades
- *     therefore auto-revert branding without any cleanup job.
+ *     use standard TaxNest branding when subscription access ends.
  *   - DomPDF safety: logos are embedded as base64 data URIs read from the
  *     local public disk — PDF rendering never fetches a remote URL.
  */
@@ -33,8 +32,7 @@ class DiBrandingService
     protected static array $cache = [];
 
     /**
-     * Neutral defaults = platform branding untouched. Non-premium companies
-     * (and premium companies with the toggle off) always get exactly this.
+     * Standard branding when the company lacks access or leaves branding off.
      */
     public static function defaults(): array
     {

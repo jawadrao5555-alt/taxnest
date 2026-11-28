@@ -102,7 +102,7 @@ class WebsiteClientLogoSyncTest extends TestCase
         $this->get($nameOnlyLogo)->assertNotFound();
     }
 
-    public function test_digital_invoice_preview_uses_enabled_branding_with_its_current_plan_gate(): void
+    public function test_digital_invoice_preview_uses_enabled_branding_on_asaan(): void
     {
         Storage::fake('public');
         $company = $this->company('di');
@@ -115,7 +115,7 @@ class WebsiteClientLogoSyncTest extends TestCase
         DiFeatureService::flushGateCaches();
         $this->get($preview)->assertNotFound();
 
-        $plan = PricingPlan::create(['name' => 'Kaarobar', 'product_type' => 'di', 'price' => 1000, 'is_trial' => false, 'invoice_limit' => 100]);
+        $plan = PricingPlan::create(['name' => 'Asaan', 'product_type' => 'di', 'price' => 1000, 'is_trial' => false, 'invoice_limit' => 100]);
         Subscription::create([
             'company_id' => $company->id,
             'pricing_plan_id' => $plan->id,

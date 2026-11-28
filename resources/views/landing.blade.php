@@ -213,6 +213,7 @@
                         <a href="{{ $product['url'] }}">{{ $product['shortName'] }}</a>
                     @endforeach
                     <a href="{{ route('public.compare') }}" @if($comparisonPage) aria-current="page" @endif>Compare</a>
+                    <a href="{{ route('upcoming-products.index') }}">Upcoming</a>
                     <a href="/tutorials">Tutorials</a>
                     <a href="/download">Downloads</a>
                     <a href="/contact">Contact</a>
@@ -230,6 +231,7 @@
                     <a href="{{ $product['url'] }}">{{ $product['name'] }}</a>
                 @endforeach
                 <a href="{{ route('public.compare') }}" @if($comparisonPage) aria-current="page" @endif>Compare Products</a>
+                <a href="{{ route('upcoming-products.index') }}">Upcoming Products</a>
                 <a href="/tutorials">Tutorials</a>
                 <a href="/download">Downloads</a>
                 <a href="/contact">Contact</a>
@@ -295,6 +297,7 @@
                 <div id="compare" class="public-details">
                     <a href="{{ route('public.compare') }}">Compare products</a>
                     <a href="{{ route('product-guide') }}">Read the product guide</a>
+                    <a href="{{ route('upcoming-products.index') }}">Explore Upcoming Products</a>
                 </div>
             </section>
 

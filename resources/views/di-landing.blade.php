@@ -628,7 +628,7 @@
                     </div>
                     <div>
                         <h4 class="text-2xl font-serif text-[#052730] mb-3">Deliver &amp; Brand Your Invoices</h4>
-                        <p class="text-gray-600 leading-relaxed mb-4">Send any invoice straight to the buyer over WhatsApp or email, or hand them a secure share link they can open on any phone. Need a month's worth of PDFs for the accountant? Download them all as a ZIP in one click. On Kaarobar and Unlimited, white-label the PDFs with your own logo and colors so every invoice carries your brand, not ours.</p>
+                        <p class="text-gray-600 leading-relaxed mb-4">Send any invoice straight to the buyer over WhatsApp or email, or hand them a secure share link they can open on any phone. Need a month's worth of PDFs for the accountant? Download them all as a ZIP in one click. Every Digital Invoice package includes invoice branding with your own logo, colors and footer.</p>
                     </div>
                 </div>
 

@@ -421,7 +421,7 @@
                                         'Customers, products & MIS reports' => fn ($p) => true,
                                         'Compliance scoring' => fn ($p) => true,
                                         'FBR Audit Pack (6-year archive)' => fn ($p) => true,
-                                        'White-label branding' => fn ($p) => \App\Services\DiFeatureService::planIncludes($p, 'white_label'),
+                                        'Invoice Branding' => fn ($p) => \App\Services\DiFeatureService::planIncludes($p, 'white_label'),
                                         'Public REST API & webhooks' => fn ($p) => \App\Services\DiFeatureService::planIncludes($p, 'public_api'),
                                         'Priority support' => fn ($p) => ($rankByPlanId[$p->id] ?? 0) >= 2,
                                         'Dedicated account manager' => fn ($p) => ($rankByPlanId[$p->id] ?? 0) >= 3,

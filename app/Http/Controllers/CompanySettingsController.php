@@ -549,7 +549,7 @@ class CompanySettingsController extends Controller
     }
 
     // ==========================================================
-    // Task 140: DI White-Label Branding (Premium — `white_label`)
+    // Digital Invoice Branding
     // ==========================================================
 
     public function branding()
@@ -580,7 +580,7 @@ class CompanySettingsController extends Controller
         // Server-side plan gate — the form is hidden for non-premium plans,
         // but the request must be independently rejected too (fail closed).
         if (!DiFeatureService::planAllows($company, 'white_label')) {
-            return redirect('/company/branding')->with('error', 'White-label branding is available on the DI Premium plan. Upgrade to unlock it.');
+            return redirect('/company/branding')->with('error', 'An active Digital Invoice package is required to edit Invoice Branding.');
         }
 
         $validated = $request->validate([

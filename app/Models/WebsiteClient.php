@@ -81,9 +81,10 @@ class WebsiteClient extends Model
             ->whereIn(DB::raw(self::SOURCE_PRODUCT), array_keys(self::PRODUCTS));
     }
 
-    public static function publicCards(string|array|null $product = null): Collection
+    public static function publicCards(string|array|null $product = null, ?int $limit = null, int $offset = 0): Collection
     {
         $cards = collect();
+        $limit ??= $product === null ? 6 : null;
         try {
             if (!Schema::hasTable('website_clients')) {
                 return $cards;
@@ -94,13 +95,18 @@ class WebsiteClient extends Model
                 ->with('company:id,product_type,logo_path,di_branding')
                 ->when($product !== null, fn ($query) => $query->whereIn('product', (array) $product))
                 ->orderByDesc('published_at')->orderBy('id')
-                ->chunk(24, function (Collection $entries) use ($cards, $product) {
+                ->chunk(24, function (Collection $entries) use ($cards, $limit, &$offset) {
                     $eligible = array_flip(WebsiteClientPaidSubscription::eligibleCompanyIds($entries->pluck('company_id')->all()));
                     foreach ($entries as $entry) {
-                        if (isset($eligible[$entry->company_id])) {
-                            $cards->push($entry);
+                        if (!isset($eligible[$entry->company_id])) {
+                            continue;
                         }
-                        if ($product === null && $cards->count() === 6) {
+                        if ($offset > 0) {
+                            $offset--;
+                            continue;
+                        }
+                        $cards->push($entry);
+                        if ($limit !== null && $cards->count() === $limit) {
                             return false;
                         }
                     }

@@ -222,6 +222,7 @@ Route::get('/sitemap.xml', function () {
     $urls = [
         ['loc' => url('/'),                'priority' => '1.0', 'changefreq' => 'weekly'],
         ['loc' => route('public.compare'), 'priority' => '0.8', 'changefreq' => 'monthly'],
+        ['loc' => route('upcoming-products.index'), 'priority' => '0.7', 'changefreq' => 'weekly'],
         ['loc' => url('/pos'),             'priority' => '0.9', 'changefreq' => 'monthly'],
         ['loc' => url('/fbr-pos-landing'), 'priority' => '0.9', 'changefreq' => 'monthly'],
         ['loc' => url('/digital-invoice'), 'priority' => '0.9', 'changefreq' => 'monthly'],

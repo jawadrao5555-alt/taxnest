@@ -27,6 +27,9 @@ final class MadadgarAnswerScope
             return $read;
         } elseif (preg_match('/(show|batao|dikhao|kitn[aiye]|total).{0,35}(today|aaj|balance|revenue|sales|collection)|(?:aaj|today).{0,30}(sales|collection|balance|kitn)|(?:doosri|other|foreign)\s*(company|tenant)|(?:company|tenant)\s*(?:id|#)\s*\d+/iu',$question)) {
             $text='Yeh sawal bounded read tools mein supported nahin. Owner exact commands today billing, today collections, today tax breakdown, stock summary, recipe summary ya today day close use kar sakta hai. Doosri company, arbitrary dates aur individual records ka access is chat se nahin milta.';$reason='live_data_unavailable';
+        } elseif (($roadmap = MadadgarUpcomingProductGuide::answer($question)) !== null) {
+            $text = $roadmap;
+            $reason = 'upcoming_products_guide';
         } elseif (($guide = self::productGuide($question, $product, $company, $actor)) !== null) {
             [$text, $reason] = $guide;
         } elseif ($company?->isLocalCollectionPilot()) {
@@ -106,6 +109,21 @@ final class MadadgarAnswerScope
                 'read_audit_id'=>$e['audit_id'],'report_date'=>$e['report_date'],'timezone'=>$e['timezone'],'branch_id'=>$e['branch_id'],
                 'result_sha256'=>$e['result_sha256'],'outcome'=>$e['outcome'],
                 'capabilities'=>['live_data_read'=>in_array($e['outcome'],['recorded','empty'],true),'billing_write'=>false,'fiscal_submit'=>false,'escalation_requires_confirmation'=>true]];
+        }
+        if (($result['scope_reason'] ?? null) === 'upcoming_products_guide') {
+            return [
+                'answer_source' => 'public_product_roadmap',
+                'source_reference' => '/upcoming-products',
+                'source_sha256' => null,
+                'source_reviewed_at' => null,
+                'answered_at' => now()->toIso8601String(),
+                'product' => $product,
+                'category' => $company?->pos_type ?? $company?->business_category,
+                'role' => $actor?->pos_role ?: $actor?->role,
+                'scope_reason' => 'upcoming_products_guide',
+                'uncertainty' => 'published_status_only',
+                'capabilities' => ['live_data_read' => false, 'billing_write' => false, 'fiscal_submit' => false, 'escalation_requires_confirmation' => true],
+            ];
         }
         $scope=($result['source']??'')==='scope';
         $path=$scope ? __FILE__ : resource_path($product==='fbrpos'?'madadgar/knowledge-fbrpos.md':'madadgar/knowledge-pos.md');

@@ -39,14 +39,13 @@ final class HealthLabPdfRenderer
     {
         $view = 'health.lab.label';
         $filename = $barcode.'.pdf';
+        $data['barcodeSvg'] = self::barcodeImage($barcode);
 
         try {
             return MpdfRenderer::render($view, $data, [80, 35], $filename, true);
         } catch (Throwable $failure) {
             Log::warning('Lab label mPDF rendering failed.', ['exception_type' => $failure::class]);
         }
-
-        $data['barcodeSvg'] = self::barcodeImage($barcode);
 
         try {
             $pointsPerMm = 72 / 25.4;

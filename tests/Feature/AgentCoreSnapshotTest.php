@@ -15,6 +15,7 @@ class AgentCoreSnapshotTest extends TestCase
         Schema::dropAllTables();
         Schema::create('companies', function (Blueprint $t) {
             $t->id(); $t->string('name'); $t->string('agent_api_key'); $t->boolean('agent_enabled')->default(true);
+            $t->json('pos_printer_settings')->nullable();
             $t->boolean('agent_core_enabled')->default(true); $t->softDeletes(); $t->timestamps();
         });
         Schema::create('users', function (Blueprint $t) {
@@ -128,12 +129,44 @@ class AgentCoreSnapshotTest extends TestCase
         $this->assertArrayNotHasKey('41', $payload['orders']);
         // Offline KOT routing block is always present (defaults when unset).
         $this->assertSame(['silent_print_enabled', 'kot_printer', 'kot_printer_device', 'counter_kot_enabled', 'counter_kot_printer',
-            'kot_compact', 'kot_align_center', 'kot_left_margin_mm'], array_keys($payload['settings']['print']));
+            'counter_kot_printer_device', 'kot_compact', 'kot_align_center', 'kot_left_margin_mm'], array_keys($payload['settings']['print']));
         $this->assertFalse($payload['settings']['print']['silent_print_enabled']);
+        $this->assertNull($payload['settings']['print']['counter_kot_printer_device']);
         $canonical = ['schema' => $body['schema'], 'revision' => $body['revision'], 'scope' => $body['scope'], 'payload' => $body['payload']];
         $this->assertSame($body['hash'], hash('sha256', \App\Services\AgentCoreSnapshotService::canonicalJson($canonical)));
         $this->assertStringNotContainsString('999', json_encode($body['payload']['stock']));
         $this->assertStringNotContainsString('222', json_encode($body['payload']['stock']));
+    }
+
+    public function test_snapshot_keeps_counter_kot_queue_with_its_assigned_device(): void
+    {
+        $settings = [
+            'silent_print_enabled' => true,
+            'kot_printer' => 'Kitchen',
+            'kot_printer_device' => 'device-1',
+            'counter_kot_enabled' => true,
+            'counter_kot_printer' => 'Counter',
+        ];
+        DB::table('companies')->where('id', 1)->update([
+            'pos_printer_settings' => json_encode($settings + ['counter_kot_printer_device' => 'counter-device-1']),
+        ]);
+        DB::table('companies')->where('id', 2)->update([
+            'pos_printer_settings' => json_encode(array_replace($settings, ['kot_printer_device' => 'device-2'])),
+        ]);
+
+        $this->withToken('key-one')->postJson('/api/agent/v2/snapshot', [
+            'device_uid' => 'device-1', 'branch_id' => 11, 'lease_id' => 1, 'lease_token' => 'token-1',
+        ])->assertOk()
+            ->assertJsonPath('payload.settings.print.kot_printer_device', 'device-1')
+            ->assertJsonPath('payload.settings.print.counter_kot_printer', 'Counter')
+            ->assertJsonPath('payload.settings.print.counter_kot_printer_device', 'counter-device-1');
+
+        $this->withToken('key-two')->postJson('/api/agent/v2/snapshot', [
+            'device_uid' => 'device-2', 'branch_id' => 12, 'lease_id' => 2, 'lease_token' => 'token-2',
+        ])->assertOk()
+            ->assertJsonPath('payload.settings.print.kot_printer_device', 'device-2')
+            ->assertJsonPath('payload.settings.print.counter_kot_printer', 'Counter')
+            ->assertJsonPath('payload.settings.print.counter_kot_printer_device', null);
     }
 
     public function test_snapshot_refuses_cross_tenant_lease_and_stale_heartbeat(): void

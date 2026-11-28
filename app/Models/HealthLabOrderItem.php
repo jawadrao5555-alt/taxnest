@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Models\Scopes\CompanyScope;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class HealthLabOrderItem extends Model
 {
@@ -29,8 +30,18 @@ class HealthLabOrderItem extends Model
         return $this->hasMany(HealthLabSpecimen::class)->orderByDesc('sequence');
     }
 
+    public function latestSpecimen(): HasOne
+    {
+        return $this->hasOne(HealthLabSpecimen::class)->latestOfMany('sequence');
+    }
+
     public function results(): HasMany
     {
         return $this->hasMany(HealthLabResult::class)->orderByDesc('revision');
+    }
+
+    public function latestResult(): HasOne
+    {
+        return $this->hasOne(HealthLabResult::class)->latestOfMany('revision');
     }
 }

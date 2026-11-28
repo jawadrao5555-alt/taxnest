@@ -323,6 +323,47 @@ class PosCallerIdV2Test extends TestCase
         $this->assertSame([], $data['calls']);
     }
 
+    public function test_calls_only_match_customers_by_the_full_number_in_the_current_company(): void
+    {
+        $company = $this->makeCompany();
+        $otherCompany = $this->makeCompany();
+        app()->instance('currentCompanyId', (int) $company->id);
+        $this->makeUser((int) $company->id);
+
+        $customerId = DB::table('pos_customers')->insertGetId([
+            'company_id' => $company->id,
+            'name' => 'Same Name',
+            'phone' => '0300-0000001',
+            'address' => 'First address',
+        ]);
+        DB::table('pos_customers')->insert([
+            'company_id' => $otherCompany->id,
+            'name' => 'Same Name',
+            'phone' => '0300-0000002',
+            'address' => 'Other company address',
+        ]);
+        foreach ([null, '923000000002', '923000000001'] as $phone) {
+            DB::table('pos_caller_events')->insert([
+                'company_id' => $company->id,
+                'phone' => $phone,
+                'caller_name' => 'Same Name',
+                'source' => 'whatsapp',
+                'ring_at' => now(),
+                'created_at' => now(),
+            ]);
+        }
+
+        foreach (['events' => 'events', 'recentCalls' => 'calls'] as $method => $key) {
+            $data = $this->posGet($method)->getData(true);
+            $calls = collect($data[$key])->mapWithKeys(fn (array $call) => [$call['phone'] ?? 'name-only' => $call]);
+            $this->assertSame('Same Name', $calls['name-only']['name']);
+            $this->assertNull($calls['name-only']['match']);
+            $this->assertNull($calls['0300-0000002']['match']);
+            $this->assertSame($customerId, $calls['0300-0000001']['match']['customer_id']);
+            $this->assertSame('First address', $calls['0300-0000001']['match']['address']);
+        }
+    }
+
     // ─── 2b. Clearing handled calls (Task 1380) ──────────────────────────────
 
     private function posPost(string $method, array $body = []): \Illuminate\Http\JsonResponse
@@ -457,7 +498,7 @@ class PosCallerIdV2Test extends TestCase
 
         // Khata balance surfaces (int) in matchCustomer output via events path:
         $match = (new \ReflectionMethod(PosCallerIdController::class, 'matchCustomer'))
-            ->invoke(app(PosCallerIdController::class), (int) $company->id, '923001234567', null);
+            ->invoke(app(PosCallerIdController::class), (int) $company->id, '923001234567');
         $this->assertSame(450, $match['khata_balance']);
 
         // Plan lock → 403.

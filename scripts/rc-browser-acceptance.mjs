@@ -2605,6 +2605,18 @@ async function catalogSearchCompleteWorkflow(page,t,v) {
 async function deliveryAddressSnapshotWorkflow(page,t,v) {
   await page.goto(baseUrl+'/pos/invoice/create',{waitUntil:'domcontentloaded'});
   await waitForOperationalSurface(page);await dismiss(page);
+  const addressPicker = page.locator('select[x-model="selectedDeliveryAddress"]');
+  const addressInput = page.locator('#tnNewAddrInput');
+  const addAddress = addressPicker.locator('..').getByRole('button', { name: '+ New', exact: true });
+  const openAddressEditor = async () => {
+    await addAddress.click();
+    await addressInput.waitFor({state:'visible'});
+    const usesCartWidth = await addressInput.evaluate(field => {
+      const cart = field.closest('[x-ref="cartList"]');
+      return cart && field.getBoundingClientRect().width >= cart.clientWidth * 0.85;
+    });
+    if (!usesCartWidth) throw new Error('Contact actions squeezed the delivery address editor');
+  };
   await page.evaluate(()=>{
     const d=window.Alpine.$data(document.querySelector('[data-tn-sale-root]'));
     if(!d.guidedOrderTypes().includes('delivery'))throw new Error('Delivery fixture is missing its supported feature');
@@ -2620,6 +2632,10 @@ async function deliveryAddressSnapshotWorkflow(page,t,v) {
     d.callerBillFrom({phone});
   },callerPhone);
   await openMobileCart(page,v,['Current Order']);
+  await openAddressEditor();
+  await saveEvidenceScreenshot(page,'walk-in-delivery-address-editor-'+v.width+'.png');
+  await addressInput.press('Escape');
+  await addressInput.waitFor({state:'hidden'});
   await page.locator('[data-save-attached-caller]:visible').click();
   const name=page.locator('[x-ref="newCustomerNameInput"]');await name.waitFor({state:'visible'});
   if(await name.inputValue()!=='')throw new Error('Caller phone was incorrectly prefilled as the customer name');
@@ -2665,13 +2681,11 @@ async function deliveryAddressSnapshotWorkflow(page,t,v) {
   await page.waitForFunction(phone=>window.Alpine.$data(document.querySelector('[data-tn-sale-root]')).selectedCustomer?.phone===phone,correctedPhone);
   await saveEvidenceScreenshot(page,'customer-contact-corrected-'+v.width+'.png');
 
-  const addressPicker = page.locator('select[x-model="selectedDeliveryAddress"]');
   await page.waitForFunction(defaultAddress=>{
     const picker=document.querySelector('select[x-model="selectedDeliveryAddress"]');
     return picker?.value===defaultAddress;
   },address);
-  await addressPicker.locator('..').getByRole('button', { name: '+ New', exact: true }).click();
-  const addressInput = page.locator('#tnNewAddrInput');
+  await openAddressEditor();
   const addressError = page.locator('#tnNewAddrError');
   const saveAddress = addressInput.locator('..').getByRole('button', { name: 'Save', exact: true });
   const addressEndpoint = baseUrl+'/pos/api/customer-addresses';

@@ -12,6 +12,7 @@ function failedHandoff(state, localVersion, isNewerVersion, readFile) {
     recovered_old_version: 'An interrupted update was repaired; the previous Agent version is running.',
     preparing: 'The updater was interrupted before installation completed; Windows recovery is pending.',
     failed_updater_start: 'Windows could not start the updater; the old Agent is still available.',
+    failed_agent_busy: 'The previous Agent did not close in time. The update stopped before replacing any files.',
     copying: 'Installation was interrupted; Windows recovery is pending.',
     failed_recovery_registration: 'Windows could not enable update recovery; the old installation was left unchanged.',
     failed_backup: 'Updater could not back up this installation.',
@@ -35,7 +36,7 @@ function recoveryPending(state, readFile) {
     const result = String(readFile(state.resultPath, 'utf8')).trim();
     return !['installed','recovered_old_version','recovered_before_copy','failed_copy_or_verify',
       'failed_restore','failed_backup','failed_source_missing','failed_updater_start',
-      'failed_recovery_registration','recovery_waiting_for_agent'].includes(result);
+      'failed_recovery_registration','recovery_waiting_for_agent','failed_agent_busy'].includes(result);
   }
   catch (_) { return true; } // uncertain handoff: never launch a second installer
 }

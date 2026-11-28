@@ -236,6 +236,7 @@ class AgentCoreSnapshotService
             'kot_printer_device' => ($settings['kot_printer_device'] ?? null) ?: null,
             'counter_kot_enabled' => (bool) ($settings['counter_kot_enabled'] ?? false),
             'counter_kot_printer' => ($settings['counter_kot_printer'] ?? null) ?: null,
+            'counter_kot_printer_device' => ($settings['counter_kot_printer_device'] ?? null) ?: null,
             'kot_compact' => (bool) ($company->kot_compact ?? false),
             'kot_align_center' => (bool) ($company->kot_align_center ?? false),
             'kot_left_margin_mm' => max(0, min(30, (int) ($company->kot_left_margin_mm ?? 0))),

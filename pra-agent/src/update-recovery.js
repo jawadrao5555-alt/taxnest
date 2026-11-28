@@ -67,7 +67,7 @@ function buildRecoveryScript({exePath, destDir, backupDir, readyPath, resultPath
     // installation or kill its work; wait briefly, then retain explicit repair.
     `${psCommand(`$ErrorActionPreference='Stop';$p=@(Get-Process -ErrorAction SilentlyContinue | Where-Object {try{$_.Path -eq ${literal(exePath)}}catch{$false}});foreach($a in $p){if(-not $a.WaitForExit(15000)){exit 1}};exit 0`)} >>${log} 2>&1`,
     'if errorlevel 1 goto busy',
-    `robocopy ${backup} ${dest} /E /R:5 /W:2 >>${log} 2>&1`,
+    `robocopy ${backup} ${dest} /E /IS /R:5 /W:2 >>${log} 2>&1`,
     'if errorlevel 8 goto failed',
     `fc /b ${quote(path.win32.join(backupDir,'resources','app.asar'))} ${quote(path.win32.join(destDir,'resources','app.asar'))} >nul 2>&1`,
     'if errorlevel 1 goto failed',

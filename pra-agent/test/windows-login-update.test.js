@@ -63,7 +63,12 @@ test('updater waits for graceful quit and retains rollback and relaunch', () => 
   assert.match(script, /robocopy "C:\\Temp\\backup" "C:\\Agent"/);
   assert.match(script, /start "" "C:\\Agent\\TaxNest PRA Agent.exe"/);
   assert.match(script, /apply-update\.log" 2>&1/);
-  assert.match(script, /Wait-Process -Id 4412 -Timeout 45/);
+  assert.match(script, /Get-Process -Id 4412.*WaitForExit\(15000\)/);
+  assert.ok(script.indexOf('goto agent_busy') < script.indexOf('robocopy'));
+  assert.match(script, /GEQ 2 goto restore/);
+  assert.match(script, /Applying update files/);
+  assert.match(script, /failed_agent_busy/);
+  assert.doesNotMatch(script, /Start-Sleep -Seconds 2\b/);
   assert.doesNotMatch(script, /timeout \/t/);
   assert.match(script, /fc \/b "C:\\Temp\\new\\resources\\app\.asar" "C:\\Agent\\resources\\app\.asar"/);
   assert.match(script, /failed_copy_or_verify/);

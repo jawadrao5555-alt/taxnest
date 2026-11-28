@@ -1,7 +1,8 @@
-title: "School aur Hospital mein wohi FBR Settings"
-audience: fbr_pos
+title: "PRA POS mein Caller ID, delivery address aur printing ki behtari"
+audience: pos
 type: improvement
 points:
-  - "School aur Hospital ki Settings mein FBR Integration Settings kholein. Yahan baqi FBR POS categories wala poora setup milega."
-  - "FBR ON/OFF, Submission Mode, POS configuration, Test Connection aur Desktop Agent ki settings aik hi jagah hain."
-  - "Pehle se saved settings mehfooz hain. Purani receipts apne asal submission mode aur POS ID ke sath rahengi."
+  - "Caller ID par saved customer us waqt khulta hai jab poora number match kare. Agar sirf naam aaye to number poochh kar customer search karein."
+  - "Current Order mein + New dabayen. Full Delivery Address ka box ab zyada khula hai. Optional Label neeche hai."
+  - "Naya Desktop Agent KOT aur receipt bhejne se pehle assigned printer check karta hai. Agar printer available na ho to Printer Settings mein us printer ko check karein."
+  - "Desktop Agent download ke baad files tayyar hone ka status alag dikhata hai."

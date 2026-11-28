@@ -1532,7 +1532,7 @@ window.addEventListener('popstate', function() {
             @endif
 
             <template x-if="selectedCustomer">
-                <div class="px-3 py-2 bg-blue-50 dark:bg-blue-900/10 border-b border-blue-100 dark:border-blue-900/20 flex items-start gap-2">
+                <div class="px-3 py-2 bg-blue-50 dark:bg-blue-900/10 border-b border-blue-100 dark:border-blue-900/20 flex flex-wrap items-start gap-x-2">
                     <div class="w-8 h-8 rounded-full bg-blue-200 dark:bg-blue-800 flex items-center justify-center flex-shrink-0 mt-0.5"><span class="text-xs font-bold text-blue-700 dark:text-blue-300" x-text="selectedCustomer.name.charAt(0)"></span></div>
                     <div class="flex-1 min-w-0">
                         <div class="flex items-center gap-1.5">
@@ -1542,34 +1542,6 @@ window.addEventListener('popstate', function() {
                         <p class="text-xs text-blue-600 dark:text-blue-400" x-text="orderCustomerPhone || window.TXT.no_phone"></p>
                         <template x-if="selectedCustomer.address">
                             <p class="text-xs text-blue-500 dark:text-blue-400 truncate" x-text="'📍 ' + selectedCustomer.address"></p>
-                        </template>
-                        {{-- Item #1 (Jul 2026): delivery-address picker — Delivery orders only.
-                             Saved addresses (address #1 + extras) in a dropdown; "+ New" saves an
-                             extra address to the customer AND selects it for this bill. --}}
-                        <template x-if="hasDeliveryPortion()">
-                            <div class="mt-1 space-y-1">
-                                <div class="flex items-center gap-1">
-                                    <select x-model="selectedDeliveryAddress" aria-label="{{ __('pos.ph_full_delivery_address') }}" @change="_deliveryAddressChoiceVersion = (_deliveryAddressChoiceVersion || 0) + 1" class="flex-1 min-w-0 text-sm font-medium rounded-md border-blue-200 dark:border-blue-800 dark:bg-gray-800 dark:text-white py-1.5 px-2 focus:ring-blue-500 focus:border-blue-400">
-                                        <option value="">{{ __('pos.delivery_address_divider') }}</option>
-                                        <template x-for="(a, ai) in customerAddresses" :key="a.id ?? ('t' + ai)">
-                                            <option :value="a.address" :selected="a.address === selectedDeliveryAddress" x-text="(a.label ? a.label + ': ' : '') + a.address"></option>
-                                        </template>
-                                    </select>
-                                    {{-- ZFC (Aug 2026): purana address wahin se DELETE bhi ho sake —
-                                         selected address ka ✕. Customers page ka chakkar khatam. --}}
-                                    <button x-show="selectedDeliveryAddress && customerAddresses.some(a => a.address === selectedDeliveryAddress)" @click="deleteSelectedAddress()" title="{{ __('pos.ti_delete_address') }}" class="text-xs font-bold text-red-500 dark:text-red-400 px-2 py-1.5 rounded-md border border-red-200 dark:border-red-800 hover:bg-red-50 dark:hover:bg-red-900/30 whitespace-nowrap">✕</button>
-                                    <button @click="showAddrNew = !showAddrNew; if (showAddrNew) { addressSaveError = ''; $nextTick(() => document.getElementById('tnNewAddrInput')?.focus()) }" class="text-xs font-bold text-blue-600 dark:text-blue-300 px-2 py-1.5 rounded-md border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/30 whitespace-nowrap">{{ __('pos.new_short') }}</button>
-                                </div>
-                                <p x-show="selectedDeliveryAddress" x-text="selectedDeliveryAddress" class="whitespace-pre-wrap break-words text-sm text-blue-900 dark:text-blue-100"></p>
-                                <div x-show="showAddrNew" x-cloak class="space-y-2">
-                                    <label for="tnNewAddrLabel" class="block text-xs font-semibold">{{ __('pos.ph_addr_label') }}</label>
-                                    <input id="tnNewAddrLabel" type="text" maxlength="50" x-model="newAddrLabel" :disabled="addressSaving" @keydown.enter.prevent="saveNewAddress()" autocomplete="off" name="pos_new_addr_label_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore class="w-full text-sm rounded-md border-blue-200 dark:border-blue-800 dark:bg-gray-800 dark:text-white py-1.5 px-2">
-                                    <label for="tnNewAddrInput" class="block text-xs font-semibold">{{ __('pos.ph_full_delivery_address') }}</label>
-                                    <textarea id="tnNewAddrInput" rows="3" maxlength="500" x-model="newAddrText" aria-required="true" aria-describedby="tnNewAddrError" data-required-message="{{ __('validation.required', ['attribute' => __('pos.ph_full_delivery_address')]) }}" @input="addressSaveError = ''" :disabled="addressSaving" @keydown.escape.prevent="if (!addressSaving) showAddrNew = false" autocomplete="off" name="pos_new_addr_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore class="w-full text-sm rounded-md border-blue-200 dark:border-blue-800 dark:bg-gray-800 dark:text-white py-1.5 px-2"></textarea>
-                                    <p id="tnNewAddrError" x-show="addressSaveError" x-text="addressSaveError" role="alert" class="text-xs text-red-700 dark:text-red-300"></p>
-                                    <button type="button" @click="saveNewAddress()" :disabled="addressSaving" class="text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 px-2 py-1.5 rounded-md disabled:opacity-50" :aria-busy="addressSaving">{{ __('pos.save_btn') }}</button>
-                                </div>
-                            </div>
                         </template>
                         <template x-if="customerStats">
                             <div class="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5">
@@ -1643,6 +1615,32 @@ window.addEventListener('popstate', function() {
                             class="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-blue-500 dark:text-blue-300 bg-white/70 dark:bg-gray-900/40 border border-blue-200 dark:border-blue-800 hover:bg-red-500 hover:text-white hover:border-red-500 transition">
                         <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
                     </button>
+                    {{-- Keep the editor on its own row so contact actions cannot shrink it. --}}
+                    <template x-if="hasDeliveryPortion()">
+                        <div class="mt-2 w-full min-w-0 flex-none space-y-2">
+                            <div class="flex items-center gap-1">
+                                <select x-model="selectedDeliveryAddress" aria-label="{{ __('pos.ph_full_delivery_address') }}" @change="_deliveryAddressChoiceVersion = (_deliveryAddressChoiceVersion || 0) + 1" class="flex-1 min-w-0 text-sm font-medium rounded-md border-blue-200 dark:border-blue-800 dark:bg-gray-800 dark:text-white py-1.5 px-2 focus:ring-blue-500 focus:border-blue-400">
+                                    <option value="">{{ __('pos.delivery_address_divider') }}</option>
+                                    <template x-for="(a, ai) in customerAddresses" :key="a.id ?? ('t' + ai)">
+                                        <option :value="a.address" :selected="a.address === selectedDeliveryAddress" x-text="(a.label ? a.label + ': ' : '') + a.address"></option>
+                                    </template>
+                                </select>
+                                {{-- ZFC (Aug 2026): purana address wahin se DELETE bhi ho sake —
+                                     selected address ka ✕. Customers page ka chakkar khatam. --}}
+                                <button x-show="selectedDeliveryAddress && customerAddresses.some(a => a.address === selectedDeliveryAddress)" @click="deleteSelectedAddress()" title="{{ __('pos.ti_delete_address') }}" class="text-xs font-bold text-red-500 dark:text-red-400 px-2 py-1.5 rounded-md border border-red-200 dark:border-red-800 hover:bg-red-50 dark:hover:bg-red-900/30 whitespace-nowrap">✕</button>
+                                <button type="button" :aria-expanded="showAddrNew" aria-controls="tnNewAddrEditor" @click="showAddrNew = !showAddrNew; if (showAddrNew) { addressSaveError = ''; $nextTick(() => document.getElementById('tnNewAddrInput')?.focus()) }" class="text-xs font-bold text-blue-600 dark:text-blue-300 px-2 py-1.5 rounded-md border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/30 whitespace-nowrap">{{ __('pos.new_short') }}</button>
+                            </div>
+                            <p x-show="selectedDeliveryAddress" x-text="selectedDeliveryAddress" class="whitespace-pre-wrap break-words text-sm text-blue-900 dark:text-blue-100"></p>
+                            <div id="tnNewAddrEditor" x-show="showAddrNew" x-cloak class="space-y-2">
+                                <label for="tnNewAddrInput" class="block text-xs font-semibold">{{ __('pos.ph_full_delivery_address') }}</label>
+                                <textarea id="tnNewAddrInput" rows="4" maxlength="500" x-model="newAddrText" aria-required="true" aria-describedby="tnNewAddrError" data-required-message="{{ __('validation.required', ['attribute' => __('pos.ph_full_delivery_address')]) }}" @input="addressSaveError = ''" :disabled="addressSaving" @keydown.escape.prevent="if (!addressSaving) showAddrNew = false" autocomplete="off" name="pos_new_addr_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore class="block w-full min-w-0 resize-y text-sm rounded-md border-blue-200 dark:border-blue-800 dark:bg-gray-800 dark:text-white py-1.5 px-2"></textarea>
+                                <p id="tnNewAddrError" x-show="addressSaveError" x-text="addressSaveError" role="alert" class="text-xs text-red-700 dark:text-red-300"></p>
+                                <label for="tnNewAddrLabel" class="block text-xs font-semibold">{{ __('pos.ph_addr_label') }}</label>
+                                <input id="tnNewAddrLabel" type="text" maxlength="50" x-model="newAddrLabel" :disabled="addressSaving" @keydown.enter.prevent="saveNewAddress()" autocomplete="off" name="pos_new_addr_label_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore class="block w-full min-w-0 text-sm rounded-md border-blue-200 dark:border-blue-800 dark:bg-gray-800 dark:text-white py-1.5 px-2">
+                                <button type="button" @click="saveNewAddress()" :disabled="addressSaving" class="text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 px-2 py-1.5 rounded-md disabled:opacity-50" :aria-busy="addressSaving">{{ __('pos.save_btn') }}</button>
+                            </div>
+                        </div>
+                    </template>
                 </div>
             </template>
 
@@ -4563,11 +4561,10 @@ window.addEventListener('popstate', function() {
                 </button>
             </div>
             <div class="p-4">
-                <p class="text-base font-extrabold text-gray-900 dark:text-white truncate" x-text="callerPopup ? (((callerPopup.match && callerPopup.match.name) || callerPopup.name || callerPopup.phone) || window.TXT.caller_unknown) : ''"></p>
-                <p class="text-xs text-gray-500 dark:text-gray-400" x-show="callerPopup && callerPopup.phone && ((callerPopup.match && callerPopup.match.name) || callerPopup.name)" x-text="callerPopup ? (callerPopup.phone || '') : ''"></p>
-                <template x-if="callerPopup && callerPopup.match">
+                <p class="text-base font-extrabold text-gray-900 dark:text-white truncate" x-text="callerPopup ? (callerVerifiedMatch(callerPopup)?.name || callerPopup.name || callerPopup.phone || window.TXT.caller_unknown) : ''"></p>
+                <p class="text-xs text-gray-500 dark:text-gray-400" x-show="callerPopup?.phone && (callerVerifiedMatch(callerPopup)?.name || callerPopup.name)" x-text="callerPopup?.phone || ''"></p>
+                <template x-if="callerVerifiedMatch(callerPopup)">
                     <div class="mt-2 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-800 px-3 py-2">
-                        <p class="text-[10px] font-bold text-amber-600 dark:text-amber-400 mb-1" x-show="callerPopup.match.matched_by === 'name'">{{ __('pos.caller_matched_by_name') }}</p>
                         <div class="flex items-center gap-3 text-[11px] font-bold text-emerald-800 dark:text-emerald-300">
                             <span><span x-text="callerPopup.match.visits"></span> {{ __('pos.caller_visits') }}</span>
                             <span>Rs <span x-text="(callerPopup.match.total_spent || 0).toLocaleString()"></span></span>
@@ -4582,9 +4579,10 @@ window.addEventListener('popstate', function() {
                         </p>
                     </div>
                 </template>
-                <p x-show="callerPopup && !callerPopup.match" class="mt-1 text-[11px] text-gray-400">{{ __('pos.caller_new_customer') }}</p>
+                <p x-show="callerPopup && !callerNumberOf(callerPopup)" class="mt-1 text-xs text-gray-600 dark:text-gray-300">{{ __('pos.caller_confirm_number') }}</p>
+                <p x-show="callerNumberOf(callerPopup) && !callerVerifiedMatch(callerPopup)" class="mt-1 text-[11px] text-gray-400">{{ __('pos.caller_new_customer') }}</p>
                 <div class="tn-caller-actions mt-3 flex flex-wrap gap-2">
-                    <button type="button" @click="callerStartBill()" class="flex-1 px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold transition">{{ __('pos.caller_make_bill') }}</button>
+                    <button type="button" x-show="callerNumberOf(callerPopup)" @click="callerStartBill()" class="flex-1 px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold transition">{{ __('pos.caller_make_bill') }}</button>
                     {{-- Task 1381: "Call back" — counter ke paired phone par tap-to-dial
                          request. Customer bill par attach bhi ho jata hai (Bill button
                          jaisa) aur popup band ho jata hai, taake order likhna foran shuru. --}}
@@ -4594,9 +4592,9 @@ window.addEventListener('popstate', function() {
                         <span>{{ __('pos.caller_call_back') }}</span>
                     </button>
                     {{-- v2: repeat last order (matched saved customer only) --}}
-                    <button type="button" x-show="callerPopup && callerPopup.match && callerPopup.match.customer_id" @click="callerRepeatOrder(callerPopup)" class="px-3 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-extrabold transition">{{ __('pos.caller_repeat_order') }}</button>
+                    <button type="button" x-show="callerVerifiedMatch(callerPopup)?.customer_id" @click="callerRepeatOrder(callerPopup)" class="px-3 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-extrabold transition">{{ __('pos.caller_repeat_order') }}</button>
                     {{-- v2: unknown caller → quick-save with phone/name prefilled --}}
-                    <button type="button" x-show="callerPopup && !callerPopup.match && callerPopup.phone" @click="callerSaveCustomer(callerPopup)" class="px-3 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-extrabold transition">{{ __('pos.caller_save_customer') }}</button>
+                    <button type="button" x-show="callerNumberOf(callerPopup) && !callerVerifiedMatch(callerPopup)" @click="callerSaveCustomer(callerPopup)" class="px-3 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-extrabold transition">{{ __('pos.caller_save_customer') }}</button>
                     <button type="button" @click="dismissCallerPopup()" class="px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 text-xs font-bold hover:bg-gray-50 dark:hover:bg-gray-800 transition">{{ __('pos.close') }}</button>
                 </div>
             </div>
@@ -4648,9 +4646,9 @@ window.addEventListener('popstate', function() {
                     <div class="flex items-center gap-2 px-3 py-2">
                         <span class="w-2 h-2 rounded-full flex-shrink-0" :class="ev.source === 'whatsapp' ? 'bg-green-500' : 'bg-sky-500'"></span>
                         <div class="min-w-0 flex-1">
-                            <p class="text-xs font-bold text-gray-900 dark:text-white truncate" x-text="((ev.match && ev.match.name) || ev.name || ev.phone) || window.TXT.caller_unknown"></p>
+                            <p class="text-xs font-bold text-gray-900 dark:text-white truncate" x-text="callerVerifiedMatch(ev)?.name || ev.name || ev.phone || window.TXT.caller_unknown"></p>
                             <p class="text-[10px] text-gray-500 dark:text-gray-400 truncate">
-                                <span x-text="ev.at"></span><template x-if="ev.phone && ((ev.match && ev.match.name) || ev.name)"><span> · <span x-text="ev.phone"></span></span></template><template x-if="ev.match && (parseInt(ev.match.khata_balance, 10) || 0) > 0"><span class="font-bold text-amber-600 dark:text-amber-400"> · Rs <span x-text="(parseInt(ev.match.khata_balance, 10) || 0).toLocaleString()"></span></span></template>
+                                <span x-text="ev.at"></span><template x-if="ev.phone && (callerVerifiedMatch(ev)?.name || ev.name)"><span> · <span x-text="ev.phone"></span></span></template><template x-if="(parseInt(callerVerifiedMatch(ev)?.khata_balance, 10) || 0) > 0"><span class="font-bold text-amber-600 dark:text-amber-400"> · Rs <span x-text="(parseInt(ev.match.khata_balance, 10) || 0).toLocaleString()"></span></span></template>
                             </p>
                             {{-- Task 1381: handled ka nishan — kaun si missed call abhi
                                  baqi hai, ek nazar mein. --}}
@@ -4665,7 +4663,7 @@ window.addEventListener('popstate', function() {
                                 class="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-300 hover:bg-indigo-600 hover:text-white disabled:opacity-60 transition">
                             <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
                         </button>
-                        <button type="button" @click="callerBillFrom(ev); showCallerLog = false" class="flex-shrink-0 px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-extrabold transition">{{ __('pos.caller_make_bill_short') }}</button>
+                        <button type="button" x-show="callerNumberOf(ev)" @click="callerBillFrom(ev); showCallerLog = false" class="flex-shrink-0 px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-extrabold transition">{{ __('pos.caller_make_bill_short') }}</button>
                         {{-- Task 1380: handle ho chuki call ko list se hatao (server par
                              cleared mark — refresh aur doosre counter par bhi saaf). --}}
                         <button type="button" @click="clearCallerEvent(ev)" title="{{ __('pos.caller_clear_call') }}" aria-label="{{ __('pos.caller_clear_call') }}" class="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-gray-400 hover:text-white hover:bg-red-500 transition">
@@ -14991,16 +14989,18 @@ function restaurantPos() {
         },
         // v2 (Task 1101): shared by the popup AND the recent-calls panel rows.
         callerBillFrom(ev) {
-            if (!ev) { return; }
-            const m = ev.match;
+            const phone = this.callerNumberOf(ev);
+            if (!phone) { return; }
+            const m = this.callerVerifiedMatch(ev);
             const name = (m && m.name) || ev.name || '';
-            const phone = (m && m.phone) || ev.phone || '';
             if (m && m.customer_id) {
                 this.selectCustomerWithStats({ id: m.customer_id, name: name, phone: phone, address: m.address || '' });
             } else {
                 // No saved customer — attach name/phone to the bill as-is (walk-in
                 // with phone); cashier can save the customer from the picker later.
                 this.selectedCustomer = { id: null, name: name || phone, phone: phone };
+                this.customerStats = null;
+                if (this.hasDeliveryPortion()) this.loadCustomerAddresses();
                 this.customerPhoneQuery = (name ? name : '') + (name && phone ? ' · ' : '') + (phone || '');
                 this.showToast(window.TXT.customer_prefix + (name || phone), 'success');
             }
@@ -15015,9 +15015,14 @@ function restaurantPos() {
         // Number nikalne ka ek hi rasta (popup, recent-calls row aur attached
         // customer card teenon isi ko poochte hain).
         callerNumberOf(ev) {
-            if (!ev) { return ''; }
-            const m = ev.match;
-            return String((m && m.phone) || ev.phone || '').trim();
+            return String(ev?.phone || '').trim();
+        },
+        callerVerifiedMatch(ev) {
+            const normalize = window.TNPosPhone?.canonical;
+            if (!normalize) return null;
+            const phone = normalize(this.callerNumberOf(ev));
+            const match = ev?.match;
+            return phone && match && match.matched_by !== 'name' && normalize(match.phone) === phone ? match : null;
         },
         /**
          * Counter ke paired phone ko tap-to-dial request bhejta hai. Auto-dial
@@ -15037,7 +15042,7 @@ function restaurantPos() {
             this.callerDialBusy = true;
 
             const evId = parseInt((ev && ev.id) || 0, 10) || 0;
-            const name = (ev && ((ev.match && ev.match.name) || ev.name)) || '';
+            const name = this.callerVerifiedMatch(ev)?.name || ev?.name || '';
             // Attach pehle: server jawab ka intezar kiye baghair order likhna
             // shuru ho sake (Bill button jaisa foran).
             if (o.attach) { this.callerBillFrom(ev); }
@@ -15134,7 +15139,7 @@ function restaurantPos() {
         // products (and deal/manual lines the server marks skipped) are skipped
         // with a toast. Quantities stay editable in the cart as usual.
         callerRepeatOrder(ev) {
-            const m = ev && ev.match;
+            const m = this.callerVerifiedMatch(ev);
             if (!m || !m.customer_id) { return; }
             fetch('{{ route('pos.api.caller-last-order', [], false) }}?customer_id=' + m.customer_id, { headers: { 'Accept': 'application/json' } })
                 .then(r => r.json())

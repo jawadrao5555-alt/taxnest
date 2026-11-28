@@ -633,6 +633,9 @@
       if (info.recoveryPending) {
         $('updateBtn').style.display = 'inline-block';
         $('updateMsg').textContent = 'Pichli update mukammal nahi hui. Windows dobara shuru karke apne account mein login karein; Agent ki purani copy wapas chalane ki koshish hogi. Masla rahe to nayi copy download karke install karein.';
+      } else if (info.preparing) {
+        $('updateBtn').style.display = 'none';
+        $('updateMsg').textContent = `Update v${info.latestBuild} download ho chuki hai. Files tayyar ho rahi hain. POS abhi use kar sakte hain.`;
       } else if (info.downloading) {
         // Auto-update in progress — no button, just progress.
         $('updateBtn').style.display = 'none';

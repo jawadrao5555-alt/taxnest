@@ -122,7 +122,7 @@ ${kitchenNotes}
  * Decide the physical prints for one local KOT job.
  * Returns [] when the shop has no silent KOT printer configured.
  */
-function planKotPrints(job, printSettings) {
+function planKotPrints(job, printSettings, deviceId) {
   const s = printSettings || {};
   const doc = (job && job.document) || {};
   const plan = [];
@@ -130,8 +130,13 @@ function planKotPrints(job, printSettings) {
   // The first target is the kitchen slip whose result completes the job.
   // A counter-only copy must never stand in for a missing kitchen printer.
   if (!s.kot_printer || !String(s.kot_printer).trim()) return plan;
+  if (s.kot_printer_device && s.kot_printer_device !== deviceId) return plan;
+  const counterCopy = s.counter_kot_enabled === true && s.counter_kot_printer && String(doc.order_type) === 'dine_in';
+  // A different computer can expose an identically named queue. If one ticket
+  // needs two assigned computers, let cloud routing keep both copies together.
+  if (counterCopy && s.counter_kot_printer_device && s.counter_kot_printer_device !== deviceId) return plan;
   plan.push({ printer: String(s.kot_printer), copyLabel: null });
-  if (s.counter_kot_enabled === true && s.counter_kot_printer && String(doc.order_type) === 'dine_in') {
+  if (counterCopy) {
     plan.push({ printer: String(s.counter_kot_printer), copyLabel: 'COUNTER COPY' });
   }
   return plan;
@@ -200,7 +205,7 @@ async function drainLocalKotQueue(domain, deps) {
   try { printSettings = ((domain.snapshot() || {}).settings || {}).print || {}; } catch (e) {}
   for (const job of jobs) {
     if (job.kind !== 'kot') { out.skipped += 1; continue; }
-    const plan = planKotPrints(job, printSettings);
+    const plan = planKotPrints(job, printSettings, deps && deps.deviceId);
     let claimed;
     try { claimed = domain.claimLocalPrint(job.id, deps && deps.deviceId); }
     catch (e) { out.skipped += 1; continue; } // another drain tick already owns it

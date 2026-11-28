@@ -2,13 +2,16 @@
 
 namespace Tests\Feature;
 
+use App\Models\AdminAuditLog;
 use App\Models\AdminUser;
+use App\Models\Company;
 use App\Models\HrEmployee;
 use App\Models\HrFieldDutyRequest;
 use App\Models\HrLeaveRequest;
 use App\Models\HrOrganization;
 use App\Models\HrPolicyVersion;
 use App\Models\HrShiftAssignment;
+use App\Models\Subscription;
 use App\Models\User;
 use App\Services\TwoStepLogin;
 use Carbon\CarbonImmutable;
@@ -35,6 +38,7 @@ final class HrWorkspaceRuntimeTest extends TestCase
         $this->actingAs($admin, 'admin')->post('/admin/hr-workspaces', $data + ['user_id' => $employee->id])
             ->assertRedirect('/admin/hr-workspaces');
         $workspace = HrOrganization::query()->sole();
+        $this->assertNull($workspace->linked_company_id);
         $this->assertDatabaseHas('hr_organization_memberships', ['organization_id' => $workspace->id, 'user_id' => $owner->id, 'role' => 'owner']);
 
         $grant = ['role' => 'employee', 'user_id' => $employee->id];
@@ -53,6 +57,45 @@ final class HrWorkspaceRuntimeTest extends TestCase
         $this->assertDatabaseHas('admin_audit_logs', ['action' => 'hr_membership_revoked', 'target_id' => $membership->id]);
         $this->patch($url.'/'.$membership->id, ['active' => '1'])->assertRedirect($url);
         $this->assertTrue($membership->refresh()->active);
+    }
+
+    public function test_super_administrator_can_link_only_an_existing_company_of_the_selected_owner(): void
+    {
+        $this->withoutVite();
+        $company = Company::create(['name' => 'Fictional shop', 'ntn' => '7000001', 'product_type' => 'pos',
+            'status' => 'approved', 'company_status' => 'active']);
+        $other = Company::create(['name' => 'Fictional second shop', 'ntn' => '7000002', 'product_type' => 'pos',
+            'status' => 'approved', 'company_status' => 'active']);
+        $owner = User::factory()->create(['company_id' => $company->id, 'role' => 'company_admin']);
+        $employee = User::factory()->create(['company_id' => $company->id, 'role' => 'employee']);
+        $subscription = Subscription::create([
+            'company_id' => $company->id, 'billing_cycle' => 'annual', 'start_date' => now()->toDateString(),
+            'end_date' => now()->addYear()->toDateString(), 'active' => true, 'final_price' => 19999,
+        ]);
+        $admin = AdminUser::create(['role' => 'super_admin', 'name' => 'Fixture link approver',
+            'email' => 'link-approver@example.test', 'password' => 'SyntheticOnly123!']);
+        $input = ['name' => 'Fictional HR workspace', 'timezone' => 'Asia/Karachi', 'owner_id' => $owner->id,
+            'linked_company_id' => $company->id];
+
+        $this->actingAs($admin, 'admin')->postJson('/admin/hr-workspaces', array_replace($input, ['linked_company_id' => $other->id]))
+            ->assertUnprocessable()->assertJsonValidationErrors('linked_company_id');
+        $this->postJson('/admin/hr-workspaces', array_replace($input, ['owner_id' => $employee->id]))
+            ->assertUnprocessable()->assertJsonValidationErrors('linked_company_id');
+        $this->assertDatabaseCount('hr_organizations', 0);
+
+        $this->post('/admin/hr-workspaces', $input)->assertRedirect('/admin/hr-workspaces');
+        $workspace = HrOrganization::query()->sole();
+        $this->assertTrue($workspace->linkedCompany->is($company));
+        $this->assertEquals($company->id, AdminAuditLog::query()->where('action', 'hr_workspace_created')->sole()->metadata['linked_company_id']);
+        $this->get('/admin/hr-workspaces')->assertOk()->assertSee('Fictional shop')
+            ->assertSee(route('saas.admin.companies.show', ['id' => $company->id]), false);
+
+        $this->postJson('/admin/hr-workspaces', $input)->assertUnprocessable()->assertJsonValidationErrors('linked_company_id');
+        $this->assertDatabaseCount('hr_organizations', 1);
+        $this->assertDatabaseCount('hr_organization_memberships', 1);
+        $this->assertSame('pos', $company->refresh()->product_type);
+        $this->assertDatabaseHas('subscriptions', ['id' => $subscription->id, 'active' => true, 'final_price' => 19999]);
+        $this->actingAs($employee, 'hr')->get('/hr/workspaces/'.$workspace->id)->assertForbidden();
     }
 
     public function test_hr_login_requires_an_active_explicit_membership_and_shared_factor(): void

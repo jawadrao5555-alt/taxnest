@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Hr;
 use App\Http\Controllers\Controller;
 use App\Models\AdminAuditLog;
 use App\Models\AdminUser;
+use App\Models\Company;
 use App\Models\HrOrganization;
 use App\Models\User;
 use Illuminate\Http\Request;
@@ -16,7 +17,8 @@ final class HrProvisioningController extends Controller
     public function index()
     {
         AdminUser::requireSuperAdministrator();
-        $workspaces = HrOrganization::query()->withCount(['employees', 'memberships'])->latest('id')->paginate(25);
+        $workspaces = HrOrganization::query()->with('linkedCompany:id,name')
+            ->withCount(['employees', 'memberships'])->latest('id')->paginate(25);
 
         return view('hr.provisioning', compact('workspaces'));
     }
@@ -28,17 +30,36 @@ final class HrProvisioningController extends Controller
             'name' => ['required', 'string', 'max:180'],
             'timezone' => ['required', 'timezone'],
             'owner_id' => ['required', 'integer', 'min:1'],
+            'linked_company_id' => ['nullable', 'integer', 'min:1'],
         ]);
         $workspace = DB::transaction(function () use ($data, $admin) {
-            $this->activeUser($data['owner_id'], 'owner_id');
-            $workspace = HrOrganization::create(['name' => $data['name'], 'timezone' => $data['timezone'], 'status' => 'active']);
-            $workspace->memberships()->create(['user_id' => $data['owner_id'], 'role' => 'owner', 'active' => true]);
-            AdminAuditLog::log($admin->id, 'hr_workspace_created', 'HrOrganization', $workspace->id, ['owner_id' => $data['owner_id']]);
+            $attributes = ['name' => $data['name'], 'timezone' => $data['timezone'], 'status' => 'active'];
+            $metadata = ['owner_id' => (int) $data['owner_id']];
+            $companyId = $data['linked_company_id'] ?? null;
+            $company = $companyId === null ? null : Company::query()->lockForUpdate()->find($companyId);
+            $owner = $this->activeUser($metadata['owner_id'], 'owner_id');
+
+            if ($companyId !== null) {
+                if (!$company?->isActive() || !$owner->isCompanyAdmin() || (int) $owner->company_id !== (int) $company->id) {
+                    throw ValidationException::withMessages([
+                        'linked_company_id' => 'Choose an active company administered by the selected owner.',
+                    ]);
+                }
+                if (HrOrganization::query()->where('linked_company_id', $company->id)->exists()) {
+                    throw ValidationException::withMessages(['linked_company_id' => 'This company already has a linked HR workspace.']);
+                }
+                $attributes['linked_company_id'] = $company->id;
+                $metadata['linked_company_id'] = $company->id;
+            }
+
+            $workspace = HrOrganization::create($attributes);
+            $workspace->memberships()->create(['user_id' => $owner->id, 'role' => 'owner', 'active' => true]);
+            AdminAuditLog::log($admin->id, 'hr_workspace_created', 'HrOrganization', $workspace->id, $metadata);
 
             return $workspace;
         }, 3);
 
-        return redirect()->route('admin.hr.index')->with('status', 'HR workspace '.$workspace->id.' created.');
+        return redirect()->route('admin.hr.index')->with('success', 'HR workspace '.$workspace->id.' created.');
     }
 
     public function addMember(Request $request, int $organization)
@@ -62,7 +83,7 @@ final class HrProvisioningController extends Controller
             }
         }, 3);
 
-        return redirect()->route('admin.hr.index')->with('status', 'Workspace membership granted.');
+        return redirect()->route('admin.hr.index')->with('success', 'Workspace membership granted.');
     }
 
     public function members(int $organization)
@@ -97,10 +118,13 @@ final class HrProvisioningController extends Controller
         return redirect()->route('admin.hr.members.index', compact('organization'))->with('status', 'Workspace membership updated.');
     }
 
-    private function activeUser(int $id, string $field = 'user_id'): void
+    private function activeUser(int $id, string $field = 'user_id'): User
     {
-        if (!User::query()->whereKey($id)->where('is_active', true)->lockForUpdate()->first()) {
+        $user = User::query()->whereKey($id)->where('is_active', true)->lockForUpdate()->first();
+        if (!$user) {
             throw ValidationException::withMessages([$field => 'Choose an existing active TaxNest account.']);
         }
+
+        return $user;
     }
 }

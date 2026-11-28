@@ -20,7 +20,7 @@ final class MadadgarUpcomingProductGuide
             return $general ? 'Upcoming Products ka verified status abhi available nahin hai.' : null;
         }
 
-        $products = UpcomingProduct::published()->orderBy('sort_order')->orderBy('id')->get(['slug', 'name', 'status']);
+        $products = UpcomingProduct::onPublicRoadmap()->orderBy('sort_order')->orderBy('id')->get(['slug', 'name', 'status']);
         $specific = $products->filter(function (UpcomingProduct $product) use ($text): bool {
             $name = preg_replace('/\btaxnest\s+/', '', str_replace('-', ' ', Str::slug($product->name)));
             $slug = str_replace('-', ' ', $product->slug);

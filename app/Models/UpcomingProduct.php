@@ -8,11 +8,13 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class UpcomingProduct extends Model
 {
+    public const RELEASED = 'released';
+
     public const STATUSES = [
         'upcoming' => 'Coming Soon',
         'in_development' => 'In Development',
         'beta' => 'Beta',
-        'released' => 'Released',
+        self::RELEASED => 'Released',
         'temporarily_unavailable' => 'Temporarily Unavailable',
     ];
 
@@ -40,6 +42,11 @@ class UpcomingProduct extends Model
     public function scopePublished(Builder $query): Builder
     {
         return $query->whereNotNull('published_at')->where('published_at', '<=', now());
+    }
+
+    public function scopeOnPublicRoadmap(Builder $query): Builder
+    {
+        return $query->published()->where('status', '!=', self::RELEASED);
     }
 
     public function interests(): HasMany

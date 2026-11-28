@@ -61,7 +61,8 @@
             background: #fff;
             overflow-wrap: anywhere;
         }
-        .directory-card img { width: 7rem; max-width: 100%; height: 2.5rem; object-fit: contain; object-position: left center; }
+        .directory-card img { width: 7rem; max-width: 100%; height: 3.25rem; object-fit: contain; object-position: left center; }
+        .directory-card-monogram { display: grid; width: 3.25rem; height: 3.25rem; place-items: center; border-radius: .5rem; background: #d9eee6; color: #075952; font-weight: 700; }
         .directory-card-name { font-size: .9rem; line-height: 1.38; font-weight: 700; }
         .directory-card-product { margin-top: .2rem; color: #526769; font-size: .78rem; }
         .directory-pages { display: flex; flex-wrap: wrap; align-items: center; gap: .65rem; margin-top: 1.85rem; }
@@ -94,13 +95,13 @@
                     @foreach($group as $client)
                         <li class="directory-card">
                             @if(\App\Services\WebsiteClientLogo::hasPublicLogo($client))
-                                <img src="{{ route('website-clients.logo', [$client->id, $client->revision]) }}" alt="" width="112" height="40" loading="lazy">
+                                <img src="{{ route('website-clients.logo', [$client->id, $client->revision]) }}" alt="" width="112" height="52" loading="lazy">
+                            @else
+                                <span class="directory-card-monogram" aria-hidden="true">{{ mb_strtoupper(mb_substr($client->display_name, 0, 1)) }}</span>
                             @endif
                             <div>
                                 <p class="directory-card-name">{{ $client->display_name }}</p>
-                                @if($client->product === 'standalone')
-                                    <p class="directory-card-product">{{ \App\Models\WebsiteClient::PRODUCTS[$client->product] }}</p>
-                                @endif
+                                <p class="directory-card-product">{{ \App\Models\WebsiteClient::PRODUCTS[$client->product] }}</p>
                             </div>
                         </li>
                     @endforeach

@@ -12,7 +12,9 @@
             @csrf
             @if($product->exists)
                 @method('PUT')
-                <p>Public path <code>/upcoming-products#{{ $product->slug }}</code></p>
+                @if($product->status !== \App\Models\UpcomingProduct::RELEASED)
+                    <p>Roadmap path <code>/upcoming-products#{{ $product->slug }}</code></p>
+                @endif
             @else
                 <label class="block">Product slug <input class="{{ $field }}" name="slug" required maxlength="80" value="{{ old('slug') }}" placeholder="product-name"></label>
             @endif
@@ -37,7 +39,8 @@
             @endforeach
             <label class="block">Sort order <input class="{{ $field }}" name="sort_order" type="number" min="0" max="5000" required value="{{ old('sort_order', $product->sort_order) }}"></label>
             <input type="hidden" name="published" value="0">
-            <label class="block"><input type="checkbox" name="published" value="1" @checked(old('published', (bool) $product->published_at))> Publish on Upcoming Products</label>
+            <label class="block"><input type="checkbox" name="published" value="1" aria-describedby="upcoming-visibility-help" @checked(old('published', (bool) $product->published_at))> Publish on Upcoming Products</label>
+            <p id="upcoming-visibility-help" class="text-sm">Set the status to Released to remove the product from the public roadmap. Existing interest records stay available here.</p>
             <button type="submit" class="tn-admin-action tn-admin-action--confirm rounded-lg px-4 py-2">Save roadmap product</button>
         </form>
     </main>

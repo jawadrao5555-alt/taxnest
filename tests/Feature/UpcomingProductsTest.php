@@ -74,9 +74,21 @@ class UpcomingProductsTest extends TestCase
         $this->assertDatabaseHas('admin_audit_logs', ['action' => 'upcoming_product_saved', 'target_id' => $draft->id]);
         $attrs['status'] = 'temporarily_unavailable';
         $this->put(route('saas.admin.upcoming-products.update', $draft), $attrs)->assertRedirect();
-        $this->postJson(route('upcoming-products.interest', $draft->slug), [
+        $interestUrl = route('upcoming-products.interest', $draft->slug);
+        $interest = [
             'email' => 'fictional@example.test', 'purpose' => 'interest', 'consent' => '1',
-        ])->assertNotFound();
+        ];
+        $this->postJson($interestUrl, $interest)->assertNotFound();
+
+        $attrs['status'] = UpcomingProduct::RELEASED;
+        $this->put(route('saas.admin.upcoming-products.update', $draft), $attrs)->assertRedirect();
+        $this->get(route('upcoming-products.index'))->assertDontSee($draft->name)
+            ->assertSee('TaxNest Distribution ERP');
+        $this->postJson($interestUrl, $interest)->assertNotFound();
+        $this->assertDatabaseCount('upcoming_product_interests', 0);
+        $this->get(route('saas.admin.upcoming-products.index'))->assertOk()
+            ->assertSee($draft->name)->assertSee('Off public roadmap');
+        $this->assertNotNull($draft->fresh()->published_at);
 
         $this->assertSame($planCount, PricingPlan::count());
         $this->assertSame($subscriptionCount, Subscription::count());
@@ -120,6 +132,9 @@ class UpcomingProductsTest extends TestCase
         $this->assertDatabaseCount('upcoming_product_interests', 2);
         $this->actingAs($this->admin(), 'admin')->get(route('saas.admin.upcoming-products.interests', $product))
             ->assertOk()->assertSee('roadmap@example.test')->assertSee('Request Early Access')->assertDontSee('Notify Me When Available · Confirmed');
+        $product->update(['status' => UpcomingProduct::RELEASED]);
+        $this->get($manage)->assertOk()->assertSee('Withdraw this request');
+        $this->get(route('saas.admin.upcoming-products.interests', $product))->assertOk()->assertSee('roadmap@example.test');
         $this->post($action, ['token' => $token, 'action' => 'withdraw'])->assertRedirect($manage);
         $this->get($manage)->assertOk()->assertSee('Your request has been withdrawn.');
         $this->assertNotNull($pending->fresh()->withdrawn_at);
@@ -158,7 +173,9 @@ class UpcomingProductsTest extends TestCase
         $this->assertSame('public_product_roadmap', MadadgarAnswerScope::metadata($result, 'pos', null, null)['answer_source']);
         $product->update(['status' => 'beta']);
         $this->assertStringContainsString('TaxNest Distribution ERP — Beta', MadadgarAnswerScope::answer('Upcoming products', 'pos', null)['text']);
-        $product->update(['published_at' => null]);
+        $product->update(['status' => UpcomingProduct::RELEASED]);
+        $this->assertStringNotContainsString('TaxNest Distribution ERP', MadadgarAnswerScope::answer('Upcoming products', 'pos', null)['text']);
+        $product->update(['status' => 'beta', 'published_at' => null]);
         $this->assertStringNotContainsString('TaxNest Distribution ERP', MadadgarAnswerScope::answer('Upcoming products', 'pos', null)['text']);
     }
 

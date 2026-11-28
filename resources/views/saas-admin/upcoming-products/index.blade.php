@@ -11,7 +11,14 @@
             <article class="tn-account-panel flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3">
                 <div>
                     <h2 class="font-semibold">{{ $product->name }}</h2>
-                    <p class="text-sm">{{ \App\Models\UpcomingProduct::STATUSES[$product->status] }} · {{ $product->published_at ? 'Published' : 'Draft' }}</p>
+                    <p class="text-sm">
+                        {{ \App\Models\UpcomingProduct::STATUSES[$product->status] }} ·
+                        @if($product->status === \App\Models\UpcomingProduct::RELEASED)
+                            Off public roadmap
+                        @else
+                            {{ $product->published_at ? 'Published' : 'Draft' }}
+                        @endif
+                    </p>
                 </div>
                 <div class="flex flex-wrap gap-3 text-sm">
                     <a class="underline" href="{{ route('saas.admin.upcoming-products.edit', $product) }}">Edit {{ $product->name }}</a>

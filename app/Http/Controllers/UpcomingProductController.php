@@ -18,14 +18,14 @@ final class UpcomingProductController extends Controller
 {
     public function index(): View
     {
-        $products = UpcomingProduct::published()->orderBy('sort_order')->orderBy('id')->get();
+        $products = UpcomingProduct::onPublicRoadmap()->orderBy('sort_order')->orderBy('id')->get();
 
         return view('public.upcoming-products.index', compact('products'));
     }
 
     public function interest(Request $request, string $slug): RedirectResponse
     {
-        $product = UpcomingProduct::published()->where('slug', $slug)->firstOrFail();
+        $product = UpcomingProduct::onPublicRoadmap()->where('slug', $slug)->firstOrFail();
         $input = $request->validate([
             'email' => ['required', 'string', 'email:rfc', 'max:254'],
             'purpose' => ['required', 'string', 'in:'.implode(',', array_keys(UpcomingProductInterest::PURPOSES))],
@@ -56,8 +56,8 @@ final class UpcomingProductController extends Controller
         ];
 
         $send = DB::transaction(function () use ($product, $matching, $submission, $now): bool {
-            // Closing or unpublishing a preview prevents a stale form submission.
-            $upcoming = UpcomingProduct::published()->lockForUpdate()->findOrFail($product->id);
+            // Recheck the roadmap after locking so a stale form cannot reopen interest.
+            $upcoming = UpcomingProduct::onPublicRoadmap()->lockForUpdate()->findOrFail($product->id);
             abort_if($upcoming->status === 'temporarily_unavailable', 404);
             $interest = UpcomingProductInterest::firstOrCreate($matching, $submission);
             if ($interest->wasRecentlyCreated) {

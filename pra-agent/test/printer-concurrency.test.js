@@ -8,6 +8,9 @@ const { processCloudPrintJob } = require('../src/printer-job');
 
 const windows = [];
 const pendingPrints = [];
+let reportedQueues;
+const installedQueues = ['Kitchen 58mm', 'Kitchen 80mm', 'Counter 80mm', 'Counter 58mm',
+  'p1', '92', 'p3', 'restart-printer', 'Fit kitchen', 'Fit counter', 'Oversize', 'Unsupported driver', 'Delayed'];
 
 class FakeWebContents extends EventEmitter {
   constructor(owner) {
@@ -17,7 +20,7 @@ class FakeWebContents extends EventEmitter {
   }
 
   async getPrintersAsync() {
-    return [];
+    return (reportedQueues || installedQueues).map(name => ({ name }));
   }
 
   async executeJavaScript(script) {
@@ -73,8 +76,24 @@ async function waitForPending(count) {
 }
 
 test.afterEach(() => {
+  reportedQueues = undefined;
   printer.setPaperProfiles({});
   while (pendingPrints.length) pendingPrints.shift().callback(true);
+});
+
+test('a missing assigned kitchen queue never falls back to the available counter queue', async () => {
+  reportedQueues = ['Counter 80mm'];
+  const reports = [];
+  const result = await processCloudPrintJob({ id: 2, type: 'kot', target_printer: 'Kitchen 58mm' }, {
+    fetchContent: async () => ({ status: 200, data: '<html>KOT</html>' }),
+    printHtml: printer.printHtml,
+    report: async (_, evidence) => reports.push(evidence),
+  });
+  assert.equal(result.success, false);
+  assert.equal(result.outcome, 'pre_spool_failed');
+  assert.match(result.error, /Assigned printer unavailable/);
+  assert.equal(reports.length, 1);
+  assert.equal(pendingPrints.length, 0);
 });
 
 // This exercises the real cloud-job -> printHtml -> Electron boundary. The

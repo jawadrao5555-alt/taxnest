@@ -897,7 +897,7 @@ class PosCallerIdController extends Controller
                 'name' => $row->caller_name,
                 'source' => $row->source,
                 'at' => Carbon::parse($row->ring_at)->format('h:i A'),
-                'match' => $this->matchCustomer($companyId, $row->phone, $row->caller_name),
+                'match' => $this->matchCustomer($companyId, $row->phone),
             ];
         })->values();
 
@@ -953,7 +953,7 @@ class PosCallerIdController extends Controller
                 'at' => Carbon::parse($row->ring_at)->format('h:i A'),
                 'called_back' => (bool) $backAt,
                 'called_back_at' => $backAt ? Carbon::parse($backAt)->format('h:i A') : null,
-                'match' => $this->matchCustomer($companyId, $row->phone, $row->caller_name),
+                'match' => $this->matchCustomer($companyId, $row->phone),
             ];
         })->values();
 
@@ -1271,64 +1271,38 @@ class PosCallerIdController extends Controller
 
     /**
      * Match a ring against pos_customers + bill history.
-     * Phone first (variants, then normalize-compare fallback); WhatsApp
-     * saved-contact rings carry only a NAME → unique-name match, flagged
-     * matched_by='name' so the popup says so.
+     * Only a matching phone number can identify a saved customer.
+     * A name supplied without a number remains display text on the event.
      */
-    private function matchCustomer(int $companyId, ?string $phone, ?string $name): ?array
+    private function matchCustomer(int $companyId, ?string $phone): ?array
     {
         $variants = $this->phoneVariants($phone);
-        $customer = null;
-        $matchedBy = null;
-
-        if ($variants) {
-            $customer = PosCustomer::where('company_id', $companyId)
-                ->whereIn('phone', $variants)->orderByDesc('id')->first();
-            if (!$customer && strlen($phone) >= 9) {
-                // Fallback: same last-7-digits candidates, normalize-compare in PHP
-                // (covers stored oddballs like "0300 123 4567").
-                $last7 = substr($phone, -7);
-                $candidates = PosCustomer::where('company_id', $companyId)
-                    ->whereNotNull('phone')->where('phone', 'like', '%' . $last7 . '%')
-                    ->limit(25)->get();
-                $customer = $candidates->first(fn ($c) => PkPhone::normalize($c->phone) === $phone);
-            }
-            if ($customer) {
-                $matchedBy = 'phone';
-            }
+        if (!$variants) {
+            return null;
         }
 
-        if (!$customer && !$variants && $name) {
-            // Name-only (WhatsApp saved contact): only a UNIQUE exact match counts.
-            $named = PosCustomer::where('company_id', $companyId)
-                ->whereRaw('LOWER(name) = ?', [mb_strtolower($name)])
-                ->limit(2)->get();
-            if ($named->count() === 1) {
-                $customer = $named->first();
-                $matchedBy = 'name';
-            }
+        $customer = PosCustomer::where('company_id', $companyId)
+            ->whereIn('phone', $variants)->orderByDesc('id')->first();
+        if (!$customer && strlen($phone) >= 9) {
+            $last7 = substr($phone, -7);
+            $candidates = PosCustomer::where('company_id', $companyId)
+                ->whereNotNull('phone')->where('phone', 'like', '%' . $last7 . '%')
+                ->limit(25)->get();
+            $customer = $candidates->first(fn ($c) => PkPhone::normalize($c->phone) === $phone);
         }
 
         // Bill history: by customer_id when known, else by raw phone variants
         // (walk-in bills store the phone without a customer row).
         $txn = PosTransaction::where('company_id', $companyId)->where('status', 'completed');
-        $hasIdentity = false;
-        $txn->where(function ($q) use ($customer, $variants, &$hasIdentity) {
+        $txn->where(function ($q) use ($customer, $variants) {
             if ($customer) {
                 $q->orWhere('customer_id', $customer->id);
                 if ($customer->phone) {
                     $q->orWhere('customer_phone', $customer->phone);
                 }
-                $hasIdentity = true;
             }
-            if ($variants) {
-                $q->orWhereIn('customer_phone', $variants);
-                $hasIdentity = true;
-            }
+            $q->orWhereIn('customer_phone', $variants);
         });
-        if (!$hasIdentity && !$customer) {
-            return null;
-        }
 
         $typeReady = Schema::hasColumn('pos_transactions', 'transaction_type');
         $signExpr = $typeReady ? "CASE WHEN transaction_type = 'return' THEN -1 ELSE 1 END" : '1';
@@ -1355,7 +1329,7 @@ class PosCallerIdController extends Controller
             'name' => $customer->name ?? ($last->customer_name ?? null),
             'phone' => $customer->phone ?? ($last->customer_phone ?? $this->displayPhone($phone)),
             'address' => $customer->address ?? null,
-            'matched_by' => $matchedBy ?? 'phone',
+            'matched_by' => 'phone',
             // v2: udhaar visibility — whole rupees, cast defensively
             // (live PDO returns decimals as strings).
             'khata_balance' => $customer ? (int) round((float) ($customer->khata_balance ?? 0)) : 0,

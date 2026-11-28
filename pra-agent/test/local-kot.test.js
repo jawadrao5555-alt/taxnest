@@ -7,8 +7,19 @@ const crypto = require('crypto');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const test = require('node:test');
 const { LocalCoreDomain } = require('../src/local-core/domain');
 const { renderKotHtml, planKotPrints, drainLocalKotQueue, shouldHandBackToCloud } = require('../src/local-kot');
+
+test('a local KOT never uses the same queue name on another assigned computer', () => {
+    const order = { document: { order_type: 'dine_in' } };
+    const settings = { kot_printer: 'Thermal', kot_printer_device: 'kitchen' };
+    assert.deepEqual(planKotPrints(order, settings, 'counter'), []);
+    assert.deepEqual(planKotPrints(order, settings, 'kitchen'), [{ printer: 'Thermal', copyLabel: null }]);
+    const splitCopy = { ...settings, counter_kot_enabled: true, counter_kot_printer: 'Thermal', counter_kot_printer_device: 'counter' };
+    assert.deepEqual(planKotPrints(order, splitCopy, 'kitchen'), []);
+    assert.deepEqual(planKotPrints(order, splitCopy, 'counter'), []);
+});
 
 const KEY = crypto.createHash('sha256').update('local-kot-tests').digest();
 const scope = { company_id: 'co-1', branch_id: 'br-1', device_id: 'dev-1', user_id: 'waiter-7' };

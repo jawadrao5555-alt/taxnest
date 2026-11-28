@@ -5815,6 +5815,7 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'caller_whatsapp_call' => 'WhatsApp Call',
     'caller_unknown' => 'Anjaan number',
     'caller_matched_by_name' => 'Naam se pehchana gaya (number nahi mila)',
+    'caller_confirm_number' => 'Caller ka number nahi mila. Number poochh kar customer search karein.',
     'caller_visits' => 'dafa aaye',
     'caller_last_order' => 'Aakhri order',
     'caller_new_customer' => 'Naya customer — abhi koi purani kharidari nahi',

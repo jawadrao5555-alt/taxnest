@@ -266,6 +266,9 @@ async function handleAgentUpdate(info, manual = false) {
 
     // Extract with PowerShell — zero extra npm dependencies.
     updStage = 'extract';
+    const extractStartedAt = Date.now();
+    updateInfo = { ...updateInfo, preparing: true };
+    sendUpdateState();
     await new Promise((resolve, reject) => {
       const psq = (s) => `'${String(s).replace(/'/g, "''")}'`;
       const ps = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
@@ -275,6 +278,7 @@ async function handleAgentUpdate(info, manual = false) {
       ps.on('close', (code) => (code === 0 ? resolve() : reject(new Error(err || `Expand-Archive exited ${code}`))));
       ps.on('error', reject);
     });
+    console.log('[self-update] package extracted in %d ms', Date.now() - extractStartedAt);
 
     // Locate the folder holding the new exe (zip root folder = TaxNest-PRA-Agent).
     updStage = 'locate';
@@ -327,7 +331,7 @@ async function handleAgentUpdate(info, manual = false) {
 
     console.log('[self-update] handing off to updater script, quitting…');
     lastUpdateAttempt = { target: info.version, stage: 'handoff', error: null, at: new Date().toISOString() };
-    updateInfo = { ...updateInfo, downloading: false, downloaded: true, progress: 100 };
+    updateInfo = { ...updateInfo, downloading: false, preparing: false, downloaded: true, progress: 100 };
     sendUpdateState();
 
     store.set('updateHandoffState', { ...nextHandoff(priorHandoff, info.version), resultPath, recoveryPath });
@@ -363,6 +367,7 @@ async function handleAgentUpdate(info, manual = false) {
     updateInfo = {
       ...updateInfo,
       downloading: false,
+      preparing: false,
       error: (e && e.message) || 'Update failed',
       autoRetrying: retryPending && autoUpdateEnabled(),
       manualRequired: !retryPending,

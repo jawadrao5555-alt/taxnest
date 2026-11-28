@@ -5812,6 +5812,7 @@ return [
     'caller_whatsapp_call' => 'واٹس ایپ کال',
     'caller_unknown' => 'انجان نمبر',
     'caller_matched_by_name' => 'نام سے پہچانا گیا (نمبر نہیں ملا)',
+    'caller_confirm_number' => 'کالر کا نمبر نہیں ملا۔ نمبر پوچھ کر گاہک تلاش کریں۔',
     'caller_visits' => 'دفعہ آئے',
     'caller_last_order' => 'آخری آرڈر',
     'caller_new_customer' => 'نیا گاہک — ابھی کوئی پرانی خریداری نہیں',

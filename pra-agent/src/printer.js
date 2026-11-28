@@ -134,7 +134,7 @@ function printHtmlUnlocked(html, deviceName, jobType = 'bill', laneKey = printer
     let timer;
     let settleTimer;
     const onClosed = () => done(false, 'print window closed');
-    const done = (success, error) => {
+    const done = (success, error, preSpool = false) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
@@ -149,7 +149,7 @@ function printHtmlUnlocked(html, deviceName, jobType = 'bill', laneKey = printer
       // later default-mode job inherits those overrides. Also destroy on
       // failure so a late load/driver callback cannot reuse the next job's DOM.
       if (win && (paperWidth || !success)) { try { win.destroy(); } catch (e) {} }
-      resolve({ success, error: error || null });
+      resolve({ success, error: error || null, ...(preSpool ? { preSpool: true } : {}) });
     };
 
     try {
@@ -187,10 +187,26 @@ function printHtmlUnlocked(html, deviceName, jobType = 'bill', laneKey = printer
           if (settled) return;
           const pageSize = paperWidth ? await prepareThermalPaper(win.webContents, paperWidth) : null;
           if (settled) return;
+          let target = deviceName;
+          if (deviceName) {
+            // During restart/update the Windows default can point to a different
+            // counter. Only submit to the specifically assigned installed queue.
+            try {
+              const queues = await win.webContents.getPrintersAsync();
+              const folded = name => String(name || '').trim().replace(/\s+/g, ' ').toLowerCase();
+              const matches = queues.filter(queue => folded(queue.name) === folded(deviceName));
+              target = matches.find(queue => queue.name === deviceName)?.name;
+              if (!target && matches.length === 1) target = matches[0].name;
+              if (!target) return done(false, 'Assigned printer unavailable or ambiguous', true);
+            } catch (_) {
+              return done(false, 'Windows printer list could not be read', true);
+            }
+          }
+          if (settled) return;
           win.webContents.print(
             {
               silent: true,
-              deviceName: deviceName,
+              deviceName: target,
               printBackground: true,
               margins: { marginType: 'none' },
               // Omitting pageSize alone makes Electron 42 fall back to A4.

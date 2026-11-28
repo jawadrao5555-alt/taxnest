@@ -100,6 +100,38 @@ function makeWindowsFixtureAgent(exePath) {
   execFileSync('powershell.exe',['-NoProfile','-NonInteractive','-EncodedCommand',Buffer.from(compile,'utf16le').toString('base64')],{timeout:30000,stdio:'pipe'});
 }
 
+test('Windows updates the stopped Agent and leaves its profile intact', {skip: process.platform !== 'win32'}, async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'taxnest apply test-'));
+  try {
+    const destDir = path.join(root, 'install'), srcDir = path.join(root, 'extracted');
+    const backupDir = path.join(root, 'backup'), profile = path.join(root, 'profile');
+    for (const dir of [destDir, srcDir]) fs.mkdirSync(path.join(dir, 'resources'), {recursive:true});
+    fs.mkdirSync(profile);
+    const config = path.join(profile, 'config.json');
+    fs.writeFileSync(config, '{"deviceUid":"fixture","receiptPrinter":"Counter 80mm"}');
+    const exePath = path.join(destDir, 'FixtureAgent.exe');
+    makeWindowsFixtureAgent(exePath);
+    fs.copyFileSync(exePath, path.join(srcDir, 'FixtureAgent.exe'));
+    fs.writeFileSync(path.join(destDir, 'resources', 'app.asar'), 'old package');
+    fs.writeFileSync(path.join(srcDir, 'resources', 'app.asar'), 'new package');
+    const resultPath = path.join(root, 'result.log'), logPath = path.join(root, 'apply.log');
+    const cmd = path.join(root, 'apply.cmd');
+    const stoppedPid = 2147483647;
+    fs.writeFileSync(cmd, buildUpdateHandoffScript({ exePath, srcDir, destDir, backupDir, resultPath, logPath, sourcePid: stoppedPid }));
+    execFileSync('cmd.exe', ['/d','/v:off','/s','/c',`""${cmd}""`], {windowsVerbatimArguments:true, timeout:60000, stdio:'pipe'});
+    assert.equal(fs.readFileSync(resultPath, 'utf8').trim(), 'installed');
+    assert.equal(fs.readFileSync(path.join(destDir, 'resources', 'app.asar'), 'utf8'), 'new package');
+    assert.equal(fs.readFileSync(path.join(backupDir, 'resources', 'app.asar'), 'utf8'), 'old package');
+    assert.deepEqual(JSON.parse(fs.readFileSync(config, 'utf8')), {deviceUid:'fixture', receiptPrinter:'Counter 80mm'});
+    assert.match(fs.readFileSync(logPath, 'utf8'), /Waiting for Agent exit[\s\S]*Applying update files[\s\S]*Relaunching Agent/);
+    const started = path.join(destDir, 'started.probe');
+    for (let i=0; i<100 && !fs.existsSync(started); i++) await new Promise(resolve => setTimeout(resolve, 50));
+    assert.equal(fs.readFileSync(started, 'utf8'), 'started');
+  } finally {
+    fs.rmSync(root, {recursive:true, force:true, maxRetries:20, retryDelay:50});
+  }
+});
+
 // Windows-only disposable filesystem acceptance: no real Agent, installer,
 // registry, restart, printer, company config or network. Registry commands are
 // injected no-ops; the generated production rollback/copy/launch body is real.
@@ -157,4 +189,7 @@ test('real settings banner explains pending recovery instead of claiming automat
   assert.equal(nodes.updateBtn.style.display,'inline-block');
   render({available:true,downloading:true,progress:42,latestBuild:'1.13.23'});
   assert.equal(nodes.updateBtn.style.display,'none');assert.match(nodes.updateMsg.textContent,/42%/);
+  render({available:true,downloading:true,preparing:true,progress:100,latestBuild:'1.13.23'});
+  assert.match(nodes.updateMsg.textContent,/Files tayyar ho rahi hain/);
+  assert.doesNotMatch(nodes.updateMsg.textContent,/100%/);
 });

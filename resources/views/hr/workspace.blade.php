@@ -43,6 +43,9 @@
             @endif
             @forelse ($employees as $employee)
                 <p><strong>{{ $employee->full_name }}</strong> <small>{{ $employee->employee_number }} · {{ $employee->designation ?: 'No designation' }} · {{ ucfirst($employee->status) }}</small></p>
+                @if ($allows('employee.invite') && $membership->organization->linked_company_id && !$employee->user_id && $employee->status === 'active')
+                    <a href="{{ route('hr.employees.invitation', ['organization' => $organization, 'employee' => $employee->id]) }}">Invite {{ $employee->full_name }} to Nest HR</a>
+                @endif
                 @if ($allows('employee.write'))
                     <details>
                         <summary>Edit {{ $employee->full_name }}</summary>

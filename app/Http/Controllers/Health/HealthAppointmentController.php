@@ -164,11 +164,13 @@ class HealthAppointmentController extends HealthPanelController
             }
         }
 
+        $appointmentDate = Carbon::parse($appointment->appointment_date);
+
         return redirect()
-            ->route('health.appointments', ['date' => Carbon::parse($data['appointment_date'])->toDateString()])
+            ->route('health.appointments', ['date' => $appointmentDate->toDateString()])
             ->with('success', $appointment->token_no
                 ? __('health.appt_token_issued', ['token' => $appointment->token_no])
-                : __('health.appt_booked'));
+                : __('health.appt_booked', ['date' => $appointmentDate->format('d M Y')]));
     }
 
     /** Move a booking to another day, time or doctor. */

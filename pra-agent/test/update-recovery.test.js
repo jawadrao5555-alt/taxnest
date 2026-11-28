@@ -42,6 +42,7 @@ test('verified backup and recovery registration precede installation writes',()=
   assert.ok(s.indexOf('echo ready>')<s.indexOf(':copyloop'));
   assert.ok(s.indexOf('fc /b "C:\\Agent A\\resources\\app.asar" "C:\\User Data\\recovery\\backup\\resources\\app.asar"')<s.indexOf('echo ready>'));
   assert.ok(s.indexOf('echo installed>')<s.indexOf(reg.unregister));
+  assert.match(s, /app\.asar \/IS \/R:2 \/W:2/);
   assert.match(s,/if errorlevel 1 goto recovery_unavailable/);
   assert.doesNotMatch(s,/taskkill|uninstall/i);
   assert.throws(()=>buildUpdateHandoffScript({...paths,readyPath:undefined}),/paired/);
@@ -112,14 +113,18 @@ test('Windows updates the stopped Agent and leaves its profile intact', {skip: p
     const exePath = path.join(destDir, 'FixtureAgent.exe');
     makeWindowsFixtureAgent(exePath);
     fs.copyFileSync(exePath, path.join(srcDir, 'FixtureAgent.exe'));
-    fs.writeFileSync(path.join(destDir, 'resources', 'app.asar'), 'old package');
-    fs.writeFileSync(path.join(srcDir, 'resources', 'app.asar'), 'new package');
+    const archiveTime = new Date('2026-01-15T12:00:00Z');
+    for (const [directory, contents] of [[destDir, 'old package'], [srcDir, 'new package']]) {
+      const file = path.join(directory, 'resources', 'app.asar');
+      fs.writeFileSync(file, contents);
+      fs.utimesSync(file, archiveTime, archiveTime);
+    }
     const resultPath = path.join(root, 'result.log'), logPath = path.join(root, 'apply.log');
     const cmd = path.join(root, 'apply.cmd');
     const stoppedPid = 2147483647;
     fs.writeFileSync(cmd, buildUpdateHandoffScript({ exePath, srcDir, destDir, backupDir, resultPath, logPath, sourcePid: stoppedPid }));
     execFileSync('cmd.exe', ['/d','/v:off','/s','/c',`""${cmd}""`], {windowsVerbatimArguments:true, timeout:60000, stdio:'pipe'});
-    assert.equal(fs.readFileSync(resultPath, 'utf8').trim(), 'installed');
+    assert.equal(fs.readFileSync(resultPath, 'utf8').trim(), 'installed', fs.readFileSync(logPath, 'utf8'));
     assert.equal(fs.readFileSync(path.join(destDir, 'resources', 'app.asar'), 'utf8'), 'new package');
     assert.equal(fs.readFileSync(path.join(backupDir, 'resources', 'app.asar'), 'utf8'), 'old package');
     assert.deepEqual(JSON.parse(fs.readFileSync(config, 'utf8')), {deviceUid:'fixture', receiptPrinter:'Counter 80mm'});

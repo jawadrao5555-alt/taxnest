@@ -16,6 +16,11 @@
         @endphp
         @if($canManageBilling)
             <a class="text-sm text-indigo-400 underline" href="{{ route('saas.admin.companies.package-receipts', $company->id) }}">Package receipts</a>
+            @if(!$company->trashed() && $company->product_type === 'pos'
+                && \App\Services\PosAddonService::isPraCompany($company)
+                && \App\Services\HistoricalPosFederalAddon::available())
+                <a class="tn-admin-action rounded-lg px-3 py-2 text-sm font-semibold" href="{{ route('saas.admin.companies.historical-federal-addon', $company->id) }}">Historical federal add-on</a>
+            @endif
         @endif
         @if($canReviewWebsiteClient)
             <a class="tn-website-client-action" href="{{ route('saas.admin.website-clients.create', ['company' => $company->id]) }}">Review for Our Clients</a>

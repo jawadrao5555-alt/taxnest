@@ -38,12 +38,15 @@ final class HistoricalPackageReceiptController extends Controller
         $admin = AdminUser::requireBillingAdministrator();
         $this->requireTerm($companyId, $subscriptionId);
         $details = $request->validate([
-            'payment_method' => ['required', 'in:cash,card'],
+            'payment_method' => ['required', 'in:cash,card,bank'],
             'verified_received_amount' => ['required', 'numeric', 'decimal:0,2', 'gt:0', 'max:1000000000'],
             'payment_date' => ['required', 'date_format:Y-m-d', 'before_or_equal:today'],
             'reference' => ['nullable', 'string', 'max:100'],
             'idempotency_key' => ['required', 'uuid'],
             'subscription_invoice_id' => ['nullable', 'integer', 'min:1'],
+            'historical_discount_percent' => ['nullable', 'numeric', 'decimal:0,2', 'min:0.01', 'max:99.99'],
+            'historical_discount_reason' => ['nullable', 'string', 'max:500'],
+            'historical_discount_reference' => ['nullable', 'string', 'max:120'],
         ]);
         if (isset($details['subscription_invoice_id'])) {
             SubscriptionInvoice::packageCharge()->where('company_id', $companyId)

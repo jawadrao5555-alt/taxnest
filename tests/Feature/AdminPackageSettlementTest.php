@@ -2,8 +2,10 @@
 
 namespace Tests\Feature;
 
-use App\Models\{AdminUser, Company, PaymentProof, PricingPlan, Subscription, SubscriptionInvoice, SubscriptionPayment};
+use App\Models\{AdminUser, Agent, AgentCommission, Company, Franchise, FranchiseCommission, PaymentProof, PricingPlan, Subscription, SubscriptionInvoice, SubscriptionPayment};
 use App\Services\AdminPackageSettlement;
+use App\Services\AgentCommissionService;
+use App\Services\WebsiteClientPaidSubscription;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -94,6 +96,96 @@ class AdminPackageSettlementTest extends TestCase
         $this->assertSame('paid', $legacy->fresh()->status);
         $this->assertNull($legacy->fresh()->document_snapshot);
         $this->assertNotNull($doc->payments()->sole()->receipt_number);
+    }
+
+    public function test_historical_negotiated_discount_records_exact_payment_on_original_term(): void
+    {
+        [$company, $plan, $admin, $payment] = $this->sale();
+        $company->update([
+            'agent_id' => Agent::create(['name' => 'Example agent', 'email' => 'agent@sale.invalid', 'status' => 'active', 'is_active' => true])->id,
+            'franchise_id' => Franchise::create(['name' => 'Example franchise', 'email' => 'franchise@sale.invalid',
+                'password' => 'Synthetic123!', 'status' => 'active', 'commission_rate' => 10])->id,
+        ]);
+        $other = Company::create(['name' => 'Another example company', 'ntn' => 'SALE0002', 'product_type' => 'pos']);
+        $sub = Subscription::create(['company_id' => $company->id, 'pricing_plan_id' => $plan->id, 'billing_cycle' => 'annual',
+            'start_date' => today()->subMonth(), 'end_date' => today()->addMonths(11), 'active' => true, 'final_price' => 12000]);
+        $priorTerm = $sub->fresh()->getAttributes();
+        $priorPlan = $plan->fresh()->getAttributes();
+        $details = array_replace($payment, [
+            'verified_received_amount' => '9000.00', 'payment_method' => 'bank',
+            'historical_discount_percent' => '25.00',
+            'historical_discount_reason' => 'Agreed annual customer discount',
+            'historical_discount_reference' => 'Original pricing agreement 2026-A',
+        ]);
+
+        $this->get(route('saas.admin.companies.package-receipts', $company->id))->assertOk()
+            ->assertSee('Record an agreed historical discount');
+        $this->from(route('saas.admin.companies.package-receipts', $company->id))
+            ->post(route('saas.admin.companies.package-receipts.record', [$company->id, $sub->id]), $details)
+            ->assertSessionHasNoErrors()->assertRedirect();
+        $invoice = SubscriptionInvoice::packageCharge()->sole();
+        $receipt = $invoice->payments()->sole();
+        $this->assertSame($invoice->id, AdminPackageSettlement::historical($company->id, $sub->id, $details, $admin->id)->id);
+        $this->assertEquals(9000, $invoice->amount);
+        $this->assertSame('paid', $invoice->status);
+        $this->assertEquals(9000, $receipt->amount);
+        $this->assertSame('bank', $receipt->payment_method);
+        $this->assertSame($details['payment_date'], $receipt->paid_at->toDateString());
+        $this->assertSame('0.00', $receipt->receipt_snapshot['remaining_balance']);
+        $this->assertSame([
+            'version' => 1,
+            'gross_paisa' => 1200000,
+            'discount_basis_points' => 2500,
+            'discount_paisa' => 300000,
+            'net_paisa' => 900000,
+            'reason' => $details['historical_discount_reason'],
+            'reference' => $details['historical_discount_reference'],
+        ], $receipt->receipt_snapshot['historical_package_discount']);
+        $this->assertSame($receipt->receipt_snapshot['historical_package_discount'], $invoice->document_snapshot['historical_package_discount']);
+        $this->assertSame($priorTerm, $sub->fresh()->getAttributes());
+        $this->assertSame($priorPlan, $plan->fresh()->getAttributes());
+        $this->assertSame([$company->id], WebsiteClientPaidSubscription::eligibleCompanyIds([$company->id, $other->id]));
+        $this->assertSame(1, PaymentProof::count());
+        AgentCommissionService::syncForAgent(Agent::findOrFail($company->agent_id));
+        $this->assertSame(0, AgentCommission::count());
+        $this->assertSame(0, FranchiseCommission::count());
+
+        $this->postJson(route('saas.admin.companies.package-receipts.record', [$other->id, $sub->id]), $details)
+            ->assertNotFound();
+        $this->from(route('saas.admin.companies.package-receipts', $company->id))
+            ->post(route('saas.admin.companies.package-receipts.record', [$company->id, $sub->id]), array_replace($details, [
+                'historical_discount_reference' => 'Different evidence',
+            ]))->assertSessionHasErrors('payment');
+        $this->assertSame(1, SubscriptionPayment::count());
+        PaymentProof::sole()->update(['status' => 'rejected']);
+        $this->assertSame([], WebsiteClientPaidSubscription::eligibleCompanyIds([$company->id]));
+    }
+
+    public function test_historical_negotiated_discount_requires_exact_net_and_evidence_and_keeps_existing_charges(): void
+    {
+        [$company, $plan, $admin, $payment] = $this->sale();
+        $sub = Subscription::create(['company_id' => $company->id, 'pricing_plan_id' => $plan->id, 'billing_cycle' => 'annual',
+            'start_date' => today()->subYear(), 'end_date' => today(), 'active' => false, 'final_price' => 12000]);
+        $details = array_replace($payment, [
+            'verified_received_amount' => '8999.99', 'historical_discount_percent' => '25',
+            'historical_discount_reason' => 'Agreed annual customer discount',
+            'historical_discount_reference' => 'Original pricing agreement 2026-A',
+        ]);
+        $record = route('saas.admin.companies.package-receipts.record', [$company->id, $sub->id]);
+        $this->post($record, $details)->assertSessionHasErrors('payment');
+        $details['verified_received_amount'] = '9000.00';
+        $this->post($record, array_replace($details, ['historical_discount_reason' => '  ']))
+            ->assertSessionHasErrors('historical_discount_reason');
+        $this->assertSame(0, PaymentProof::count());
+
+        $existing = SubscriptionInvoice::create(['company_id' => $company->id, 'subscription_id' => $sub->id,
+            'due_date' => today(), 'amount' => 12000, 'status' => 'pending']);
+        $this->post($record, $details + ['subscription_invoice_id' => $existing->id])
+            ->assertSessionHasErrors('payment');
+        $this->assertEquals(12000, $existing->fresh()->amount);
+        $this->assertSame('pending', $existing->fresh()->status);
+        $this->assertSame(0, SubscriptionPayment::count());
+        $this->assertSame(0, PaymentProof::count());
     }
 
     public function test_verified_historical_recovery_uses_independent_amount_without_second_payment_or_activation(): void

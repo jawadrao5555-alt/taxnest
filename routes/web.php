@@ -1642,6 +1642,13 @@ Route::prefix('admin')->middleware(['admin.auth'])->group(function () {
             Route::post('/terms/{subscriptionId}/payments/{paymentId}/attest', 'attest')->whereNumber(['subscriptionId', 'paymentId'])->name('saas.admin.companies.package-receipts.attest');
             Route::post('/terms/{subscriptionId}/proofs/{proofId}', 'recover')->whereNumber(['subscriptionId', 'proofId'])->name('saas.admin.companies.package-receipts.recover');
         });
+    Route::prefix('companies/{companyId}/historical-federal-addon')
+        ->where(['companyId' => '[0-9]+'])
+        ->controller(\App\Http\Controllers\SaasAdmin\HistoricalPosFederalAddonController::class)
+        ->group(function () {
+            Route::get('/', 'show')->name('saas.admin.companies.historical-federal-addon');
+            Route::post('/', 'record')->name('saas.admin.companies.historical-federal-addon.record');
+        });
     Route::get('/companies/{company}/billing/invoices/{invoice}', [\App\Http\Controllers\SubscriptionDocumentController::class, 'adminInvoice'])->whereNumber(['company', 'invoice'])->name('saas.admin.billing.documents.invoice');
     Route::get('/companies/{company}/billing/receipts/{payment}', [\App\Http\Controllers\SubscriptionDocumentController::class, 'adminReceipt'])->whereNumber(['company', 'payment'])->name('saas.admin.billing.documents.receipt');
     Route::post('/companies/{company}/billing/adjustments', [\App\Http\Controllers\SaasAdmin\AdminSubscriptionAdjustmentController::class, 'store'])

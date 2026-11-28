@@ -15,6 +15,7 @@
                 <dd class="mt-1 text-sm">
                     @if(in_array($code, $active, true))
                         {{ __('pos_federal_addons.active') }}
+                        <span class="mt-1 block text-gray-600 dark:text-gray-300">{{ __('pos_federal_addons.setup_optional') }}</span>
                     @elseif(in_array($code, $pending, true))
                         {{ __('pos.addons_pending_title') }}
                     @elseif($annualPrice > 0)

@@ -29,6 +29,14 @@
 
             @foreach($termCharges as $charge)
                 <div class="text-sm text-gray-200">Charge #{{ $charge->id }} &middot; PKR {{ number_format($charge->amount, 2) }} &middot; {{ ucfirst($charge->status) }}</div>
+                @if($discount = $charge->document_snapshot[\App\Services\VerifiedSubscriptionDocuments::HISTORICAL_DISCOUNT] ?? null)
+                    <p class="text-sm text-gray-300">
+                        Recorded gross PKR {{ number_format($discount['gross_paisa'] / 100, 2) }}
+                        &middot; Agreed discount {{ number_format($discount['discount_basis_points'] / 100, 2) }}% (PKR {{ number_format($discount['discount_paisa'] / 100, 2) }})
+                        &middot; Agreed net PKR {{ number_format($discount['net_paisa'] / 100, 2) }}
+                    </p>
+                    <p class="text-sm text-gray-300">{{ $discount['reason'] }} &middot; Evidence {{ $discount['reference'] }}</p>
+                @endif
                 @forelse($charge->payments as $payment)
                     @php
                         $allocatedProof = $termProofs->firstWhere('admin_allocated_payment_id', $payment->id);
@@ -102,7 +110,7 @@
                         @endif
                         <input type="hidden" name="idempotency_key" value="{{ (string) \Illuminate\Support\Str::uuid() }}">
                         <label>Payment method
-                            <select name="payment_method" required class="w-full rounded bg-gray-800"><option value="">Select method</option><option value="cash">Cash</option><option value="card">Card</option></select>
+                            <select name="payment_method" required class="w-full rounded bg-gray-800"><option value="">Select method</option><option value="cash">Cash</option><option value="card">Card</option><option value="bank">Bank transfer</option></select>
                         </label>
                         <label>Actual amount received (PKR)
                             <input type="number" name="verified_received_amount" min="0.01" step="0.01" required class="w-full rounded bg-gray-800">
@@ -113,6 +121,21 @@
                         <label>Reference (optional)
                             <input type="text" name="reference" maxlength="100" class="w-full rounded bg-gray-800">
                         </label>
+                        @if($termCharges->isEmpty())
+                            <details class="space-y-2 sm:col-span-2">
+                                <summary class="cursor-pointer text-indigo-400">Record an agreed historical discount</summary>
+                                <p>Use the documented discount and payment for this term. Enter the exact net amount received above.</p>
+                                <label>Agreed discount (%)
+                                    <input type="number" name="historical_discount_percent" min="0.01" max="99.99" step="0.01" class="w-full rounded bg-gray-800">
+                                </label>
+                                <label>Reason for discount
+                                    <input type="text" name="historical_discount_reason" maxlength="500" class="w-full rounded bg-gray-800">
+                                </label>
+                                <label>Agreement or supporting evidence reference
+                                    <input type="text" name="historical_discount_reference" maxlength="120" class="w-full rounded bg-gray-800">
+                                </label>
+                            </details>
+                        @endif
                         <button class="rounded bg-indigo-600 px-3 py-2 text-white" type="submit">Confirm payment received</button>
                     </form>
                 </details>

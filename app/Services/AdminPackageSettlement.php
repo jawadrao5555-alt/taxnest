@@ -61,10 +61,12 @@ final class AdminPackageSettlement
     public static function historical(int $companyId, int $subscriptionId, array $payment, int $adminId): SubscriptionInvoice
     {
         self::assertActor($adminId);
-        $data = self::paymentData($payment);
-        return DB::transaction(function () use ($companyId, $subscriptionId, $data, $adminId) {
+        $data = self::paymentData($payment, historical: true);
+        $discounted = isset($data['historical_discount_percent']);
+        $origin = $discounted ? PaymentProof::HISTORICAL_DISCOUNT_ORIGIN : 'history';
+        return DB::transaction(function () use ($companyId, $subscriptionId, $data, $adminId, $discounted, $origin) {
             $company = Company::whereKey($companyId)->lockForUpdate()->firstOrFail();
-            $fingerprint = self::fingerprint('history', $subscriptionId, '', $data);
+            $fingerprint = self::fingerprint($origin, $subscriptionId, '', $data);
             if ($document = self::replayed($company, $data, $fingerprint)) return $document;
             $subscription = self::historicalSubscription($companyId, $subscriptionId);
             self::guardPendingProof($companyId);
@@ -77,8 +79,15 @@ final class AdminPackageSettlement
                 ->lockForUpdate()->first()) {
                 self::invalid('Verified package evidence already exists or is unallocated. Review it before recording a new collection.');
             }
+            if ($discounted) {
+                if ($legacy) self::invalid('An existing package charge needs separate reconciliation before recording a historical discount.');
+                $discount = self::historicalDiscount($company, $subscription, $data);
+                self::requireFullAmount($data, $discount['net_paisa'] / 100, 'The confirmed amount must equal the agreed historical net price.');
+
+                return self::collect($company, $subscription, $data, $adminId, $origin, $fingerprint, null, historicalDiscount: $discount);
+            }
             self::requireFullAmount($data, $subscription->final_price);
-            return self::collect($company, $subscription, $data, $adminId, 'history', $fingerprint, $subscription->distributor_quote_snapshot, $legacy);
+            return self::collect($company, $subscription, $data, $adminId, $origin, $fingerprint, $subscription->distributor_quote_snapshot, $legacy);
         }, 3);
     }
 
@@ -208,7 +217,41 @@ final class AdminPackageSettlement
         return $sub;
     }
 
-    private static function collect(Company $company, Subscription $sub, array $data, int $adminId, string $origin, string $fingerprint, ?array $quote, ?SubscriptionInvoice $legacy = null): SubscriptionInvoice
+    private static function historicalDiscount(Company $company, Subscription $sub, array $data): array
+    {
+        PlanCompanyCompatibility::assertMatches($company, $sub->entitlementPlan());
+        if (!$sub->start_date || !$sub->end_date || $sub->end_date->lte($sub->start_date)) {
+            self::invalid('Enter an agreed historical discount only for a package with a recorded term.');
+        }
+
+        $quote = $sub->distributor_quote_snapshot ?? [];
+        if ((float) ($quote['discount_amount'] ?? 0) > 0
+            || (float) ($quote['undiscounted_addon_amount'] ?? 0) > 0
+            || (float) data_get($sub->purchase_snapshot, 'price.extra_branch_price', 0) > 0
+            || PosSignupBundle::federalAmount($quote) > 0
+            || ($sub->purchase_snapshot['source'] ?? null) === SubscriptionPurchaseSnapshot::SOURCE_ERP_UPGRADE) {
+            self::invalid('This term already has a discount, bundled charge or applied credit. Review the original agreement separately.');
+        }
+
+        $grossPaisa = (int) round((float) $sub->final_price * 100);
+        $basisPoints = (int) round((float) $data['historical_discount_percent'] * 100);
+        $discountPaisa = intdiv($grossPaisa * $basisPoints + 5000, 10000);
+        if ($discountPaisa <= 0 || $discountPaisa >= $grossPaisa) {
+            self::invalid('The agreed discount must leave a positive amount payable.');
+        }
+
+        return [
+            'version' => 1,
+            'gross_paisa' => $grossPaisa,
+            'discount_basis_points' => $basisPoints,
+            'discount_paisa' => $discountPaisa,
+            'net_paisa' => $grossPaisa - $discountPaisa,
+            'reason' => $data['historical_discount_reason'],
+            'reference' => $data['historical_discount_reference'],
+        ];
+    }
+
+    private static function collect(Company $company, Subscription $sub, array $data, int $adminId, string $origin, string $fingerprint, ?array $quote, ?SubscriptionInvoice $legacy = null, ?array $historicalDiscount = null): SubscriptionInvoice
     {
         $proof = new PaymentProof;
         $proof->forceFill([
@@ -220,18 +263,20 @@ final class AdminPackageSettlement
             'admin_settlement_fingerprint' => $fingerprint, 'admin_settlement_invoice_id' => $legacy?->id, 'distributor_quote_snapshot' => $quote,
             'distributor_net_amount' => $data['verified_received_amount'],
         ]);
-        self::attributeFranchise($company, $proof);
+        if (!$proof->isDocumentarySettlement()) self::attributeFranchise($company, $proof);
         $proof->save();
-        $document = VerifiedSubscriptionDocuments::record($proof, $sub, (float) $data['verified_received_amount'], $proof->payment_date, $legacy);
+        $document = VerifiedSubscriptionDocuments::record($proof, $sub, (float) $data['verified_received_amount'], $proof->payment_date, $legacy, $historicalDiscount);
         if (!$document) self::invalid('Subscription document storage is unavailable.');
         if ($origin === 'signup') PosSignupBundle::activate($company, $sub, $proof);
-        AgentCommissionService::recordForProof($proof, atomic: true);
-        FranchiseCommissionService::recordForProof($proof, atomic: true);
+        if (!$proof->isDocumentarySettlement()) {
+            AgentCommissionService::recordForProof($proof, atomic: true);
+            FranchiseCommissionService::recordForProof($proof, atomic: true);
+        }
         AdminAuditLog::log($adminId, 'Admin package payment recorded', 'PaymentProof', $proof->id, [
             'company_id' => $company->id, 'subscription_id' => $sub->id, 'subscription_invoice_id' => $document->id,
             'origin' => $origin, 'method' => $data['payment_method'], 'payment_date' => $data['payment_date'],
             'verified_received_amount' => $data['verified_received_amount'],
-        ]);
+        ] + ($historicalDiscount ? [VerifiedSubscriptionDocuments::HISTORICAL_DISCOUNT => $historicalDiscount] : []));
         return $document;
     }
 
@@ -274,16 +319,31 @@ final class AdminPackageSettlement
         abort_unless((int) AdminUser::requireBillingAdministrator()->id === $id, 403);
     }
 
-    private static function paymentData(array $payment, bool $requireTerm = false): array
+    private static function paymentData(array $payment, bool $requireTerm = false, bool $historical = false): array
     {
         $rules = [
             'verified_received_amount' => ['required', 'numeric', 'decimal:0,2', 'min:0.01', 'max:1000000000'],
-            'payment_method' => ['required', 'in:cash,card'], 'payment_date' => ['required', 'date_format:Y-m-d', 'before_or_equal:today'],
+            'payment_method' => ['required', $historical ? 'in:cash,card,bank' : 'in:cash,card'], 'payment_date' => ['required', 'date_format:Y-m-d', 'before_or_equal:today'],
             'reference' => ['nullable', 'string', 'max:120'], 'idempotency_key' => ['required', 'uuid'],
         ];
         if (!$requireTerm) $rules['subscription_invoice_id'] = ['nullable', 'integer', 'min:1'];
         if ($requireTerm) $rules['expected_subscription_id'] = ['required', 'integer', 'min:0'];
+        if ($historical) {
+            $rules['historical_discount_percent'] = ['nullable', 'numeric', 'decimal:0,2', 'min:0.01', 'max:99.99', 'required_with:historical_discount_reason,historical_discount_reference'];
+            $rules['historical_discount_reason'] = ['nullable', 'string', 'max:500', 'required_with:historical_discount_percent'];
+            $rules['historical_discount_reference'] = ['nullable', 'string', 'max:120', 'required_with:historical_discount_percent'];
+            foreach (array_intersect_key($payment, array_flip(['historical_discount_percent', 'historical_discount_reason', 'historical_discount_reference'])) as $field => $value) {
+                $payment[$field] = is_string($value) ? trim($value) : $value;
+            }
+        }
         $data = Validator::make($payment, $rules)->validate();
+        if ($historical) {
+            if (isset($data['historical_discount_percent'])) {
+                $data['historical_discount_percent'] = number_format((float) $data['historical_discount_percent'], 2, '.', '');
+            } else {
+                unset($data['historical_discount_percent'], $data['historical_discount_reason'], $data['historical_discount_reference']);
+            }
+        }
         $data['reference'] = trim((string) ($data['reference'] ?? '')) ?: null;
         $data['verified_received_amount'] = number_format((float) $data['verified_received_amount'], 2, '.', '');
         if ($requireTerm) $data['expected_subscription_id'] = (int) $data['expected_subscription_id'];
@@ -305,10 +365,10 @@ final class AdminPackageSettlement
             : $document->where('payment_proof_id', $prior->id)->firstOrFail();
     }
 
-    private static function requireFullAmount(array $data, mixed $expected): void
+    private static function requireFullAmount(array $data, mixed $expected, string $error = 'The confirmed amount must equal the full package price.'): void
     {
         if (!is_numeric($expected) || $expected <= 0 || $data['verified_received_amount'] !== number_format((float) $expected, 2, '.', '')) {
-            self::invalid('The confirmed amount must equal the full package price.');
+            self::invalid($error);
         }
     }
 

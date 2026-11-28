@@ -439,6 +439,7 @@ class PosAddonService
 
         $quote = $approvedQuote ?? self::quote($codes, $cycle, $company, $subscription);
         $start = now()->toDateString();
+        $purchaseReset = Schema::hasColumn('pos_addons', 'historical_purchase') ? ['historical_purchase' => null] : [];
 
         foreach ($quote['codes'] as $code) {
             PosAddon::updateOrCreate(
@@ -451,7 +452,7 @@ class PosAddonService
                     'ends_at' => $end,
                     'payment_proof_id' => $proofId,
                     'subscription_id' => $subscription?->id,
-                ]
+                ] + $purchaseReset
             );
         }
     }

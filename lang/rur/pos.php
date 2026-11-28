@@ -7170,6 +7170,7 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'hotel_reports_hint' => 'Is branch ki occupancy aur aaj ki folio raqam. Tax invoice guest folio par rehta hai.',
     // ---- Task 1582 end ----
     'waiter_edit_save_kitchen' => 'Save & Send Kitchen Update',
+    'waiter_order_edit_opened' => 'Order :order khul gaya. Items add karke save karein, ya customer tayyar ho to payment lein.',
     'waiter_edit_take_payment' => 'Take Payment',
     'waiter_edit_saving' => 'Saving…',
     'waiter_edit_saved' => 'Kitchen update saved for this waiter order.',

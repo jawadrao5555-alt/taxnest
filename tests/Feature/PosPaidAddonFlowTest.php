@@ -1052,6 +1052,30 @@ class PosPaidAddonFlowTest extends TestCase
         $this->assertSame('locked', PosFederalAddonAccess::state($company, 'federal_ims'));
     }
 
+    public function test_billing_distinguishes_package_delivery_features_from_addon_availability(): void
+    {
+        config(['pra_di_sandbox.paid_addon_annual_rates' => []]);
+        $unlimited = $this->makePlan('Unlimited', [
+            'riders_enabled' => true, 'rider_tracking_enabled' => true, 'caller_id_enabled' => true,
+        ]);
+        $shop = $this->makeShop($unlimited);
+        $this->actingAs($this->posUser($shop), 'pos')->get('/pos/billing')->assertOk()
+            ->assertSee(__('pos_addon_billing.included'))
+            ->assertSee(__('pos.addon_label_delivery_riders'))
+            ->assertSee(__('pos.addon_label_rider_tracking'))
+            ->assertSee(__('pos_federal_addons.price_pending'))
+            ->assertSee(__('pos_addon_billing.no_purchases'))
+            ->assertDontSee('data-addon-code="rider_tracking"', false);
+
+        config(['pra_di_sandbox.paid_addon_annual_rates' => ['federal_di' => 12000]]);
+        $business = $this->makePlan('Business', ['riders_enabled' => true]);
+        $shop = $this->makeShop($business, [], ['final_price' => 0]);
+        $this->actingAs($this->posUser($shop), 'pos')->get('/pos/billing')->assertOk()
+            ->assertSee(__('pos_addon_billing.federal_unavailable'))
+            ->assertSee('data-addon-code="rider_tracking"', false)
+            ->assertDontSee('data-addon-code="federal_di"', false);
+    }
+
     public function test_federal_options_are_visible_on_the_public_page_and_pra_billing_before_pricing_is_enabled(): void
     {
         config(['pra_di_sandbox.paid_addon_annual_rates' => []]);

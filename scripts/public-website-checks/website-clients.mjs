@@ -1,25 +1,116 @@
 import assert from 'node:assert/strict';
 
-export default async function check(page, baseUrl) {
-  assert.equal((await page.goto(baseUrl + '/', {waitUntil: 'networkidle'})).status(), 200);
-  const grid = page.getByRole('region', {name: 'Our Clients'});
-  await grid.scrollIntoViewIfNeeded();
+const excluded = /Synthetic Unpublished Studio|Synthetic Expired Studio/;
 
-  const cards = grid.getByRole('listitem');
-  assert.equal(await cards.count(), 2);
-  assert.match(await grid.innerText(), /Synthetic Retail Studio\s+PRA POS/);
-  assert.match(await grid.innerText(), /Synthetic Invoice Studio\s+Digital Invoice/);
-  assert.equal(await grid.getByText('Synthetic Unpublished Studio').count(), 0);
-  assert.equal(await grid.getByText('Synthetic Expired Studio').count(), 0);
-  const logo = grid.locator('img');
-  await logo.evaluate(image => image.decode());
-  const size = await cards.first().boundingBox();
-  assert(size && size.x >= 0 && size.x + size.width <= page.viewportSize().width);
-  const columns = await grid.getByRole('list').evaluate(list => getComputedStyle(list).gridTemplateColumns.split(' ').length);
-  assert.equal(columns, page.viewportSize().width === 390 ? 2 : 6);
+async function assertFitsPage(page, label) {
+  assert(await page.evaluate(() => Math.max(document.documentElement.scrollWidth, document.body.scrollWidth) <= innerWidth + 1),
+    label + ' overflows the viewport');
+}
+
+async function verifyReel(page, baseUrl, dismissal, reducedMotion = false) {
+  const fresh = await page.context().newPage();
+  try {
+    if (reducedMotion) await fresh.emulateMedia({reducedMotion: 'reduce'});
+    assert.equal((await fresh.goto(baseUrl + '/', {waitUntil: 'networkidle'})).status(), 200);
+    const reel = fresh.locator('[data-client-reel]');
+    await reel.waitFor({state: 'visible'});
+    const box = await reel.boundingBox();
+    const {width, height} = fresh.viewportSize();
+    assert(box && box.x > 0 && box.x + box.width < width && box.height < height / 2,
+      'Client reel covers the page instead of fitting inside a small panel');
+    assert(Math.abs(box.x + box.width / 2 - width / 2) <= 2, 'Client reel is not horizontally centered');
+    assert(Math.abs(box.y + box.height / 2 - height / 2) <= 2, 'Client reel is not vertically centered');
+    await assertFitsPage(fresh, 'Homepage with client reel');
+    assert.match(await reel.innerText(), /Synthetic Retail Studio/);
+    assert.match(await reel.innerText(), /Synthetic Invoice Studio/);
+    assert.doesNotMatch(await reel.innerText(), excluded);
+    const approvedLogo = reel.locator('img').first();
+    await approvedLogo.evaluate(image => image.decode());
+    assert(await approvedLogo.evaluate(image => image.naturalWidth > 0), 'Approved client logo did not load in the reel');
+
+    const track = reel.locator('[data-client-reel-track]');
+    if (reducedMotion) {
+      assert(await track.evaluate(el => {
+        const style = getComputedStyle(el);
+        return style.animationName === 'none' || style.animationDuration.split(',').every(value => parseFloat(value) === 0);
+      }), 'Reduced-motion preference did not stop the client reel');
+    } else {
+      const initialTransform = await track.evaluate(element => getComputedStyle(element).transform);
+      await fresh.waitForFunction(initial => getComputedStyle(document.querySelector('[data-client-reel-track]')).transform !== initial,
+        initialTransform);
+    }
+
+    if (dismissal === 'outside') {
+      await fresh.mouse.click(1, height - 1);
+    } else if (dismissal === 'escape') {
+      const pause = reel.locator('[data-client-reel-pause]');
+      await pause.click();
+      assert.equal(await pause.innerText(), 'Resume');
+      assert.equal(await track.evaluate(element => getComputedStyle(element).animationPlayState), 'paused');
+      await pause.click();
+      assert.equal(await pause.innerText(), 'Pause');
+      await fresh.keyboard.press('Escape');
+      assert(await fresh.locator('[data-client-directory-link]').evaluate(link => link === document.activeElement),
+        'Escape did not return focus from the reel to the directory link');
+    } else {
+      await reel.locator('[data-client-reel-close]').click();
+    }
+    await reel.waitFor({state: 'hidden'});
+    assert.equal(new URL(fresh.url()).pathname, '/', 'Closing the client reel changed the page');
+    if (!reducedMotion) {
+      await fresh.reload({waitUntil: 'networkidle'});
+      assert.equal(await reel.isVisible(), false, 'The dismissed client reel reappeared in the same tab');
+    }
+  } finally {
+    await fresh.close();
+  }
+}
+
+export default async function check(page, baseUrl) {
+  await verifyReel(page, baseUrl, 'outside');
+  await verifyReel(page, baseUrl, 'escape');
+  await verifyReel(page, baseUrl, 'button', true);
+
+  assert.equal((await page.goto(baseUrl + '/', {waitUntil: 'networkidle'})).status(), 200);
+  const homepage = page.locator('[data-home-clients]');
+  const reel = page.locator('[data-client-reel]');
+  if (await reel.isVisible()) await reel.locator('[data-client-reel-close]').click();
+  assert.equal(await homepage.getByRole('listitem').count(), 0, 'Homepage still builds a growing grid of clients');
+  const directoryLink = homepage.locator('a[data-client-directory-link]');
+  assert.equal(new URL(await directoryLink.getAttribute('href'), baseUrl).href, baseUrl + '/our-clients');
+  await directoryLink.click();
+  await page.waitForURL('**/our-clients');
+  const directory = page.getByRole('main');
+  await directory.getByRole('heading', {name: 'Our Clients', exact: true}).waitFor();
+  assert.match(await directory.innerText(), /Synthetic Retail Studio/);
+  assert.match(await directory.innerText(), /Synthetic Invoice Studio/);
+  assert.doesNotMatch(await directory.innerText(), excluded);
+  await directory.locator('img[src*="/website-clients/"]').first().evaluate(image => image.decode());
+  await assertFitsPage(page, 'Client directory');
+
+  const filters = directory.getByRole('navigation', {name: 'Filter clients by product'});
+  for (const product of ['All products', 'Digital Invoice', 'PRA POS', 'FBR POS (IMS)', 'TaxNest ERP']) {
+    assert(await filters.getByRole('link', {name: product, exact: true}).isVisible(), `Missing directory filter for ${product}`);
+  }
+  const digitalInvoice = filters.getByRole('link', {name: 'Digital Invoice', exact: true});
+  await digitalInvoice.click();
+  await page.waitForURL('**/our-clients?product=di');
+  assert.match(await directory.innerText(), /Synthetic Invoice Studio/);
+  assert.doesNotMatch(await directory.innerText(), /Synthetic Retail Studio/);
+  assert.equal(await directory.locator('img[src*="/website-clients/"]').count(), 0, 'Name-only client unexpectedly has an image');
+  assert.equal(await digitalInvoice.getAttribute('aria-current'), 'page');
+  const pra = filters.getByRole('link', {name: 'PRA POS', exact: true});
+  await pra.click();
+  await page.waitForURL('**/our-clients?product=pos');
+  assert.match(await directory.innerText(), /Synthetic Retail Studio/);
+  assert.doesNotMatch(await directory.innerText(), /Synthetic Invoice Studio/);
+  assert.doesNotMatch(await directory.innerText(), excluded);
+  assert.equal(await pra.getAttribute('aria-current'), 'page');
+  await assertFitsPage(page, 'Filtered client directory');
 
   assert.equal((await page.goto(baseUrl + '/digital-invoice', {waitUntil: 'networkidle'})).status(), 200);
-  assert.equal(await grid.getByRole('listitem').count(), 1);
-  assert.match(await grid.innerText(), /Synthetic Invoice Studio\s+Digital Invoice/);
-  assert.equal(await grid.locator('img').count(), 0);
+  const productClients = page.getByRole('region', {name: 'Our Clients'});
+  assert.equal(await productClients.getByRole('listitem').count(), 1);
+  assert.match(await productClients.innerText(), /Synthetic Invoice Studio\s+Digital Invoice/);
+  assert.equal(await productClients.locator('img').count(), 0);
 }

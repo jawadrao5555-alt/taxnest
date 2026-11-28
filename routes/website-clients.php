@@ -1,8 +1,11 @@
 <?php
 
 use App\Http\Controllers\SaasAdmin\WebsiteClientController;
+use App\Http\Controllers\WebsiteClientDirectoryController;
 use App\Http\Controllers\WebsiteClientLogoController;
 use Illuminate\Support\Facades\Route;
+
+Route::get('/our-clients', WebsiteClientDirectoryController::class)->name('website-clients.index');
 
 Route::get('/website-clients/{client}/logo/{revision}', WebsiteClientLogoController::class)
     ->whereNumber(['client', 'revision'])->name('website-clients.logo');

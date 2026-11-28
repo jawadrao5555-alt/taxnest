@@ -447,7 +447,7 @@
         </div>
     </section>
 
-    <x-website-clients product="pos" />
+    <x-website-clients :product="['pos', 'standalone']" />
 
     <!-- Testimonial -->
     <section class="py-24 bg-[#052730] text-white border-y border-[#0A4D5C]">

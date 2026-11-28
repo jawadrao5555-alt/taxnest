@@ -261,6 +261,27 @@ class HealthOpdCoreTest extends TestCase
 
     /* ───────────────── 2. Queue and fee ───────────────── */
 
+    public function test_a_scheduled_appointment_confirms_the_booked_date(): void
+    {
+        $this->actingAs($this->receptionist, HealthPanel::GUARD);
+        $this->post('/health/patients', [
+            'name' => 'Synthetic Appointment Patient',
+            'gender' => 'female',
+            'age_years' => 26,
+            'consent_treatment' => 1,
+        ])->assertRedirect();
+
+        $bookingDate = now()->addDays(2);
+        $this->post('/health/appointments', [
+            'health_patient_id' => HealthPatient::firstOrFail()->id,
+            'health_doctor_id' => $this->doctor->id,
+            'kind' => HealthAppointment::KIND_SCHEDULED,
+            'appointment_date' => $bookingDate->toDateString(),
+            'appointment_time' => '12:00',
+        ])->assertRedirect(route('health.appointments', ['date' => $bookingDate->toDateString()]))
+            ->assertSessionHas('success', __('health.appt_booked', ['date' => $bookingDate->format('d M Y')]));
+    }
+
     public function test_a_walk_in_checks_itself_in_and_freezes_the_fee_onto_the_visit(): void
     {
         $this->actingAs($this->receptionist, HealthPanel::GUARD);

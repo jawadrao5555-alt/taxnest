@@ -186,6 +186,23 @@ class WebsiteClientsTest extends TestCase
         $this->assertDatabaseCount('website_clients', 0);
     }
 
+    public function test_admin_can_find_a_saved_card_by_public_name_legal_name_or_account_code_and_filter_by_product(): void
+    {
+        $company = Company::create(['name' => 'Synthetic Legal Restaurant', 'ntn' => 'WC-SEARCH-POS', 'product_type' => 'pos']);
+        $other = Company::create(['name' => 'Synthetic School Candidate', 'ntn' => 'WC-SEARCH-ERP', 'product_type' => 'erps']);
+        $this->payForPackage($other);
+        $entry = WebsiteClient::create(['display_name' => 'Synthetic Public Menu', 'product' => 'pos']);
+        $entry->forceFill(['company_id' => $company->id])->save();
+        $this->actingAs($this->admin('admin'), 'admin');
+
+        foreach ([$entry->display_name, $company->name, $company->account_code] as $search) {
+            $this->get(route('saas.admin.website-clients.index', ['q' => $search, 'product' => 'pos']))
+                ->assertOk()->assertSee($entry->display_name)->assertSee('Draft')->assertDontSee($other->name);
+        }
+        $this->get(route('saas.admin.website-clients.index', ['product' => 'erp']))
+            ->assertOk()->assertSee($other->name)->assertSee('Active paid subscription')->assertDontSee($entry->display_name);
+    }
+
     public function test_linked_card_and_logo_hide_when_company_product_changes_or_company_becomes_inactive(): void
     {
         $company = Company::create(['name' => 'Synthetic Posted Account', 'ntn' => 'WC-SYNTHETIC-POSTED', 'product_type' => 'di']);
@@ -263,9 +280,9 @@ class WebsiteClientsTest extends TestCase
     public function test_hidden_approved_cards_do_not_take_a_public_grid_slot(): void
     {
         $eligible = [];
-        for ($index = 0; $index < 7; $index++) {
+        for ($index = 0; $index < 8; $index++) {
             $company = Company::create(['name' => 'Synthetic ERP '.$index, 'ntn' => 'WC-SYNTHETIC-SLOT-'.$index, 'product_type' => 'erps']);
-            if ($index < 6) {
+            if ($index < 7) {
                 $this->payForPackage($company);
                 $eligible[] = $company->name;
             }
@@ -274,7 +291,22 @@ class WebsiteClientsTest extends TestCase
         }
 
         $this->assertSame(array_reverse($eligible), WebsiteClient::publicCards('erp')->pluck('display_name')->all());
-        $this->get('/nest-erps')->assertOk()->assertSee($eligible[0])->assertDontSee('Synthetic ERP 6');
+        $this->get('/nest-erps')->assertOk()->assertSee($eligible[0])->assertDontSee('Synthetic ERP 7');
+        $this->get('/')->assertOk()->assertSee($eligible[6])->assertDontSee($eligible[0]);
+    }
+
+    public function test_public_pos_page_includes_approved_standalone_pos_clients(): void
+    {
+        $company = Company::create([
+            'name' => 'Synthetic Standalone Cafe', 'ntn' => 'WC-PUBLIC-STANDALONE',
+            'product_type' => 'pos', 'pos_integration_mode' => 'standalone',
+        ]);
+        $this->payForPackage($company);
+        $card = WebsiteClient::create(['display_name' => $company->name, 'product' => 'standalone']);
+        $card->forceFill(['company_id' => $company->id, 'published_at' => now()])->save();
+
+        $this->get('/pos')->assertOk()->assertSee($company->name)->assertSee('Our Clients');
+        $this->get('/nest-erps')->assertOk()->assertDontSee($company->name);
     }
 
     public function test_a_legacy_manual_card_can_be_linked_but_stays_private_until_approved_again(): void

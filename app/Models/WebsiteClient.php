@@ -39,9 +39,10 @@ class WebsiteClient extends Model
         return $this->belongsTo(Company::class);
     }
 
-    public static function companySources(): Builder
+    public static function companySources(?string $product = null): Builder
     {
         $query = self::eligibleCompany(Company::query())
+            ->when($product !== null, fn (Builder $query) => $query->where(DB::raw(self::SOURCE_PRODUCT), $product))
             ->select('companies.id', 'companies.name', 'companies.account_code')
             ->selectRaw(self::SOURCE_PRODUCT.' as website_product');
 
@@ -80,9 +81,10 @@ class WebsiteClient extends Model
             ->whereIn(DB::raw(self::SOURCE_PRODUCT), array_keys(self::PRODUCTS));
     }
 
-    public static function publicCards(?string $product = null): Collection
+    public static function publicCards(string|array|null $product = null, ?int $limit = null, int $offset = 0): Collection
     {
         $cards = collect();
+        $limit ??= $product === null ? 6 : null;
         try {
             if (!Schema::hasTable('website_clients')) {
                 return $cards;
@@ -91,15 +93,20 @@ class WebsiteClient extends Model
             self::query()->approvedForWebsite()
                 ->select('id', 'company_id', 'display_name', 'product', 'logo_mime', 'revision', 'sync_company_logo')
                 ->with('company:id,product_type,logo_path,di_branding')
-                ->when($product !== null, fn ($query) => $query->where('product', $product))
+                ->when($product !== null, fn ($query) => $query->whereIn('product', (array) $product))
                 ->orderByDesc('published_at')->orderBy('id')
-                ->chunk(24, function (Collection $entries) use ($cards) {
+                ->chunk(24, function (Collection $entries) use ($cards, $limit, &$offset) {
                     $eligible = array_flip(WebsiteClientPaidSubscription::eligibleCompanyIds($entries->pluck('company_id')->all()));
                     foreach ($entries as $entry) {
-                        if (isset($eligible[$entry->company_id])) {
-                            $cards->push($entry);
+                        if (!isset($eligible[$entry->company_id])) {
+                            continue;
                         }
-                        if ($cards->count() === 6) {
+                        if ($offset > 0) {
+                            $offset--;
+                            continue;
+                        }
+                        $cards->push($entry);
+                        if ($limit !== null && $cards->count() === $limit) {
                             return false;
                         }
                     }

@@ -12,9 +12,15 @@
             // Product label + colour come from the catalogue: a hand-written
             // map here used to leave a new product line grey and unnamed.
             $erpsVertical = \App\Support\NestErps::verticalOf($company);
+            $isErpWorkspace = \App\Support\NestErps::isProductType($company->product_type);
         @endphp
         @if($canManageBilling)
             <a class="text-sm text-indigo-400 underline" href="{{ route('saas.admin.companies.package-receipts', $company->id) }}">Package receipts</a>
+            @if(!$company->trashed() && $company->product_type === 'pos'
+                && \App\Services\PosAddonService::isPraCompany($company)
+                && \App\Services\HistoricalPosFederalAddon::available())
+                <a class="tn-admin-action rounded-lg px-3 py-2 text-sm font-semibold" href="{{ route('saas.admin.companies.historical-federal-addon', $company->id) }}">Historical federal add-on</a>
+            @endif
         @endif
         @if($canReviewWebsiteClient)
             <a class="tn-website-client-action" href="{{ route('saas.admin.website-clients.create', ['company' => $company->id]) }}">Review for Our Clients</a>
@@ -92,6 +98,7 @@
             <h3 class="text-sm font-semibold text-white mb-3">
                 @if($company->product_type === 'di') FBR Integration
                 @elseif($company->product_type === 'fbrpos') FBR POS Integration
+                @elseif($isErpWorkspace) ERP Workspace
                 @else PRA Integration
                 @endif
             </h3>
@@ -124,6 +131,26 @@
                     </span>
                     <span aria-hidden="true">→</span>
                 </a>
+                @elseif($isErpWorkspace)
+                @php
+                    $erpSubscription = $accountOverview['current'];
+                    $erpPlan = $erpSubscription?->entitlementPlan();
+                    $demoExpiry = ($erpPlan?->features['erp_demo_access'] ?? false) === true
+                        ? $erpSubscription->trial_ends_at
+                        : null;
+                @endphp
+                <div class="flex justify-between gap-2 min-w-0">
+                    <span class="text-gray-400 shrink-0">Workspace sign-in</span>
+                    <a class="text-indigo-400 underline font-semibold text-right min-w-0 break-words" href="{{ \App\Support\NestErps::loginPath($erpsVertical) }}">
+                        Open {{ \App\Support\NestErps::verticalLabel($erpsVertical) }} sign-in
+                    </a>
+                </div>
+                @if($demoExpiry)
+                <div class="flex justify-between gap-2 min-w-0">
+                    <span class="text-gray-400 shrink-0">Recorded demo expiry</span>
+                    <time class="text-white text-right min-w-0 break-words" datetime="{{ $demoExpiry->toIso8601String() }}">{{ $demoExpiry->format('d M Y, H:i T') }}</time>
+                </div>
+                @endif
                 @else
                 <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">PRA Environment</span><span class="text-white text-right min-w-0 break-words">{{ ucfirst($company->pra_environment ?? 'N/A') }}</span></div>
                 <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">POS ID</span><span class="text-white text-right min-w-0 break-all">{{ $company->pra_pos_id ?? '—' }}</span></div>

@@ -2,15 +2,19 @@
 <html lang="{{ app()->getLocale() }}" dir="{{ app()->getLocale() === 'ur' ? 'rtl' : 'ltr' }}">
 <head><meta charset="utf-8"><title>{{ $order->order_no }}</title>
     <style>
-        body { color: #1f2937; font-family: dejavusans, sans-serif; font-size: 10pt; }
-        body[dir=rtl] { font-family: jameelnoorinastaleeq, dejavusans, sans-serif; }
+        body { color: #1f2937; font-family: 'DejaVu Sans', dejavusans, sans-serif; font-size: 10pt; }
+        html[dir=rtl] body { font-family: jameelnoorinastaleeq, 'DejaVu Sans', dejavusans, sans-serif; }
         h1 { font-size: 18pt; }
         h2 { font-size: 12pt; margin: 0 0 2mm; }
         .test { border-top: 0.3mm solid #9ca3af; margin-top: 5mm; padding-top: 3mm; page-break-inside: avoid; }
         .meta { font-size: 8pt; }
+        @media print { .print-action { display: none; } }
     </style>
 </head>
 <body>
+    @if($browserPrint ?? false)
+        <button class="print-action" type="button" onclick="window.print()">{{ __('health.print') }}</button>
+    @endif
     <h1>{{ __('lab_workflow.report') }}</h1>
     <p>{{ $company?->name }}</p>
     <p>{{ $order->patient?->name }} · <bdi>{{ $order->patient?->mrn }}</bdi> · <bdi>{{ $order->order_no }}</bdi></p>

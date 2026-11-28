@@ -7166,6 +7166,7 @@ return [
     'hotel_reports_hint' => 'اس برانچ کی حاضری اور آج کی کھاتہ رقم۔ ٹیکس بل مہمان کھاتے پر رہتا ہے۔',
     // ---- Task 1582 end ----
     'waiter_edit_save_kitchen' => 'کچن اپ ڈیٹ محفوظ کریں',
+    'waiter_order_edit_opened' => 'آرڈر :order کھل گیا ہے۔ اشیا شامل کر کے محفوظ کریں، یا گاہک تیار ہو تو ادائیگی وصول کریں۔',
     'waiter_edit_take_payment' => 'ادائیگی لیں',
     'waiter_edit_saving' => 'محفوظ ہو رہا ہے…',
     'waiter_edit_saved' => 'ویٹر آرڈر کی کچن اپ ڈیٹ محفوظ ہو گئی۔',

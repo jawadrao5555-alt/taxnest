@@ -53,6 +53,13 @@ class PaymentProof extends Model
     /** Non-package request lanes. Anything NOT listed here is a renewal proof. */
     public const ADDON_KINDS = ['extra_branch', 'pos_addon', 'ai_pages'];
 
+    public const HISTORICAL_DISCOUNT_ORIGIN = 'history_discount';
+
+    public function isDocumentarySettlement(): bool
+    {
+        return in_array($this->admin_settlement_origin, ['allocated', self::HISTORICAL_DISCOUNT_ORIGIN], true);
+    }
+
     /** hasColumn() per call = DB round trip; per-request memo. */
     private static ?bool $kindColumn = null;
 

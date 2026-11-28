@@ -18,8 +18,10 @@ use App\Services\HealthAccessService;
 use App\Services\HealthModuleService;
 use App\Services\HealthScopeService;
 use App\Support\NestErps;
+use App\Support\PosLocale;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
@@ -134,6 +136,37 @@ class HealthLabWorkflowTest extends TestCase
         $pdf = $this->get($report)->assertOk()->assertHeader('Content-Type', 'application/pdf');
         $this->assertStringStartsWith('%PDF-', $pdf->getContent());
         $this->assertStringContainsString('no-store', (string) $pdf->headers->get('Cache-Control'));
+
+        $originalStorage = app()->storagePath();
+        $brokenMpdfStorage = $originalStorage.'/framework/testing/lab-pdf-'.Str::uuid();
+        File::ensureDirectoryExists($brokenMpdfStorage.'/app');
+        File::put($brokenMpdfStorage.'/app/mpdf', 'A file prevents mPDF from opening its cache directory.');
+        try {
+            app()->useStoragePath($brokenMpdfStorage);
+            $verifier->update(['language' => PosLocale::ROMAN_URDU]);
+            $fallbackReport = $this->get($report)->assertOk()->assertHeader('Content-Type', 'application/pdf');
+            $this->assertStringStartsWith('%PDF-', $fallbackReport->getContent());
+            $this->assertStringContainsString('no-store', (string) $fallbackReport->headers->get('Cache-Control'));
+            $this->assertStringStartsWith('inline', (string) $fallbackReport->headers->get('Content-Disposition'));
+
+            $verifier->update(['language' => PosLocale::URDU_SCRIPT]);
+            $fallbackPrint = $this->get($report)->assertOk()
+                ->assertSee('dir="rtl"', false)->assertSee('Edited synthetic value')
+                ->assertSee(__('lab_workflow.report', [], PosLocale::URDU_SCRIPT))
+                ->assertSee('window.print()', false);
+            $this->assertStringContainsString('no-store', (string) $fallbackPrint->headers->get('Cache-Control'));
+
+            $this->actingAs($technician, 'health');
+            $labelUrl = route('health.lab.orders.label', [...$args, $replacement]);
+            $fallbackLabel = $this->get($labelUrl)->assertOk()->assertHeader('Content-Type', 'application/pdf');
+            $this->assertStringStartsWith('%PDF-', $fallbackLabel->getContent());
+            $this->assertStringContainsString('no-store', (string) $fallbackLabel->headers->get('Cache-Control'));
+            $this->assertStringStartsWith('inline', (string) $fallbackLabel->headers->get('Content-Disposition'));
+        } finally {
+            app()->useStoragePath($originalStorage);
+            $verifier->update(['language' => PosLocale::ENGLISH]);
+            File::deleteDirectory($brokenMpdfStorage);
+        }
 
         $this->actingAs($owner, 'health');
         $amend = array_replace($result, [

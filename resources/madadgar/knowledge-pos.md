@@ -76,12 +76,12 @@ Sale screen ki mazeed cheezein:
 - Guided Flow (default ON): Customer → Items → Order Type (1/2/3) → Pay — sirf Enter dabate jayen: khali customer box par Enter = walk-in skip; items dal kar khali search par Enter = agla step; pay modal mein Enter = Cash confirm. /pos/customize se ON/OFF hota hai.
 
 ## Payment aur Receipt
-- Payment methods: Cash aur Card (payment modal mein; keyboard 1 = Cash, 2 = Card). Har method ka apna tax rate ho sakta hai (aam default: cash 16%, card/digital 8%; company ke liye alag rate bhi ho sakta hai — /pos/features par "Cash Rate (%)" aur "Card / Digital Rate (%)" fields).
+- Payment methods: Cash aur Card (payment modal mein; keyboard 1 = Cash, 2 = Card). Company ki saved rates /pos/features par "Cash Rate (%)" aur "Card / Digital Rate (%)" mein dekhein. Applicable rate badalne se pehle authorized support se tasdeeq karein.
 - Bill ka grand total hamesha poore rupay mein round hota hai (line items 2 decimal tak).
 - Receipt 80mm ya 58mm thermal printer par print hoti hai — paper size /pos/receipt-settings ya PRA Settings dono jagah se badlein; print khud printer ki asal width par fit hota hai.
 - Receipt Settings (/pos/receipt-settings) par DO tabs hain: "PRA Receipt" aur "Local Receipt" — har tab ke apne toggles: Show Address, Show NTN, Show Email, Show Phone/Mobile, Show Cashier Details, Show Tax, aur Footer message (toggle + apna text). Global options: Receipt Paper Size (80mm Standard / 58mm Compact), PDF Download Paper (Thermal Roll / A4), Bold Receipt Print toggle, Logo Style (Compact/Large).
 - Agar DOWNLOAD ki hui PDF bill aam (non-thermal) printer par side par shift ho kar kati hui chape, to /pos/receipt-settings par "PDF Download Paper" ko A4 kar dein — bill poore A4 page ke upar-left par seedhi chapegi. Thermal roll wali printing par is se koi asar nahi parta.
-- "Show Tax" OFF karne se customer copy par Subtotal aur Tax chhup jate hain — sirf grand TOTAL nazar aata hai; items apni asal price par dikhte hain. Lekin PRA ko tax hamesha POORA submit hota hai.
+- "Show Tax" OFF karne se customer copy par Subtotal aur Tax chhup jate hain — sirf grand TOTAL nazar aata hai; items apni asal price par dikhte hain. Yeh display setting fiscal reporting enable nahin karti aur reported amounts nahin badalti.
 - Receipt ka default style: bold + center logo; company chahe to plain style choose kar sakti hai. Text gehra/bold hai taake saste printers par bhi saaf chape.
 - Restaurant orders ki receipt par order type ka numaya badge chapta hai — DINE-IN, TAKE AWAY ya DELIVERY (bold, border ke saath, bilkul upar). Retail/simple bills par koi badge nahi aata.
 - Kisi bhi purane bill ki receipt dobara: sale screen par Alt+R (Reprint) — ya /pos/transactions se bill khol kar receipt/PDF.
@@ -99,14 +99,14 @@ Sale screen ki mazeed cheezein:
 - Product barcode stickers: /pos/products/labels — sticker par naam, price, barcode aur SKU aata hai; "Columns" box se sheet ke columns (1-5) set karein aur "Print" dabayen.
 
 ## PRA Reporting (Fiscal)
-- PRA reporting ON ho to har final bill PRA ko report hota hai aur POS-YYYY-NNNNN fiscal serial milta hai; receipt par PRA fiscal number aur QR aata hai.
+- PRA reporting ON aur approved connection ready ho to eligible final bills PRA ko report hote hain. Authority se acceptance ke baad receipt par PRA fiscal number aur QR aata hai. Pending/failed ya local bill ko accepted nahin samjhein.
 - Reporting ke BAGHAIR bane bills (provisional ya reporting-OFF finals) B-series serial par rehte hain.
 - Internet na ho ya PRA down ho to bill 'offline' queue mein jata hai aur khud retry hota hai — quota dobara nahi katta.
 - PRA se reject bills F11 modal mein aate hain — wahan se Edit & Retry karein.
 - Per-cashier PRA toggle: /pos/team par har cashier ke liye PRA reporting alag ON/OFF ho sakti hai.
 - PRA Settings (/pos/pra-settings, sirf admin) ke fields: Environment (Sandbox/Production), Connection Mode (Cloud API / PRA Fiscal Device), POS Registration ID, Production Token, PRA Proxy URL (optional), Receipt Printer Size (80mm/58mm). "Test Connection" button se connection check karein.
 - Confidential PIN: 4-6 digit PIN — PRA Settings page par "Set PIN / Change PIN" se. Yeh PIN limit se zyada discount jaisi hassas actions par manager override ke liye use hota hai. Cashier PIN set/change nahi kar sakta.
-- PRA Connection ke 2 modes: (1) Cloud API — server seedha PRA ko bhejta hai; (2) PRA Fiscal Device — dukan ke PC par Desktop Sync Agent bills PRA ko bhejta hai. NAYE PRA registrations ke liye Fiscal Device mode zaroori hai (PRA ka rule).
+- PRA Connection ke 2 modes: (1) Cloud API; (2) PRA Fiscal Device — dukan ke PC par Desktop Sync Agent ke saath. Apni approved registration ke liye applicable mode confirm karein.
 - Invoice Submission Mode (/pos/agent, Cloud mode wali companies): "Agent Sync" = Desktop Agent bills PRA ko bhejta hai; "Direct Production" = server seedha bhejta hai — "Switch to..." button se badlein. Direct par switch karne se silent printing BAND NAHI hoti — agent connected rehta hai. Fiscal Device mode mein Direct available nahi.
 - Agent page (/pos/agent) par: agent ka status (Online/Offline, last seen, version, aaj submit hue bills), Company ID + API Key (masked, Show/Copy buttons, Generate/Regenerate Key), Server URL, aur "Download TaxNest Agent" (Windows).
 - Desktop Sync Agent: Windows PC par chalta hai; bills PRA ko submit karta hai aur silent printing bhi isi se hoti hai. Agent khud update ho jata hai (v1.3.0+).
@@ -119,7 +119,7 @@ Sale screen ki mazeed cheezein:
 - F10 modal ke andar har local bill par actions: Enter = Make Final (promote), E = Edit, D = Delete (cashier delete nahi kar sakta).
 - F10 modal mein upar SEARCH box hai (1 Aug 2026): customer ka naam, phone number ya bill number likhein to list foran filter ho jati hai — raat ko bohat se provisional bills ikathay final karne walon ke liye. Modal khulte hi cursor search mein hota hai; ↑↓ se select, Enter = Make Final. FBR POS ke F10 modal mein bhi yehi search hai.
 - Promote karne par method picker khulta hai — 3 options: Cash (1), Card (2), ya "Finalize LOCAL — don't send to PRA" (3 ya L) = bill final ho jata hai lekin PRA ko NAHI jata, B-series par hi rehta hai. Esc = cancel.
-- Cash/Card se promote = PRA final: naya POS fiscal serial milta hai aur monthly quota use hota hai. Promote sirf USI mahine ke andar ho sakta hai.
+- Cash/Card se promote karne par enabled PRA reporting mein eligible bill ka submission status dekhein. Accepted bill ka PRA number confirm karein. Company ki edition aur permissions ke mutabiq local aur reporting ke options nazar aate hain.
 - /pos/transactions par bhi local bill ke saamne "Submit to PRA" button hota hai (current month ke bills par).
 - Day-close par us din ke local bills company ki standing policy ke mutabiq save ya delete hote hain — policy /pos/customize → Local Billing se (sirf admin; provisional aur final dono ke liye alag "Save to record"/"Auto-delete" options + customer spend history rakhne ka toggle).
 - PRA ko report ho chuke bills kabhi delete nahi hote — sirf pure local bills wash hote hain.
@@ -161,8 +161,8 @@ Sale screen ki mazeed cheezein:
 - Deal sirf apne set kiye dino (aur date range) mein sale screen par aati hai.
 - Deals sirf seedhi billing ke liye hain — hold/KOT par nahi ja sakti.
 
-## Restaurant Module (Business/Unlimited packages)
-- Chahiye: Pro ya Unlimited package (ya active trial), phir /pos/features se restaurant features ON karein (KOT, Table Management, KDS, Kitchen Notes, Recipes).
+## Restaurant Module
+- Apne package ki /pos/billing par Restaurant features dekhein. Available hon to /pos/features se KOT, Table Management, KDS, Kitchen Notes aur Recipes setup karein.
 - Order types ke rules: Dine-In = pehle Hold/KOT, khana banne ke baad payment; Takeaway = seedha final bill; Delivery = final ya provisional dono.
 - Tables/Floors: /pos/restaurant/table-management → "+ Add Floor" (floor ka naam, jaise Ground Floor) → "+ Add Table" (Table Number jaise T1, Seats 1-50). Table delete = card par × button.
 - Dine-In order: sale screen par order type "Dine In" → table picker khud khulta hai → table select → items → "Send to Kitchen" (KOT) ya Hold → khana ban jaye to TABLE board (Alt+B) mein table par click karke "View / Edit" ya "FINAL karo" se payment. Table payment par khud free ho jata hai.
@@ -234,7 +234,7 @@ Sale screen ki mazeed cheezein:
 ## Team / Roles (/pos/team)
 - Member add: /pos/team → naam, email, phone, password, role → save.
 - Roles: Manager = admin jaisa (settings, reports, sab); Cashier = sirf billing. Kitchen, Waiter, Rider, Delivery Manager = mehdood, FREE (limit mein nahi ginte).
-- Manager aur Cashier package ki account limit mein ginte hain (Starter 1, Business 5, Pro 10, Unlimited unlimited).
+- Manager aur Cashier package ki account limit mein ginte hain. Current team limit /pos/billing mein dekhein.
 - Cashier ON/OFF toggle team page par hai (band cashier login nahi kar sakta).
 - Har cashier ke liye PRA reporting alag ON/OFF karne ka toggle bhi yahin hai.
 - Company admin team members ke passwords /pos/team par dekh sakta hai (sirf admin ko nazar aate hain).
@@ -246,14 +246,12 @@ Sale screen ki mazeed cheezein:
 - Custom Access OFF (default) = role ka aam rawaiya, bilkul pehle jaisa. Kisi member par set na karein to kuch nahi badalta.
 - Cashier ko aam tor par band cheez (misal Customize ya Team) tick karne se woh us page tak pahunch jata hai; Manager ki koi cheez untick karne se woh us se chhin jati hai.
 - Kitchen, Waiter, Rider, Delivery Manager par Custom Access LAGOO NAHI hota — yeh roles apne mehdood ilaqe mein hi rehte hain (custom grant se admin pages nahi milte; zaroorat ho to role badlein). Company admin (owner) kabhi mehdood nahi ho sakta.
-- Custom Access Business, Pro aur Unlimited packages mein hai (ya active trial). Package mein na ho to /pos/team par lock-card dikhta hai; pehle se saved sets ghair-moassar (inert) ho jate hain — member aam role ki tarah chalta hai, koi lock out nahi hota.
+- Custom Access ki availability /pos/billing par apne package mein dekhein. Package mein na ho to /pos/team par lock-card dikhta hai; pehle se saved sets ghair-moassar ho jate hain aur member aam role ki tarah chalta hai.
 
 ## Packages aur Billing (/pos/billing)
-- Starter: 2 team accounts aur 2,000 final bills/mahina.
-- Business: 5 team accounts, 1 branch aur unlimited final bills; Restaurant, Delivery Riders, QR Menu aur Custom Access shamil.
-- Pro: 20 team accounts, 3 branches aur unlimited final bills; Business ke sab features + Staff Hazri.
-- Unlimited: unlimited team accounts, 5 branches, unlimited final bills aur Priority Support.
-- Packages ki current saalana aur 3-mahina prices /pos/billing par dekhein.
+- Current terms, prices, team aur branch limits aur included features ke liye /pos/billing par Compare packages dekhein.
+- Rider Live Tracking aur Caller ID package mein included hon to alag payment nahin. Warna current term ke available options dekhein. Extra branch slots ka apna option hai.
+- Optional federal add-on: eligible paid PRA POS package term ke liye FBR Digital Invoice ya FBR POS (IMS) mein se aik channel. Availability aur configured rate /pos/billing mein dekhein. Add-on grant aur fiscal connection setup alag steps hain.
 - Payment ka tareeqa: plan chunein → di gayi bank details (Bank, Title, IBAN) par raqam bhejein → payment proof form bharein: Package, Amount Paid (PKR), Reference/TID, aur proof upload (JPG/PNG/PDF) → admin verify kar ke package activate karta hai. Jaldi ho to "Send on WhatsApp" button se proof WhatsApp par bhi bhej sakte hain.
 - Sirf FINAL bills quota mein ginte hain — provisional FREE hain jab tak promote na hon; offline retry dobara nahi ginta. Quota har mahine reset hota hai.
 
@@ -262,10 +260,10 @@ Sale screen ki mazeed cheezein:
   1. **Standard (Tax Upar Se / Exclusive)**: menu price par tax alag se lagta hai.
   2. **Menu Rate Final — Sab Same (Inclusive)**: menu price hi grand total hai, har payment method par same.
   3. **Menu Rate Final — Card Bachat (Card-save)**: menu price cash ke hisab se final; card/digital par thora sasta — receipt par "Card Discount" nazar aata hai.
-- Tax rates: default cash 16%, card/digital 8% — apne rates /pos/features par "Cash Rate (%)" / "Card / Digital Rate (%)" fields se set karein (ya support se).
+- Saved tax rates /pos/features par "Cash Rate (%)" / "Card / Digital Rate (%)" mein dekhein. Applicable rate authorized support se confirm karein.
 - Kisi ek product ko tax-free karna ho: product edit karein → "Tax Exempt" toggle ON.
 - Mode badalne se purane bills nahi badalte — sirf naye bills par lagta hai.
-- PRA ko tax hamesha poora aur sahi submit hota hai, chahe receipt par dikhaya jaye ya nahi.
+- Receipt par tax ki visibility fiscal setup aur reported amount ko nahin badalti. Fiscal status accepted record, queue ya connection settings mein dekhein.
 
 ## Customers (/pos/customers)
 - Fields: Name, Phone, Email, Type (Registered/Unregistered), CNIC, NTN, City, Address. "+ Add Customer" se banayen; phone/naam se search; Active/Inactive toggle; inline Edit; Delete.
@@ -277,7 +275,7 @@ Sale screen ki mazeed cheezein:
 
 ## POS Features (/pos/features) — sirf admin/manager
 - Step 1 — Business Type: 9 presets (Restaurant, Cafe, Quick Service, Retail, Pharmacy, Salon, Grocery, Wholesale, Hybrid) — chunte hi features ki sifarish set ho jati hai.
-- Step 2 — Feature toggles: Inventory Tracking, Delivery/Takeaway, Barcode Scanning, Customer Profiles, Service Jobs, Bulk Pricing, Prescription (Pharmacy), Customer Loyalty, Multi-Branch; Restaurant walay (Business/Unlimited): KOT, Table Management, KDS, Kitchen Notes, Recipes.
+- Step 2 — Feature toggles: Inventory Tracking, Delivery/Takeaway, Barcode Scanning, Customer Profiles, Service Jobs, Bulk Pricing, Prescription (Pharmacy), Customer Loyalty, Multi-Branch. Available Restaurant controls: KOT, Table Management, KDS, Kitchen Notes, Recipes.
 - Cashier & Receipt preferences: density (Simple/Standard/Premium), Guided Keyboard Billing, Auto-Print KOT, Allow KOT Reprint.
 - Sales Tax Rates (PRA): Cash Rate (%) aur Card/Digital Rate (%).
 - "Reset" se features dobara default par aa jate hain.
@@ -366,7 +364,7 @@ Sale screen ki mazeed cheezein:
 - "Manual button nazar nahi aata": Manual sirf Simple Mode (Inventory Tracking OFF) mein hota hai. Inventory ON ho to pehle /pos/products par product banayen.
 - "Bills ki limit khatam ho gayi": package upgrade karein ya filhal provisional bills banayen (baad mein promote).
 - "Team member add nahi ho raha": package ki account limit poori ho chuki hai — upgrade karein.
-- "Restaurant features nazar nahi aa rahe": Pro ya Unlimited package chahiye, phir /pos/features se ON karein.
+- "Restaurant features nazar nahi aa rahe": /pos/billing par package availability check karein, phir /pos/features par applicable controls dekhein.
 - "Dashboard par Opening Cash nazar nahi aa raha": din pehle hi close ho chuka hai — kal subah enter karein.
 - "Deal ki price ghalat lag rahi hai": deal ke din/dates check karein — deal sirf apne set kiye dino par chalti hai.
 - "KOT kitchen par nahi aa raha": /pos/restaurant/kitchen-settings par counter/printer check karein aur Desktop Agent chalta ho.
@@ -427,12 +425,8 @@ Sale screen ki mazeed cheezein:
 - Cancel hue orders ab delete NAHI hote — record mehfooz rehta hai. Reports menu mein naya page "Cancelled Orders" (sirf admin/manager): tareekh ka filter (aaj / 7 din / 30 din / apni marzi), kul ginti aur maliyat, aur CSV ya PDF download.
 - Cancel modal mein (jab KOT ja chuki ho) har item ke aage "Ban gaya ✓ / Nahi bana" ka tick hota hai — poora order nahi, item-wise batayein. Cancelled Orders report mein bane hue items par ✓ aur "zaya (bane hue) ki maliyat" ka alag khana aata hai.
 
-## Subscription packages — kis package mein kya hai (29 Sep 2026)
-- Starter (Rs 19,999/year): bunyadi billing, offline billing, 2 team accounts, 1 branch. WhatsApp Bill, Delivery Riders aur public QR Menu ismein NAHI aur WhatsApp Bill ka paid add-on bhi nahi.
-- Business (Rs 29,999/year): Starter + poora Restaurant module, Deals & combos, analytics, advanced reports/exports, Team Custom Access, Delivery Riders, public QR Menu, Staff Hazri aur WhatsApp Bill. 7 team accounts, 1 branch.
-- Unlimited (Rs 37,999/year): Business ke sab features + Rider Live Tracking aur Caller ID. 12 team accounts, 2 branches.
-- Sirf do optional paid POS feature add-ons hain: Rider Live Tracking aur Caller ID, dono Business par. Unlimited mein dono included. Zyada branches alag paid branch add-on se milti hain.
-- Trial ke dauran SAB features milte hain. Agar koi feature package mein na ho to us ka page Billing par le jata hai — upgrade kar ke khul jata hai.
+## Standalone POS
+- Standalone edition sales aur receipts local rakhti hai. PRA reporting aur federal fiscal add-ons is edition mein available nahin. Business features aur access apne current package ki /pos/billing mein dekhein.
 
 ### Physical Stock Check mein scope select na ho
 
@@ -484,7 +478,7 @@ Stock health counts each product/branch row once: empty/negative, low positive, 
 
 
 ## PRA + FBR Digital Invoice — Sandbox aur Production
-- Sirf active company owner: Receipt Settings → "PRA + FBR Digital Invoice · Connection setup".
+- Eligible active company owner /pos/tax-integrations mein apna allowed federal channel dekhein. Digital Invoice setup mein Sandbox aur Production ka connection review karein.
 - Sandbox aur Production ke tokens alag save hotay hain; dono encrypted hain. Token chat mein na mangain. Blank field se purana token mehfooz rehta hai.
 - Pehle Sandbox select karke company ke applicable scenarios test karein. Accepted scenarios ki local list setup par hai; tamam required scenarios ka status IRIS mein confirm karein.
 - FBR production token issue kare to usay Production token field mein save karein, Production select karein aur onboarding/tax mapping ki tasdeeq karein. TaxNest khud production token issue nahi karta aur khud live mode mein nahi jata.
@@ -494,7 +488,7 @@ Stock health counts each product/branch row once: empty/negative, low positive, 
 - Accepted result par 58mm/80mm combined receipt preview mein us environment ka DI number/QR aata hai. Sandbox receipt par TEST label rehta hai; unaccepted Production receipt sirf preview hai.
 - Unknown/submitting result ko dobara send na karein; FBR se reconcile karwayein. Disable karne se naye submissions band aur history readable rehti hai.
 - PRA tax ki wajah se FBR exemption/zero rate khud select na karein. Company ki tax mapping review honi hai.
-- FBR POS (IMS) selection, automatic checkout aur normal 9 receipt formats mein integration is workbench ka hissa nahi.
+- FBR POS (IMS) alag connection workflow hai. PRA POS add-on mein aik eligible channel chuna jata hai; sirf approved setup aur matching reporting mode tak guidance dein.
 
 ## Local IMS ki automatic pehchan (Agent 1.13.31)
 - Tax Integrations → FBR POS mein shop PC list se select karein; Agent se detected local URL khud milta hai. Aik online PC aur aik service ho to fields khud select hoti hain. Zyada PCs/services hon to sahi connection select karein.

@@ -47,6 +47,9 @@ class UrduPrintFontCoverageTest extends TestCase
         // too (manual print button — not in the auto-print list).
         'resources/views/pos/product-labels.blade.php',
         'resources/views/fbr-pos/product-labels.blade.php',
+        // The Lab browser fallback localizes its print button. The specimen
+        // barcode and order number are generated left-to-right identifiers.
+        'resources/views/health/lab/label.blade.php',
     ];
 
     /**

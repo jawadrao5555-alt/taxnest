@@ -576,7 +576,7 @@
                             {{-- Task 626: takeaway OFF = parcel (non-dine-in) orders par
                                  waiter ka Add Items rasta bhi band — order dikh jata hai
                                  (status/settle cashier side), append nahi hota. --}}
-                            <button @click="startAppend(o)" x-show="(canTakeaway || o.order_type === 'dine_in') && !o.local" class="px-4 py-2 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold transition">{{ __('pos.add_items') }}</button>
+                            <button @click="startAppend(o)" x-show="(!o.status || o.status === 'held') && (canTakeaway || o.order_type === 'dine_in') && !o.local" class="px-4 py-2 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold transition">{{ __('pos.add_items') }}</button>
                             {{-- Offline (local) order: no sequential offline append vocabulary, so append/shift/cancel wait for the net. --}}
                             <span x-show="o.local" class="text-[11px] font-bold text-amber-700 dark:text-amber-300">{{ __('pos.waiter_local_order_hint') }}</span>
                             {{-- Table Shift (owner batch, 26 Jul 2026): sirf dine-in
@@ -588,7 +588,7 @@
                                  Task 527: admin-controlled permission (default OFF) —
                                  band ho to button hi nahi (server bhi 403 deta hai). --}}
                             @if($waiterCanCancel ?? false)
-                            <button x-show="!o.assigned_cashier_id && !o.local" @click="cancelAsk = o" class="px-4 py-2 rounded-lg bg-white dark:bg-gray-800 border border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-50 text-xs font-bold transition">✕ {{ __('pos.cancel') }}</button>
+                            <button x-show="(!o.status || o.status === 'held') && !o.assigned_cashier_id && !o.local" @click="cancelAsk = o" class="px-4 py-2 rounded-lg bg-white dark:bg-gray-800 border border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-50 text-xs font-bold transition">✕ {{ __('pos.cancel') }}</button>
                             @endif
                         </div>
                     </div>
@@ -1581,7 +1581,7 @@ function waiterApp() {
         // My open parcel (takeaway/delivery) orders — used by the Parcel button
         // badge and its inline sub-list (Task #342, Aug 2026).
         parcelOrders() {
-            return this.myOrders.filter(o => o.order_type !== 'dine_in');
+            return this.myOrders.filter(o => o.order_type !== 'dine_in' && (!o.status || o.status === 'held'));
         },
 
         // Tap the Parcel button (Task #342): agar khule parcel orders hain to

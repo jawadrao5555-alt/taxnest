@@ -22,10 +22,26 @@ class WebsiteClientController extends Controller
     {
         AdminUser::requireReleaseAdministrator();
 
-        $search = trim($request->validate(['q' => ['nullable', 'string', 'max:120']])['q'] ?? '');
+        $filters = $request->validate([
+            'q' => ['nullable', 'string', 'max:120'],
+            'product' => ['nullable', Rule::in(array_keys(WebsiteClient::PRODUCTS))],
+        ]);
+        $search = trim($filters['q'] ?? '');
+        $product = $filters['product'] ?? null;
         $matchedCompanyId = $search !== '' ? WebsiteClient::matchingCompanyId($search) : null;
         $entries = WebsiteClient::query()->select('id', 'company_id', 'display_name', 'product', 'revision', 'published_at')
+            ->when($product !== null, fn ($query) => $query->where('product', $product))
+            ->when($search !== '', fn ($query) => $query->where(fn ($matches) => $matches
+                ->where('display_name', 'like', '%'.$search.'%')
+                ->orWhereHas('company', fn ($company) => $company->where('name', 'like', '%'.$search.'%'))
+                ->when($matchedCompanyId !== null, fn ($match) => $match->orWhere('company_id', $matchedCompanyId))))
             ->latest('id')->paginate(25)->withQueryString();
+        $candidates = WebsiteClient::companySources($product)
+            ->whereNotIn('companies.id', WebsiteClient::query()->select('company_id')->whereNotNull('company_id'))
+            ->when($search !== '', fn ($query) => $query->where(fn ($matches) => $matches
+                ->where('companies.name', 'like', '%'.$search.'%')
+                ->when($matchedCompanyId !== null, fn ($match) => $match->orWhere('companies.id', $matchedCompanyId))))
+            ->latest('companies.id')->paginate(15, ['*'], 'candidates_page')->withQueryString();
         $approved = WebsiteClient::query()->approvedForWebsite()->whereKey($entries->modelKeys())->pluck('company_id', 'id');
         $paidCompanies = array_flip(WebsiteClientPaidSubscription::eligibleCompanyIds($approved->values()->all()));
         $hidden = $approved->reject(fn ($companyId) => isset($paidCompanies[$companyId]));
@@ -38,12 +54,9 @@ class WebsiteClientController extends Controller
             'publicIds' => $approved->filter(fn ($companyId) => isset($paidCompanies[$companyId]))->keys()->all(),
             'pendingIds' => $hidden->filter(fn ($companyId) => isset($pending[$companyId]))->keys()->all(),
             'search' => $search,
-            'candidates' => WebsiteClient::companySources()
-                ->whereNotIn('companies.id', WebsiteClient::query()->select('company_id')->whereNotNull('company_id'))
-                ->when($search !== '', fn ($query) => $query->where(fn ($matches) => $matches
-                    ->where('companies.name', 'like', '%'.$search.'%')
-                    ->when($matchedCompanyId !== null, fn ($match) => $match->orWhere('companies.id', $matchedCompanyId))))
-                ->latest('companies.id')->paginate(15, ['*'], 'candidates_page')->withQueryString(),
+            'product' => $product,
+            'candidates' => $candidates,
+            'paidCandidateIds' => WebsiteClientPaidSubscription::eligibleCompanyIds($candidates->getCollection()->modelKeys()),
         ]);
     }
 

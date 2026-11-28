@@ -259,6 +259,50 @@ class WaiterCashierEditBehaviorTest extends TestCase
         $this->assertSame($tx->id, (int) $fresh->pos_transaction_id);
     }
 
+    public function test_waiter_sees_cashier_and_admin_additions_until_the_same_order_is_paid(): void
+    {
+        $company = Company::create(['name' => 'Demo restaurant']);
+        $waiter = User::create(['company_id' => $company->id, 'name' => 'Waiter', 'pos_role' => 'pos_waiter']);
+        $cashier = $this->cashier($company->id);
+        $order = $this->order($company, $waiter, ['status' => 'ready', 'assigned_cashier_id' => $cashier->id]);
+        $lineId = $this->line($order);
+        $productId = DB::table('pos_products')->insertGetId([
+            'company_id' => $company->id, 'name' => 'Fries', 'price' => 60, 'is_active' => true,
+        ]);
+        $burger = ['line_id' => $lineId, 'name' => 'Burger', 'quantity' => 1, 'unit_price' => 100, 'special_notes' => 'old'];
+        $fries = ['item_id' => $productId, 'name' => 'Fries', 'quantity' => 1, 'unit_price' => 60];
+
+        $cashierEdit = $this->edit($order, [$burger, $fries], 'cashier-add');
+        $this->assertSame(200, $cashierEdit->getStatusCode());
+        $this->assertSame(160.0, (float) $cashierEdit->getData(true)['total']);
+
+        $admin = User::create(['company_id' => $company->id, 'name' => 'Manager', 'pos_role' => 'pos_manager']);
+        Auth::guard('pos')->setUser($admin);
+        $fries['line_id'] = $cashierEdit->getData(true)['order']['items'][1]['line_id'];
+        $adminEdit = $this->edit($order, [$burger, $fries, ['name' => 'Drink', 'quantity' => 1, 'unit_price' => 40]], 'admin-add', 1);
+        $this->assertSame(200, $adminEdit->getStatusCode());
+        $this->assertSame('ready', $order->fresh()->status);
+        $this->assertNull($order->fresh()->pos_transaction_id);
+        $this->assertDatabaseCount('restaurant_orders', 1);
+
+        Auth::guard('pos')->setUser($waiter);
+        $orders = app(RestaurantWaiterController::class)->myOrders()->getData(true);
+        $this->assertCount(1, $orders);
+        $this->assertSame($order->id, $orders[0]['id']);
+        $this->assertSame(['Burger', 'Fries', 'Drink'], array_column($orders[0]['items'], 'name'));
+        $this->assertSame(200.0, (float) $orders[0]['total_amount']);
+
+        $otherWaiter = User::create(['company_id' => $company->id, 'name' => 'Other waiter', 'pos_role' => 'pos_waiter']);
+        Auth::guard('pos')->setUser($otherWaiter);
+        $this->assertSame([], app(RestaurantWaiterController::class)->myOrders()->getData(true));
+
+        $payment = \App\Models\PosTransaction::create(['company_id' => $company->id, 'payment_method' => 'cash']);
+        $this->assertTrue(RestaurantWaiterController::settleWaiterOrder($company->id, $order->id, $payment, $cashier, false, 2));
+        $this->assertFalse(RestaurantWaiterController::settleWaiterOrder($company->id, $order->id, $payment, $cashier, false, 2));
+        Auth::guard('pos')->setUser($waiter);
+        $this->assertSame([], app(RestaurantWaiterController::class)->myOrders()->getData(true));
+    }
+
     public function test_product_metadata_is_authoritative_over_client_name_price_and_tax_flag(): void
     {
         $company = Company::create(['name' => 'A']); $cashier = $this->cashier($company->id);

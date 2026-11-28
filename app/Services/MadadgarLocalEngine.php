@@ -249,10 +249,10 @@ class MadadgarLocalEngine
              'a' => "KOT kitchen par na aaye to yeh check karein:\n1. /pos/restaurant/kitchen-settings par \"KDS Auto-Print\" — agar ON hai to KOT sirf KDS wali device se print hota hai; KDS use nahi karte to isay OFF karein.\n2. \"Kitchen Printer\" ON ho aur Desktop Agent PC par chalta ho.\n3. Setting badalne ke baad sale screen refresh (F5) karein."],
 
             ['p' => [['tax', 'nahi', 'bill'], ['tax', 'chhupana'], ['tax', 'hide']],
-             'a' => "Receipt par tax dikhana/chhupana /pos/receipt-settings se hota hai — \"Show Tax\" toggle (PRA aur Local tab alag alag hain, sahi tab dekhein). Show Tax OFF ho to customer copy par sirf grand TOTAL nazar aata hai; lekin PRA ko tax hamesha POORA submit hota hai."],
+             'a' => "Receipt par tax dikhana/chhupana /pos/receipt-settings se hota hai — \"Show Tax\" toggle (PRA aur Local tab alag alag hain, sahi tab dekhein). Show Tax OFF ho to customer copy par sirf grand TOTAL nazar aata hai. Yeh display setting fiscal reporting ko enable nahin karti aur reported amounts nahin badalti."],
 
             ['p' => [['tax', 'price'], ['tax', 'set']],
-             'a' => "Tax rates /pos/features par set hote hain — \"Cash Rate (%)\" aur \"Card / Digital Rate (%)\" (aam default: cash 16%, card 8%). Kisi ek product ko tax-free karna ho to product edit mein \"Tax Exempt\" ON karein. Tax pricing ke 3 modes /pos/customize se milte hain: Standard (tax upar se), Menu Rate Final — Sab Same, aur Menu Rate Final — Card Bachat."],
+             'a' => "Company mein saved tax rates /pos/features par \"Cash Rate (%)\" aur \"Card / Digital Rate (%)\" mein dekhein. Update karne se pehle applicable rate authorized support se tasdeeq karein. Product ki approved exemption product edit mein \"Tax Exempt\" se set hoti hai. /pos/customize mein Standard, Menu Rate Final — Sab Same, aur Menu Rate Final — Card Bachat modes milte hain."],
 
             ['p' => [['opening', 'cash']],
              'a' => "Opening Cash din ke shuru mein Dashboard ke \"Opening Cash\" card par enter hota hai — drawer ka cash amount (aur chahein to note) likh kar Save karein. Cashier bhi kar sakta hai; sirf aaj ke liye hota hai aur din close hone ke baad lock ho jata hai."],
@@ -267,7 +267,7 @@ class MadadgarLocalEngine
              'a' => "Printer lagane ka tareeqa:\n1. Printer PC se connect kar ke driver install karein.\n2. Browser ke print dialog mein wohi printer select karein.\n3. /pos/receipt-settings par paper size (80mm ya 58mm) set karein.\nNestPOS har aam thermal printer (USB, network ya Bluetooth) ke sath chalta hai. Bina dialog ke seedha print chahiye to Desktop Sync Agent install kar ke /pos/printer-settings par Silent Printing ON karein."],
 
             ['p' => [['makefinal'], ['promote'], ['provisional', 'final'], ['local', 'bill', 'final']],
-             'a' => "Local/provisional bill ko final karne ke liye sale screen par F10 dabayen → bill select karein → Enter (Make Final) → method chunein: Cash (1), Card (2), ya \"Finalize LOCAL — don't send to PRA\" (3 ya L). Cash/Card se promote par PRA fiscal serial milta hai aur monthly quota use hota hai — promote sirf USI mahine ke andar ho sakta hai. /pos/transactions par bhi local bill ke saamne \"Submit to PRA\" button hota hai."],
+             'a' => "Local/provisional bill final karne ke liye F10 dabayen → bill select karein → Enter (Make Final) → payment method chunein. Enabled PRA reporting mein eligible bill ki fiscal submission ka status check karein. Agar local rakhna ho to \"Finalize LOCAL\" option chunein jab available ho. Company ki edition aur permissions ke mutabiq options nazar aate hain."],
 
             ['p' => [['provisional'], ['local', 'bill'], ['f9']],
              'a' => "Provisional (local) bill: sale screen par \"Save Provisional\" button ya F9 — bill B-series par save hota hai, PRA ko report NAHI hota aur quota nahi katta. Dekhne ke liye F10 modal (search bhi hai) ya /pos/local-bills portal. Baad mein F10 se Make Final (promote) kar sakte hain — Cash (1), Card (2), ya Finalize LOCAL (3/L)."],
@@ -300,16 +300,16 @@ class MadadgarLocalEngine
              'a' => "Dine-In order ka tareeqa: sale screen par order type \"Dine In\" chunein → table picker khud khulta hai, table select karein → items dalein → \"Send to Kitchen\" (KOT) ya Hold (F5). Khana ban jaye to TABLE board (Alt+B ya TABLE button) mein table par click kar ke \"FINAL karo\" se payment karein — table khud free ho jata hai. Tables /pos/restaurant/table-management par banti hain."],
 
             ['p' => [['table', 'add'], ['floor']],
-             'a' => "Tables /pos/restaurant/table-management par banti hain: \"+ Add Floor\" se floor banayen (jaise Ground Floor), phir \"+ Add Table\" se table (number jaise T1, seats 1-50). Table delete card ke × button se. Iske liye Table Management feature ON hona chahiye (/pos/features; Business/Unlimited package ya trial)."],
+             'a' => "Tables /pos/restaurant/table-management par banti hain: \"+ Add Floor\" se floor banayen (jaise Ground Floor), phir \"+ Add Table\" se table (number jaise T1, seats 1-50). Table delete card ke × button se. Package mein Table Management available ho aur /pos/features mein ON ho."],
 
             ['p' => [['rider']],
-             'a' => "Riders /pos/riders par bante hain — naam, phone, CNIC, vehicle number; \"Create Login\" se rider ka login banayen (rider sirf /pos/rider portal dekhta hai, team limit mein nahi ginta). Rider assign bill banne ke BAAD hota hai — sale screen ke GREEN \"Deliveries\" button (Delivery Board) ya /pos/deliveries se. Wahin se Dispatch/Delivered mark aur \"Settle Cash\" bhi hota hai. Riders feature Business aur Unlimited packages mein shamil hai."],
+             'a' => "Package mein Riders feature available ho to /pos/riders par naam, phone, CNIC aur vehicle number se rider banayen. \"Create Login\" se rider ko /pos/rider portal milta hai. Bill banne ke baad sale screen ke \"Deliveries\" button ya /pos/deliveries se rider assign karein, Dispatch/Delivered mark karein aur \"Settle Cash\" use karein."],
 
             ['p' => [['team']],
              'a' => "Naya team member /pos/team par add hota hai — naam, email, phone, password aur role chun kar save karein. Roles: Manager (admin jaisa) aur Cashier (sirf billing) package ki account limit mein ginte hain; Kitchen, Waiter, Rider aur Delivery Manager FREE hain (limit mein nahi ginte). Cashier ON/OFF toggle aur per-cashier PRA reporting toggle bhi isi page par hain."],
 
             ['p' => [['package'], ['upgrade']],
-             'a' => "Packages (saalana): Starter Rs 19,999 mein 2 team accounts, 1 branch aur offline billing hai; WhatsApp Bill nahi. Business Rs 29,999 mein 7 team accounts, 1 branch, Restaurant, Staff Hazri, Riders, QR Menu aur WhatsApp Bill shamil hain. Unlimited Rs 37,999 mein 12 team accounts, 2 branches, Rider Live Tracking aur Caller ID bhi shamil hain. Sirf Business par Rider Live Tracking aur Caller ID paid feature add-ons hain; zyada branches branch add-on se milti hain. Tafseel /pos/billing par dekhein."],
+             'a' => "Current packages, terms, prices, included features aur limits ke liye /pos/billing par Compare packages dekhein. Rider Live Tracking aur Caller ID included hon to alag payment nahin, warna eligible package par available option dekhein. Extra branch slots ka apna option hai. Eligible paid PRA POS package term mein optional federal add-on FBR Digital Invoice ya FBR POS (IMS) mein se aik hota hai. Current rate aur availability Billing mein dekhein; fiscal setup Tax Integrations mein hota hai."],
 
             ['p' => [['limit', 'khatam'], ['limit', 'poori'], ['limit', 'bill'], ['limit']],
              'a' => "Sirf FINAL bills monthly quota mein ginte hain — provisional (F9) bills FREE hain jab tak promote na hon. Bills ki limit khatam ho jaye to filhal provisional bills banayen (baad mein promote karein) ya /pos/billing se package upgrade karein. Quota har mahine reset hota hai. Team accounts ki limit poori ho to bhi upgrade hi rasta hai."],
@@ -339,7 +339,7 @@ class MadadgarLocalEngine
              'a' => "Bill customer ko WhatsApp par bhejne ke liye /pos/transactions se bill kholein → share link banayen — yeh link WhatsApp waghera par bhej sakte hain."],
 
             ['p' => [['restaurant']],
-             'a' => "Restaurant module ke liye Pro ya Unlimited package chahiye (ya active trial), phir /pos/features se restaurant features ON karein — KOT, Table Management, KDS, Kitchen Notes, Recipes. Dine-In, Takeaway aur Delivery teenon ko Hold ya Send to Kitchen kar sakte hain; Tables ON hon to Dine-In ke liye table zaroori hai. Tables /pos/restaurant/table-management par banti hain."],
+             'a' => "Restaurant module ki availability /pos/billing mein apne package par dekhein. Included ho to /pos/features se KOT, Table Management, KDS, Kitchen Notes aur Recipes setup karein. Dine-In, Takeaway aur Delivery teenon ko Hold ya Send to Kitchen kar sakte hain; Tables ON hon to Dine-In ke liye table zaroori hai. Tables /pos/restaurant/table-management par banti hain."],
 
             ['p' => [['hold']],
              'a' => "Hold (F5) Dine-In, Takeaway aur Delivery teenon ke liye hai — Tables ON hon to Dine-In ke liye table zaroori hai; manual items aur deals hold nahi ho saktin. Held orders TABLE board (Alt+B ya TABLE button) mein milte hain: table wale table card par aur baqi \"Held Orders (bina table)\" amber chips mein — click se Bill Kholo / PAY / KOT options milte hain."],
@@ -360,10 +360,10 @@ class MadadgarLocalEngine
              'a' => "Quick Type Mode (F7): \"{quick_type}\" jaisi line likhein — pura order khud cart mein aa jata hai. Default BAND hota hai — admin /pos/customize se ON kare, phir sale screen par F7 se modal khulta hai."],
 
             ['p' => [['qr', 'menu'], ['public', 'menu']],
-             'a' => "QR Menu ke liye /pos/business-profile kholein → \"Public Page Enabled\" ON + \"Menu\" visible ON → menu builder mein products tick karein → QR code customer ko dikhayen. Kya kya public dikhe (Phone, Email, Address waghera) har cheez ka apna toggle hai. \"Regenerate Link\" se naya link banta hai. Yeh feature Business, Pro aur Unlimited packages mein hai."],
+             'a' => "QR Menu package mein available ho to /pos/business-profile kholein → \"Public Page Enabled\" ON + \"Menu\" visible ON → menu builder mein products tick karein → QR code customer ko dikhayen. Phone, Email aur Address ki visibility alag set hoti hai. \"Regenerate Link\" se naya link banta hai. Package access /pos/billing par dekhein."],
 
             ['p' => [['hazri'], ['attendance']],
-             'a' => "Staff Hazri /pos/reports par \"Staff Hazri\" button se milti hai (sirf admin/manager): kaun kab login hua (First In), kab tak kaam kiya (Last Out), kitne bills banaye — business day (subah 6 → subah 6) ke hisab se, date picker se purane din bhi. Yehi hazri Day-Close Z-report mein bhi shamil hoti hai. Yeh feature Pro aur Unlimited packages mein hai."],
+             'a' => "Package mein included ho to admin/manager /pos/reports par \"Staff Hazri\" kholein: login (First In), aakhri activity (Last Out) aur bills business day ke hisab se, purane dates bhi. Yehi hazri Day-Close Z-report mein bhi shamil hoti hai. Current package access /pos/billing par dekhein."],
 
             // --- generic catch-alls: hamesha aakhir mein (specific pehle jeet chuke hote hain) ---
             ['p' => [['customer', 'history'], ['customer', 'purana']],
@@ -376,10 +376,10 @@ class MadadgarLocalEngine
              'a' => "Nayi bill Dashboard ke \"Nayi Sale\" button (ya /pos/invoice/create) se banti hai:\n1. (Optional) Customer box mein phone/naam se customer chunein — walk-in ke liye khali chhor dein.\n2. Items dalein — search box, product grid ya barcode scan se.\n3. Qty cart row ke qty box se badlein.\n4. \"PAY\" (F8) → Cash (1) ya Card (2) = FINAL bill; ya \"Save Provisional\" (F9) = local bill.\n5. Receipt popup se P = Print."],
 
             ['p' => [['kot']],
-             'a' => "KOT (Kitchen Order Ticket) kitchen ke liye order ki parchi hai — \"Send to Kitchen\" button Dine-In, Takeaway ya Delivery order ko bina payment ke kitchen bhejta aur ticket print karta hai. Tables ON hon to Dine-In ke liye table zaroori hai. KOT/kitchen printer settings /pos/restaurant/kitchen-settings par hain; yeh restaurant module ka feature hai (Business/Unlimited) — /pos/features se ON hota hai."],
+             'a' => "KOT (Kitchen Order Ticket) kitchen ke liye order ki parchi hai — \"Send to Kitchen\" se order kitchen jata hai. Tables ON hon to Dine-In ke liye table zaroori hai. Package mein KOT available ho to /pos/features mein enable karein aur /pos/restaurant/kitchen-settings par printer aur order routing dekhein."],
 
             ['p' => [['pra']],
-             'a' => "PRA integration: har FINAL bill Punjab Revenue Authority ko report hota hai aur chhota fiscal serial (P-036 style) milta hai — receipt par PRA number aur QR aata hai. Settings /pos/pra-settings par (sirf admin): Environment, Connection Mode (Cloud API / PRA Fiscal Device), POS Registration ID, Token — \"Test Connection\" se check karein. Internet na ho to bill offline queue mein ja kar khud retry hota hai, quota dobara nahi katta. Naye PRA registrations ke liye Fiscal Device mode zaroori hai."],
+             'a' => "PRA reporting enabled aur connection ready ho to eligible FINAL bills report hote hain. PRA se accepted bill ka PRA number aur QR receipt par milta hai. Local aur Provisional bills ki status alag rehti hai. Admin /pos/pra-settings par apni approved Environment, Connection Mode aur POS Registration ID check karein, phir \"Test Connection\" use karein. Pending ya failed bill ka status queue mein dekhein."],
         ];
     }
 
@@ -401,13 +401,13 @@ class MadadgarLocalEngine
              'a' => "POS Registration ID aur Token FBR se milte hain jab aap apna POS FBR ke saath register karte hain — dono /fbr-pos/settings par dalne hote hain (sirf admin). Environment (Sandbox/Production) token ke mutabiq chunein aur \"Test Connection\" se check karein. \"Resource forbidden\" ya token error ka matlab token/environment ka mel nahi hai."],
 
             ['p' => [['fiscal', 'device'], ['agent']],
-             'a' => "Connection Mode /fbr-pos/settings par hai: \"Cloud API\" purane registered POS IDs ke liye, aur NAYE FBR registrations ke liye \"Fiscal Device / Local Service\" mode zaroori hai — is mein FBR ka local service usi computer par chalta hai jis ke liye Desktop Agent install hota hai (download settings page ke Agent section se). Install ke baad Test Connection se check karein."],
+             'a' => "Connection Mode /fbr-pos/settings par hai. Apne FBR registration ke liye approved \"Cloud API\" ya \"Fiscal Device / Local Service\" option check karein. Local Service ke liye usi computer par Desktop Agent install karein (settings page ke Agent section se). Save ke baad Test Connection se check karein."],
 
             ['p' => [['dayclose'], ['zreport']],
              'a' => "Day close /fbr-pos/day-close par hota hai:\n1. Page kholein — din ka khulasa (sales, tax, payments) nazar aayega.\n2. Cash gin kar reconcile karein.\n3. \"Close Day\" dabayen.\nPurani closes isi page par milti hain — PDF aur Thermal print dono. Auto Day-Close (24h) ka option bhi hai. Din band karne se pehle fail queue check kar lein."],
 
             ['p' => [['provisional'], ['local', 'bill'], ['makefinal']],
-             'a' => "Provisional bill: sale screen par \"Save Provisional\" — bill save hota hai magar FBR ko report NAHI hota. Baad mein provisional list (F10) ya /fbr-pos/transactions se \"Make Final\" (promote) karein — tabhi bill FBR ko jata hai aur receipt par FBR number + QR aata hai."],
+             'a' => "Provisional bill: sale screen par \"Save Provisional\" se bill sirf save hota hai. Baad mein provisional list (F10) ya /fbr-pos/transactions se \"Make Final\" kar sakte hain. FBR reporting enabled ho to eligible final bill ki submission hoti hai; accepted number aur QR receipt par dikhte hain."],
 
             ['p' => [['silent']],
              'a' => "Silent printing (bina print dialog ke) ke liye Desktop Agent install karein aur printer settings mein \"Silent Printing\" ON kar ke Bill/KOT printers chunein — list Agent se aati hai. Setting badalne ke baad sale screen refresh (F5) karein."],
@@ -431,7 +431,7 @@ class MadadgarLocalEngine
              'a' => "Apna package, mahana bill limit aur expiry /fbr-pos/billing par nazar aati hai. FBR POS mein mahana quota mein provisional bills bhi ginte hain. Upgrade ya renewal ke liye billing page se payment proof upload karein ya TaxNest team se WhatsApp par rabta karein."],
 
             ['p' => [['offline'], ['internet']],
-             'a' => "Internet chala jaye to bill save ho jata hai aur FBR ko report offline queue mein chala jata hai — net wapas aane par khud submit ho jata hai, double report nahi hota. Jo bills phir bhi reh jayen wo /fbr-pos/fail-queue par milte hain — wahan se Retry All kar dein."],
+             'a' => "Offline billing package aur setup mein available ho to bill offline save ho sakta hai. Connection aane par /fbr-pos/transactions mein bill aur reporting status dekhein. Enabled FBR reporting mein failed submissions /fbr-pos/fail-queue mein milti hain. Retry se pehle config error aur authority status review karein."],
         ];
     }
 

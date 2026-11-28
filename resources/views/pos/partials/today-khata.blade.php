@@ -60,6 +60,9 @@
             </div>
             <p class="text-[10px] uppercase tracking-wider font-bold {{ $tkIsPra ? 'text-teal-700 dark:text-teal-400' : 'text-amber-700 dark:text-amber-400' }}">{{ __('pos.khata_total_sale') }}</p>
             <p class="text-xl font-black text-gray-900 dark:text-white">Rs {{ number_format($s['sale'], 0) }}</p>
+            @if(!$tkIsPra && abs($s['provisional_sale'] ?? 0) >= 0.01)
+                <p class="text-xs text-gray-700 dark:text-gray-200">{{ __('pos_history.khata_includes_provisional', ['amount' => number_format($s['provisional_sale'], 2)]) }}</p>
+            @endif
 
             <div class="mt-2 pt-2 border-t {{ $tkIsPra ? 'border-teal-200 dark:border-teal-800' : 'border-amber-200 dark:border-amber-800' }} space-y-1">
                 @if($tkIsPra)
@@ -89,6 +92,12 @@
                     <span class="text-gray-600 dark:text-gray-400 pl-3">{{ __('pos.khata_card_sale') }}</span>
                     <span class="font-semibold text-gray-700 dark:text-gray-300">Rs {{ number_format($s['card_sale'] ?? 0, 0) }}</span>
                 </div>
+                @if(abs($s['other_sale'] ?? 0) >= 0.01)
+                <div class="flex items-center justify-between text-xs">
+                    <span class="text-gray-600 dark:text-gray-400 pl-3">{{ __('pos_history.khata_other_sale') }}</span>
+                    <span class="font-semibold text-gray-700 dark:text-gray-300">Rs {{ number_format($s['other_sale'], 0) }}</span>
+                </div>
+                @endif
                 <div class="flex items-center justify-between text-xs">
                     <span class="text-gray-600 dark:text-gray-400">{{ __('pos.khata_exempt_items') }}</span>
                     <span class="font-semibold text-gray-700 dark:text-gray-300">Rs {{ number_format($s['exempt_items'], 0) }}</span>

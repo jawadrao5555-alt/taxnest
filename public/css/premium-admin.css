@@ -444,7 +444,7 @@ html.dark body.admin-themed.tn-premium-shell,
     font: inherit; color-scheme: light;
 }
 .dark .tn-dashboard-detail-filters :is(input, select, option) { color-scheme: dark; }
-.tn-dashboard-detail-filters label { color: var(--tn-admin-text); font-weight: 600; }
+.tn-dashboard-detail-filters label { font-weight: 600; }
 .tn-dashboard-detail-filters :is(input, select):focus-visible,
 .tn-dashboard-detail :is(a, button):focus-visible,
 .tn-company-tabs button:focus-visible {
@@ -537,6 +537,7 @@ body.admin-themed.tn-premium-shell {
     --tn-brand: var(--admin-accent);
     --tn-brand-deep: var(--admin-accent-hover);
     --tn-brand-soft: var(--admin-canvas);
+    --tn-subtle: var(--tn-muted);
     --tn-admin-legacy-panel: var(--admin-sidebar, #111827);
     --tn-admin-legacy-raised: color-mix(in srgb, var(--tn-admin-legacy-panel) 84%, white);
 }
@@ -546,6 +547,11 @@ body.admin-themed main :is(.text-gray-400, .text-gray-500, .text-gray-600) {
 body.admin-themed main :is(h1, h2, h3).text-white { color: var(--tn-admin-text) !important; }
 body.admin-themed main :is(.bg-gray-900, .bg-gray-950, .bg-slate-900, .bg-slate-950):not(:where(.tn-company-directory, .tn-company-directory *, .tn-company-panel, .tn-company-panel *, .tn-metric-ledger *, .tn-channel-ledger *, .tn-information-grid *, .tn-audit-panel, .tn-audit-panel *)) {
     background-color: var(--tn-admin-legacy-panel) !important;
+}
+/* Plain headings, links and labels inherit the card ink. Keep the fallback
+   specificity low so explicit text and status colors can still take precedence. */
+:where(body.admin-themed main :is(.bg-gray-900, .bg-gray-950, .bg-slate-900, .bg-slate-950):not(:where(.tn-company-directory, .tn-company-directory *, .tn-company-panel, .tn-company-panel *, .tn-metric-ledger *, .tn-channel-ledger *, .tn-information-grid *, .tn-audit-panel, .tn-audit-panel *))) {
+    color: #f1f5f9;
 }
 body.admin-themed main :is(.bg-gray-800):not(:where(.tn-company-directory, .tn-company-directory *, .tn-company-panel, .tn-company-panel *, .tn-metric-ledger *, .tn-channel-ledger *, .tn-information-grid *, .tn-audit-panel, .tn-audit-panel *)) {
     background-color: var(--tn-admin-legacy-raised) !important;
@@ -571,6 +577,37 @@ body.admin-themed .tn-company-tabs button[aria-pressed="true"] {
     background-color: var(--admin-accent-hover) !important;
     color: #ffffff !important;
     border-color: var(--admin-accent-hover) !important;
+}
+body.admin-themed main :is(a, button).bg-emerald-600.text-white:not(.admin-btn, .tn-admin-action) {
+    background-color: #047857 !important;
+    color: #ffffff !important;
+}
+body.admin-themed main :is(a, button).bg-emerald-600.text-white:not(.admin-btn, .tn-admin-action):hover {
+    background-color: #065f46 !important;
+}
+html:not(.dark) body.admin-themed main .bg-white :is(a, button).text-emerald-600 {
+    color: #047857 !important;
+}
+html:not(.dark) body.admin-themed main :is(a, button).bg-red-50.text-red-600 {
+    color: #b91c1c !important;
+}
+
+/* Package requests use pale foregrounds throughout. Pair the root section
+   with the same dark surface as its billing and review cards. */
+body.admin-themed main > section.text-gray-100 {
+    background-color: var(--tn-admin-legacy-panel);
+    border-radius: var(--tn-admin-radius);
+}
+
+/* Keep the subscription filters readable on the light workspace, apart
+   from the separate assignment form inside the dark card. */
+body.admin-themed main form[action$="/admin/subscriptions"] > label {
+    color: var(--tn-admin-text);
+}
+body.admin-themed main form[action$="/admin/subscriptions"] > button {
+    background-color: var(--admin-accent-hover, #4f46e5);
+    border-color: var(--admin-accent-hover, #4f46e5);
+    color: #ffffff;
 }
 
 /* Status colours describe the result, independently of the chosen palette.
@@ -645,19 +682,19 @@ body.admin-themed main .tn-admin-plan-tabs button[aria-pressed="true"] {
     text-underline-offset: .25em;
 }
 body.admin-themed main :is(a, button).text-indigo-400 { color: var(--admin-accent-hover) !important; }
-body.admin-themed main :is(.bg-gray-900, .bg-gray-950, .bg-gray-800):not(:where(.tn-company-directory, .tn-company-directory *, .tn-company-panel, .tn-company-panel *, .tn-metric-ledger *, .tn-channel-ledger *, .tn-information-grid *, .tn-audit-panel, .tn-audit-panel *)) :is(a, button).text-indigo-400 {
+body.admin-themed main :is(.bg-gray-900, .bg-gray-950, .bg-gray-800, .bg-slate-900, .bg-slate-950):not(:where(.tn-company-directory, .tn-company-directory *, .tn-company-panel, .tn-company-panel *, .tn-metric-ledger *, .tn-channel-ledger *, .tn-information-grid *, .tn-audit-panel, .tn-audit-panel *)) :is(a, button).text-indigo-400 {
     color: var(--admin-accent-text) !important;
 }
 /* Shared premium CSS also paints main; use the same palette on that actual
    visible surface, rather than only on the shell behind it. */
 body.admin-themed .tn-admin-workspace,
 body.admin-themed main { background-color: var(--tn-admin-canvas) !important; }
-body.admin-themed main :is(input, select, textarea):is(.bg-gray-900, .bg-gray-800):not(:where(.tn-company-directory, .tn-company-directory *, .tn-company-panel *, .tn-metric-ledger *, .tn-channel-ledger *, .tn-information-grid *, .tn-audit-panel *)) {
+body.admin-themed main :is(input, select, textarea):is(.bg-gray-900, .bg-gray-950, .bg-gray-800, .bg-slate-900, .bg-slate-950):not(:where(.tn-company-directory, .tn-company-directory *, .tn-company-panel *, .tn-metric-ledger *, .tn-channel-ledger *, .tn-information-grid *, .tn-audit-panel *)) {
     color: #f1f5f9 !important;
     border-color: #94a3b8 !important;
     color-scheme: dark;
 }
-body.admin-themed main :is(input, textarea):is(.bg-gray-900, .bg-gray-800):not(:where(.tn-company-directory, .tn-company-directory *, .tn-company-panel *, .tn-metric-ledger *, .tn-channel-ledger *, .tn-information-grid *, .tn-audit-panel *))::placeholder {
+body.admin-themed main :is(input, textarea):is(.bg-gray-900, .bg-gray-950, .bg-gray-800, .bg-slate-900, .bg-slate-950):not(:where(.tn-company-directory, .tn-company-directory *, .tn-company-panel *, .tn-metric-ledger *, .tn-channel-ledger *, .tn-information-grid *, .tn-audit-panel *))::placeholder {
     color: #cbd5e1 !important;
     opacity: 1;
 }

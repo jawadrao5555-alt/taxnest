@@ -147,7 +147,7 @@ class SendAgentOfflineAlerts extends Command
             // failed — same convention as trial:reminders).
             Notification::create([
                 'company_id' => $company->id,
-                'type' => 'agent_offline_' . now()->format('YmdHi'),
+                'type' => Notification::AGENT_OFFLINE_TYPE_PREFIX . now()->format('YmdHi'),
                 'title' => 'Desktop Agent offline',
                 'message' => "Aap ka NestPOS Desktop Agent {$hours}+ ghante se offline hai — PC/agent chalu karein.",
                 'read' => false,

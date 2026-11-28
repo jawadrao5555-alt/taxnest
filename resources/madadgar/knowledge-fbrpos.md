@@ -10,13 +10,13 @@ Yeh Nest FBR POS (FBR-integrated Point of Sale) ka guide hai. Sirf is guide ki m
 - Apna profile badalna: /fbr-pos/my-profile — Full Name, Email, Phone, Username, aur password change (Current Password + New Password + Confirm).
 
 ## FBR Integration — POS ID, Token, Sandbox/Production (/fbr-pos/settings)
-- Nest FBR POS har FINAL bill FBR ke IMS (Integrated Management System, SRO 1279) ko report karta hai — receipt par FBR ka fiscal invoice number aur QR code aata hai.
+- FBR reporting enabled aur approved connection ready ho to eligible FINAL bill FBR IMS ko report hota hai. Accepted invoice ka FBR fiscal number aur QR receipt par aata hai. Local, pending aur failed status alag hain. School aur Hospital local collections mein fiscal submission band rehti hai.
 - FBR Settings sirf admin khol sakta hai: /fbr-pos/settings.
 - POS Registration ID aur Token FBR se milte hain jab aap apna POS FBR ke saath register karte hain. Yeh dono settings page par dalne hote hain.
 - Environment do hain: SANDBOX (testing — bills asli report NAHI hote) aur PRODUCTION (asli reporting). Dukan chalani ho to Production chunein; sandbox sirf test ke liye hai.
-- Connection Mode do hain: "Cloud API" (purane registered POS IDs ke liye) aur "Fiscal Device / Local Service" — NAYE FBR POS registrations ke liye Fiscal Device mode zaroori hai (FBR ka local IMS service usi computer par chalta hai, is ke liye Desktop Agent install hota hai — download /fbr-pos/settings ke Agent section se).
+- Connection Mode do hain: "Cloud API" aur "Fiscal Device / Local Service". Company ke approved registration mein applicable mode check karein. Local IMS service shop ke computer par chalti hai; Desktop Agent /fbr-pos/settings ke Agent section se download karein.
 - Settings save karne ke baad "Test Connection" button se check karein ke FBR se rabta theek hai.
-- FBR Reporting ka toggle bhi settings mein hai — OFF ho to bills FBR ko report nahi hote (sirf local record). Qanooni taqaza poora karne ke liye ON rakhein.
+- FBR Reporting ka toggle settings mein hai. OFF ho to bills ka local record banta hai. Production ki reporting se pehle company ka authorized setup verify karein.
 - "Resource forbidden" ya token error aaye to matlab token/environment ka mel nahi — check karein ke Production token Production environment ke saath hai aur POS ID wohi hai jo FBR ne di.
 
 ## Fail Queue — Jo Bills FBR ko Report Nahi Huay (/fbr-pos/fail-queue)
@@ -43,9 +43,9 @@ Yeh Nest FBR POS (FBR-integrated Point of Sale) ka guide hai. Sirf is guide ki m
 - Customer (optional): customer box mein phone/naam type karein → select karein; match na mile to "Add as New" se foran naya customer ban jata hai. Walk-in ke liye khali chhor dein.
 - Quantity: cart row ke qty box par click kar ke number type karein, ya same item dobara add karein.
 - Discount BILL level par lagta hai — cart ke neeche % Discount; limit se zyada discount par Manager PIN chahiye hota hai.
-- Payment: Cash ya Card chun kar bill FINAL karein — final hote hi bill FBR ko report hota hai aur receipt par FBR number + QR aata hai.
-- Provisional bill: "Save Provisional" — bill save hota hai magar FBR ko report NAHI hota. Baad mein provisional list (F10) ya /fbr-pos/transactions se "Make Final" (promote) kar sakte hain — tabhi FBR ko jata hai.
-- Offline mode: internet chala jaye to bill queue mein save hota hai aur net aane par khud FBR ko chala jata hai — double report nahi hota.
+- Payment: Cash ya Card chun kar bill FINAL karein. FBR receipt number aur QR authority se acceptance ke baad milte hain. FBR reporting OFF ho to bill local rehta hai.
+- Provisional bill: "Save Provisional" se bill sirf save hota hai. Baad mein provisional list (F10) ya /fbr-pos/transactions se "Make Final" kar sakte hain. Enabled reporting mein eligible bill ka submission status check karein.
+- Offline mode package aur setup mein available ho to pending bill queue mein save hota hai. Internet wapas aane par transaction ya fail queue ka status dekhein.
 - Barcode scanner ke liye alag setup nahi chahiye — koi bhi USB/Bluetooth scanner jo keyboard ki tarah type karta hai seedha chal jata hai.
 
 ## Receipts aur Printing

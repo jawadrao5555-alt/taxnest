@@ -251,6 +251,24 @@ class PosPendingBillsTileTest extends TestCase
         return view('pos.partials.pending-bills-tile', $viewData)->render();
     }
 
+    public function test_both_dashboards_list_recent_unread_notifications_without_a_type_column(): void
+    {
+        DB::table('notifications')->insert([
+            ['company_id' => $this->companyId, 'title' => 'Current notice', 'read' => false, 'created_at' => now()],
+            ['company_id' => $this->companyId, 'title' => 'Read notice', 'read' => true, 'created_at' => now()],
+            ['company_id' => $this->companyId, 'title' => 'Expired notice', 'read' => false, 'created_at' => now()->subDays(31)],
+        ]);
+
+        $this->actAs('pos', 'pos_admin');
+        $praData = (new PosController())->dashboard(new Request())->getData();
+        $this->assertSame(['Current notice'], $praData['notifications']->pluck('title')->all());
+
+        Auth::guard('pos')->forgetUser();
+        $this->actAs('fbrpos', 'pos_admin');
+        $fbrData = (new FbrPosController())->dashboard()->getData();
+        $this->assertSame(['Current notice'], $fbrData['notifications']->pluck('title')->all());
+    }
+
     // ── FBR dashboard ────────────────────────────────────────────────────────
 
     public function test_fbr_admin_sees_tile_with_only_todays_provisionals_counted(): void

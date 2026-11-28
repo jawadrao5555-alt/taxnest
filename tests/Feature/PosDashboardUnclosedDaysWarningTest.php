@@ -119,9 +119,73 @@ class PosDashboardUnclosedDaysWarningTest extends TestCase
         $response->assertDontSee(trans_choice('pos.dash_unclosed_days_title', 1, ['count' => 1]));
     }
 
+    public function test_dashboard_shows_one_current_agent_warning_alongside_other_company_notices(): void
+    {
+        $this->enableSilentPrintWithStaleHeartbeat();
+        $otherCompany = Company::create(['name' => 'Other shop', 'product_type' => 'pos']);
+
+        $this->addNotice($this->company, 'subscription_notice', 'Subscription notice', 'Renewal is coming up.', now()->subDays(2));
+        $this->addNotice($otherCompany, 'agent_offline_202601021100', 'Desktop Agent offline', 'Other shop outage', now());
+
+        foreach (range(0, 3) as $daysAgo) {
+            $this->addNotice($this->company, 'agent_offline_20260101000'.$daysAgo, 'Desktop Agent offline', 'Prior outage '.$daysAgo, now()->subDay()->subDays($daysAgo));
+        }
+
+        $this->addNotice($this->company, 'agent_offline_202601021000', 'Desktop Agent offline', 'Earlier warning during this outage', now()->subHours(2));
+        $latestId = $this->addNotice($this->company, 'agent_offline_202601021100', 'Desktop Agent offline', 'Latest warning during this outage', now()->subHour());
+
+        $dashboard = $this->actingAs($this->posAdmin, 'pos')->get('/pos/dashboard')->assertOk();
+        $dashboard->assertSee('Subscription notice')->assertSee('Latest warning during this outage')
+            ->assertDontSee('Earlier warning during this outage')->assertDontSee('Prior outage')->assertDontSee('Other shop outage');
+        $this->assertSame(1, substr_count($dashboard->getContent(), '>Desktop Agent offline<'));
+
+        $this->post(route('pos.notifications.dismiss', $latestId))->assertRedirect();
+        $this->get('/pos/dashboard')->assertOk()->assertSee('Subscription notice')->assertDontSee('Desktop Agent offline');
+    }
+
+    public function test_dashboard_hides_unread_agent_warning_after_recovery_and_shows_a_new_outage(): void
+    {
+        $this->enableSilentPrintWithStaleHeartbeat();
+        $oldId = $this->addNotice($this->company, 'agent_offline_202601021100', 'Desktop Agent offline', 'Recovered outage warning', now()->subHour());
+        $this->company->forceFill(['agent_last_seen' => now()])->save();
+
+        $this->actingAs($this->posAdmin, 'pos')->get('/pos/dashboard')->assertOk()->assertDontSee('Desktop Agent offline');
+        $this->assertDatabaseHas('notifications', ['id' => $oldId, 'read' => false]);
+
+        $this->travel(3)->hours();
+        $this->get('/pos/dashboard')->assertOk()->assertDontSee('Recovered outage warning');
+
+        $this->artisan('pos:agent-offline-alerts')->assertSuccessful();
+        $this->get('/pos/dashboard')->assertOk()->assertSee('Desktop Agent offline')->assertDontSee('Recovered outage warning');
+
+        $this->company->forceFill(['pos_printer_settings' => ['silent_print_enabled' => false]])->save();
+        $this->get('/pos/dashboard')->assertOk()->assertDontSee('Desktop Agent offline');
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     // Helpers
     // ─────────────────────────────────────────────────────────────────────────
+
+    private function enableSilentPrintWithStaleHeartbeat(): void
+    {
+        $this->company->forceFill([
+            'agent_enabled' => true,
+            'agent_last_seen' => now()->subHours(5),
+            'pos_printer_settings' => ['silent_print_enabled' => true],
+        ])->save();
+    }
+
+    private function addNotice(Company $company, string $type, string $title, string $message, Carbon $createdAt): int
+    {
+        return DB::table('notifications')->insertGetId([
+            'company_id' => $company->id,
+            'type' => $type,
+            'title' => $title,
+            'message' => $message,
+            'created_at' => $createdAt,
+            'updated_at' => $createdAt,
+        ]);
+    }
 
     /** Seed one completed bill on the PRIOR business day; returns its Y-m-d. */
     private function strandPriorDay(): string
@@ -211,6 +275,10 @@ class PosDashboardUnclosedDaysWarningTest extends TestCase
             $t->string('default_language')->nullable();
             $t->boolean('pos_setup_completed')->default(false);
             $t->string('pos_dashboard_style')->nullable();
+            $t->boolean('agent_enabled')->default(false);
+            $t->timestamp('agent_last_seen')->nullable();
+            $t->timestamp('agent_offline_notified_at')->nullable();
+            $t->json('pos_printer_settings')->nullable();
             // Day-close cashier switch intentionally ABSENT in the base schema
             // (PROD-drift shape) → dayCloseAllowed falls back to FALSE for
             // cashiers, TRUE for admins/managers.

@@ -80,15 +80,16 @@ final class PosFederalAddonAccess
         $grants = self::grants($company)->get();
         $grant = $grants->firstWhere('addon_code', $code);
         if ($grants->count() === 1 && $grant && $grant->active && $grant->subscription_id && $grant->payment_proof_id
-            && (float) $grant->amount > 0 && $grant->starts_at && $grant->starts_at->lte(now())
+            && $grant->starts_at && $grant->starts_at->lte(now())
             && $grant->ends_at && $grant->ends_at->endOfDay()->isFuture()) {
             $sub = PosAddonService::activeSubscription($company);
             if (self::hasPaidPackage($company) && (int) $sub->id === (int) $grant->subscription_id) {
                 $proof = PaymentProof::whereKey($grant->payment_proof_id)
                     ->where('company_id', $company->id)->where('subscription_id', $sub->id)
                     ->where('status', 'verified')->first();
-                if ($proof && (in_array($code, $proof->addonCodeList(), true)
-                    || PosSignupBundle::coversFederalGrant($proof, $grant))) {
+                if ($proof && (HistoricalPosFederalAddon::coversIncluded($grant, $proof)
+                    || ((float) $grant->amount > 0 && (in_array($code, $proof->addonCodeList(), true)
+                        || PosSignupBundle::coversFederalGrant($proof, $grant))))) {
                     return 'paid';
                 }
             }

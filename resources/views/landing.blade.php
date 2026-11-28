@@ -47,6 +47,7 @@
     <title>{{ $title }}</title>
     <meta name="description" content="{{ $description }}">
     <link rel="canonical" href="{{ $canonical }}">
+    @unless($comparisonPage)<link rel="stylesheet" href="{{ asset('css/client-reel.css') }}">@endunless
     @include('partials.meta-og', ['ogTitle' => $title, 'ogDescription' => $description, 'ogUrl' => $canonical])
     @include('partials.font-css', ['fontFamilies' => 'playfair-display:400,600,700|inter:400,500,600,700'])
     @include('partials.fast-first-paint', ['bootBg' => '#092A33'])
@@ -297,7 +298,7 @@
                 </div>
             </section>
 
-            <x-website-clients />
+            <x-website-client-home />
         @endif
     </main>
 

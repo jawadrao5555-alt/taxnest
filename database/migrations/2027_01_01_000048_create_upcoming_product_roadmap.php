@@ -34,8 +34,10 @@ return new class extends Migration
             $table->string('purpose', 25);
             $table->char('token_hash', 64)->unique();
             $table->string('consent_version', 20);
-            $table->timestamp('consented_at');
-            $table->timestamp('confirmation_sent_at');
+            // The application supplies both times. Avoid MariaDB's implicit
+            // TIMESTAMP defaults under strict SQL mode.
+            $table->dateTime('consented_at');
+            $table->dateTime('confirmation_sent_at');
             $table->timestamp('confirmed_at')->nullable();
             $table->timestamp('withdrawn_at')->nullable();
             $table->timestamps();

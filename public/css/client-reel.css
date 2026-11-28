@@ -11,21 +11,22 @@
     position: fixed;
     z-index: 45;
     top: 50%;
-    left: 50%;
-    width: min(43rem, calc(100% - 2rem));
-    transform: translate(-50%, -50%);
-    padding: 0.45rem 0 0.7rem;
-    border: 1px solid #3f686c;
-    border-radius: 0.8rem;
+    inset-inline: 0;
+    transform: translateY(-50%);
+    padding: 0.6rem 0 0.95rem;
+    border-block: 1px solid #3f686c;
     background: linear-gradient(115deg, #092a33, #124650);
     color: #f4fbf7;
     box-shadow: 0 12px 36px #0b303f33;
     --focus-ring: #91f0d8;
+    --reel-gap: clamp(0.6rem, 1vw, 1rem);
+    --reel-gutter: clamp(0.9rem, 3vw, 3rem);
+    --reel-logo-size: clamp(3rem, 5vw, 4.5rem);
 }
 
 .client-reel[hidden], .client-reel button[hidden] { display: none; }
-.client-reel__bar { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; padding: 0 0.7rem 0.45rem; }
-.client-reel__bar a { display: inline-flex; gap: 0.35rem; align-items: center; min-height: 2.75rem; font-size: 0.94rem; font-weight: 700; }
+.client-reel__bar { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; padding: 0 var(--reel-gutter) 0.65rem; }
+.client-reel__bar a { display: inline-flex; gap: 0.45rem; align-items: center; min-height: 2.75rem; font-size: clamp(1rem, 1.35vw, 1.25rem); font-weight: 700; }
 .client-reel__bar a span { color: #9de8d7; }
 .client-reel__actions { display: flex; align-items: center; gap: 0.35rem; }
 .client-reel__actions button {
@@ -44,37 +45,36 @@
 .client-reel__track { display: flex; width: max-content; }
 .client-reel[data-moving="true"] .client-reel__track { animation: client-reel-scroll var(--reel-duration) linear infinite; }
 .client-reel:is([data-paused="true"], :hover, :focus-within) .client-reel__track { animation-play-state: paused; }
-.client-reel__group { display: flex; flex: 0 0 auto; gap: 0.55rem; margin: 0; padding: 0 0.55rem 0 0; list-style: none; }
+.client-reel__group { display: flex; flex: 0 0 auto; gap: var(--reel-gap); margin: 0; padding: 0 var(--reel-gap) 0 0; list-style: none; }
 .client-reel__card {
     display: flex;
-    flex: 0 0 11.5rem;
+    flex: 0 0 clamp(16rem, 27vw, 24rem);
     align-items: center;
-    gap: 0.55rem;
-    min-height: 3.5rem;
-    padding: 0.4rem 0.5rem;
+    gap: clamp(0.65rem, 1.15vw, 1rem);
+    min-height: clamp(5.3rem, 9vw, 7rem);
+    padding: clamp(0.65rem, 1.15vw, 1rem);
     border: 1px solid #e0e8df;
-    border-radius: 0.45rem;
+    border-radius: 0.65rem;
     background: #f7f8f5;
     color: #092a33;
 }
-.client-reel__card img, .client-reel__monogram { width: 2.75rem; height: 2.25rem; flex: 0 0 2.75rem; object-fit: contain; }
+.client-reel__card img, .client-reel__monogram { width: var(--reel-logo-size); height: var(--reel-logo-size); flex: 0 0 var(--reel-logo-size); object-fit: contain; }
 .client-reel__monogram { display: grid; place-items: center; border-radius: 0.3rem; background: #d9eee6; color: #075952; font-weight: 700; }
+.client-reel__details { display: grid; gap: 0.25rem; min-width: 0; }
 .client-reel__name {
-    display: -webkit-box;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-    overflow: hidden;
     overflow-wrap: anywhere;
-    font-size: 0.77rem;
+    font-size: clamp(0.92rem, 1.2vw, 1.12rem);
     font-weight: 700;
-    line-height: 1.21;
+    line-height: 1.25;
 }
+.client-reel__product { color: #11645a; font-size: clamp(0.8rem, 1vw, 0.96rem); font-weight: 700; line-height: 1.2; }
 .client-reel[data-moving="false"] .client-reel__track { margin-inline: auto; }
+.client-reel[data-moving="false"] .client-reel__group { padding-inline-end: 0; }
 
-@keyframes client-reel-scroll { to { transform: translateX(-50%); } }
+@keyframes client-reel-scroll { from { transform: translateX(-50%); } to { transform: translateX(0); } }
 
 @media (prefers-reduced-motion: reduce) {
     .client-reel[data-moving] .client-reel__track { animation: none; }
-    .client-reel__viewport { overflow-x: auto; }
+    .client-reel__viewport { overflow-x: auto; padding-inline: var(--reel-gutter); }
     .client-reel__group--copy, .client-reel__card--repeat, [data-client-reel-pause] { display: none; }
 }

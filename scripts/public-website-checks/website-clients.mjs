@@ -16,14 +16,28 @@ async function verifyReel(page, baseUrl, dismissal, reducedMotion = false) {
     await reel.waitFor({state: 'visible'});
     const box = await reel.boundingBox();
     const {width, height} = fresh.viewportSize();
-    assert(box && box.x > 0 && box.x + box.width < width && box.height < height / 2,
-      'Client reel covers the page instead of fitting inside a small panel');
-    assert(Math.abs(box.x + box.width / 2 - width / 2) <= 2, 'Client reel is not horizontally centered');
+    assert(box && Math.abs(box.x) <= 1 && Math.abs(box.x + box.width - width) <= 1,
+      'Client reel does not reach both screen edges');
+    assert(box.height >= 120 && box.height < height / 2, 'Client reel does not fit within a readable center strip');
     assert(Math.abs(box.y + box.height / 2 - height / 2) <= 2, 'Client reel is not vertically centered');
     await assertFitsPage(fresh, 'Homepage with client reel');
     assert.match(await reel.innerText(), /Synthetic Retail Studio/);
     assert.match(await reel.innerText(), /Synthetic Invoice Studio/);
     assert.doesNotMatch(await reel.innerText(), excluded);
+    const retailCard = reel.locator('.client-reel__card').filter({hasText: 'Synthetic Retail Studio'}).first();
+    assert.equal(await retailCard.locator('.client-reel__product').innerText(), 'PRA POS');
+    const invoiceCard = reel.locator('.client-reel__card').filter({hasText: 'Synthetic Invoice Studio'}).first();
+    assert.equal(await invoiceCard.locator('.client-reel__product').innerText(), 'Digital Invoice');
+    assert(await retailCard.locator('.client-reel__name').evaluate(name => {
+      const style = getComputedStyle(name);
+      const bounds = name.closest('.client-reel__card').getBoundingClientRect();
+      const text = document.createRange();
+      text.selectNodeContents(name);
+      return style.overflowY === 'visible' && !(parseInt(style.webkitLineClamp, 10) > 0) &&
+        Array.from(text.getClientRects()).every(rect =>
+          rect.left >= bounds.left - 1 && rect.right <= bounds.right + 1 &&
+          rect.top >= bounds.top - 1 && rect.bottom <= bounds.bottom + 1);
+    }), 'Client name is clipped in the reel');
     const approvedLogo = reel.locator('img').first();
     await approvedLogo.evaluate(image => image.decode());
     assert(await approvedLogo.evaluate(image => image.naturalWidth > 0), 'Approved client logo did not load in the reel');
@@ -35,9 +49,11 @@ async function verifyReel(page, baseUrl, dismissal, reducedMotion = false) {
         return style.animationName === 'none' || style.animationDuration.split(',').every(value => parseFloat(value) === 0);
       }), 'Reduced-motion preference did not stop the client reel');
     } else {
-      const initialTransform = await track.evaluate(element => getComputedStyle(element).transform);
-      await fresh.waitForFunction(initial => getComputedStyle(document.querySelector('[data-client-reel-track]')).transform !== initial,
-        initialTransform);
+      const initialX = await track.evaluate(element => new DOMMatrixReadOnly(getComputedStyle(element).transform).m41);
+      await fresh.waitForFunction(initial => {
+        const track = document.querySelector('[data-client-reel-track]');
+        return new DOMMatrixReadOnly(getComputedStyle(track).transform).m41 > initial;
+      }, initialX);
     }
 
     if (dismissal === 'outside') {
@@ -98,6 +114,8 @@ export default async function check(page, baseUrl) {
   assert.match(await directory.innerText(), /Synthetic Invoice Studio/);
   assert.doesNotMatch(await directory.innerText(), /Synthetic Retail Studio/);
   assert.equal(await directory.locator('img[src*="/website-clients/"]').count(), 0, 'Name-only client unexpectedly has an image');
+  assert.equal(await directory.locator('.directory-card-monogram').count(), 1, 'Name-only client is missing its visual fallback');
+  assert.equal(await directory.locator('.directory-card-product').innerText(), 'Digital Invoice');
   assert.equal(await digitalInvoice.getAttribute('aria-current'), 'page');
   const pra = filters.getByRole('link', {name: 'PRA POS', exact: true});
   await pra.click();
